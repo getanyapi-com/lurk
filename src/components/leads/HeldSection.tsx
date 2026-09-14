@@ -40,6 +40,7 @@ export function HeldSection({ items, params, selectedId }: HeldSectionProps) {
         return (
           <LeadRow
             key={item.id}
+            id={id}
             href={entryHref(params, id)}
             selected={id === selectedId}
             title={item.title}

@@ -4,6 +4,8 @@ import { FeedFilters } from "@/components/leads/FeedFilters";
 import { HeldSection } from "@/components/leads/HeldSection";
 import { LeadDetail } from "@/components/leads/LeadDetail";
 import { LeadRow } from "@/components/leads/LeadRow";
+import { OpeningProvider } from "@/components/leads/opening";
+import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
 import { ScoreBadge } from "@/components/ScoreBadge";
@@ -37,13 +39,6 @@ const EMPTY_SENTENCE: Record<LeadStatus, string> = {
   not_fit: "You have not marked any leads as a miss yet.",
   resolved: "No lead has said in its thread that the need is already met.",
 };
-
-/**
- * Both panes fill the window under the pinned header, inside the page gutter,
- * so the list scrolls against a post that stays put. Every term is a token.
- */
-const PANE_HEIGHT = "calc(100dvh - var(--header-height) - var(--page-gutter) * 2)";
-const PANE_TOP = "calc(var(--header-height) + var(--page-gutter))";
 
 /** The same page over the whole of time, keeping every other filter pill. */
 function allTimeHref(params: Record<string, string | undefined>): string {
@@ -154,61 +149,57 @@ export async function Feed({ projectId, status, days, params }: FeedProps) {
       <PeopleStrip entries={entries} />
       <FeedFilters facets={facets} />
 
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,7fr)_minmax(0,9fr)]">
-        <div
-          className="sticky flex flex-col overflow-y-auto rounded-card border bg-surface"
-          style={{ top: PANE_TOP, maxHeight: PANE_HEIGHT }}
-        >
-          <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-surface px-3 py-2">
-            <span className="text-mono tracking-wide text-fg-muted uppercase">Leads</span>
-            <span className="text-mono tabular-nums text-fg-muted">{entries.length}</span>
-          </div>
-          {entries.length === 0 ? (
-            <p className="text-small p-3 text-fg-muted">
-              {status !== "new" ? (
-                EMPTY_SENTENCE[status]
-              ) : elsewhere > 0 ? (
-                <>
-                  Nothing in this window.{" "}
-                  <Link className="underline" href={allTimeHref(params)}>
-                    {elsewhere} {elsewhere === 1 ? "lead" : "leads"} in all time
-                  </Link>
-                  .
-                </>
+      <OpeningProvider serverSelectedId={selectedId}>
+        <LeadWorkspace
+          list={
+            <>
+              <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-surface px-3 py-2">
+                <span className="text-mono tracking-wide text-fg-muted uppercase">Leads</span>
+                <span className="text-mono tabular-nums text-fg-muted">{entries.length}</span>
+              </div>
+              {entries.length === 0 ? (
+                <p className="text-small p-3 text-fg-muted">
+                  {status !== "new" ? (
+                    EMPTY_SENTENCE[status]
+                  ) : elsewhere > 0 ? (
+                    <>
+                      Nothing in this window.{" "}
+                      <Link className="underline" href={allTimeHref(params)}>
+                        {elsewhere} {elsewhere === 1 ? "lead" : "leads"} in all time
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    sentence
+                  )}
+                </p>
               ) : (
-                sentence
+                entries.map((entry) => (
+                  <LeadRow
+                    key={entry.id}
+                    id={entry.id}
+                    href={entryHref(params, entry.id)}
+                    selected={entry.id === selectedId}
+                    title={entry.lead.title}
+                    author={entry.lead.author}
+                    avatarUrl={entry.lead.avatarUrl}
+                    subreddit={entry.lead.subreddit}
+                    subredditIconUrl={entry.lead.subredditIconUrl}
+                    createdAt={entry.lead.createdAt}
+                    trailing={<ScoreBadge score={entry.lead.score} />}
+                  />
+                ))
               )}
-            </p>
-          ) : (
-            entries.map((entry) => (
-              <LeadRow
-                key={entry.id}
-                href={entryHref(params, entry.id)}
-                selected={entry.id === selectedId}
-                title={entry.lead.title}
-                author={entry.lead.author}
-                avatarUrl={entry.lead.avatarUrl}
-                subreddit={entry.lead.subreddit}
-                subredditIconUrl={entry.lead.subredditIconUrl}
-                createdAt={entry.lead.createdAt}
-                trailing={<ScoreBadge score={entry.lead.score} />}
-              />
-            ))
-          )}
-          {held.length > 0 ? (
-            <HeldSection items={held} params={params} selectedId={selectedId} />
-          ) : null}
-        </div>
-
-        {selection ? (
-          <div
-            className="sticky flex flex-col overflow-hidden rounded-card border bg-surface"
-            style={{ top: PANE_TOP, maxHeight: PANE_HEIGHT }}
-          >
-            <LeadDetail selection={selection} projectId={projectId} />
-          </div>
-        ) : null}
-      </div>
+              {held.length > 0 ? (
+                <HeldSection items={held} params={params} selectedId={selectedId} />
+              ) : null}
+            </>
+          }
+          pane={
+            selection ? <LeadDetail selection={selection} projectId={projectId} /> : null
+          }
+        />
+      </OpeningProvider>
     </div>
   );
 }
