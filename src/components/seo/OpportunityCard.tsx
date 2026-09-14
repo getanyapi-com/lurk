@@ -1,5 +1,6 @@
 import { ArrowUp, MessageCircle } from "lucide-react";
 import { SubredditChip } from "@/components/SubredditChip";
+import type { Relevance } from "@/lib/discovery/label";
 import { relativeAge } from "@/lib/format";
 import { GoogleRankBadge } from "@/components/seo/GoogleRankBadge";
 
@@ -7,6 +8,8 @@ export type RankingThread = {
   id: string;
   position: number | null;
   competitorPresent: boolean;
+  /** What this project judged the thread to hold, or null if nothing has. */
+  verdict: Relevance | null;
   title: string;
   url: string;
   subreddit: string;
@@ -14,6 +17,16 @@ export type RankingThread = {
   score: number | null;
   numComments: number | null;
   createdAt: Date;
+};
+
+/**
+ * What a verdict says on the card. A thread nobody has judged says nothing:
+ * an unread thread is not a rejected one, and the page orders it that way.
+ */
+const VERDICT_WORDS: Partial<Record<Relevance, string>> = {
+  relevant: "Someone asking",
+  plausible: "Maybe asking",
+  irrelevant: "Nobody asking",
 };
 
 type OpportunityCardProps = { thread: RankingThread };
@@ -51,6 +64,11 @@ export function OpportunityCard({ thread }: OpportunityCardProps) {
             icon={<MessageCircle className={iconClass} aria-hidden="true" />}
             value={thread.numComments}
           />
+          {thread.verdict && VERDICT_WORDS[thread.verdict] ? (
+            <span className="rounded-control border px-2 py-0.5 text-mono text-fg-muted">
+              {VERDICT_WORDS[thread.verdict]}
+            </span>
+          ) : null}
           {thread.competitorPresent ? (
             <span className="rounded-control border px-2 py-0.5 text-mono text-fg">
               Competitor named
