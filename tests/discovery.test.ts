@@ -416,7 +416,7 @@ describe("what the evidence says about communities", () => {
 
 describe("what the evidence says to search for", () => {
   it("collapses the city out of a phrase so one demand is one family", () => {
-    const families = rankFamilies(EVIDENCE, DESTINATION_NAMES);
+    const families = rankFamilies(EVIDENCE, DESTINATION_NAMES, PHRASINGS);
     const top = families[0];
     expect(top.family).toBe("hotels-allow-18");
     expect(top.phrases).toContain("hotels 20 year olds");
@@ -521,11 +521,10 @@ describe("competitors", () => {
 describe("the plan the ranking publishes", () => {
   const plan = planFromRanks({
     communities: rankCommunities(EVIDENCE, DESTINATION_NAMES),
-    families: rankFamilies(EVIDENCE, DESTINATION_NAMES),
+    families: rankFamilies(EVIDENCE, DESTINATION_NAMES, PHRASINGS),
     competitors: [{ name: "hotelages.com", role: "direct_substitute", evidence: 2 }],
     scopedCommunities: ["vegas"],
     productNumbers: PRODUCT_NUMBERS,
-    phrasings: PHRASINGS,
     limits: { ...TIERS.free, subredditsPerProject: 3 },
   });
 
@@ -552,7 +551,6 @@ describe("the plan the ranking publishes", () => {
       competitors: [],
       scopedCommunities: [],
       productNumbers: PRODUCT_NUMBERS,
-    phrasings: PHRASINGS,
       limits: { ...TIERS.free, subredditsPerProject: 2 },
     });
     expect(crowded.subreddits.map((row) => row.state)).toEqual([
@@ -570,17 +568,18 @@ describe("the plan the ranking publishes", () => {
           family: "a",
           weighted: 4,
           phrases: ["hotels that let 18 year olds check in", "hotel 18 check in"],
+          asked: null,
         },
         {
           family: "b",
           weighted: 2,
           phrases: ["hotel 18 check in", "hotels that let 18 year olds check in"],
+          asked: null,
         },
       ],
       competitors: [],
       scopedCommunities: [],
       productNumbers: PRODUCT_NUMBERS,
-    phrasings: PHRASINGS,
       limits: TIERS.free,
     });
     expect(twice.keywords).toEqual([
@@ -608,26 +607,62 @@ describe("the plan the ranking publishes", () => {
             "Open-source Reddit scraper",
             "Best Methods for Scraping Reddit Data?",
           ],
+          asked: "reddit scraper api",
         },
       ],
       competitors: [],
       scopedCommunities: [],
       productNumbers: new Set<string>(),
-      phrasings: ["reddit scraper api"],
       limits: TIERS.free,
     });
     expect(nouns.keywords).toEqual([{ keyword: "reddit scraper api", evidence: 3 }]);
+  });
+
+  /**
+   * Two phrasings share a family key when their first three meaning words
+   * match, so the key alone cannot say which of them Google answered. Reading
+   * the fallback off the key picked whichever phrasing the product listed last
+   * and threw the supported one away. The phrasing is taken from the query
+   * behind the evidence instead, so this goes through the real ranking.
+   */
+  it("falls back to the phrasing the evidence came from, not a colliding one", () => {
+    const phrasings = ["reddit scraper api for comments", "reddit scraper api for images"];
+    const collided: EvidenceLike[] = [
+      {
+        postId: "c1",
+        subreddit: "webscraping",
+        query: `${SITE_SCOPE} reddit scraper api for comments`,
+        family: "reddit-scraper-api",
+        destination: null,
+        position: 1,
+        title: "Open source Reddit comment scraper",
+        snippet: "I need every comment on a thread.",
+        relevance: "relevant",
+      },
+    ];
+    const colliding = planFromRanks({
+      communities: [],
+      families: rankFamilies(collided, [], phrasings),
+      competitors: [],
+      scopedCommunities: [],
+      productNumbers: new Set<string>(),
+      limits: TIERS.free,
+    });
+    expect(colliding.keywords).toEqual([
+      { keyword: "reddit scraper api for comments", evidence: 1 },
+    ]);
   });
 
   /** A family nothing asked for still has no search to fall back to. */
   it("writes no search for a family whose phrasing it never saw", () => {
     const orphan = planFromRanks({
       communities: [],
-      families: [{ family: "unasked-family", weighted: 2, phrases: ["open source reddit scraper"] }],
+      families: [
+        { family: "unasked-family", weighted: 2, phrases: ["open source reddit scraper"], asked: null },
+      ],
       competitors: [],
       scopedCommunities: [],
       productNumbers: new Set<string>(),
-      phrasings: ["reddit scraper api"],
       limits: TIERS.free,
     });
     expect(orphan.keywords).toEqual([]);

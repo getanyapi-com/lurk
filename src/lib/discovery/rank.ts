@@ -180,10 +180,48 @@ export type FamilyRank = {
   weighted: number;
   /** The buyer's own words, with the city taken out so one demand is one family. */
   phrases: string[];
+  /** The phrasing whose own query earned this family its evidence, if one did. */
+  asked: string | null;
 };
 
+/** One phrasing as it is asked: the buyer's words, with the spacing tidied. */
+export function askedText(phrase: string): string {
+  return phrase.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * Which phrasing actually earned this family its evidence. A family key is the
+ * first three meaning words of a phrasing, so two phrasings collide on one key:
+ * "reddit scraper api for comments" and "reddit scraper api for images" are one
+ * family, and the key alone cannot say which of them Google answered. Every
+ * observation carries the query it came from, and a query carries its phrasing
+ * verbatim, so the strongest thread the labels kept names its own phrasing. A
+ * thread Google's labels called plausible counts, on the same weighting the
+ * rest of the ranking uses.
+ */
+function askedPhrasing(rows: EvidenceLike[], phrasings: string[]): string | null {
+  const ordered = rows
+    .filter((row) => weightOf(row.relevance) > 0)
+    .sort(
+      (left, right) =>
+        weightOf(right.relevance) - weightOf(left.relevance) ||
+        (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER),
+    );
+  for (const row of ordered) {
+    const asked = phrasings.map(askedText).find((phrase) => row.query.includes(phrase));
+    if (asked) {
+      return asked;
+    }
+  }
+  return null;
+}
+
 /** The problem families the evidence supports, strongest first. */
-export function rankFamilies(rows: EvidenceLike[], destinations: string[]): FamilyRank[] {
+export function rankFamilies(
+  rows: EvidenceLike[],
+  destinations: string[],
+  phrasings: string[],
+): FamilyRank[] {
   const byFamily = new Map<string, EvidenceLike[]>();
   for (const row of rows) {
     if (!row.family) {
@@ -203,6 +241,7 @@ export function rankFamilies(rows: EvidenceLike[], destinations: string[]): Fami
         phrases: distinct(
           evidence.map((thread) => collapseDestinations(thread.title, destinations)),
         ),
+        asked: askedPhrasing(group, phrasings),
       };
     })
     .sort((left, right) => right.weighted - left.weighted || left.family.localeCompare(right.family));

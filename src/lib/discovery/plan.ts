@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { projectCompetitors, projectKeywords, projectSubreddits, projects } from "@/db/schema";
 import { capped } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
-import { familyKey } from "./phrases";
 import type { CommunityRank, CompetitorRank, FamilyRank } from "./rank";
 import { compileBooleanQuery, scopedBooleanQuery } from "./rank";
 
@@ -32,11 +31,6 @@ export type PlanInput = {
   scopedCommunities: string[];
   /** The numbers this product itself says, which is what makes one a constraint. */
   productNumbers: Set<string>;
-  /**
-   * The product's own phrasings, which is what a family falls back to when its
-   * evidence carries no constraint to compile.
-   */
-  phrasings: string[];
   limits: TierLimits | null;
 };
 
@@ -66,11 +60,6 @@ function dedupeKeywords(rows: PlannedKeyword[]): PlannedKeyword[] {
   return [...best.values()];
 }
 
-/** One phrasing as a search: the buyer's words, with the spacing tidied. */
-function tidy(phrase: string): string {
-  return phrase.trim().replace(/\s+/g, " ");
-}
-
 /**
  * What the ranking means for the plan. A community with no relevant evidence
  * gets no row at all, which is the whole point of discovery: nothing reaches
@@ -94,14 +83,16 @@ export function planFromRanks(input: PlanInput): DiscoveryPlan {
   // a bare subject like "hotel" matches most of Reddit. Some demands have no
   // constraint to carry: a person shopping for a Reddit scraper asks for the
   // thing by its name. Measured 2026-09-13 on getanyapi.com, every family
-  // compiled empty and the project got no searches at all. The phrasing Google
-  // already answered with relevant threads is what that family falls back to,
-  // and only a family with relevant evidence ever reaches here.
+  // compiled empty and the project got no searches at all. Such a family falls
+  // back to the phrasing whose own query earned it its evidence, which is why
+  // the ranking carries that phrasing rather than this reading it off the key.
+  // Measured the same day, reddit.search on "reddit scraper api" returns people
+  // asking for one, where "reddit AND scraper AND api" returns people selling
+  // one: 17 of 25 asks against 4, because requiring every word favours the
+  // person whose own tool is named by all of them.
   const families = input.families.filter((family) => family.phrases.length > 0);
-  const asked = new Map(input.phrasings.map((phrase) => [familyKey(phrase), tidy(phrase)]));
   const broad = families.map((family) => ({
-    keyword:
-      compileBooleanQuery(family.phrases, input.productNumbers) || (asked.get(family.family) ?? ""),
+    keyword: compileBooleanQuery(family.phrases, input.productNumbers) || (family.asked ?? ""),
     evidence: Math.round(family.weighted),
   }));
   const top = broad.find((item) => item.keyword.length > 0);

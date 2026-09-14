@@ -123,7 +123,7 @@ export type PublishInput = {
 export async function publishFromEvidence(input: PublishInput) {
   const names = input.destinations.map((place) => place.name);
   const communities = rankCommunities(input.rows, names);
-  const families = rankFamilies(input.rows, names);
+  const families = rankFamilies(input.rows, names, input.phrasings);
   const scoped = rankSide(input.rows.filter((row) => isDestinationQuery(row.query, names)))
     .filter((item) => item.weighted > 0)
     .slice(0, discoveryBudget(input.limits).scoped)
@@ -134,7 +134,6 @@ export async function publishFromEvidence(input: PublishInput) {
     competitors: input.competitors,
     scopedCommunities: scoped,
     productNumbers: numberTerms(input.productTexts),
-    phrasings: input.phrasings,
     limits: input.limits,
   });
   await publishDiscoveryPlan(input.projectId, plan);

@@ -24,7 +24,8 @@ describe("profile phrasings", () => {
     expect(bullet).toMatch(/the name a buyer types for the thing itself/);
     expect(bullet).toMatch(/"reddit scraper"/);
     expect(bullet).toMatch(/Name that platform or system/);
-    expect(bullet).toMatch(/leave out this product's own name and the names of its rivals/);
+    expect(bullet).toMatch(/this product's own name and the names of its rivals/);
+    expect(bullet).toMatch(/a rival is not a platform/);
   });
 
   /** A phrase with its small words taken out is a keyword list, not a search. */
