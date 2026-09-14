@@ -24,6 +24,13 @@ export type PlanRow = {
   source: string;
   state: string;
   lastCoveredAt: Date | null;
+  /**
+   * How much relevant evidence Google returned for this row, the model's own
+   * verdicts weighted: a relevant thread counts one and a plausible one a half.
+   * It is what discovery measured, never what a model guessed about a query it
+   * had not seen answered.
+   */
+  evidence: number;
 };
 
 /** The states that are retrieved every scan. Everything else is a candidate. */
@@ -45,6 +52,22 @@ export function byStaleness(rows: PlanRow[]): PlanRow[] {
     const left = a.lastCoveredAt?.getTime() ?? 0;
     const right = b.lastCoveredAt?.getTime() ?? 0;
     return left - right;
+  });
+}
+
+/**
+ * The order a scan spends its searches in. A scan buys fewer searches than a
+ * plan holds rows, and staleness alone gave every row the same claim on them:
+ * on lurk.so on 2026-09-14 `instagram api`, whose Google results the model
+ * called relevant six times, took its turn behind `ahrefs api`, which it called
+ * relevant three times. A row nothing has covered yet goes first, so every new
+ * row is tried once whatever its evidence; after that the evidence decides, and
+ * staleness breaks the tie so two equal rows still rotate.
+ */
+export function byWorth(rows: PlanRow[]): PlanRow[] {
+  return [...byStaleness(rows)].sort((a, b) => {
+    const untried = Number(b.lastCoveredAt === null) - Number(a.lastCoveredAt === null);
+    return untried || b.evidence - a.evidence;
   });
 }
 

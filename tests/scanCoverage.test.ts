@@ -3,6 +3,7 @@ import type { FetchContext } from "@/lib/reddit/fetch";
 import type { StoredPost } from "@/lib/reddit/store";
 import type { PlanRow } from "@/lib/scan/coverage";
 import type { ScanProject } from "@/lib/scan/project";
+import { TIERS } from "@/lib/tiers";
 
 /**
  * When a covered window's watermark is allowed to move. Retrieval finding the
@@ -31,6 +32,7 @@ const NOW = new Date("2026-09-06T12:00:00Z");
 const HOUR = 60 * 60 * 1000;
 
 const query: PlanRow = {
+  evidence: 0,
   id: "keyword-1",
   table: "keyword",
   key: "form builder",
@@ -86,5 +88,55 @@ describe("the watermark a scan's retrieval has earned", () => {
     expect(result.candidates.map((candidate) => candidate.post.id)).toEqual([post.id]);
     expect(markCovered).not.toHaveBeenCalled();
     expect(result.covered).toEqual([{ row: query, at: NOW }]);
+  });
+});
+
+/**
+ * A scan buys fewer searches than a plan holds rows. Which rows it buys was
+ * decided by staleness alone, so a search whose results the model called
+ * relevant six times waited behind one it called relevant three times.
+ */
+describe("which rows a scan's budget buys", () => {
+  beforeEach(() => {
+    for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchFeedThreads]) {
+      mock.mockReset();
+    }
+    markCovered.mockReset();
+    recordSources.mockReset();
+    recordSources.mockResolvedValue(0);
+    lastWideSweeps.mockReset();
+    lastWideSweeps.mockResolvedValue(new Map());
+    serpCallsToday.mockReset();
+    serpCallsToday.mockResolvedValue(1000);
+    fetchSearch.mockResolvedValue({ value: { posts: [], nextCursor: null } });
+  });
+
+  it("searches the row with the most relevant evidence, not the stalest", async () => {
+    const row = (key: string, evidence: number, coveredHoursAgo: number): PlanRow => ({
+      id: key,
+      table: "keyword",
+      key,
+      source: "serp",
+      state: "active",
+      lastCoveredAt: new Date(NOW.getTime() - coveredHoursAgo * HOUR),
+      evidence,
+    });
+    await retrieve({
+      project: {
+        id: "project-2",
+        queries: [row("ahrefs api", 3, 48), row("instagram api", 6, 1)],
+        communities: [],
+      } as unknown as ScanProject,
+      ctx: {} as FetchContext,
+      // One search, so the budget has to choose between the two rows.
+      limits: { ...TIERS.free, searchesPerScan: 1, serpQueriesPerDay: 0 },
+      windowMs: 30 * 24 * HOUR,
+      scanIntervalHours: 6,
+      hydration: null,
+      now: NOW,
+    });
+
+    expect(fetchSearch).toHaveBeenCalledTimes(1);
+    expect(fetchSearch.mock.calls[0][1]).toBe("instagram api");
   });
 });

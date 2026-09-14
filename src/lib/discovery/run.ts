@@ -180,13 +180,18 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
     destinations: input.destinations,
     budget: budget.queries,
   });
+  // The opening set is the page's own size: one query per phrasing, plus the
+  // places. What the tier bounds is how far past it expansion may go, which is
+  // the distance between its two numbers.
+  const opening = queries.length;
+  const ceiling = opening + Math.max(budget.max - budget.queries, 0);
 
   while (queries.length > 0) {
     const round = await runRound(ctx, brief, queries, maxAgeMs, labelled);
     used.push(...queries);
     labels.push(...round.labels);
     costUsd += round.costUsd;
-    if (used.length > budget.queries) {
+    if (used.length > opening) {
       perRound.push(round.newRelevant);
     }
     if (expansionShouldStop(perRound)) {
@@ -198,7 +203,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
       budget: budget.queries,
       used,
       coverage: coverageFrom(await loadEvidence(input.projectId)),
-      max: budget.max,
+      max: ceiling,
     });
   }
 

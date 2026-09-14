@@ -66,11 +66,38 @@ describe("the queries discovery buys", () => {
     budget: TIERS.free.discoveryQueries,
   });
 
-  it("splits the budget between the problem and the places the page names", () => {
+  it("asks the problem with no place in it, and the places the page names", () => {
     expect(queries).toHaveLength(8);
     expect(queries.filter((item) => item.destination === null)).toHaveLength(4);
     expect(queries.filter((item) => item.destination !== null)).toHaveLength(4);
     expect(queries.every((item) => item.query.endsWith(" reddit"))).toBe(true);
+  });
+
+  /**
+   * A phrasing that is never asked can never earn a search. Under a flat budget
+   * nine of getanyapi.com's twenty-one phrasings went unasked on 2026-09-14,
+   * which is why it had no search for LinkedIn, YouTube or Facebook. One Google
+   * query is $0.0005, so the page's own count is what the opening set costs.
+   */
+  it("asks every phrasing the page produced, however small the tier's budget", () => {
+    const many = [...PHRASINGS, "reddit scraper", "linkedin scraper", "google maps scraper"];
+    const asked = buildDiscoveryQueries({
+      problemPhrasings: many,
+      destinations: [],
+      budget: 2,
+    });
+    expect(asked.map((item) => item.query)).toEqual(many.map((phrase) => googleQuery(phrase)));
+  });
+
+  /** The tier still bounds the places, which are the open-ended half. */
+  it("keeps the tier's budget on the places the page names", () => {
+    const placed = buildDiscoveryQueries({
+      problemPhrasings: PHRASINGS,
+      destinations: DESTINATIONS,
+      budget: 2,
+    });
+    expect(placed.filter((item) => item.destination !== null)).toHaveLength(2);
+    expect(placed.filter((item) => item.destination === null)).toHaveLength(PHRASINGS.length);
   });
 
   /**

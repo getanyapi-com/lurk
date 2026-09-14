@@ -61,6 +61,7 @@ function retrievedNames(rows: { id: string; name: string; source: string; state:
       source: row.source,
       state: row.state,
       lastCoveredAt: null,
+      evidence: 0,
     })),
   ).map((row) => row.key);
 }
@@ -90,6 +91,7 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
     source: item.source,
     state: item.state,
     lastCoveredAt: item.lastCoveredAt,
+    evidence: item.evidence ?? 0,
   }));
   const communities: PlanRow[] = subs.map((item) => ({
     id: item.id,
@@ -98,6 +100,7 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
     source: item.source,
     state: item.state,
     lastCoveredAt: item.lastCoveredAt,
+    evidence: item.evidence ?? 0,
   }));
   return {
     id: row.id,

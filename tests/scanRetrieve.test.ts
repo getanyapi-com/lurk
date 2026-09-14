@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   byStaleness,
+  byWorth,
   coverageTimeframe,
   explorationPick,
   googleFeedQuery,
@@ -32,6 +33,7 @@ function row(patch: Partial<PlanRow> = {}): PlanRow {
     key: patch.key ?? "form builder",
     source: patch.source ?? "serp",
     state: patch.state ?? "active",
+    evidence: patch.evidence ?? 0,
     lastCoveredAt: patch.lastCoveredAt ?? null,
   };
 }
@@ -208,5 +210,49 @@ describe("which plan rows a candidate credits", () => {
       { table: "keyword", id: "q1" },
       { table: "community", id: "c1" },
     ]);
+  });
+});
+
+/**
+ * A scan buys fewer searches than a plan holds rows, and staleness alone gave
+ * every row the same claim on them: on lurk.so on 2026-09-14 `instagram api`,
+ * whose Google results the model called relevant six times, took its turn
+ * behind `ahrefs api`, which it called relevant three times. The evidence
+ * decides now, after every row has had one turn.
+ */
+describe("the order a scan spends its searches in", () => {
+  const at = (row: Partial<PlanRow>): PlanRow => ({
+    id: row.key ?? "row",
+    table: "keyword",
+    key: row.key ?? "row",
+    source: "serp",
+    state: "active",
+    lastCoveredAt: row.lastCoveredAt ?? null,
+    evidence: row.evidence ?? 0,
+  });
+
+  it("spends on the best evidence once every row has had a turn", () => {
+    const ordered = byWorth([
+      at({ key: "ahrefs api", evidence: 3, lastCoveredAt: new Date("2026-09-14T00:00:00Z") }),
+      at({ key: "instagram api", evidence: 6, lastCoveredAt: new Date("2026-09-14T06:00:00Z") }),
+      at({ key: "seo api", evidence: 2, lastCoveredAt: new Date("2026-09-13T00:00:00Z") }),
+    ]);
+    expect(ordered.map((row) => row.key)).toEqual(["instagram api", "ahrefs api", "seo api"]);
+  });
+
+  it("gives a row nothing has covered its turn before any evidence is weighed", () => {
+    const ordered = byWorth([
+      at({ key: "instagram api", evidence: 6, lastCoveredAt: new Date("2026-09-14T06:00:00Z") }),
+      at({ key: "linkedin scraper", evidence: 0, lastCoveredAt: null }),
+    ]);
+    expect(ordered.map((row) => row.key)).toEqual(["linkedin scraper", "instagram api"]);
+  });
+
+  it("rotates two rows of equal evidence by staleness", () => {
+    const ordered = byWorth([
+      at({ key: "fresh", evidence: 4, lastCoveredAt: new Date("2026-09-14T06:00:00Z") }),
+      at({ key: "stale", evidence: 4, lastCoveredAt: new Date("2026-09-10T06:00:00Z") }),
+    ]);
+    expect(ordered.map((row) => row.key)).toEqual(["stale", "fresh"]);
   });
 });

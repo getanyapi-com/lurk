@@ -61,28 +61,31 @@ function unique(queries: DiscoveryQuery[]): DiscoveryQuery[] {
 export type QueryPlanInput = {
   problemPhrasings: string[];
   destinations: Destination[];
-  /** The tier's discovery budget: how many queries this first pass may buy. */
+  /** The tier's discovery budget: how many place queries this first pass buys. */
   budget: number;
 };
 
 /**
- * The opening set: an even split between the problem asked with no place and
- * the problem asked about a place, so a product that sells in twenty cities
- * cannot spend its whole budget on one of them, and a product whose page names
- * no place still asks the problem in full.
+ * The opening set: every way the page says its buyers ask, each asked once with
+ * no place in it, and then the places the page names, in the order it names
+ * them. Every phrasing is asked because one that is never asked can never earn
+ * a search, and the phrasings are what the page itself produced: a product that
+ * works with ten platforms says so in ten ways, and on 2026-09-14 nine of
+ * getanyapi.com's twenty-one went unasked under a flat budget, which is why it
+ * had no search for LinkedIn, YouTube or Facebook. One Google query is $0.0005.
+ * The tier's budget governs the places, which are the open-ended half: a
+ * product selling in twenty cities cannot spend a whole discovery on them.
  */
 export function buildDiscoveryQueries(input: QueryPlanInput): DiscoveryQuery[] {
   const phrasings = input.problemPhrasings.filter((phrase) => meaningWords(phrase).length > 0);
-  if (phrasings.length === 0 || input.budget <= 0) {
+  if (phrasings.length === 0) {
     return [];
   }
-  const withPlace = input.destinations.length > 0;
-  const problemSlots = withPlace ? Math.floor(input.budget / 2) : input.budget;
-  const problem = phrasings.slice(0, problemSlots).map((phrase) => problemQuery(phrase, null));
+  const problem = phrasings.map((phrase) => problemQuery(phrase, null));
   const destination = input.destinations
-    .slice(0, input.budget - problem.length)
+    .slice(0, Math.max(input.budget, 0))
     .map((place, index) => problemQuery(phrasings[index % phrasings.length], place.name));
-  return unique([...problem, ...destination]).slice(0, input.budget);
+  return unique([...problem, ...destination]);
 }
 
 /** How much relevant evidence each family and each place has produced so far. */

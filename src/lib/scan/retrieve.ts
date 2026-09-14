@@ -6,7 +6,7 @@ import type { TierLimits } from "@/lib/tiers";
 import { serpCallsToday } from "@/lib/usage";
 import { retrievalBudgets } from "./constants";
 import {
-  byStaleness,
+  byWorth,
   coverageTimeframe,
   explorationPick,
   googleFeedQuery,
@@ -191,17 +191,17 @@ async function runSerp(loop: Loop, row: PlanRow, budget: number): Promise<number
   return spent;
 }
 
-/** The rows this scan searches: the stalest active ones, plus the explorer. */
+/** The rows this scan searches: the best active ones, plus the explorer. */
 function searchSlots(project: ScanProject, budget: number, explorer: PlanRow | null): PlanRow[] {
   const reserved = explorer?.table === "keyword" ? 1 : 0;
-  const active = byStaleness(retrieved(project.queries)).slice(0, Math.max(budget - reserved, 0));
+  const active = byWorth(retrieved(project.queries)).slice(0, Math.max(budget - reserved, 0));
   return reserved && explorer ? [...active, explorer] : active;
 }
 
-/** The communities this scan polls: the stalest active ones, plus the explorer. */
+/** The communities this scan polls: the best active ones, plus the explorer. */
 function listingSlots(project: ScanProject, budget: number, explorer: PlanRow | null): PlanRow[] {
   const reserved = explorer?.table === "community" ? 1 : 0;
-  const active = byStaleness(retrieved(project.communities)).slice(0, Math.max(budget - reserved, 0));
+  const active = byWorth(retrieved(project.communities)).slice(0, Math.max(budget - reserved, 0));
   return reserved && explorer ? [...active, explorer] : active;
 }
 
@@ -243,8 +243,8 @@ export async function retrieve(input: RetrieveInput): Promise<Retrieval> {
   for (const row of queries) {
     await runSearch(loop, row, needsWideSweep(wide.get(row.key.toLowerCase()) ?? null, now));
   }
-  const communities = byStaleness(retrieved(project.communities)).slice(0, budgets.scoped);
-  const best = byStaleness(retrieved(project.queries))[0] ?? queries[0];
+  const communities = byWorth(retrieved(project.communities)).slice(0, budgets.scoped);
+  const best = byWorth(retrieved(project.queries))[0] ?? queries[0];
   if (best) {
     for (const community of communities) {
       await runScoped(loop, community, best);
@@ -256,7 +256,7 @@ export async function retrieve(input: RetrieveInput): Promise<Retrieval> {
 
   let hydrated = 0;
   const allowance = Math.max(budgets.serpPerDay - (await serpCallsToday(project.id)), 0);
-  const serpRows = byStaleness(retrieved(project.queries)).slice(0, allowance);
+  const serpRows = byWorth(retrieved(project.queries)).slice(0, allowance);
   for (const row of serpRows) {
     const left = input.hydration === null ? Number.MAX_SAFE_INTEGER : input.hydration - hydrated;
     hydrated += await runSerp(loop, row, Math.max(left, 0));
