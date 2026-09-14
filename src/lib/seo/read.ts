@@ -1,6 +1,7 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { redditPosts, seoOpportunities, subreddits } from "@/db/schema";
+import { discoveryEvidence, redditPosts, seoOpportunities, subreddits } from "@/db/schema";
+import type { Relevance } from "@/lib/discovery/label";
 
 /**
  * What a refresh writes as its progress when the project has no problem
@@ -9,9 +10,42 @@ import { redditPosts, seoOpportunities, subreddits } from "@/db/schema";
  */
 export const NO_PHRASINGS_PROGRESS = "No problem phrasings to look up yet";
 
+/**
+ * The order a ranking thread is worth replying in. Discovery already judges
+ * every thread it buys against this product, and since both sides ask Google
+ * the one question, the threads Google ranks for a phrasing are the threads
+ * discovery labelled. A thread nobody has judged sits above one judged to hold
+ * nobody asking, because an unread thread is not a rejected one.
+ */
+export const VERDICT_ORDER: Relevance[] = ["relevant", "plausible", "unlabeled", "irrelevant"];
+
+/** The same order as a SQL CASE, so the database sorts on what this file says. */
+function verdictRank() {
+  const arms = VERDICT_ORDER.map(
+    (verdict, index) => sql`when ${verdict} then ${index + 1}`,
+  );
+  return sql<number>`min(case ${discoveryEvidence.relevance} ${sql.join(arms, sql` `)} else ${VERDICT_ORDER.length} end)`;
+}
+
+/** What this project has already judged each thread to be, best verdict kept. */
+function verdicts(projectId: string) {
+  return db()
+    .select({ postId: discoveryEvidence.postId, rank: verdictRank().as("rank") })
+    .from(discoveryEvidence)
+    .where(eq(discoveryEvidence.projectId, projectId))
+    .groupBy(discoveryEvidence.postId)
+    .as("verdicts");
+}
+
 export type SeoRow = Awaited<ReturnType<typeof listOpportunities>>[number];
 
 export type SeoFilter = { keyword?: string; subreddit?: string; competitor?: string };
+
+/** The verdict one rank stands for, or null when nothing has judged the thread. */
+export function verdictOf(rank: number | null): Relevance | null {
+  const verdict = rank === null ? null : VERDICT_ORDER[rank - 1];
+  return verdict && verdict !== "unlabeled" ? verdict : null;
+}
 
 /** What one Google search cost this project, for the cost line on its threads. */
 
@@ -33,13 +67,20 @@ const columns = {
   createdAt: redditPosts.createdAt,
 };
 
-/** Every ranking thread this project holds, keyword by keyword, best rank first. */
+/**
+ * Every ranking thread this project holds, keyword by keyword, the ones worth
+ * replying in first and Google's own rank breaking the tie. It sorts rather
+ * than hides: a thread with nobody asking in it still ranks, and one reply in
+ * it still works, which is what this tab is for.
+ */
 export async function listOpportunities(projectId: string, filter: SeoFilter) {
+  const judged = verdicts(projectId);
   return db()
-    .select(columns)
+    .select({ ...columns, verdictRank: judged.rank })
     .from(seoOpportunities)
     .innerJoin(redditPosts, eq(redditPosts.id, seoOpportunities.postId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
+    .leftJoin(judged, eq(judged.postId, seoOpportunities.postId))
     .where(
       and(
         eq(seoOpportunities.projectId, projectId),
@@ -49,7 +90,11 @@ export async function listOpportunities(projectId: string, filter: SeoFilter) {
         filter.competitor === "no" ? eq(seoOpportunities.competitorPresent, false) : undefined,
       ),
     )
-    .orderBy(asc(seoOpportunities.keyword), asc(seoOpportunities.position));
+    .orderBy(
+      asc(seoOpportunities.keyword),
+      sql`coalesce(${judged.rank}, ${VERDICT_ORDER.indexOf("unlabeled") + 1})`,
+      asc(seoOpportunities.position),
+    );
 }
 
 /** The keywords and communities the filter pills can actually offer. */

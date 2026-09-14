@@ -13,6 +13,7 @@ import {
   listOpportunities,
   NO_PHRASINGS_PROGRESS,
   seoFacets,
+  verdictOf,
   type SeoRow,
 } from "@/lib/seo/read";
 
@@ -33,6 +34,7 @@ function toThread(row: SeoRow): RankingThread {
     id: row.id,
     position: row.position,
     competitorPresent: row.competitorPresent,
+    verdict: verdictOf(row.verdictRank),
     title: row.title,
     url: row.url,
     subreddit: row.subreddit,
