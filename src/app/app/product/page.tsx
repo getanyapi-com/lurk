@@ -1,30 +1,21 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
 import { ActivityPoll } from "@/components/ActivityPoll";
 import { EmptyState } from "@/components/EmptyState";
-import { EvidenceThreads } from "@/components/product/EvidenceThreads";
 import { ListEditor } from "@/components/product/ListEditor";
-import { PlanEditor } from "@/components/product/PlanEditor";
+import { PlanSections } from "@/components/product/PlanSections";
 import { ProfileForm } from "@/components/product/ProfileForm";
+import { ListSkeleton } from "@/components/Skeleton";
 import { Button } from "@/components/ui/button";
-import { db } from "@/db";
-import {
-  projectCompetitors,
-  projectKeywords,
-  projectSubreddits,
-  subreddits as subredditRows,
-} from "@/db/schema";
 import {
   rebuildProfileAction,
   scanAndOpenLeadsAction,
 } from "@/app/app/product/actions";
 import { requireLocalUser } from "@/lib/auth";
-import { dedupeThreads } from "@/lib/discovery/rank";
-import { loadEvidence, parseDestinations, parseTextList } from "@/lib/discovery/store";
+import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { activeProject } from "@/lib/projects";
 import { activitySentence, isBusy, projectActivity } from "@/lib/projectActivity";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
-import { tierForUser } from "@/lib/tier";
 
 type ProductPageProps = { searchParams: Promise<{ project?: string }> };
 
@@ -49,53 +40,7 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
     );
   }
 
-  const [keywords, subs, competitors, { limits }] = await Promise.all([
-    db()
-      .select()
-      .from(projectKeywords)
-      .where(eq(projectKeywords.projectId, project.id)),
-    db()
-      .select()
-      .from(projectSubreddits)
-      .where(eq(projectSubreddits.projectId, project.id)),
-    db()
-      .select()
-      .from(projectCompetitors)
-      .where(eq(projectCompetitors.projectId, project.id)),
-    tierForUser(user.id),
-  ]);
-  const icons = Object.fromEntries(
-    (await db().select().from(subredditRows)).map((row) => [row.name, row.iconUrl]),
-  );
   const activity = await projectActivity(project.id);
-  const evidence = await loadEvidence(project.id);
-  const threads = dedupeThreads(evidence)
-    .sort((left, right) => right.weight - left.weight || left.bestPosition - right.bestPosition)
-    .map((thread) => {
-      const row = evidence.find((item) => item.postId === thread.postId);
-      return {
-        postId: thread.postId,
-        canonicalUrl: row?.canonicalUrl ?? "",
-        subreddit: thread.subreddit,
-        title: thread.title,
-        relevance: row?.relevance ?? "unlabeled",
-      };
-    });
-  const planRow = (row: {
-    source: string;
-    state: string;
-    evidence: number;
-    freshCandidates: number;
-    freshLeads: number;
-    lastCoveredAt: Date | null;
-  }) => ({
-    source: row.source,
-    state: row.state,
-    evidence: row.evidence,
-    freshCandidates: row.freshCandidates,
-    freshLeads: row.freshLeads,
-    lastCoveredAt: row.lastCoveredAt,
-  });
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -184,36 +129,14 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
         }))}
       />
 
-      <PlanEditor
-        title="Searches"
-        hint="What we search Reddit for. Google evidence wrote these; pin one to keep it."
-        placeholder="cold email deliverability"
-        kind="keyword"
-        projectId={project.id}
-        rows={keywords.map((row) => ({ value: row.keyword, ...planRow(row) }))}
-        limit={limits?.keywordsPerProject ?? null}
-      />
-      <PlanEditor
-        title="Communities"
-        hint="Where relevant threads were actually found. Waiting ones are next in line."
-        placeholder="r/saas"
-        kind="subreddit"
-        projectId={project.id}
-        rows={subs.map((row) => ({ value: row.name, ...planRow(row) }))}
-        limit={limits?.subredditsPerProject ?? null}
-        icons={icons}
-      />
-      <PlanEditor
-        title="Competitors"
-        hint="Named in the evidence as doing the same job for the same person."
-        placeholder="Acme"
-        kind="competitor"
-        projectId={project.id}
-        rows={competitors.map((row) => ({ value: row.name, ...planRow(row) }))}
-        limit={limits?.competitors ?? null}
-      />
-
-      <EvidenceThreads threads={threads} />
+      {/*
+        Everything discovery wrote, read behind its own boundary: it is every
+        evidence row this project holds, and the profile form above it was
+        never waiting on any of that.
+      */}
+      <Suspense fallback={<ListSkeleton rows={5} />}>
+        <PlanSections projectId={project.id} userId={user.id} />
+      </Suspense>
 
       <div className="flex flex-wrap items-center gap-3">
         <form action={scanAndOpenLeadsAction}>
