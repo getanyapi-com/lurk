@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { SearchSelect } from "@/components/ui/searchSelect";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +15,15 @@ export type FilterSpec = {
   /** What the pill reads as when the URL says nothing about this filter. */
   fallback: string;
   options: SelectOption[];
+  /**
+   * Whether the option list needs a search box. Set it for the lists that grow
+   * with the project - the communities a scan finds, the phrasings discovery
+   * writes - and leave it off for a fixed handful like a window or a status,
+   * where a search box is one more thing to read past.
+   */
+  searchable?: boolean;
+  /** What that search box says before anything is typed. */
+  searchPlaceholder?: string;
 };
 
 /**
@@ -57,13 +67,24 @@ export function FilterPills({ filters }: { filters: FilterSpec[] }) {
           ) : (
             filter.icon
           )}
-          <Select
-            shape="pill"
-            ariaLabel={filter.ariaLabel}
-            value={params.get(filter.name) ?? filter.fallback}
-            options={filter.options}
-            onValueChange={(value) => select(filter.name, value)}
-          />
+          {filter.searchable ? (
+            <SearchSelect
+              shape="pill"
+              ariaLabel={filter.ariaLabel}
+              searchPlaceholder={filter.searchPlaceholder}
+              value={params.get(filter.name) ?? filter.fallback}
+              options={filter.options}
+              onValueChange={(value) => select(filter.name, value)}
+            />
+          ) : (
+            <Select
+              shape="pill"
+              ariaLabel={filter.ariaLabel}
+              value={params.get(filter.name) ?? filter.fallback}
+              options={filter.options}
+              onValueChange={(value) => select(filter.name, value)}
+            />
+          )}
         </span>
       ))}
     </div>

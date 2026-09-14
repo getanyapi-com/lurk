@@ -42,6 +42,8 @@ export function FeedFilters({ facets }: FeedFiltersProps) {
       ariaLabel: "subreddit",
       icon: <Hash className={ICON} aria-hidden="true" />,
       fallback: "",
+      searchable: true,
+      searchPlaceholder: "r/webscraping",
       options: [
         { value: "", label: "All subreddits" },
         ...facets.subreddits.map((name) => ({ value: name.toLowerCase(), label: `r/${name}` })),

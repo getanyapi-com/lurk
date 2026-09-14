@@ -28,7 +28,25 @@ type SelectProps = {
   className?: string;
 };
 
-const TRIGGER: Record<"pill" | "field", string> = {
+/**
+ * The shape of any dropdown the app opens, shared with the searchable one so
+ * the two never drift into looking like different products.
+ */
+export const POPUP_CLASS = cn(
+  "min-w-[var(--anchor-width)] max-w-[var(--available-width)] origin-[var(--transform-origin)]",
+  "overflow-hidden rounded-card border bg-surface py-1 shadow-lg shadow-black/10 outline-none",
+  "transition-[opacity,scale] duration-100 ease-out",
+  "data-starting-style:scale-[0.98] data-starting-style:opacity-0",
+  "data-ending-style:scale-[0.98] data-ending-style:opacity-0",
+);
+
+export const ITEM_CLASS = cn(
+  "text-small grid cursor-default grid-cols-[1rem_1fr] items-center gap-2",
+  "py-1.5 pr-3 pl-2 text-fg outline-none select-none",
+  "data-highlighted:bg-surface-2 data-disabled:opacity-50",
+);
+
+export const TRIGGER: Record<"pill" | "field", string> = {
   pill: "text-small h-6 gap-1.5 pr-1 pl-0.5 text-fg",
   field: "text-small h-8 gap-2 rounded-control border bg-surface px-2 text-fg",
 };
@@ -78,26 +96,14 @@ export function Select({
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Positioner className="z-50 outline-none" sideOffset={6}>
-          <SelectPrimitive.Popup
-            className={cn(
-              "min-w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-hidden rounded-card",
-              "border bg-surface py-1 shadow-lg shadow-black/10 outline-none",
-              "transition-[opacity,scale] duration-100 ease-out",
-              "data-starting-style:scale-[0.98] data-starting-style:opacity-0",
-              "data-ending-style:scale-[0.98] data-ending-style:opacity-0",
-            )}
-          >
+          <SelectPrimitive.Popup className={POPUP_CLASS}>
             <SelectPrimitive.List className="max-h-[var(--available-height)] overflow-y-auto">
               {options.map((option) => (
                 <SelectPrimitive.Item
                   key={option.value}
                   value={option.value}
                   disabled={option.disabled}
-                  className={cn(
-                    "text-small grid cursor-default grid-cols-[1rem_1fr] items-center gap-2",
-                    "py-1.5 pr-3 pl-2 text-fg outline-none select-none",
-                    "data-highlighted:bg-surface-2 data-disabled:opacity-50",
-                  )}
+                  className={ITEM_CLASS}
                 >
                   <SelectPrimitive.ItemIndicator className="col-start-1">
                     <Check className="size-3.5" aria-hidden="true" />
