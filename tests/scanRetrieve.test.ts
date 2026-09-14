@@ -186,9 +186,10 @@ describe("what each source asks for", () => {
     );
   });
 
-  it("turns a Reddit Boolean query into something Google can answer", () => {
+  /** One form for every Google question, so two callers share one paid run. */
+  it("turns a Reddit Boolean query into the app's one Google question", () => {
     expect(googleFeedQuery("subreddit:hotels AND (pet friendly OR dog friendly)")).toBe(
-      "pet friendly dog friendly site:reddit.com/r/",
+      "pet friendly dog friendly reddit",
     );
   });
 });

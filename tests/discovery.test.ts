@@ -6,7 +6,6 @@ import {
   buildDiscoveryQueries,
   expandDiscoveryQueries,
   expansionShouldStop,
-  SITE_SCOPE,
   type Destination,
 } from "@/lib/discovery/queries";
 import {
@@ -23,6 +22,7 @@ import {
   type EvidenceLike,
 } from "@/lib/discovery/rank";
 import { askedQueries } from "@/lib/discovery/refresh";
+import { googleQuery } from "@/lib/seo/fetch";
 import { TIERS } from "@/lib/tiers";
 
 const generateStructured = vi.fn();
@@ -70,20 +70,34 @@ describe("the queries discovery buys", () => {
     expect(queries).toHaveLength(8);
     expect(queries.filter((item) => item.destination === null)).toHaveLength(4);
     expect(queries.filter((item) => item.destination !== null)).toHaveLength(4);
-    expect(queries.every((item) => item.query.startsWith(SITE_SCOPE))).toBe(true);
+    expect(queries.every((item) => item.query.endsWith(" reddit"))).toBe(true);
+  });
+
+  /**
+   * A shared Google run is keyed on the query text alone, so discovery and the
+   * Reddit SEO tab asking one phrasing two ways bought it twice. They ask the
+   * one question now, and the second caller pays nothing.
+   */
+  it("asks Google the same question the Reddit SEO tab asks", () => {
+    const asked = buildDiscoveryQueries({
+      problemPhrasings: PHRASINGS,
+      destinations: [],
+      budget: 1,
+    });
+    expect(asked[0].query).toBe(googleQuery(PHRASINGS[0]));
   });
 
   it("asks the phrasing as the buyer said it, word for word", () => {
-    expect(queries[0].query).toBe(`${SITE_SCOPE} hotels that allow 18 year olds`);
-    expect(queries[1].query).toBe(`${SITE_SCOPE} under 21 hotel check in`);
-    expect(queries[2].query).toBe(`${SITE_SCOPE} hotel refused check in because of age`);
+    expect(queries[0].query).toBe(googleQuery("hotels that allow 18 year olds"));
+    expect(queries[1].query).toBe(googleQuery("under 21 hotel check in"));
+    expect(queries[2].query).toBe(googleQuery("hotel refused check in because of age"));
   });
 
   it("adds the city, and only the city, to a query about a place", () => {
     const placed = queries.filter((item) => item.destination !== null);
     expect(placed.map((item) => item.destination)).toEqual(DESTINATION_NAMES);
-    expect(placed[0].query).toBe(`${SITE_SCOPE} hotels that allow 18 year olds Las Vegas`);
-    expect(placed[1].query).toBe(`${SITE_SCOPE} under 21 hotel check in Miami`);
+    expect(placed[0].query).toBe(googleQuery("hotels that allow 18 year olds Las Vegas"));
+    expect(placed[1].query).toBe(googleQuery("under 21 hotel check in Miami"));
     expect(placed[1].query).not.toContain("Florida");
   });
 
@@ -248,10 +262,10 @@ describe("labels the model has to cite", () => {
 });
 
 /** The threads the eight queries came back with, as Google ordered them. */
-const BROAD = `${SITE_SCOPE} hotels that allow 18 year olds`;
-const BROAD_TWO = `${SITE_SCOPE} minimum hotel check in age`;
-const VEGAS = `${SITE_SCOPE} hotels that allow 18 year olds Las Vegas`;
-const MIAMI = `${SITE_SCOPE} under 21 hotel check in Miami`;
+const BROAD = googleQuery("hotels that allow 18 year olds");
+const BROAD_TWO = googleQuery("minimum hotel check in age");
+const VEGAS = googleQuery("hotels that allow 18 year olds Las Vegas");
+const MIAMI = googleQuery("under 21 hotel check in Miami");
 
 const EVIDENCE: EvidenceLike[] = [
   {
@@ -631,7 +645,7 @@ describe("the plan the ranking publishes", () => {
       {
         postId: "c1",
         subreddit: "webscraping",
-        query: `${SITE_SCOPE} reddit scraper api for comments`,
+        query: googleQuery("reddit scraper api for comments"),
         family: "reddit-scraper-api",
         destination: null,
         position: 1,

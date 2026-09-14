@@ -1,15 +1,14 @@
+import { googleQuery } from "@/lib/seo/fetch";
 import { cityPart, familyKey, meaningWords } from "./phrases";
 
 /**
  * The Google searches discovery buys. Half ask the problem in the buyer's own
  * words with no place in them, half ask it about one place this product's page
- * names. Both are scoped to Reddit communities, because a thread is the only
- * evidence this app can act on. Nothing here invents a phrasing or a place:
- * every query is built from what the product page itself said.
+ * names. Both are aimed at Reddit through the app's one Google question, so a
+ * phrasing the Reddit SEO tab has already bought is free here. Nothing here
+ * invents a phrasing or a place: every query is built from what the product
+ * page itself said.
  */
-
-/** What every discovery query is aimed at: a post inside some community. */
-export const SITE_SCOPE = "site:reddit.com/r/";
 
 /** A place this product serves, with the page text it was read from. */
 export type Destination = { name: string; sourceText: string };
@@ -41,7 +40,7 @@ function problemQuery(phrasing: string, destination: string | null): DiscoveryQu
   const body = phrasing.trim().replace(/\s+/g, " ");
   const place = destination === null ? "" : cityPart(destination);
   return {
-    query: [SITE_SCOPE, body, place].filter(Boolean).join(" ").trim(),
+    query: googleQuery([body, place].filter(Boolean).join(" ")),
     family: familyKey(phrasing),
     destination,
     kind: destination === null ? "problem" : "destination",

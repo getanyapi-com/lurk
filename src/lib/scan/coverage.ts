@@ -1,3 +1,5 @@
+import { googleQuery } from "@/lib/seo/fetch";
+
 /**
  * How one scan decides what to cover and in what order. Every decision here is
  * a pure function of the plan rows and the clock, so the retrieval loop only
@@ -98,8 +100,8 @@ export function scopedQuery(community: string, query: string): string {
 
 /**
  * What a Google feed query says. The plan's Reddit queries are Boolean and
- * Google is not, so the operators and the community scope come out and the
- * site restriction goes in.
+ * Google is not, so the operators and the community scope come out and what is
+ * left is asked as the one Google question this app has.
  */
 export function googleFeedQuery(query: string): string {
   const plain = query
@@ -108,7 +110,7 @@ export function googleFeedQuery(query: string): string {
     .replace(/[()]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return `${plain} site:reddit.com/r/`;
+  return googleQuery(plain);
 }
 
 /** Why a listing walk stopped, or that it has not. */

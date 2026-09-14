@@ -22,7 +22,20 @@ export const SEO_GEO = "us";
 /** And asks for them in English, which is also Google's own default. */
 export const SEO_LANGUAGE = "en";
 
-/** What we actually send Google: the keyword, aimed at Reddit. */
+/**
+ * What we actually send Google, wherever the question comes from: the words a
+ * buyer would type, with "reddit" after them. It is what a person searching
+ * for a thread actually types, and Google answers it with mostly Reddit, so
+ * every caller asks the one question and they share one paid run between them.
+ *
+ * Measured 2026-09-14 over five phrasings: `site:reddit.com/r/` returns 9 or
+ * 10 threads of 10 results against this form's 6 or 7 of 9, so the operator is
+ * the denser form per call. It is not the better one. The two forms answer
+ * from different slices - this one found 12 threads the operator missed across
+ * those five - and everything discovery buys is labelled for relevance before
+ * it can reach a plan, so a thread that does not belong costs a label and
+ * nothing else.
+ */
 export function googleQuery(keyword: string): string {
   return `${keyword.trim()} reddit`;
 }
