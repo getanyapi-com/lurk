@@ -3,10 +3,10 @@ import { Header } from "@/components/Header";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { Rail, type RailGroup } from "@/components/Rail";
 import { requireLocalUser } from "@/lib/auth";
-import { listMentions } from "@/lib/competitors/read";
+import { countMentions } from "@/lib/competitors/read";
 import { newLeadCount } from "@/lib/leads";
 import { activeProject, listProjects } from "@/lib/projects";
-import { listOpportunities } from "@/lib/seo/read";
+import { countOpportunities } from "@/lib/seo/read";
 import { URL_HEADER } from "@/proxy";
 
 type RailCounts = { newLeads: number; rankingThreads: number; mentions: number };
@@ -43,16 +43,12 @@ const EMPTY_COUNTS: RailCounts = { newLeads: 0, rankingThreads: 0, mentions: 0 }
  * Google ranks, and competitor mentions inside the mention window.
  */
 async function countsFor(projectId: string): Promise<RailCounts> {
-  const [newLeads, opportunities, mentions] = await Promise.all([
+  const [newLeads, rankingThreads, mentions] = await Promise.all([
     newLeadCount(projectId),
-    listOpportunities(projectId, {}),
-    listMentions(projectId),
+    countOpportunities(projectId),
+    countMentions(projectId),
   ]);
-  return {
-    newLeads,
-    rankingThreads: opportunities.length,
-    mentions: mentions.length,
-  };
+  return { newLeads, rankingThreads, mentions };
 }
 
 /** The project the page below is showing, which the rail has to count for. */
@@ -63,8 +59,10 @@ async function requestedProject(): Promise<string | undefined> {
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireLocalUser();
-  const projects = await listProjects(user.id);
-  const project = await activeProject(user.id, await requestedProject());
+  const [projects, project] = await Promise.all([
+    listProjects(user.id),
+    requestedProject().then((requested) => activeProject(user.id, requested)),
+  ]);
   const counts = project ? await countsFor(project.id) : EMPTY_COUNTS;
   return (
     <div className="flex min-h-dvh flex-col">

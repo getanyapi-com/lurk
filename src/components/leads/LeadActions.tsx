@@ -5,6 +5,7 @@ import { Check, Copy, ExternalLink, EyeOff, PenLine, ThumbsDown } from "lucide-r
 import { hideLeadAction, markNotFitAction } from "@/app/app/leads/actions";
 import { DraftPanel } from "@/components/drafts/DraftPanel";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 
 const NOT_FIT_REASONS = [
   "wrong audience",
@@ -89,22 +90,14 @@ export function LeadActions({
             action={markNotFitAction.bind(null, projectId, leadId)}
             className="flex items-center gap-1.5"
           >
-            <select
+            <Select
               name="reason"
               required
-              defaultValue=""
-              aria-label="Why this lead is not a fit"
-              className="text-small h-7 rounded-control border bg-surface px-1.5 text-fg"
-            >
-              <option value="" disabled>
-                Pick a reason
-              </option>
-              {NOT_FIT_REASONS.map((reason) => (
-                <option key={reason} value={reason}>
-                  {reason}
-                </option>
-              ))}
-            </select>
+              ariaLabel="Why this lead is not a fit"
+              placeholder="Pick a reason"
+              className="h-7"
+              options={NOT_FIT_REASONS.map((reason) => ({ value: reason, label: reason }))}
+            />
             <Button type="submit" variant="outline" size="sm">
               Save
             </Button>

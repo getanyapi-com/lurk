@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { addChannelAction } from "@/app/app/settings/alerts/actions";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { ALERT_CHANNELS, CHANNEL_LABELS, type AlertChannel } from "@/lib/alerts/types";
 
 type AddChannelFormProps = {
@@ -41,19 +42,14 @@ export function AddChannelForm({ projectId, webhooksAtCap, hourlyAllowed }: AddC
   return (
     <form action={submit} className="flex flex-col gap-3 rounded-card border bg-surface p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <Select
           name="channel"
-          aria-label="Channel type"
+          ariaLabel="Channel type"
+          className="h-10 px-3 text-body"
           value={channel}
-          onChange={(event) => setChannel(event.target.value as AlertChannel)}
-          className={FIELD}
-        >
-          {ALERT_CHANNELS.map((one) => (
-            <option key={one} value={one}>
-              {CHANNEL_LABELS[one]}
-            </option>
-          ))}
-        </select>
+          onValueChange={(value) => setChannel(value as AlertChannel)}
+          options={ALERT_CHANNELS.map((one) => ({ value: one, label: CHANNEL_LABELS[one] }))}
+        />
         <input
           name="target"
           required
@@ -61,12 +57,20 @@ export function AddChannelForm({ projectId, webhooksAtCap, hourlyAllowed }: AddC
           aria-label="Where to send it"
           className={`${FIELD} min-w-64 flex-1`}
         />
-        <select name="cadence" aria-label="How often" defaultValue="daily" className={FIELD}>
-          <option value="daily">Daily</option>
-          <option value="hourly" disabled={!hourlyAllowed}>
-            {hourlyAllowed ? "Hourly" : "Hourly (connect a wallet)"}
-          </option>
-        </select>
+        <Select
+          name="cadence"
+          ariaLabel="How often"
+          className="h-10 px-3 text-body"
+          defaultValue="daily"
+          options={[
+            { value: "daily", label: "Daily" },
+            {
+              value: "hourly",
+              label: hourlyAllowed ? "Hourly" : "Hourly (connect a wallet)",
+              disabled: !hourlyAllowed,
+            },
+          ]}
+        />
         <Button type="submit" size="lg" disabled={blocked}>
           <Plus className="size-4" aria-hidden="true" />
           Add channel

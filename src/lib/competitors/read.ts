@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { competitorMentions } from "@/db/schema/competitors";
 import { projectCompetitors, redditAuthors, redditPosts, subreddits } from "@/db/schema";
@@ -34,6 +34,29 @@ export async function listCompetitorNames(projectId: string): Promise<string[]> 
 
 function windowStart(days: number, now = new Date()): Date {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * How many mentions are in the window. The rail's pill wants the number and
+ * nothing else, and asking the database to count is a great deal less work
+ * than reading every mention with its thread, its author and its icon on every
+ * page of the app.
+ */
+export async function countMentions(
+  projectId: string,
+  days = MENTION_WINDOW_DAYS,
+): Promise<number> {
+  const rows = await db()
+    .select({ total: count() })
+    .from(competitorMentions)
+    .innerJoin(redditPosts, eq(redditPosts.id, competitorMentions.postId))
+    .where(
+      and(
+        eq(competitorMentions.projectId, projectId),
+        gte(redditPosts.createdAt, windowStart(days)),
+      ),
+    );
+  return rows[0]?.total ?? 0;
 }
 
 /** Every mention inside the window, newest first. */

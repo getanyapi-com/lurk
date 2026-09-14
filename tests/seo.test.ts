@@ -307,3 +307,60 @@ describe.skipIf(!process.env.DATABASE_URL)("what a refresh pays to judge", () =>
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 });
+
+/**
+ * The rail's pill used to read every ranking thread and take the length, on
+ * every page of the app. The count it asks for now has to agree with the list
+ * it stands for, including the part that is easy to get wrong: a thread whose
+ * post has aged out of our thirty days keeps its row with a null post, and the
+ * list does not show it.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("the ranking-thread count in the rail", () => {
+  it("counts what the list shows, and not a thread whose post is gone", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { countOpportunities, listOpportunities } = await import("@/lib/seo/read");
+
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "AnyAPI" })
+      .returning();
+
+    const run = randomUUID().replace(/-/g, "").slice(0, 8);
+    const held = [`${run}a`, `${run}b`];
+    for (const [index, postId] of held.entries()) {
+      await db().insert(schema.redditPosts).values({
+        id: postId,
+        subreddit: "webscraping",
+        title: `A ranking thread ${postId}`,
+        url: `https://www.reddit.com/r/webscraping/comments/${postId}/x/`,
+        createdAt: new Date(),
+      });
+      await db().insert(schema.seoOpportunities).values({
+        projectId: project.id,
+        keyword: "reddit scraper",
+        postId,
+        position: index + 1,
+      });
+    }
+    // The thread whose post retention already deleted, which set its post to
+    // null rather than taking the row away.
+    await db().insert(schema.seoOpportunities).values({
+      projectId: project.id,
+      keyword: "reddit scraper",
+      postId: null,
+      position: 3,
+    });
+
+    const rows = await listOpportunities(project.id, {});
+    expect(await countOpportunities(project.id)).toBe(rows.length);
+    expect(rows.length).toBe(held.length);
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+    await db().delete(schema.redditPosts).where(inArray(schema.redditPosts.id, held));
+  });
+});

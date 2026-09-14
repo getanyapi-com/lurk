@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Favicon } from "@/components/Favicon";
 
 export type SwitcherProject = { id: string; name: string; url: string | null };
@@ -16,6 +18,7 @@ type ProjectSwitcherProps = {
 export function ProjectSwitcher({ projects, defaultId }: ProjectSwitcherProps) {
   const router = useRouter();
   const params = useSearchParams();
+  const [pending, startTransition] = useTransition();
   const activeId = params.get("project") ?? defaultId;
   const active =
     projects.find((project) => project.id === activeId) ?? projects[0];
@@ -23,28 +26,25 @@ export function ProjectSwitcher({ projects, defaultId }: ProjectSwitcherProps) {
   function select(id: string) {
     const next = new URLSearchParams(params.toString());
     next.set("project", id);
-    router.push(`?${next.toString()}`);
+    startTransition(() => router.push(`?${next.toString()}`));
   }
 
   return (
     <div className="flex flex-col gap-2">
       {projects.length > 0 ? (
-        <div className="flex items-center gap-2 rounded-control border bg-surface px-2">
+        <div
+          className={`flex items-center gap-2 rounded-control border bg-surface px-2 transition-opacity${pending ? " opacity-60" : ""}`}
+          aria-busy={pending}
+        >
           <Favicon url={active?.url ?? null} name={active?.name ?? "?"} />
-          <select
+          <Select
+            shape="pill"
+            className="h-10 min-w-0 flex-1 text-body"
+            ariaLabel="Active project"
             value={activeId ?? ""}
-            onChange={(event) => select(event.target.value)}
-            aria-label="Active project"
-            // pr-6 keeps a long project name clear of the select's own arrow,
-            // which a native select draws over the text rather than eliding it.
-            className="h-10 min-w-0 flex-1 bg-surface pr-6 text-body text-fg"
-          >
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={select}
+            options={projects.map((project) => ({ value: project.id, label: project.name }))}
+          />
         </div>
       ) : null}
       <Button

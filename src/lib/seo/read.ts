@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { discoveryEvidence, redditPosts, seoOpportunities, subreddits } from "@/db/schema";
 import type { Relevance } from "@/lib/discovery/label";
@@ -95,6 +95,23 @@ export async function listOpportunities(projectId: string, filter: SeoFilter) {
       sql`coalesce(${judged.rank}, ${VERDICT_ORDER.indexOf("unlabeled") + 1})`,
       asc(seoOpportunities.position),
     );
+}
+
+/**
+ * How many ranking threads this project holds. The rail's pill shows the
+ * number, so it asks for the number rather than for every thread, its verdict
+ * and its community on every page of the app.
+ */
+export async function countOpportunities(projectId: string): Promise<number> {
+  const rows = await db()
+    .select({ total: count() })
+    .from(seoOpportunities)
+    // The same join the list makes, because a thread whose post has aged out
+    // of our thirty days keeps its row with a null post and the list does not
+    // show it. A count that included it would promise a thread that is gone.
+    .innerJoin(redditPosts, eq(redditPosts.id, seoOpportunities.postId))
+    .where(eq(seoOpportunities.projectId, projectId));
+  return rows[0]?.total ?? 0;
 }
 
 /** The keywords and communities the filter pills can actually offer. */
