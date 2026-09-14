@@ -190,6 +190,28 @@ export function askedText(phrase: string): string {
 }
 
 /**
+ * The longest a phrasing may be before Reddit's own search stops answering it.
+ * Google reads a sentence for its meaning; Reddit search matches words, so a
+ * sentence's ordinary words match most of the site. Measured 2026-09-14, the
+ * top twelve results of each search, counting the ones about the product's own
+ * problem: "reddit scraper" and "linkedin scraper" 12 of 12, "email
+ * verification api" 12, "google maps scraper api" 12; then "need data without
+ * another subscription" 0, "scraper failed and returned nothing" 3, "pay per
+ * request instead of subscription" 3, "another provider means another schema
+ * again" 1 - that one returns Schema Therapy. Four words held, five drifted.
+ */
+export const REDDIT_SEARCH_WORDS = 4;
+
+/**
+ * Whether Reddit search can be asked this phrasing as it stands. A phrasing it
+ * cannot is not lost: Google still asks it in discovery and in the Reddit SEO
+ * tab, which is where a sentence belongs.
+ */
+export function redditCanSearch(phrase: string): boolean {
+  return words(phrase).length <= REDDIT_SEARCH_WORDS;
+}
+
+/**
  * Which phrasing actually earned this family its evidence. A family key is the
  * first three meaning words of a phrasing, so two phrasings collide on one key:
  * "reddit scraper api for comments" and "reddit scraper api for images" are one
@@ -208,7 +230,9 @@ function askedPhrasing(rows: EvidenceLike[], phrasings: string[]): string | null
         (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER),
     );
   for (const row of ordered) {
-    const asked = phrasings.map(askedText).find((phrase) => row.query.includes(phrase));
+    const asked = phrasings
+      .map(askedText)
+      .find((phrase) => row.query.includes(phrase) && redditCanSearch(phrase));
     if (asked) {
       return asked;
     }
@@ -247,6 +271,14 @@ export function rankFamilies(
     .sort((left, right) => right.weighted - left.weighted || left.family.localeCompare(right.family));
 }
 
+/**
+ * Words that say a demand is a refusal rather than a topic. None of them is a
+ * constraint on its own: `(api) AND (without)` means every post about an API,
+ * and on 2026-09-14 that search and its two siblings produced 0, 0 and 1 leads
+ * on lurk.so against 7 for `instagram api` and 5 for `tiktok scraper`. They are
+ * still kept out of the subject, because a search anchored on "not" finds
+ * nothing about anything.
+ */
 const NEGATIONS = new Set(["no", "non", "not", "without", "cannot", "cant", "wont"]);
 
 /**
@@ -327,9 +359,7 @@ export function compileBooleanQuery(phrases: string[], productNumbers: Set<strin
     const constraints = [
       ...multi.filter((pair) => saysNumber(pair, productNumbers)).map((pair) => `"${pair}"`),
       ...all.filter(
-        (word) =>
-          !consumed.has(word) &&
-          ((isNumberWord(word) && productNumbers.has(word)) || NEGATIONS.has(word)),
+        (word) => !consumed.has(word) && isNumberWord(word) && productNumbers.has(word),
       ),
     ];
     constraintsPerPhrase.push(constraints);
