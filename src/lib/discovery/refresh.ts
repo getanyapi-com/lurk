@@ -146,6 +146,7 @@ export async function runDiscoveryRefresh(
     limits,
     competitors: mergeCompetitors(await existingCompetitors(projectId), competitorsFrom(labels)),
     productTexts: [brief, ...problemPhrasings],
+    phrasings: problemPhrasings,
   });
   await enqueueJob("discovery_refresh", projectId, new Date(Date.now() + maxAgeMs));
   return { queries: queries.length, threads: fresh.length, costUsd: found.costUsd };

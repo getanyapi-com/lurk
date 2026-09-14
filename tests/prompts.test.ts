@@ -10,6 +10,29 @@ describe("profile phrasings", () => {
     expect(bullet).toMatch(/booking already made/);
     expect(bullet).toMatch(/"parent booking a hotel for an 18 year old"/);
   });
+
+  /**
+   * A product whose buyers ask for the thing by name had no way to say so: the
+   * prompt asked only for a problem with a constraint in it, and forbade every
+   * product and company name, so "reddit scraper" could never be written down.
+   * Measured 2026-09-13, getanyapi.com produced "no plan for one endpoint job",
+   * whose Google results are IT career threads, while "reddit scraper api"
+   * returns people asking for one.
+   */
+  it("asks for the name a buyer types for the thing itself", () => {
+    const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- problemPhrasings:"));
+    expect(bullet).toMatch(/the name a buyer types for the thing itself/);
+    expect(bullet).toMatch(/"reddit scraper"/);
+    expect(bullet).toMatch(/Name that platform or system/);
+    expect(bullet).toMatch(/leave out this product's own name and the names of its rivals/);
+  });
+
+  /** A phrase with its small words taken out is a keyword list, not a search. */
+  it("asks for the phrasing a person says out loud, not a bag of keywords", () => {
+    const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- problemPhrasings:"));
+    expect(bullet).toMatch(/rather than as a bag of keywords/);
+    expect(bullet).toMatch(/keep the small words that make it a sentence/);
+  });
 });
 
 /**

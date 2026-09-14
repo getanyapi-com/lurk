@@ -115,6 +115,8 @@ export type PublishInput = {
   competitors: CompetitorRank[];
   /** Everything this product says about itself, which is where its numbers come from. */
   productTexts: string[];
+  /** The product's own phrasings, which a family with no constraint searches for. */
+  phrasings: string[];
 };
 
 /** Ranks everything this project has ever seen and publishes the new plan. */
@@ -132,6 +134,7 @@ export async function publishFromEvidence(input: PublishInput) {
     competitors: input.competitors,
     scopedCommunities: scoped,
     productNumbers: numberTerms(input.productTexts),
+    phrasings: input.phrasings,
     limits: input.limits,
   });
   await publishDiscoveryPlan(input.projectId, plan);
@@ -208,6 +211,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
     limits: input.limits,
     competitors: mergeCompetitors([], competitorsFrom(labels)),
     productTexts: [brief, ...input.problemPhrasings],
+    phrasings: input.problemPhrasings,
   });
   return {
     queries: used.length,

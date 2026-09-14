@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { projectCompetitors, projectKeywords, projectSubreddits, projects } from "@/db/schema";
 import { capped } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
+import { familyKey } from "./phrases";
 import type { CommunityRank, CompetitorRank, FamilyRank } from "./rank";
 import { compileBooleanQuery, scopedBooleanQuery } from "./rank";
 
@@ -31,6 +32,11 @@ export type PlanInput = {
   scopedCommunities: string[];
   /** The numbers this product itself says, which is what makes one a constraint. */
   productNumbers: Set<string>;
+  /**
+   * The product's own phrasings, which is what a family falls back to when its
+   * evidence carries no constraint to compile.
+   */
+  phrasings: string[];
   limits: TierLimits | null;
 };
 
@@ -60,6 +66,11 @@ function dedupeKeywords(rows: PlannedKeyword[]): PlannedKeyword[] {
   return [...best.values()];
 }
 
+/** One phrasing as a search: the buyer's words, with the spacing tidied. */
+function tidy(phrase: string): string {
+  return phrase.trim().replace(/\s+/g, " ");
+}
+
 /**
  * What the ranking means for the plan. A community with no relevant evidence
  * gets no row at all, which is the whole point of discovery: nothing reaches
@@ -79,9 +90,18 @@ export function planFromRanks(input: PlanInput): DiscoveryPlan {
     };
   });
 
+  // A family whose evidence carries no constraint compiles to nothing, because
+  // a bare subject like "hotel" matches most of Reddit. Some demands have no
+  // constraint to carry: a person shopping for a Reddit scraper asks for the
+  // thing by its name. Measured 2026-09-13 on getanyapi.com, every family
+  // compiled empty and the project got no searches at all. The phrasing Google
+  // already answered with relevant threads is what that family falls back to,
+  // and only a family with relevant evidence ever reaches here.
   const families = input.families.filter((family) => family.phrases.length > 0);
+  const asked = new Map(input.phrasings.map((phrase) => [familyKey(phrase), tidy(phrase)]));
   const broad = families.map((family) => ({
-    keyword: compileBooleanQuery(family.phrases, input.productNumbers),
+    keyword:
+      compileBooleanQuery(family.phrases, input.productNumbers) || (asked.get(family.family) ?? ""),
     evidence: Math.round(family.weighted),
   }));
   const top = broad.find((item) => item.keyword.length > 0);

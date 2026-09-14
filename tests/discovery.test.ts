@@ -525,6 +525,7 @@ describe("the plan the ranking publishes", () => {
     competitors: [{ name: "hotelages.com", role: "direct_substitute", evidence: 2 }],
     scopedCommunities: ["vegas"],
     productNumbers: PRODUCT_NUMBERS,
+    phrasings: PHRASINGS,
     limits: { ...TIERS.free, subredditsPerProject: 3 },
   });
 
@@ -551,6 +552,7 @@ describe("the plan the ranking publishes", () => {
       competitors: [],
       scopedCommunities: [],
       productNumbers: PRODUCT_NUMBERS,
+    phrasings: PHRASINGS,
       limits: { ...TIERS.free, subredditsPerProject: 2 },
     });
     expect(crowded.subreddits.map((row) => row.state)).toEqual([
@@ -578,11 +580,57 @@ describe("the plan the ranking publishes", () => {
       competitors: [],
       scopedCommunities: [],
       productNumbers: PRODUCT_NUMBERS,
+    phrasings: PHRASINGS,
       limits: TIERS.free,
     });
     expect(twice.keywords).toEqual([
       { keyword: '(hotel OR hotels) AND (18 OR "check in")', evidence: 4 },
     ]);
+  });
+
+  /**
+   * A product whose buyers ask for the thing by its name has no age, no limit
+   * and no refusal to compile, so every family returned an empty query and the
+   * project got no searches at all. Measured 2026-09-13 against getanyapi.com:
+   * the five phrasings the profile produced compiled to nothing, and the live
+   * project on lurk.so had 0 of 25 searches. These titles are the ones Google
+   * returned that day for "reddit scraper api".
+   */
+  it("falls back to the phrasing itself when a family carries no constraint", () => {
+    const nouns = planFromRanks({
+      communities: [],
+      families: [
+        {
+          family: "reddit-scraper-api",
+          weighted: 3,
+          phrases: [
+            "How to scrape Reddit now (Closed API)?",
+            "Open-source Reddit scraper",
+            "Best Methods for Scraping Reddit Data?",
+          ],
+        },
+      ],
+      competitors: [],
+      scopedCommunities: [],
+      productNumbers: new Set<string>(),
+      phrasings: ["reddit scraper api"],
+      limits: TIERS.free,
+    });
+    expect(nouns.keywords).toEqual([{ keyword: "reddit scraper api", evidence: 3 }]);
+  });
+
+  /** A family nothing asked for still has no search to fall back to. */
+  it("writes no search for a family whose phrasing it never saw", () => {
+    const orphan = planFromRanks({
+      communities: [],
+      families: [{ family: "unasked-family", weighted: 2, phrases: ["open source reddit scraper"] }],
+      competitors: [],
+      scopedCommunities: [],
+      productNumbers: new Set<string>(),
+      phrasings: ["reddit scraper api"],
+      limits: TIERS.free,
+    });
+    expect(orphan.keywords).toEqual([]);
   });
 
   it("searches the compiled families and the discovered city community", () => {
