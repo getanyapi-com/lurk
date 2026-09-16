@@ -18,14 +18,22 @@ describe("profile phrasings", () => {
    * Measured 2026-09-13, getanyapi.com produced "no plan for one endpoint job",
    * whose Google results are IT career threads, while "reddit scraper api"
    * returns people asking for one.
+   *
+   * The names are now their own field. Asked for as phrasings they came back
+   * 25, 5 and 25 times over three runs of one unchanged page on 2026-09-16, so
+   * a platform the page names had no search bought for it at all; asked for as
+   * platforms the same three runs named the same 31, and the searches are built
+   * from them in code.
    */
-  it("asks for the name a buyer types for the thing itself", () => {
+  it("asks for the platforms by name, and forbids them in the phrasings", () => {
+    const platforms = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- platforms:"));
+    expect(platforms).toMatch(/every system, platform, site or kind of data/);
+    expect(platforms).toMatch(/the words a buyer types for the thing itself/);
+    expect(platforms).toMatch(/this product's own name and the names of its rivals/);
+    expect(platforms).toMatch(/a rival is not a platform/);
+
     const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- problemPhrasings:"));
-    expect(bullet).toMatch(/the name a buyer types for the thing itself/);
-    expect(bullet).toMatch(/"reddit scraper"/);
-    expect(bullet).toMatch(/Name that platform or system/);
-    expect(bullet).toMatch(/this product's own name and the names of its rivals/);
-    expect(bullet).toMatch(/a rival is not a platform/);
+    expect(bullet).toMatch(/Do not write the name a buyer types for a platform here/);
   });
 
   /** A phrase with its small words taken out is a keyword list, not a search. */

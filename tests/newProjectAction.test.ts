@@ -56,6 +56,7 @@ const profile = {
   serviceGeography: "Worldwide",
   destinations: [],
   problemPhrasings: ["forms that branch"],
+  platforms: ["Zapier"],
   budgetFit: "Under $50 a month",
 };
 
@@ -94,6 +95,12 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
       .from(schema.projects)
       .where(eq(schema.projects.userId, user.id));
     expect(project.pain).toBe(profile.pain);
+    // The platform the page names is stored as the searches a buyer types.
+    expect(project.problemPhrasings).toEqual([
+      "forms that branch",
+      "zapier api",
+      "zapier scraper",
+    ]);
     expect(project.discoveredAt).toBeNull();
 
     const queued = await db()
