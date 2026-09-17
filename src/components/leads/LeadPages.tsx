@@ -6,7 +6,7 @@ import { LeadRow } from "@/components/leads/LeadRow";
 import { entryHref } from "@/components/leads/workspace";
 import { Skeleton } from "@/components/Skeleton";
 import { VerdictBadge } from "@/components/VerdictBadge";
-import type { FeedRow } from "@/lib/feed";
+import { FEED_PAGE_SIZE, type FeedRow } from "@/lib/feed";
 
 type LeadPagesProps = {
   projectId: string;
@@ -42,9 +42,12 @@ export function LeadPages({
   const [failed, setFailed] = useState(false);
   const foot = useRef<HTMLDivElement | null>(null);
   const fetching = useRef(false);
+  /** The count these pages were read against, so a change in it is noticed. */
+  const counted = useRef(total);
   const params = useMemo(() => Object.fromEntries(new URLSearchParams(search)), [search]);
   const shown = drawn + rows.length;
   const whole = shown >= total;
+  const held = rows.length;
 
   const more = useCallback(async () => {
     if (fetching.current) {
@@ -61,6 +64,45 @@ export function LeadPages({
       fetching.current = false;
     }
   }, [projectId, search, shown]);
+
+  /**
+   * Hiding a lead or marking it a miss takes it out of the feed, and the
+   * server draws its own page again. The pages this holds are not redrawn with
+   * it, so a row that has left the feed would sit there until a filter moved;
+   * a count that has changed is how that is known, and the pages held are read
+   * again from where the server's page ends.
+   */
+  useEffect(() => {
+    if (counted.current === total) {
+      return;
+    }
+    counted.current = total;
+    const pages = Math.ceil(held / FEED_PAGE_SIZE);
+    if (pages === 0 || fetching.current) {
+      return;
+    }
+    let live = true;
+    fetching.current = true;
+    void (async () => {
+      try {
+        const fresh: FeedRow[] = [];
+        for (let page = 0; page < pages; page += 1) {
+          fresh.push(...(await moreLeadsAction(projectId, search, drawn + page * FEED_PAGE_SIZE)));
+        }
+        if (live) {
+          setRows(fresh);
+        }
+      } catch {
+        // What is on screen is one lead out of date, which is better than
+        // emptying a list the reader is in the middle of.
+      } finally {
+        fetching.current = false;
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [drawn, held, projectId, search, total]);
 
   useEffect(() => {
     const mark = foot.current;
