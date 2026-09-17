@@ -5,6 +5,11 @@
 # trusting one GitHub repository's default branch, and the two role assignments
 # the workflow needs: push to the registry and roll the container app.
 #
+# GitHub's OIDC token names the repository with its owner and repository ids
+# embedded, as repo:owner@123/repo@456:ref:refs/heads/main, so the credential
+# subject has to match that exactly. The ids come from `gh api`, so the GitHub
+# CLI must be signed in.
+#
 # Usage:
 #   GITHUB_REPO=owner/repo RESOURCE_GROUP=reddit-leads-prod scripts/azure-github-oidc.sh --dry-run
 #   GITHUB_REPO=owner/repo RESOURCE_GROUP=reddit-leads-prod scripts/azure-github-oidc.sh
@@ -38,6 +43,10 @@ fi
 APP_DISPLAY_NAME="$RESOURCE_GROUP-github-deploy"
 CREDENTIAL_NAME="$(printf '%s' "$GITHUB_REPO" | tr '/' '-')-$BRANCH"
 
+OWNER_ID="$(gh api "repos/$GITHUB_REPO" --jq .owner.id)"
+REPO_ID="$(gh api "repos/$GITHUB_REPO" --jq .id)"
+SUBJECT="repo:${GITHUB_REPO%%/*}@$OWNER_ID/${GITHUB_REPO#*/}@$REPO_ID:ref:refs/heads/$BRANCH"
+
 run() {
   if $DRY_RUN; then printf 'would run: %s\n' "$*"; return 0; fi
   "$@"
@@ -52,7 +61,7 @@ cat <<PLAN
 subscription    $(capture az account show --query id -o tsv)
 tenant          $(capture az account show --query tenantId -o tsv)
 app             $APP_DISPLAY_NAME
-trusts          repo:$GITHUB_REPO:ref:refs/heads/$BRANCH
+trusts          $SUBJECT
 scope           the $RESOURCE_GROUP resource group (Contributor and AcrPush)
 PLAN
 
@@ -72,7 +81,7 @@ CREDENTIAL_JSON="$(cat <<JSON
 {
   "name": "$CREDENTIAL_NAME",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:$GITHUB_REPO:ref:refs/heads/$BRANCH",
+  "subject": "$SUBJECT",
   "description": "GitHub Actions deploy from $GITHUB_REPO on $BRANCH",
   "audiences": ["api://AzureADTokenExchange"]
 }
