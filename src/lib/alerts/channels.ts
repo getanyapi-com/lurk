@@ -59,6 +59,32 @@ export function normalizeTarget(channel: AlertChannel, raw: string): string {
   return target;
 }
 
+/**
+ * How the settings screen names one channel. The last path segment of a webhook
+ * URL is its secret half, so a pasted webhook is described by everything up to
+ * that segment and never reaches the browser whole.
+ */
+export function describeTarget(
+  channel: AlertChannel,
+  target: string,
+  label: string | null,
+): string {
+  if (label) {
+    return label;
+  }
+  if (channel === "email") {
+    return target;
+  }
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return CHANNEL_LABELS[channel];
+  }
+  const kept = url.pathname.split("/").filter(Boolean).slice(0, -1).join("/");
+  return `${url.host}/${kept ? `${kept}/` : ""}...`;
+}
+
 export type AddChannelInput = {
   projectId: string;
   channel: AlertChannel;

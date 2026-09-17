@@ -9,9 +9,10 @@ import { CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "@/lib/aler
 export type ChannelRow = {
   id: string;
   channel: AlertChannel;
-  target: string;
-  /** Shown instead of the target when the target is a secret, as a Slack webhook is. */
-  label: string | null;
+  /** What to call it: its label, its address, or a webhook URL without its secret. */
+  describedBy: string;
+  /** True when `describedBy` is a name rather than an address, so it reads as prose. */
+  named: boolean;
   cadence: AlertCadence;
   lastSentAt: string | null;
 };
@@ -58,9 +59,9 @@ export function AlertChannelList({ projectId, channels }: AlertChannelListProps)
             <Icon className="size-4 shrink-0 text-fg-muted" aria-hidden="true" />
             <span className="text-body text-fg">{CHANNEL_LABELS[row.channel]}</span>
             <span
-              className={`min-w-0 flex-1 truncate text-fg-muted ${row.label ? "text-body" : "font-mono text-mono"}`}
+              className={`min-w-0 flex-1 truncate text-fg-muted ${row.named ? "text-body" : "font-mono text-mono"}`}
             >
-              {row.label ?? row.target}
+              {row.describedBy}
             </span>
             <span className="rounded-control bg-surface-2 px-2 py-0.5 text-small text-fg-muted">
               {row.cadence}

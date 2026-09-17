@@ -36,7 +36,7 @@ import {
   customWebhookCapText,
   type SelectableLead,
 } from "@/lib/alerts/select";
-import { normalizeTarget } from "@/lib/alerts/channels";
+import { describeTarget, normalizeTarget } from "@/lib/alerts/channels";
 import type { Digest, DigestLead } from "@/lib/alerts/types";
 import { TIERS } from "@/lib/tiers";
 
@@ -156,6 +156,20 @@ describe("targets", () => {
     expect(() => normalizeTarget("slack", "https://example.com/x")).toThrow(/hooks.slack.com/);
     expect(() => normalizeTarget("discord", "https://example.com/x")).toThrow(/discord.com/);
     expect(() => normalizeTarget("email", "not-an-address")).toThrow(/email address/);
+  });
+
+  it("describes a pasted webhook without its secret segment", () => {
+    expect(
+      describeTarget("discord", "https://discord.com/api/webhooks/1550230446191808572/tok3n", null),
+    ).toBe("discord.com/api/webhooks/1550230446191808572/...");
+    expect(describeTarget("slack", "https://hooks.slack.com/services/T1/B2/s3cret", null)).toBe(
+      "hooks.slack.com/services/T1/B2/...",
+    );
+    expect(describeTarget("slack", "https://hooks.slack.com/services/T1/B2/s3cret", "#alerts")).toBe(
+      "#alerts",
+    );
+    expect(describeTarget("email", "you@company.com", null)).toBe("you@company.com");
+    expect(describeTarget("webhook", "not-a-url", null)).toBe("Webhook");
   });
 });
 

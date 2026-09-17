@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AddChannelForm } from "@/components/alerts/AddChannelForm";
 import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChannelList";
 import { EmptyState } from "@/components/EmptyState";
-import { listChannels } from "@/lib/alerts/channels";
+import { describeTarget, listChannels } from "@/lib/alerts/channels";
 import { slackApp } from "@/lib/alerts/config";
 import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
@@ -43,8 +43,8 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const rows: ChannelRow[] = channels.map((one) => ({
     id: one.id,
     channel: one.channel,
-    target: one.target,
-    label: one.label,
+    describedBy: describeTarget(one.channel, one.target, one.label),
+    named: one.label !== null,
     cadence: one.cadence,
     lastSentAt: one.lastSentAt ? one.lastSentAt.toISOString().slice(0, 16).replace("T", " ") : null,
   }));
