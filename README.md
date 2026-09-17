@@ -280,8 +280,8 @@ GITHUB_REPO=owner/repo RESOURCE_GROUP=reddit-leads-prod scripts/azure-github-oid
 GITHUB_REPO=owner/repo RESOURCE_GROUP=reddit-leads-prod scripts/azure-github-oidc.sh
 ```
 
-Then set these on the repository and remove `if: false` from the `deploy` job. That is the
-whole remaining step.
+Then set these on the repository, with `gh variable set` and `gh secret set` or in the
+repository settings:
 
 | Repository variable | Where it comes from |
 |---|---|
@@ -301,7 +301,8 @@ commit, and then polls `APP_HEALTH_URL` until it answers 200. Migrations are not
 job: `docker-entrypoint.sh` applies them before the server starts, and one replica means
 they run once.
 
-Until the repository exists, `scripts/deploy-manual.sh` does the same from a clean checkout:
+`scripts/deploy-manual.sh` does the same from a clean checkout, for when the workflow is
+not an option:
 
 ```bash
 RESOURCE_GROUP=reddit-leads-prod scripts/deploy-manual.sh

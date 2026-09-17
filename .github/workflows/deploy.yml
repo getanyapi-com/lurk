@@ -1,9 +1,8 @@
 name: Deploy
 
-# Turning this on means removing `if: false` below and setting the repository
-# variables and secrets listed in the deploy section of README.md. Everything
-# else is finished: the job builds the image, pushes it to the registry, rolls
-# the container app, and waits for the public health path to answer.
+# Every push to main builds the image, pushes it to the registry, rolls the
+# container app, and waits for the public health path to answer. The repository
+# variables and secrets it reads are listed in the deploy section of README.md.
 on:
   push:
     branches: [main]
@@ -15,7 +14,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: false
     runs-on: ubuntu-latest
     permissions:
       id-token: write
