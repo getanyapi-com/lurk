@@ -23,11 +23,12 @@ export type FeedFilter = {
   status: LeadStatus;
   days: FeedWindow;
   /**
-   * One calendar day, as `2026-09-14`, clicked out of the people strip. It
-   * narrows the window rather than replacing it: the pills still say which
-   * window the day was picked from, so clearing it puts you back there.
+   * One slice of the clock, clicked out of the people strip: a month as
+   * `2026-09`, a day as `2026-09-14`, an hour as `2026-09-14T15`. It narrows
+   * the window rather than replacing it, so the pills still say which window
+   * the slice was picked from and clearing it puts you back there.
    */
-  day?: string;
+  at?: string;
   kind?: LeadKind;
   subreddit?: string;
   stage?: string;
@@ -42,7 +43,7 @@ export type FeedParams = {
   project?: string;
   status?: string;
   days?: string;
-  day?: string;
+  at?: string;
   subreddit?: string;
   stage?: string;
   theme?: string;
@@ -55,28 +56,83 @@ function pad(part: number): string {
   return String(part).padStart(2, "0");
 }
 
-/** The local calendar day a moment falls on, the way the URL writes one. */
-export function dayKey(at: Date): string {
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+/**
+ * How wide one slice of the clock is. The strip draws a window in whichever of
+ * these a column of it means, and clicking that column filters the feed to it.
+ */
+export type Grain = "month" | "day" | "hour";
+
+const SHAPE: Record<Grain, RegExp> = {
+  month: /^\d{4}-\d{2}$/,
+  day: /^\d{4}-\d{2}-\d{2}$/,
+  hour: /^\d{4}-\d{2}-\d{2}T\d{2}$/,
+};
+
+/** The slice a moment falls in, at one grain, the way the URL writes it. */
+export function atKey(at: Date, grain: Grain): string {
+  const day = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+  if (grain === "month") {
+    return day.slice(0, 7);
+  }
+  return grain === "day" ? day : `${day}T${pad(at.getHours())}`;
 }
 
-/** Midnight to midnight, local, for one of those keys. */
-export function dayBounds(day: string): { start: Date; end: Date } {
-  const [year, month, date] = day.split("-").map(Number);
-  return { start: new Date(year, month - 1, date), end: new Date(year, month - 1, date + 1) };
+/** Which of the three a key is, by its shape, or nothing when it is none of them. */
+export function grainOf(at: string): Grain | null {
+  return (Object.keys(SHAPE) as Grain[]).find((grain) => SHAPE[grain].test(at)) ?? null;
+}
+
+/** When one slice starts and when the next one does, in local time. */
+export function atBounds(at: string): { start: Date; end: Date } {
+  const [date, hour] = at.split("T");
+  const [year, month, day] = date.split("-").map(Number);
+  const grain = grainOf(at);
+  if (grain === "month") {
+    return { start: new Date(year, month - 1, 1), end: new Date(year, month, 1) };
+  }
+  if (grain === "day") {
+    return { start: new Date(year, month - 1, day), end: new Date(year, month - 1, day + 1) };
+  }
+  const start = new Date(year, month - 1, day, Number(hour));
+  return { start, end: new Date(year, month - 1, day, Number(hour) + 1) };
+}
+
+/** What one reads as in a sentence: "August", "August 24", "2pm on August 24". */
+export function atLabel(at: string): string {
+  const { start } = atBounds(at);
+  const grain = grainOf(at);
+  if (grain === "month") {
+    return start.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  }
+  const day = start.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+  if (grain === "day") {
+    return day;
+  }
+  const hour = start.toLocaleTimeString(undefined, { hour: "numeric" }).toLowerCase().replace(/\s+/g, "");
+  return `${hour} on ${day}`;
+}
+
+/** The same, with the preposition the grain takes, for a sentence about it. */
+export function atSentence(at: string): string {
+  const grain = grainOf(at);
+  return `${grain === "month" ? "in" : grain === "day" ? "on" : "at"} ${atLabel(at)}`;
 }
 
 /**
- * The day a URL names, or nothing. It has to round-trip through a real date:
+ * The slice a URL names, or nothing. It has to round-trip through a real date:
  * `2026-02-31` parses in JavaScript, as the third of March, and a day the feed
  * agreed to filter on but the strip never draws is a filter you cannot clear
  * by clicking the same column again.
  */
-function oneDay(value: string | undefined): string | undefined {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+function oneSlice(value: string | undefined): string | undefined {
+  if (!value) {
     return undefined;
   }
-  return dayKey(dayBounds(value).start) === value ? value : undefined;
+  const grain = grainOf(value);
+  if (!grain) {
+    return undefined;
+  }
+  return atKey(atBounds(value).start, grain) === value ? value : undefined;
 }
 
 /**
@@ -88,7 +144,7 @@ export function feedFilter(params: FeedParams): FeedFilter {
   return {
     status: STATUSES.find((one) => one === params.status) ?? "new",
     days: FEED_WINDOWS.find((one) => String(one) === params.days) ?? 30,
-    day: oneDay(params.day),
+    at: oneSlice(params.at),
     subreddit: params.subreddit || undefined,
     stage: params.stage || undefined,
     theme: params.theme || undefined,

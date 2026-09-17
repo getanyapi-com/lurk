@@ -63,46 +63,57 @@ describe("the lead stream", () => {
       subreddit: "hotels",
     });
 
-    const { columns, live } = timeline([face("today", 0), face("older", 5)], { days: 7 }, now);
+    const { columns, grain, live } = timeline([face("today", 0), face("older", 5)], { days: 7 }, now);
 
+    expect(grain).toBe("day");
     expect(columns).toHaveLength(7);
     expect(columns.at(-1)?.faces.map((one) => one.id)).toEqual(["today"]);
-    expect(columns.at(-1)?.day).toBe("2026-09-17");
+    expect(columns.at(-1)?.key).toBe("2026-09-17");
     expect(columns.at(-6)?.faces.map((one) => one.id)).toEqual(["older"]);
     // The quiet days between the two keep their room rather than closing up.
     expect(columns.filter((column) => column.faces.length === 0)).toHaveLength(5);
     expect(live).toBe(true);
   });
 
-  it("lays one day out in hours, and those are not days to click", () => {
+  it("drops a step when a slice is picked: a day into hours, a month into days", () => {
     const now = new Date(2026, 8, 17, 15, 30).getTime();
-    const at = (hour: number): Date => new Date(2026, 8, 14, hour, 10);
-    const face = (id: string, hour: number, score = 70): LeadFace => ({
+    const face = (id: string, at: Date, score = 70): LeadFace => ({
       id,
-      at: at(hour),
+      at,
       score,
       author: "asker",
       avatarUrl: null,
       subreddit: "hotels",
     });
+    const morning = face("morning", new Date(2026, 8, 14, 9, 10));
+    const best = face("best", new Date(2026, 8, 14, 9, 40), 95);
+    const night = face("night", new Date(2026, 8, 14, 22, 5));
 
-    const { columns, ticks, live } = timeline(
-      [face("morning", 9), face("best", 9, 95), face("night", 22)],
-      { days: 30, day: "2026-09-14" },
-      now,
-    );
+    const day = timeline([morning, best, night], { days: 30, at: "2026-09-14" }, now);
 
-    expect(columns).toHaveLength(24);
-    expect(columns[9].faces.map((one) => one.id)).toEqual(["best", "morning"]);
-    expect(columns[22].faces.map((one) => one.id)).toEqual(["night"]);
-    expect(columns.every((column) => column.day === null)).toBe(true);
+    expect(day.grain).toBe("hour");
+    expect(day.columns).toHaveLength(24);
+    expect(day.columns[9].faces.map((one) => one.id)).toEqual(["best", "morning"]);
+    expect(day.columns[9].key).toBe("2026-09-14T09");
+    expect(day.columns[22].faces.map((one) => one.id)).toEqual(["night"]);
     // A day already gone by has no "now" on it to colour.
-    expect(live).toBe(false);
-    expect(ticks.at(0)?.index).toBe(0);
-    expect(ticks.at(-1)?.index).toBe(23);
+    expect(day.live).toBe(false);
+
+    // An hour picked still reads its own day, so the neighbouring hours are
+    // there to move to and the one picked is there to click off again.
+    const hour = timeline([morning, best, night], { days: 30, at: "2026-09-14T09" }, now);
+    expect(hour.grain).toBe("hour");
+    expect(hour.columns[9].key).toBe("2026-09-14T09");
+
+    const month = timeline([morning, best, night], { days: 30, at: "2026-09" }, now);
+    expect(month.grain).toBe("day");
+    // September, all thirty days of it, whatever window it was picked from.
+    expect(month.columns).toHaveLength(30);
+    expect(month.columns[13].key).toBe("2026-09-14");
+    expect(month.columns[13].faces).toHaveLength(3);
   });
 
-  it("draws all time in whole days, from the oldest lead to today", () => {
+  it("reads a long backfill in months, and a short one still in days", () => {
     const now = new Date(2026, 8, 17, 15, 30).getTime();
     const face = (id: string, daysAgo: number): LeadFace => ({
       id,
@@ -113,14 +124,38 @@ describe("the lead stream", () => {
       subreddit: "hotels",
     });
 
-    const { columns } = timeline([face("old", 300), face("new", 0)], { days: "all" }, now);
+    const long = timeline([face("old", 300), face("new", 0)], { days: "all" }, now);
 
-    // A year of backfill still fits the card: thirty columns at most, and the
-    // oldest lead is inside the first of them. A column is a fortnight there,
-    // so it is not one day and not a day the feed can be filtered to.
-    expect(columns.length).toBeLessThanOrEqual(30);
-    expect(columns[0].faces.map((one) => one.id)).toEqual(["old"]);
-    expect(columns.at(-1)?.faces.map((one) => one.id)).toEqual(["new"]);
-    expect(columns.at(-1)?.day).toBeNull();
+    expect(long.grain).toBe("month");
+    expect(long.columns.at(-1)?.key).toBe("2026-09");
+    expect(long.columns.at(-1)?.faces.map((one) => one.id)).toEqual(["new"]);
+    expect(long.columns[0].faces.map((one) => one.id)).toEqual(["old"]);
+    // Eleven months, one column each: a year of leads still fits the card.
+    expect(long.columns.length).toBeLessThanOrEqual(31);
+
+    const short = timeline([face("old", 20), face("new", 0)], { days: "all" }, now);
+    expect(short.grain).toBe("day");
+    expect(short.columns.at(-1)?.key).toBe("2026-09-17");
+  });
+
+  it("labels the axis often enough to read, and thins it for a narrow card", () => {
+    const now = new Date(2026, 8, 17, 15, 30).getTime();
+    const faces: LeadFace[] = [
+      { id: "one", at: new Date(now), score: 70, author: "a", avatarUrl: null, subreddit: "h" },
+    ];
+
+    const { columns, ticks } = timeline(faces, { days: 30 }, now);
+
+    expect(columns).toHaveLength(30);
+    // Both ends always, and enough between them to find a date by reading
+    // rather than by counting columns.
+    expect(ticks.length).toBeGreaterThanOrEqual(7);
+    expect(ticks[0].index).toBe(0);
+    expect(ticks.at(-1)?.index).toBe(29);
+    expect(ticks[0].sparse).toBe(true);
+    expect(ticks.at(-1)?.sparse).toBe(true);
+    // The narrow set is a subset of the wide one, so a small card never labels
+    // a column a big one leaves bare.
+    expect(ticks.filter((tick) => tick.sparse).length).toBeLessThan(ticks.length);
   });
 });

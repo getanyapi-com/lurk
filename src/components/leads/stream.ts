@@ -1,6 +1,6 @@
-import { dayBounds, dayKey } from "@/lib/feed";
+import { atBounds, atKey, grainOf } from "@/lib/feed";
 
-import type { FeedRow, FeedWindow, LeadFace } from "@/lib/feed";
+import type { FeedRow, FeedWindow, Grain, LeadFace } from "@/lib/feed";
 import type { FeedLead } from "@/lib/leads";
 
 /** One lead as the workspace shows it: the post or comment, and how it judged. */
@@ -115,48 +115,64 @@ export function buildStream(cards: CardLead[]): StreamEntry[] {
   return cards.map((lead): StreamEntry => ({ id: `lead-${lead.id}`, at: lead.createdAt, lead }));
 }
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** How many columns the widest windows are drawn in. */
-const COLUMNS = 30;
+const COLUMNS = 31;
+
+/** Past this many days, all time is read in months rather than in days. */
+const MONTHS_OVER_DAYS = 62;
 
 /** One column of the people strip: a slice of the window, and who posted in it. */
 export type StreamColumn = {
   /** The moment the slice starts, in milliseconds. */
   at: number;
-  /**
-   * The calendar day this column is, when it is exactly one, and null when it
-   * is not: an hour of a day already chosen, or a fortnight of an old backfill.
-   * A column with a day is a column you can click to filter the feed to it.
-   */
-  day: string | null;
+  /** The slice itself, as the URL writes it. Clicking the column filters to it. */
+  key: string;
+  /** What the slice is called on the axis, and in the hint when it is hovered. */
+  label: string;
   /** The faces in the slice, best score first. */
   faces: LeadFace[];
 };
 
-/** One dated label under the strip, on the column it belongs to. */
-export type StreamTick = { index: number; label: string };
+/** One label under the strip, on the column it belongs to. */
+export type StreamTick = {
+  index: number;
+  label: string;
+  /** Whether it survives on a card too narrow to hold every label. */
+  sparse: boolean;
+};
 
 /** The people strip as it is drawn: a fixed row of columns, and its axis. */
 export type StreamTimeline = {
   columns: StreamColumn[];
   ticks: StreamTick[];
+  /** What one column of this strip means, which is what clicking one filters to. */
+  grain: Grain;
   /** Whether the last column is the one happening now, so its label can say so. */
   live: boolean;
 };
 
-/** The window the strip draws: the pills' own, narrowed to a day when one is picked. */
-export type StripWindow = { days: FeedWindow; day?: string };
+/** The window the strip draws: the pills' own, narrowed to a slice when one is picked. */
+export type StripWindow = { days: FeedWindow; at?: string };
 
-function startOfDay(ms: number): number {
-  const date = new Date(ms);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+/** The start of the slice `count` steps on from this one. */
+function step(from: Date, grain: Grain, count: number): Date {
+  const year = from.getFullYear();
+  const month = from.getMonth();
+  const date = from.getDate();
+  if (grain === "month") {
+    return new Date(year, month + count, 1);
+  }
+  if (grain === "day") {
+    return new Date(year, month, date + count);
+  }
+  return new Date(year, month, date, from.getHours() + count);
 }
 
-/** The slice the column containing `now` ends on, so today is always drawn. */
-function endOn(from: number, now: number, step: number): number {
-  return from + Math.floor((now - from) / step) * step + step;
+/** The slice a moment sits in, as a date. */
+function floorTo(at: Date, grain: Grain): Date {
+  return atBounds(atKey(at, grain)).start;
 }
 
 function oldestOf(faces: LeadFace[], fallback: number): number {
@@ -164,61 +180,69 @@ function oldestOf(faces: LeadFace[], fallback: number): number {
 }
 
 /**
- * How one window is cut up: the width of a column, where the first one starts
+ * How one window is cut up: what a column means, where the first one starts,
  * and how many there are.
  *
- * A column is a day unless the window is already one day, and then it is an
- * hour. That is what makes the strip answer the question the feed is asking:
- * over a week or a month you want to know which day people asked on, and you
- * get the hour-by-hour reading of a day by picking that day.
+ * A column is one step finer than the window it draws, so clicking one always
+ * takes you somewhere new: a month of leads is drawn in days, a day of them in
+ * hours, and a backfill reaching back a year is drawn in months. That is what
+ * makes the strip answer the question the feed is asking rather than repeating
+ * the pill above it.
  */
-function shape(faces: LeadFace[], window: StripWindow, now: number) {
-  if (window.day) {
-    return { step: HOUR_MS, start: dayBounds(window.day).start.getTime(), count: 24 };
+function shape(faces: LeadFace[], window: StripWindow, now: number): {
+  grain: Grain;
+  start: Date;
+  count: number;
+} {
+  const picked = window.at ? grainOf(window.at) : null;
+  if (picked === "month") {
+    const { start, end } = atBounds(window.at as string);
+    return { grain: "day", start, count: Math.round((end.getTime() - start.getTime()) / DAY_MS) };
+  }
+  if (picked) {
+    // A day or an hour of one: the day it belongs to, read hour by hour.
+    return { grain: "hour", start: floorTo(atBounds(window.at as string).start, "day"), count: 24 };
   }
   if (window.days === 1) {
-    // Off the local day, not off the epoch: an hour is a named hour here, and
-    // half-hour zones would have cut every column across two of them.
-    const end = endOn(startOfDay(now), now, HOUR_MS);
-    return { step: HOUR_MS, start: end - 24 * HOUR_MS, count: 24 };
+    // The last 24 hours, ending on the hour happening now.
+    return { grain: "hour", start: step(floorTo(new Date(now), "hour"), "hour", -23), count: 24 };
   }
-  const end = startOfDay(now) + DAY_MS;
+  const today = floorTo(new Date(now), "day");
   if (window.days !== "all") {
-    return { step: DAY_MS, start: end - window.days * DAY_MS, count: window.days };
+    return { grain: "day", start: step(today, "day", 1 - window.days), count: window.days };
   }
-  // All time is as long as the oldest lead, in whole days so the labels are
-  // dates: a project with a year of backfill gets fortnight-wide columns.
-  const span = Math.max(end - startOfDay(oldestOf(faces, now)), DAY_MS);
-  const step = Math.max(Math.ceil(span / (COLUMNS * DAY_MS)), 1) * DAY_MS;
-  // Never fewer than a week of columns: one lead on the day it arrived is a
-  // strip of one column, and it drew that face alone in the middle of the card.
-  const count = Math.max(Math.ceil(span / step), 7);
-  return { step, start: end - count * step, count };
+  const oldest = new Date(oldestOf(faces, now));
+  const days = Math.round((today.getTime() - floorTo(oldest, "day").getTime()) / DAY_MS) + 1;
+  if (days <= MONTHS_OVER_DAYS) {
+    // Never fewer than a week of columns: one lead on the day it arrived drew
+    // that face alone in the middle of the card.
+    const count = Math.max(days, 7);
+    return { grain: "day", start: step(today, "day", 1 - count), count };
+  }
+  const first = floorTo(oldest, "month");
+  const months =
+    (today.getFullYear() - first.getFullYear()) * 12 + today.getMonth() - first.getMonth() + 1;
+  return { grain: "month", start: step(today, "month", 1 - Math.min(months, COLUMNS)), count: Math.min(months, COLUMNS) };
 }
 
-/**
- * What a tick says. A window of a day or two is read in hours and anything
- * longer in dates: a month of columns labelled by hour said nothing at all.
- */
-function tickLabel(at: number, span: number): string {
-  const date = new Date(at);
-  if (span <= 2 * DAY_MS) {
+/** What a column is called, at the grain it is drawn in. */
+function columnLabel(at: Date, grain: Grain): string {
+  const date = at;
+  if (grain === "hour") {
     return date
       .toLocaleTimeString(undefined, { hour: "numeric" })
       .toLowerCase()
       .replace(/\s+/g, "");
   }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (grain === "day") {
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  // Four digits of year, because "Sep 25" beside "Sep 17" reads as a date.
+  return date.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
 
-/**
- * Five or so labels across the strip, always including both ends. The last one
- * is where the window runs out, and it is the one worth reading, so a tick that
- * would crowd it is dropped rather than drawn on top of it.
- */
-function ticksOn(columns: StreamColumn[], step: number): StreamTick[] {
-  const last = columns.length - 1;
-  const every = Math.max(Math.round(last / 4), 1);
+/** Evenly spaced column indexes, always both ends, never crowding the last. */
+function series(last: number, every: number): number[] {
   const at: number[] = [];
   for (let index = 0; index < last; index += every) {
     at.push(index);
@@ -227,8 +251,26 @@ function ticksOn(columns: StreamColumn[], step: number): StreamTick[] {
     at.pop();
   }
   at.push(last);
-  const span = columns.length * step;
-  return at.map((index) => ({ index, label: tickLabel(columns[index].at, span) }));
+  return at;
+}
+
+/**
+ * The labels under the strip. Roughly one every eight columns is what a card
+ * this wide holds, and a narrow one keeps every fourth of those: a reader who
+ * has to count columns from "Aug 19" to find the seventh of September is
+ * reading a chart with no axis on it.
+ */
+function ticksOn(columns: StreamColumn[]): StreamTick[] {
+  const last = columns.length - 1;
+  const at = series(last, Math.max(Math.round(last / 8), 1));
+  // The narrow set is taken out of the wide one, so nothing is labelled on a
+  // small card that a big one does not also label.
+  const keep = Math.max(Math.round(at.length / 5), 1);
+  return at.map((index, n) => ({
+    index,
+    label: columns[index].label,
+    sparse: n % keep === 0 || n === at.length - 1,
+  }));
 }
 
 /**
@@ -246,20 +288,38 @@ export function timeline(
   window: StripWindow,
   now = Date.now(),
 ): StreamTimeline {
-  const { step, start, count } = shape(faces, window, now);
-  const columns: StreamColumn[] = Array.from({ length: count }, (_, index) => {
-    const at = start + index * step;
-    return { at, day: step === DAY_MS ? dayKey(new Date(at)) : null, faces: [] };
-  });
+  const { grain, start, count } = shape(faces, window, now);
+  const columns: StreamColumn[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const at = step(start, grain, index);
+    columns.push({
+      at: at.getTime(),
+      key: atKey(at, grain),
+      label: columnLabel(at, grain),
+      faces: [],
+    });
+  }
+  const byKey = new Map(columns.map((column, index) => [column.key, index]));
+  const end = step(start, grain, count).getTime();
   for (const face of faces) {
-    const index = Math.floor((face.at.getTime() - start) / step);
-    columns[Math.min(Math.max(index, 0), count - 1)].faces.push(face);
+    // By key, so a month of 28 days and an hour a clock change repeats both
+    // land where they were posted. Anything outside is held at the near end.
+    const known = byKey.get(atKey(face.at, grain));
+    const index =
+      known ?? (face.at.getTime() < columns[0].at ? 0 : face.at.getTime() >= end ? count - 1 : null);
+    if (index !== null) {
+      columns[index].faces.push(face);
+    }
   }
   for (const column of columns) {
     column.faces.sort((a, b) => b.score - a.score);
   }
-  const end = start + count * step;
-  return { columns, ticks: ticksOn(columns, step), live: now >= end - step && now < end };
+  return {
+    columns,
+    ticks: ticksOn(columns),
+    grain,
+    live: now >= columns[count - 1].at && now < end,
+  };
 }
 
 /**

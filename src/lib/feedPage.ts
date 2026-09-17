@@ -37,7 +37,7 @@ function filterKey(filter: FeedFilter): string {
     filter.subreddit ?? null,
     filter.stage ?? null,
     filter.theme ?? null,
-    filter.day ?? null,
+    filter.at ?? null,
   ]);
 }
 
@@ -47,15 +47,15 @@ async function readFeedPage(projectId: string, filter: FeedFilter): Promise<Feed
     countLeads(projectId, filter),
     listLeadFaces(projectId, filter),
     feedFacets(projectId),
-    listReviewItems(projectId, filter.days, filter.day),
+    listReviewItems(projectId, filter.days, filter.at),
     scanReport(projectId, filter.days),
   ]);
-  // The whole of time, and the whole of it: the day a strip column picked is
+  // The whole of time, and the whole of it: the slice a strip column picked is
   // dropped with the window, or the count offered as "in all time" would still
   // be one day of it.
   const elsewhere =
-    total === 0 && filter.status === "new" && (filter.days !== "all" || filter.day)
-      ? await countLeads(projectId, { ...filter, days: "all", day: undefined })
+    total === 0 && filter.status === "new" && (filter.days !== "all" || filter.at)
+      ? await countLeads(projectId, { ...filter, days: "all", at: undefined })
       : 0;
   return { rows, total, faces, facets, review, report, elsewhere };
 }

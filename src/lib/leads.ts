@@ -14,7 +14,7 @@ import {
 } from "@/db/schema";
 import { forgetProjectFeed } from "./projectFeedCache";
 import { DEFAULT_SCORE_THRESHOLD } from "./scan/constants";
-import { dayBounds } from "./feed";
+import { atBounds } from "./feed";
 
 import type {
   FeedFacets,
@@ -113,15 +113,15 @@ export function newerThan(days: FeedWindow) {
 }
 
 /**
- * One calendar day out of that window, clicked in the people strip. Local
- * midnight to local midnight, on the same need date the window is read by, so
- * a column of faces and the list under it hold exactly the same leads.
+ * One slice of that window - a month, a day, an hour - clicked in the people
+ * strip. Read on the same need date the window is, so a column of faces and
+ * the list under it hold exactly the same leads.
  */
-export function onDay(day: string | undefined) {
-  if (!day) {
+export function onAt(at: string | undefined) {
+  if (!at) {
     return undefined;
   }
-  const { start, end } = dayBounds(day);
+  const { start, end } = atBounds(at);
   return sql`${NEED_AT} >= ${start.toISOString()}::timestamptz and ${NEED_AT} < ${end.toISOString()}::timestamptz`;
 }
 
@@ -156,7 +156,7 @@ function feedWhere(projectId: string, filter: FeedFilter) {
     eq(leads.status, filter.status),
     OVER_THRESHOLD,
     newerThan(filter.days),
-    onDay(filter.day),
+    onAt(filter.at),
     filter.kind ? eq(leads.kind, filter.kind) : undefined,
     filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
     filter.stage ? eq(leads.stage, filter.stage) : undefined,
@@ -247,7 +247,7 @@ export async function findLead(projectId: string, leadId: string): Promise<FeedL
 export async function listReviewItems(
   projectId: string,
   days: FeedWindow,
-  day?: string,
+  at?: string,
 ): Promise<ReviewItem[]> {
   const rows = await db()
     .select({
@@ -284,7 +284,7 @@ export async function listReviewItems(
         eq(leadEvaluations.projectId, projectId),
         eq(leadEvaluations.decision, "review"),
         newerThan(days),
-        onDay(day),
+        onAt(at),
         notExists(
           db()
             .select({ one: sql`1` })
