@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { forgetProjectFeed } from "./projectFeedCache";
 import { DEFAULT_SCORE_THRESHOLD } from "./scan/constants";
+import { dayBounds } from "./feed";
 
 import type {
   FeedFacets,
@@ -112,6 +113,19 @@ export function newerThan(days: FeedWindow) {
 }
 
 /**
+ * One calendar day out of that window, clicked in the people strip. Local
+ * midnight to local midnight, on the same need date the window is read by, so
+ * a column of faces and the list under it hold exactly the same leads.
+ */
+export function onDay(day: string | undefined) {
+  if (!day) {
+    return undefined;
+  }
+  const { start, end } = dayBounds(day);
+  return sql`${NEED_AT} >= ${start.toISOString()}::timestamptz and ${NEED_AT} < ${end.toISOString()}::timestamptz`;
+}
+
+/**
  * The project's own minimum score, applied when the feed is read. Moving it on
  * the Product page changes the next page load, with no rescan and nothing
  * deleted, because the judgement and the user's floor are different facts. The
@@ -142,6 +156,7 @@ function feedWhere(projectId: string, filter: FeedFilter) {
     eq(leads.status, filter.status),
     OVER_THRESHOLD,
     newerThan(filter.days),
+    onDay(filter.day),
     filter.kind ? eq(leads.kind, filter.kind) : undefined,
     filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
     filter.stage ? eq(leads.stage, filter.stage) : undefined,
@@ -232,6 +247,7 @@ export async function findLead(projectId: string, leadId: string): Promise<FeedL
 export async function listReviewItems(
   projectId: string,
   days: FeedWindow,
+  day?: string,
 ): Promise<ReviewItem[]> {
   const rows = await db()
     .select({
@@ -268,6 +284,7 @@ export async function listReviewItems(
         eq(leadEvaluations.projectId, projectId),
         eq(leadEvaluations.decision, "review"),
         newerThan(days),
+        onDay(day),
         notExists(
           db()
             .select({ one: sql`1` })

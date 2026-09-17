@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildStream, groupByDay, type CardLead } from "@/components/leads/stream";
+import { buildStream, timeline, type CardLead } from "@/components/leads/stream";
 import type { LeadFace } from "@/lib/feed";
 
 /**
@@ -52,18 +52,75 @@ describe("the lead stream", () => {
     expect(entries.map((entry) => entry.lead.id)).toEqual(["strong", "weak"]);
   });
 
-  it("still groups the people strip by day, newest day first", () => {
-    const face = (id: string, ageDays: number): LeadFace => ({
+  it("draws a window of days in days, so a column is a day you can click", () => {
+    const now = new Date(2026, 8, 17, 15, 30).getTime();
+    const face = (id: string, daysAgo: number): LeadFace => ({
       id,
-      at: new Date(Date.now() - ageDays * DAY_MS),
+      at: new Date(now - daysAgo * DAY_MS),
       score: 70,
       author: "asker",
       avatarUrl: null,
       subreddit: "hotels",
     });
 
-    const days = groupByDay([face("strong", 20), face("weak", 1)]);
+    const { columns, live } = timeline([face("today", 0), face("older", 5)], { days: 7 }, now);
 
-    expect(days.map((day) => day.faces.map((one) => one.id))).toEqual([["weak"], ["strong"]]);
+    expect(columns).toHaveLength(7);
+    expect(columns.at(-1)?.faces.map((one) => one.id)).toEqual(["today"]);
+    expect(columns.at(-1)?.day).toBe("2026-09-17");
+    expect(columns.at(-6)?.faces.map((one) => one.id)).toEqual(["older"]);
+    // The quiet days between the two keep their room rather than closing up.
+    expect(columns.filter((column) => column.faces.length === 0)).toHaveLength(5);
+    expect(live).toBe(true);
+  });
+
+  it("lays one day out in hours, and those are not days to click", () => {
+    const now = new Date(2026, 8, 17, 15, 30).getTime();
+    const at = (hour: number): Date => new Date(2026, 8, 14, hour, 10);
+    const face = (id: string, hour: number, score = 70): LeadFace => ({
+      id,
+      at: at(hour),
+      score,
+      author: "asker",
+      avatarUrl: null,
+      subreddit: "hotels",
+    });
+
+    const { columns, ticks, live } = timeline(
+      [face("morning", 9), face("best", 9, 95), face("night", 22)],
+      { days: 30, day: "2026-09-14" },
+      now,
+    );
+
+    expect(columns).toHaveLength(24);
+    expect(columns[9].faces.map((one) => one.id)).toEqual(["best", "morning"]);
+    expect(columns[22].faces.map((one) => one.id)).toEqual(["night"]);
+    expect(columns.every((column) => column.day === null)).toBe(true);
+    // A day already gone by has no "now" on it to colour.
+    expect(live).toBe(false);
+    expect(ticks.at(0)?.index).toBe(0);
+    expect(ticks.at(-1)?.index).toBe(23);
+  });
+
+  it("draws all time in whole days, from the oldest lead to today", () => {
+    const now = new Date(2026, 8, 17, 15, 30).getTime();
+    const face = (id: string, daysAgo: number): LeadFace => ({
+      id,
+      at: new Date(now - daysAgo * DAY_MS),
+      score: 70,
+      author: "asker",
+      avatarUrl: null,
+      subreddit: "hotels",
+    });
+
+    const { columns } = timeline([face("old", 300), face("new", 0)], { days: "all" }, now);
+
+    // A year of backfill still fits the card: thirty columns at most, and the
+    // oldest lead is inside the first of them. A column is a fortnight there,
+    // so it is not one day and not a day the feed can be filtered to.
+    expect(columns.length).toBeLessThanOrEqual(30);
+    expect(columns[0].faces.map((one) => one.id)).toEqual(["old"]);
+    expect(columns.at(-1)?.faces.map((one) => one.id)).toEqual(["new"]);
+    expect(columns.at(-1)?.day).toBeNull();
   });
 });

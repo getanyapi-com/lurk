@@ -47,6 +47,8 @@ function allTimeHref(params: Record<string, string | undefined>): string {
     }
   }
   query.set("days", "all");
+  // The day a strip column picked goes with the window it narrowed.
+  query.delete("day");
   return `?${query.toString()}`;
 }
 
@@ -133,7 +135,7 @@ export async function Feed({ projectId, params }: FeedProps) {
       </div>
 
       <ActivityPoll busy={isBusy(activity)} />
-      <PeopleStrip faces={faces} />
+      <PeopleStrip faces={faces} days={filter.days} day={filter.day} params={params} />
       <FeedFilters facets={facets} />
 
       <OpeningProvider serverSelectedId={selectedId}>

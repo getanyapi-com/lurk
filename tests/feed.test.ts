@@ -220,3 +220,30 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     expect(faces[0].at).toBeInstanceOf(Date);
   });
 });
+
+/**
+ * The day a column in the people strip puts in the URL, read back. It reaches
+ * a SQL bound, so a value that is not one of ours has to become no filter at
+ * all rather than a date JavaScript was willing to invent.
+ */
+describe("the day one strip column filters to", () => {
+  it("takes a real calendar day and drops anything else", async () => {
+    const { feedFilter } = await import("@/lib/feed");
+
+    expect(feedFilter({ day: "2026-09-14" }).day).toBe("2026-09-14");
+    // February the thirty-first parses, as the third of March. It is not a day.
+    expect(feedFilter({ day: "2026-02-31" }).day).toBeUndefined();
+    expect(feedFilter({ day: "yesterday" }).day).toBeUndefined();
+    expect(feedFilter({ day: "2026-09-14'; drop table leads--" }).day).toBeUndefined();
+    expect(feedFilter({}).day).toBeUndefined();
+  });
+
+  it("keeps the window the day was picked from, so it can be handed back", async () => {
+    const { feedFilter } = await import("@/lib/feed");
+
+    expect(feedFilter({ days: "7", day: "2026-09-14" })).toMatchObject({
+      days: 7,
+      day: "2026-09-14",
+    });
+  });
+});
