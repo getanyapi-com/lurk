@@ -60,7 +60,6 @@ export const projects = pgTable("projects", {
   targetUsers: text("target_users"),
   geography: text("geography"),
   budgetFit: text("budget_fit"),
-  voiceProfile: text("voice_profile"),
   scoreThreshold: integer("score_threshold"),
   /**
    * Bumped on every edit to the facts a judgement is made against. A stored
@@ -303,17 +302,6 @@ export const leadEvaluations = pgTable(
     index("lead_evaluations_project_decision_idx").on(t.projectId, t.decision),
   ],
 );
-
-export const drafts = pgTable("drafts", {
-  id: id(),
-  leadId: text("lead_id")
-    .notNull()
-    .references(() => leads.id, { onDelete: "cascade" }),
-  kind: text("kind").notNull(),
-  mode: text("mode").notNull(),
-  text: text("text").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
 
 export const seoOpportunities = pgTable("seo_opportunities", {
   id: id(),

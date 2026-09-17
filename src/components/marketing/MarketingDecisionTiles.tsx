@@ -1,20 +1,20 @@
-import { Copy, Mail, MessageSquare, ShieldCheck, Tags, Webhook } from "lucide-react";
+import { Mail, MessageSquare, Quote, ShieldCheck, Tags, Webhook } from "lucide-react";
 import { BrandImage } from "./BrandImage";
 import { EyebrowLink } from "./EyebrowLink";
-import { ALERT_THREAD, DRAFT_THREAD, MOCK_DRAFT, RULE_THREAD } from "./mockContent";
+import { ALERT_THREAD, MOCK_DETAIL, RULE_THREAD } from "./mockContent";
 import { MENTION_TALLY, SAVED_THEMES } from "./researchContent";
 import { ThreadIdentity } from "./ThreadIdentity";
 
 /** Four quiet tiles: what lurk puts in front of you before you decide to reply. */
 export function MarketingDecisionTiles() {
   return (
-    <section className="decision-section" id="drafts" data-proof="reply">
+    <section className="decision-section" id="decide" data-proof="reply">
       <header className="centered-heading">
         <EyebrowLink href="#costs">Your reply, your decision</EyebrowLink>
         <h2>Context first. Nothing sends.</h2>
         <p>
-          Read the community rule, draft in your voice, and copy it yourself. lurk never posts
-          or DMs on your behalf.
+          The community rule, the reason it scored and what keeps coming up, all in front of
+          you before you type a word. lurk never posts or DMs on your behalf.
         </p>
       </header>
       <div className="four-up">
@@ -39,24 +39,22 @@ export function MarketingDecisionTiles() {
         </figure>
         <figure>
           <div className="quiet-tile">
-            <div className="quiet-card quiet-draft">
-              <div className="quiet-tabs">
-                <span data-on>Comment</span>
-                <span>DM</span>
-                <span data-on>Starter</span>
-                <span>Pitch</span>
+            <div className="quiet-card quiet-reason">
+              <ThreadIdentity thread={MOCK_DETAIL} />
+              <strong>{MOCK_DETAIL.title}</strong>
+              <div className="policy-line">
+                <Quote />
+                <span>
+                  {MOCK_DETAIL.stage}
+                  <small>{MOCK_DETAIL.reason}</small>
+                </span>
               </div>
-              <small>Reply to u/{DRAFT_THREAD.author}</small>
-              <p>{MOCK_DRAFT}</p>
-              <span className="quiet-button">
-                <Copy size={14} />
-                Copy
-              </span>
+              <p>&ldquo;{MOCK_DETAIL.matchedPhrase}&rdquo;</p>
             </div>
           </div>
           <figcaption>
-            <strong>A draft in your voice</strong> Comment or DM, a conversation starter by
-            default, edited by you and copied by you.
+            <strong>Why it scored</strong> The stage they are at, one sentence of reasoning,
+            and the exact words that matched.
           </figcaption>
         </figure>
         <figure>

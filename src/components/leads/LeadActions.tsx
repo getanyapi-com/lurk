@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Check, Copy, ExternalLink, EyeOff, PenLine, ThumbsDown } from "lucide-react";
+import { useState } from "react";
+import { Check, Copy, ExternalLink, EyeOff, ThumbsDown } from "lucide-react";
 import { hideLeadAction, markNotFitAction } from "@/app/app/leads/actions";
-import { DraftPanel } from "@/components/drafts/DraftPanel";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 
@@ -20,40 +19,17 @@ type LeadActionsProps = {
   leadId: string;
   url: string;
   title: string;
-  subreddit: string;
-  promoPolicy: string | null;
 };
 
 /**
- * The foot of the detail pane. Writing the reply is the one thing this page is
- * for, so it is the only filled button; opening the thread and taking the lead
- * out of the feed sit beside it. The draft opens underneath, where it is read.
+ * The foot of the detail pane. Reading the thread on Reddit is the one thing
+ * this page leads to, so it is the only filled button; the rest take the lead
+ * out of the feed or record why it was wrong.
  */
-export function LeadActions({
-  projectId,
-  leadId,
-  url,
-  title,
-  subreddit,
-  promoPolicy,
-}: LeadActionsProps) {
-  const [open, setOpen] = useState(false);
-  const [draftRequests, setDraftRequests] = useState(0);
+export function LeadActions({ projectId, leadId, url, title }: LeadActionsProps) {
   const [copied, setCopied] = useState(false);
   const [picking, setPicking] = useState(false);
-  const draftRef = useRef<HTMLDivElement>(null);
   const iconClass = "size-3.5 text-fg-muted";
-
-  useEffect(() => {
-    if (draftRequests > 0) {
-      draftRef.current?.querySelector("textarea")?.focus();
-    }
-  }, [draftRequests]);
-
-  function draftReply() {
-    setOpen(true);
-    setDraftRequests((count) => count + 1);
-  }
 
   async function copyTitle() {
     await navigator.clipboard.writeText(title);
@@ -64,17 +40,12 @@ export function LeadActions({
   return (
     <div className="flex shrink-0 flex-col gap-3 border-t p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="lg" onClick={draftReply}>
-          <PenLine className="size-3.5" aria-hidden="true" />
-          Draft a reply
-        </Button>
         <Button
-          variant="ghost"
-          size="sm"
+          size="lg"
           nativeButton={false}
           render={
             <a href={url} target="_blank" rel="noreferrer noopener">
-              <ExternalLink className={iconClass} aria-hidden="true" />
+              <ExternalLink className="size-3.5" aria-hidden="true" />
               Open on Reddit
             </a>
           }
@@ -117,16 +88,6 @@ export function LeadActions({
           {copied ? "Copied" : "Copy title"}
         </Button>
       </div>
-      {open ? (
-        <div ref={draftRef}>
-          <DraftPanel
-            projectId={projectId}
-            leadId={leadId}
-            subreddit={subreddit}
-            promoPolicy={promoPolicy}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }

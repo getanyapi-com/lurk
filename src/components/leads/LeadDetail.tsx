@@ -170,8 +170,6 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
         leadId={lead.id}
         url={lead.url}
         title={lead.title}
-        subreddit={lead.subreddit}
-        promoPolicy={lead.promoPolicy}
       />
     </Pane>
   );

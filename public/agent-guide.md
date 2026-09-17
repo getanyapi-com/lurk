@@ -77,10 +77,11 @@ your user what you concluded and why. Quote the poster's own words back to them;
 the `reason` field is the app's one-line judgement, and your job is to check it
 against the body rather than repeat it.
 
-There is no sending in this product. No DM queue, no browser extension, no
-comment posting, no outbox. **Hide** and **not a fit** are actions the human
-takes in the app, and they are the only two states a lead moves into by hand. If
-your user asks you to reply to a lead, write the draft, hand them the text, and
+There is no sending in this product, and no reply writing either. No DM queue,
+no browser extension, no comment posting, no outbox, no drafted replies.
+**Hide** and **not a fit** are actions the human takes in the app, and they are
+the only two states a lead moves into by hand. If your user asks you to reply to
+a lead, the words have to come from you or from them: hand them the text and
 point them at the `url` field. Reddit punishes generic outreach and so do the
 subreddits; a specific, peer-to-peer message that references the actual post is
 the only kind worth sending.

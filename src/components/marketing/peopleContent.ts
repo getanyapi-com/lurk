@@ -36,7 +36,7 @@ export type PeopleCard = {
   title: string;
   caption: string;
   ask: string;
-  shot: "leads" | "seo" | "drafts";
+  shot: "leads" | "seo" | "competitors";
   tone: "pastel-pink" | "pastel-teal" | "pastel-mint";
 };
 
@@ -57,10 +57,10 @@ export const PEOPLE_CARDS: PeopleCard[] = [
     tone: "pastel-teal",
   },
   {
-    title: "Drafts",
-    caption: "A reply in your voice that reacts to the post and asks one question. You copy it; nothing sends.",
-    ask: "Any budgeting app for people who enjoy the budgeting process?",
-    shot: "drafts",
+    title: "Competitors",
+    caption: "Who gets recommended in the threads your leads sit in, and how each mention was meant.",
+    ask: "Free typeform alternative?",
+    shot: "competitors",
     tone: "pastel-mint",
   },
 ];

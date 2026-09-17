@@ -20,7 +20,7 @@ export function MarketingSeoTiles() {
   return (
     <section id="seo" className="seo-tiles" data-proof="seo">
       <header className="left-heading">
-        <EyebrowLink href="#drafts">
+        <EyebrowLink href="#decide">
           <BrandWord name="Reddit" /> SEO
         </EyebrowLink>
         <h2>A reply can outlive the day you write it.</h2>
