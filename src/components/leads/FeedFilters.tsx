@@ -1,8 +1,25 @@
-import { CalendarDays, Filter, Hash, Target } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, Filter, Hash, Target, X } from "lucide-react";
 import { FilterPills, type FilterSpec } from "@/components/FilterPills";
-import { FEED_WINDOWS, type FeedFacets } from "@/lib/feed";
+import { atLabel, FEED_WINDOWS, type FeedFacets, type FeedParams } from "@/lib/feed";
 
-type FeedFiltersProps = { facets: FeedFacets };
+type FeedFiltersProps = {
+  facets: FeedFacets;
+  /** The slice of the clock a strip column picked, when one has been. */
+  at?: string;
+  params: FeedParams;
+};
+
+/** The same page without the slice, keeping every other filter. */
+function clearedHref(params: FeedParams): string {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(params)) {
+    if (value && name !== "at" && name !== "lead") {
+      query.set(name, value);
+    }
+  }
+  return `?${query.toString()}`;
+}
 
 const WINDOW_LABELS: Record<string, string> = {
   1: "Today",
@@ -25,7 +42,7 @@ function label(stage: string): string {
 const ICON = "size-3.5 shrink-0 text-fg-muted";
 
 /** The row of pills over the feed: when, where, how far along, and what state. */
-export function FeedFilters({ facets }: FeedFiltersProps) {
+export function FeedFilters({ facets, at, params }: FeedFiltersProps) {
   const filters: FilterSpec[] = [
     {
       name: "days",
@@ -67,5 +84,25 @@ export function FeedFilters({ facets }: FeedFiltersProps) {
       options: Object.entries(STATUS_LABELS).map(([value, text]) => ({ value, label: text })),
     },
   ];
-  return <FilterPills filters={filters} />;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {/*
+        A slice picked in the strip is a filter like any other, so it says so
+        where the others do. It is not one of the pills because it has no list
+        to choose from: the strip is its control, and this is the receipt.
+      */}
+      {at ? (
+        <Link
+          href={clearedHref(params)}
+          className="text-small inline-flex items-center gap-1.5 rounded-control border border-fg bg-surface-2 py-1 pr-2 pl-2.5 text-fg"
+        >
+          <CalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
+          {atLabel(at)}
+          <X className="size-3.5 shrink-0 text-fg-muted" aria-hidden="true" />
+          <span className="sr-only">Clear this filter</span>
+        </Link>
+      ) : null}
+      <FilterPills filters={filters} />
+    </div>
+  );
 }

@@ -1,4 +1,4 @@
-import { namedCompetitors } from "@/lib/seo/competitors";
+import { competitorsNamed } from "@/lib/competitors/match";
 import type { RankingThread } from "@/lib/seo/thread";
 
 /**
@@ -16,7 +16,7 @@ export function ThreadStatus({
   thread: RankingThread;
   competitors: string[];
 }) {
-  const named = namedCompetitors(competitors, thread.title, thread.body);
+  const named = competitorsNamed(competitors, `${thread.title}\n${thread.body ?? ""}`);
   const closed = thread.isLocked ? "locked" : thread.isArchived ? "archived" : "closed";
   if (!thread.closed && !thread.competitorPresent) {
     return null;

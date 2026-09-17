@@ -24,6 +24,12 @@ export const users = pgTable("users", {
   id: id(),
   clerkUserId: text("clerk_user_id").notNull().unique(),
   email: text("email"),
+  /**
+   * What this user changed about their scan settings, and only that: the
+   * preset owns every value they have not touched. `lib/settings` is the one
+   * reader and the one writer.
+   */
+  settings: jsonb("settings"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -54,7 +60,6 @@ export const projects = pgTable("projects", {
   targetUsers: text("target_users"),
   geography: text("geography"),
   budgetFit: text("budget_fit"),
-  voiceProfile: text("voice_profile"),
   scoreThreshold: integer("score_threshold"),
   /**
    * Bumped on every edit to the facts a judgement is made against. A stored
@@ -140,6 +145,12 @@ export const projectCompetitors = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /**
+     * The site this company sells from, which is where its logo comes from.
+     * Null when nothing we read told us, and then the name wears its initials
+     * rather than a favicon guessed off the spelling.
+     */
+    domain: text("domain"),
     /** What this company is to us: direct substitute, alternative, supplier, reference. */
     role: text("role"),
     ...planColumns(),
@@ -291,17 +302,6 @@ export const leadEvaluations = pgTable(
     index("lead_evaluations_project_decision_idx").on(t.projectId, t.decision),
   ],
 );
-
-export const drafts = pgTable("drafts", {
-  id: id(),
-  leadId: text("lead_id")
-    .notNull()
-    .references(() => leads.id, { onDelete: "cascade" }),
-  kind: text("kind").notNull(),
-  mode: text("mode").notNull(),
-  text: text("text").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
 
 export const seoOpportunities = pgTable("seo_opportunities", {
   id: id(),

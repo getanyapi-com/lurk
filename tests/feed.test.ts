@@ -220,3 +220,50 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     expect(faces[0].at).toBeInstanceOf(Date);
   });
 });
+
+/**
+ * The slice a column in the people strip puts in the URL, read back. It reaches
+ * a SQL bound, so a value that is not one of ours has to become no filter at
+ * all rather than a date JavaScript was willing to invent.
+ */
+describe("the slice one strip column filters to", () => {
+  it("takes a month, a day and an hour, and drops anything else", async () => {
+    const { feedFilter } = await import("@/lib/feed");
+
+    expect(feedFilter({ at: "2026-09" }).at).toBe("2026-09");
+    expect(feedFilter({ at: "2026-09-14" }).at).toBe("2026-09-14");
+    expect(feedFilter({ at: "2026-09-14T15" }).at).toBe("2026-09-14T15");
+    // February the thirty-first parses, as the third of March. It is not a day.
+    expect(feedFilter({ at: "2026-02-31" }).at).toBeUndefined();
+    expect(feedFilter({ at: "2026-09-14T25" }).at).toBeUndefined();
+    expect(feedFilter({ at: "2026-13" }).at).toBeUndefined();
+    expect(feedFilter({ at: "yesterday" }).at).toBeUndefined();
+    expect(feedFilter({ at: "2026-09-14'; drop table leads--" }).at).toBeUndefined();
+    expect(feedFilter({}).at).toBeUndefined();
+  });
+
+  it("bounds each grain from its own start to the next one's", async () => {
+    const { atBounds, atLabel, grainOf } = await import("@/lib/feed");
+
+    expect(grainOf("2026-09")).toBe("month");
+    expect(grainOf("2026-09-14")).toBe("day");
+    expect(grainOf("2026-09-14T15")).toBe("hour");
+
+    // A month is as long as the month is, not thirty days.
+    expect(atBounds("2026-02")).toEqual({
+      start: new Date(2026, 1, 1),
+      end: new Date(2026, 2, 1),
+    });
+    expect(atBounds("2026-09-14T15").end).toEqual(new Date(2026, 8, 14, 16));
+    expect(atLabel("2026-09-14")).toContain("14");
+  });
+
+  it("keeps the window the slice was picked from, so it can be handed back", async () => {
+    const { feedFilter } = await import("@/lib/feed");
+
+    expect(feedFilter({ days: "7", at: "2026-09-14" })).toMatchObject({
+      days: 7,
+      at: "2026-09-14",
+    });
+  });
+});

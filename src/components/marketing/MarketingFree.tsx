@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { PRESETS } from "@/lib/settings/presets";
 import { limitsFor, type TierName } from "@/lib/tiers";
 import { BrandImage } from "./BrandImage";
 import { MONTHLY_PLANS, PRICING_OBSERVED } from "./pricingContent";
@@ -13,6 +14,17 @@ const OPTIONS = [
 type Choice = (typeof OPTIONS)[number]["id"];
 const count = (value: number | null | undefined) =>
   value == null ? "No app limit" : value.toLocaleString("en-US");
+
+/** What the scan cadence preset of each option says, in the visitor's words. */
+function cadenceLabel(choice: Choice): string {
+  if (choice === "self-host") {
+    return "Your schedule";
+  }
+  const cadence = PRESETS[choice].cadence;
+  return cadence.kind === "daily"
+    ? "Daily, at the hour you pick"
+    : `Every ${cadence.hours === 1 ? "hour" : `${cadence.hours} hours`}`;
+}
 
 const MAX_USD = Math.max(...MONTHLY_PLANS.map((plan) => plan.usd));
 
@@ -27,12 +39,7 @@ export function MarketingFree() {
     ["Projects", count(limits?.projects)],
     ["Keywords / project", count(limits?.keywordsPerProject)],
     ["Communities / project", count(limits?.subredditsPerProject)],
-    [
-      "Scan cadence",
-      limits
-        ? `Every ${limits.scanIntervalHours} ${limits.scanIntervalHours === 1 ? "hour" : "hours"}`
-        : "Your schedule",
-    ],
+    ["Scan cadence", cadenceLabel(choice)],
     [
       "SEO refresh",
       limits
@@ -145,7 +152,7 @@ export function MarketingFree() {
         </dl>
         <small>
           {limits
-            ? `${limits.alertCadence === "daily" ? "Daily" : "Hourly"} alerts / ${count(limits.alertWebhooks)} webhook${limits.alertWebhooks === 1 ? "" : "s"}`
+            ? `${limits.alertCadence === "daily" ? "Daily" : "Hourly"} alerts / Slack and Discord, plus ${count(limits.customWebhooks)} custom webhook${limits.customWebhooks === 1 ? "" : "s"}`
             : "Configure Docker, Postgres, Clerk, AnyAPI and OpenRouter. Model usage is billed separately."}
         </small>
       </div>

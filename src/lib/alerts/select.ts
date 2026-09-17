@@ -1,5 +1,10 @@
 import type { TierLimits } from "@/lib/tiers";
-import { WEBHOOK_CHANNELS, type AlertCadence, type AlertChannel, type DigestLead } from "./types";
+import {
+  CUSTOM_WEBHOOK_CHANNEL,
+  type AlertCadence,
+  type AlertChannel,
+  type DigestLead,
+} from "./types";
 
 /** How long one cadence waits between messages. */
 export const CADENCE_MS: Record<AlertCadence, number> = {
@@ -69,22 +74,25 @@ export function selectLeads(
   }));
 }
 
-export function isWebhookChannel(channel: AlertChannel): boolean {
-  return WEBHOOK_CHANNELS.includes(channel);
+export function isCustomWebhook(channel: AlertChannel): boolean {
+  return channel === CUSTOM_WEBHOOK_CHANNEL;
 }
 
-/** How many webhook channels a project already has against what it may have. */
-export function webhookAllowance(
+/** How many custom webhooks a project already has against what it may have. */
+export function customWebhookAllowance(
   existing: AlertChannel[],
   limits: TierLimits | null,
 ): { used: number; limit: number | null; atCap: boolean } {
-  const used = existing.filter(isWebhookChannel).length;
-  const limit = limits?.alertWebhooks ?? null;
+  const used = existing.filter(isCustomWebhook).length;
+  const limit = limits?.customWebhooks ?? null;
   return { used, limit, atCap: limit != null && used >= limit };
 }
 
 /** The cap line the settings screen shows, or null when nothing is capped. */
-export function webhookCapText(existing: AlertChannel[], limits: TierLimits | null): string | null {
-  const { used, limit } = webhookAllowance(existing, limits);
-  return limit == null ? null : `${used} of ${limit} webhooks`;
+export function customWebhookCapText(
+  existing: AlertChannel[],
+  limits: TierLimits | null,
+): string | null {
+  const { used, limit } = customWebhookAllowance(existing, limits);
+  return limit == null ? null : `${used} of ${limit} custom webhook${limit === 1 ? "" : "s"}`;
 }

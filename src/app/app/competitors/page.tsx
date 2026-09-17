@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import {
-  listCompetitorNames,
+  domainsByName,
+  listCompetitors,
   listMentions,
   mentionSeries,
   topCompetitors,
@@ -61,12 +62,14 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
     );
   }
 
-  const [names, mentions, last, next] = await Promise.all([
-    listCompetitorNames(project.id),
+  const [competitors, mentions, last, next] = await Promise.all([
+    listCompetitors(project.id),
     listMentions(project.id),
     lastRunJob("competitor_scan", project.id),
     nextQueuedJob("competitor_scan", project.id),
   ]);
+  const names = competitors.map((row) => row.name);
+  const domains = domainsByName(competitors);
   const ranked = topCompetitors(mentions);
 
   return (
@@ -92,8 +95,8 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
         />
       ) : (
         <>
-          {ranked.length > 0 ? <TopCompetitors rows={ranked} /> : null}
-          <MentionsBar series={mentionSeries(mentions, names)} />
+          {ranked.length > 0 ? <TopCompetitors rows={ranked} domains={domains} /> : null}
+          <MentionsBar series={mentionSeries(mentions, names)} domains={domains} />
           {mentions.length === 0 ? (
             <EmptyState
               title="No mentions yet"

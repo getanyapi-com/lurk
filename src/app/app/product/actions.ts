@@ -13,9 +13,11 @@ import {
 import { scanNowAction } from "@/app/app/scan";
 import { enqueueJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
+import { competitorHost } from "@/lib/competitors/host";
 import type { Destination } from "@/lib/discovery/queries";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { buildProfile } from "@/lib/profile";
+import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import { projectForUser } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
@@ -99,6 +101,9 @@ export async function saveProfileAction(
         ...(edited ? { profileVersion: sql`${projects.profileVersion} + 1` } : {}),
       })
       .where(eq(projects.id, project.id));
+    // The feed applies this project's own minimum score when it is read, so the
+    // read it is holding was made against the old floor.
+    forgetProjectFeed(project.id);
     revalidatePath("/app", "layout");
     return { error: null, saved: true };
   } catch (error) {
@@ -182,7 +187,9 @@ async function insertChip(kind: ChipKind, projectId: string, value: string) {
   }
   await db()
     .insert(projectCompetitors)
-    .values({ ...owned, name: value })
+    // Somebody who types a competitor in as a domain has already told us its
+    // site, so the row wears its logo from the moment it is added.
+    .values({ ...owned, name: value, domain: competitorHost(value) })
     .onConflictDoNothing();
 }
 
@@ -302,6 +309,42 @@ export async function setChipStateAction(
         );
       await bumpProfileVersion(project.id);
     }
+    revalidatePath("/app/product");
+    return { error: null };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "That could not be changed.",
+    };
+  }
+}
+
+/**
+ * Points one competitor at the site it sells from, which is where its logo
+ * comes from. An empty box clears it and puts the initials back. No verdict
+ * ever rested on a logo, so this does not invalidate the profile the way a
+ * competitor being added or removed does.
+ */
+export async function setCompetitorDomainAction(
+  projectId: string,
+  name: string,
+  raw: string,
+): Promise<ChipResult> {
+  try {
+    const { project } = await ownedProject(projectId);
+    const typed = raw.trim();
+    const domain = typed ? competitorHost(typed) : null;
+    if (typed && !domain) {
+      return { error: `"${typed}" is not a website. Try typeform.com.` };
+    }
+    await db()
+      .update(projectCompetitors)
+      .set({ domain })
+      .where(
+        and(
+          eq(projectCompetitors.projectId, project.id),
+          eq(projectCompetitors.name, name),
+        ),
+      );
     revalidatePath("/app/product");
     return { error: null };
   } catch (error) {

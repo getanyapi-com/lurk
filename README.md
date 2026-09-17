@@ -23,13 +23,11 @@ fee. Self-hosting has no limits at all.
   selling rather than buying.
 - **Ranks the feed.** Filter by window, community and stage. Every card carries the poster,
   the community, the age, the subreddit's own self-promotion rule, and the cost line.
-- **Drafts a reply in your voice.** Comment or DM, conversation-starter or honest pitch, with
-  a Copy button and nothing else.
 - **Sends alerts.** A digest email, a Slack or Discord post, or your own webhook.
 - **Finds the Reddit threads Google already ranks** for your keywords, with position, thread
-  age and whether a competitor is named in it.
-- **Watches your competitors** on Reddit and says whether each mention was positive, negative
-  or neutral.
+  age and whether a competitor is named in it or recommended in its replies.
+- **Watches your competitors** on Reddit: which ones are being recommended in the threads
+  your leads sit in, and what new posts naming them say, positive, negative or neutral.
 - **Groups your leads into pain themes**, over data you already paid for.
 - **Answers all of it over a read-only API and MCP**, so an agent can triage for you.
 
@@ -37,7 +35,8 @@ fee. Self-hosting has no limits at all.
 
 Deliberately absent, and not planned:
 
-- **No posting.** No comment or DM is ever sent for you. Drafts have a Copy button.
+- **No posting.** No comment or DM is ever sent for you.
+- **No reply drafting.** lurk finds and explains the conversation; the words are yours.
 - **No browser extension.**
 - **No conversation inbox.** Once you reply, the conversation belongs to Reddit.
 - **No feedback loop that rewrites your filters.** Marking a lead as not a fit records the
@@ -90,7 +89,7 @@ npm run anyapi:register
 | `ANYAPI_HOUSE_API_KEY` | no | - | The key used when a user has not connected a wallet. |
 | `TYPESAFE_API_KEY` | no | - | Judges every title, post and comment the scan reads (TypeSafe Jev). Without it nothing is scored. |
 | `TYPESAFE_MODEL` | no | `jev-latest` | Override the model. |
-| `OPENROUTER_API_KEY` | no | - | Pays for the product profile, drafting and clustering. |
+| `OPENROUTER_API_KEY` | no | - | Pays for the product profile, competitor classification and clustering. |
 | `OPENROUTER_MODEL` | no | `meta/muse-spark-1.3-contributor` | Override the model. |
 | `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and one of the two below. |
 | `AZURE_EMAIL_CONNECTION_STRING` | no | - | Sends the digest through Azure Communication Services. Wins when both are set. |
@@ -115,12 +114,11 @@ A hosted instance has two tiers. Self-hosting is neither: it has no limits at al
 | Scan cadence | every 6 hours | hourly |
 | Comment scan | top 20 scored threads per scan | every thread over your threshold |
 | Feed window | 30 days | 30 days |
-| Drafts | unlimited | unlimited |
-| Alerts | daily digest + 1 webhook | hourly, unlimited webhooks |
-| Reddit SEO | 10 keywords, refreshed weekly | unlimited, refreshed daily |
+| Alerts | daily digest, Slack and Discord, + 1 custom webhook | hourly, unlimited custom webhooks |
+| Reddit SEO | 10 keywords, refreshed weekly | unlimited keywords, refreshed daily |
 | Competitors | 3 | unlimited |
 | Insights | full | full |
-| API and MCP | read-only, 1,000 requests a day | read-only, 10,000 requests a day |
+| API and MCP | read-only, 1,000 requests a day | read-only, unlimited requests |
 
 Connecting a wallet buys freshness and breadth, not features. Every feature is on in every
 tier.
@@ -136,7 +134,9 @@ the token here and revokes it at AnyAPI.
 ## Alerts
 
 Settings -> Alerts is where new leads land. Add an email digest, a Slack or Discord webhook,
-or a generic webhook that receives the same digest as JSON. Email needs `ALERTS_FROM_EMAIL`
+or a generic webhook that receives the same digest as JSON. Slack and Discord cost nothing to
+post to, so a project may add as many of those as it likes; the generic webhook is the one the
+free tier caps, at one. Email needs `ALERTS_FROM_EMAIL`
 and one carrier: `AZURE_EMAIL_CONNECTION_STRING` or `SMTP_URL`, in that order. On Azure, the local part of `ALERTS_FROM_EMAIL` must also be added as a sender
 username on the domain, or every send is refused. The webhooks need nothing. A digest carries the day's new leads with
 their score, reason, community and link, in the same shapes the feed uses, and sends nothing

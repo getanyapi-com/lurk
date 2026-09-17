@@ -131,8 +131,9 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
         ),
       );
     expect(pending).toHaveLength(1);
-    const waitHours = (pending[0].runAt.getTime() - Date.now()) / HOUR_MS;
-    expect(waitHours).toBeGreaterThan(5);
-    expect(waitHours).toBeLessThanOrEqual(6);
+    const { cadenceFor } = await import("@/lib/settings/cadence");
+    const { PRESETS } = await import("@/lib/settings/presets");
+    const due = cadenceFor(PRESETS.free.cadence).nextRunAt(new Date()).getTime();
+    expect(pending[0].runAt.getTime()).toBeCloseTo(due, -4);
   });
 });

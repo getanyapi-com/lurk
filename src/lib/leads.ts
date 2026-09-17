@@ -12,7 +12,9 @@ import {
   subreddits,
   usageLedger,
 } from "@/db/schema";
+import { forgetProjectFeed } from "./projectFeedCache";
 import { DEFAULT_SCORE_THRESHOLD } from "./scan/constants";
+import { atBounds } from "./feed";
 
 import type {
   FeedFacets,
@@ -111,6 +113,19 @@ export function newerThan(days: FeedWindow) {
 }
 
 /**
+ * One slice of that window - a month, a day, an hour - clicked in the people
+ * strip. Read on the same need date the window is, so a column of faces and
+ * the list under it hold exactly the same leads.
+ */
+export function onAt(at: string | undefined) {
+  if (!at) {
+    return undefined;
+  }
+  const { start, end } = atBounds(at);
+  return sql`${NEED_AT} >= ${start.toISOString()}::timestamptz and ${NEED_AT} < ${end.toISOString()}::timestamptz`;
+}
+
+/**
  * The project's own minimum score, applied when the feed is read. Moving it on
  * the Product page changes the next page load, with no rescan and nothing
  * deleted, because the judgement and the user's floor are different facts. The
@@ -141,6 +156,7 @@ function feedWhere(projectId: string, filter: FeedFilter) {
     eq(leads.status, filter.status),
     OVER_THRESHOLD,
     newerThan(filter.days),
+    onAt(filter.at),
     filter.kind ? eq(leads.kind, filter.kind) : undefined,
     filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
     filter.stage ? eq(leads.stage, filter.stage) : undefined,
@@ -231,6 +247,7 @@ export async function findLead(projectId: string, leadId: string): Promise<FeedL
 export async function listReviewItems(
   projectId: string,
   days: FeedWindow,
+  at?: string,
 ): Promise<ReviewItem[]> {
   const rows = await db()
     .select({
@@ -267,6 +284,7 @@ export async function listReviewItems(
         eq(leadEvaluations.projectId, projectId),
         eq(leadEvaluations.decision, "review"),
         newerThan(days),
+        onAt(at),
         notExists(
           db()
             .select({ one: sql`1` })
@@ -355,4 +373,5 @@ export async function setLeadStatus(
     .update(leads)
     .set({ status, notFitReason })
     .where(and(eq(leads.id, leadId), eq(leads.projectId, projectId)));
+  forgetProjectFeed(projectId);
 }

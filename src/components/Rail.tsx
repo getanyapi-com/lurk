@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Box, Lightbulb, Radar, Receipt, Search, Settings, Swords } from "lucide-react";
+import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** One icon per destination, so the rail reads at a glance. */
@@ -12,6 +12,7 @@ const ICONS = {
   lightbulb: Lightbulb,
   swords: Swords,
   box: Box,
+  bell: Bell,
   receipt: Receipt,
   settings: Settings,
 } as const;

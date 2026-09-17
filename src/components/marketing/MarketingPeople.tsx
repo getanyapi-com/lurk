@@ -1,12 +1,12 @@
 import { PRODUCT_NAME } from "@/lib/brand";
 import { AppMockLeads } from "./AppMockLeads";
 import { AppMockSeo } from "./AppMockSeo";
-import { AppMockDrafts } from "./AppMockDrafts";
+import { AppMockCompetitors } from "./AppMockCompetitors";
 import { EyebrowLink } from "./EyebrowLink";
 import { PeopleWall } from "./PeopleWall";
 import { PEOPLE_CARDS } from "./peopleContent";
 
-const SHOTS = { leads: AppMockLeads, seo: AppMockSeo, drafts: AppMockDrafts } as const;
+const SHOTS = { leads: AppMockLeads, seo: AppMockSeo, competitors: AppMockCompetitors } as const;
 
 /** The people behind the leads, then three small windows into the product. */
 export function MarketingPeople() {

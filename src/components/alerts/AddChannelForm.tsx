@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
 
 type AddChannelFormProps = {
   projectId: string;
-  /** Channels whose webhook allowance is already used up. */
-  webhooksAtCap: boolean;
+  /** True when the tier's custom webhook allowance is already used up. */
+  customWebhooksAtCap: boolean;
   hourlyAllowed: boolean;
   /** True when this instance has a Slack app, so a channel can be picked instead of pasted. */
   slackInstall: boolean;
@@ -30,7 +30,7 @@ const FIELD =
 /** Type, address and cadence for one new alert channel. */
 export function AddChannelForm({
   projectId,
-  webhooksAtCap,
+  customWebhooksAtCap,
   hourlyAllowed,
   slackInstall,
 }: AddChannelFormProps) {
@@ -38,7 +38,7 @@ export function AddChannelForm({
   const [cadence, setCadence] = useState<AlertCadence>("daily");
   const [pasteSlack, setPasteSlack] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const blocked = webhooksAtCap && channel !== "email";
+  const blocked = customWebhooksAtCap && channel === "webhook";
   const pickSlack = channel === "slack" && slackInstall && !pasteSlack;
   const installHref = `/connect/slack?${new URLSearchParams({ project: projectId, cadence })}`;
 
@@ -117,7 +117,7 @@ export function AddChannelForm({
       ) : null}
       {blocked ? (
         <p className="text-small text-fg-muted">
-          This tier allows one webhook. Connect a wallet to add more.
+          This tier allows one custom webhook. Connect a wallet to add more.
         </p>
       ) : null}
       {error ? <p className="text-small text-reddit">{error}</p> : null}

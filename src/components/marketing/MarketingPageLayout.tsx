@@ -26,7 +26,7 @@ export function MarketingPageLayout({ variant }: { variant: Variant }) {
             </h1>
             <p className="hero-description">
               <BrandWord name="Reddit" /> threads are what search and AI answers cite. lurk finds
-              the ones about what you sell, scores who is asking, and drafts your reply. You post.
+              the ones about what you sell, scores who is asking, and tells you why. You reply.
             </p>
             <CtaRow />
             <div className="hero-promises">

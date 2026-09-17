@@ -104,7 +104,7 @@ export async function PlanSections({ projectId, userId }: PlanSectionsProps) {
         placeholder="Acme"
         kind="competitor"
         projectId={projectId}
-        rows={competitors.map((row) => ({ value: row.name, ...planRow(row) }))}
+        rows={competitors.map((row) => ({ value: row.name, domain: row.domain, ...planRow(row) }))}
         limit={limits?.competitors ?? null}
       />
       <EvidenceThreads threads={threads} />

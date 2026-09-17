@@ -1,4 +1,9 @@
-type MeterProps = { label: string; value: number | null };
+type MeterProps = {
+  label: string;
+  value: number | null;
+  /** What this judgement actually asked and answered, for the hover. */
+  hint?: string;
+};
 
 const STEPS = [1, 2, 3, 4];
 
@@ -15,17 +20,20 @@ function tone(value: number): string {
  * A judgement the scan never made reads as a dash: an empty bar would say the
  * scan looked and scored it zero, which is a different fact.
  */
-export function Meter({ label, value }: MeterProps) {
+export function Meter({ label, value, hint }: MeterProps) {
   if (value === null) {
     return (
-      <span className="flex items-center justify-between gap-2">
+      <span className="flex items-center justify-between gap-2" title={hint}>
         <span className="text-mono text-fg-muted">{label}</span>
         <span className="text-mono text-fg-muted">-</span>
       </span>
     );
   }
   return (
-    <span className="flex items-center justify-between gap-2" title={`${label} ${value} of 4`}>
+    <span
+      className="flex items-center justify-between gap-2"
+      title={hint ?? `${label} ${value} of 4`}
+    >
       <span className="text-mono text-fg-muted">{label}</span>
       <span className="flex items-center gap-1" aria-label={`${label} ${value} of 4`}>
         {STEPS.map((step) => (

@@ -19,7 +19,11 @@ export default async function ApiSettingsPage() {
           Read your projects, leads, Reddit SEO, pain themes and spend from a script or an agent.
         </p>
       </div>
-      <ApiKeysPanel keys={keys} requestsPerDay={tier.limits?.apiRequestsPerDay ?? null} />
+      <ApiKeysPanel
+        keys={keys}
+        requestsPerDay={tier.limits?.apiRequestsPerDay ?? null}
+        selfHosted={config().SELF_HOSTED}
+      />
       <ApiAccessPanel restBaseUrl={`${origin}/api/v1`} mcpUrl={`${origin}/api/mcp`} />
     </div>
   );

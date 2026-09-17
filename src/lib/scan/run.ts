@@ -3,30 +3,23 @@ import { clientForUser } from "@/lib/anyapi";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchAuthorProfile, fetchPost } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
-import { scanIntervalHours, tierForUser } from "@/lib/tier";
+import { cadenceFor, threadPolicyFor } from "@/lib/settings";
+import { tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
-import { heldForComments, judgeThreads, readThreads } from "./comments";
+import { writeThreadMentions } from "@/lib/competitors/threads";
+import { judgeThreads, readThreads } from "./comments";
 import { hydrationCap, inFlight } from "./constants";
 import { isSentinel } from "./evidence";
 import { routeLead, type LeadKind } from "./gates";
 import {
   alreadyJudged,
-  commentDigests,
-  digestComments,
   loadEvaluations,
   postHash,
   writeEvaluations,
   type EvaluationRecord,
   type StoredJudgement,
 } from "./evaluations";
-import {
-  demoteLeads,
-  leadKey,
-  openPostLeads,
-  resolveLeads,
-  writeLeads,
-  type LeadRow,
-} from "./leads";
+import { demoteLeads, leadKey, threadsToRead, writeLeads, type LeadRow } from "./leads";
 import { loadScanProject, type ScanProject } from "./project";
 import { retrieve } from "./retrieve";
 import { creditSources, markCovered, type CandidateSource } from "./sources";
@@ -39,9 +32,6 @@ const RETENTION_MS = RETENTION_DAYS * 24 * HOUR_MS;
 
 /** A Reddit avatar changes rarely, so one lookup covers a whole month. */
 const AUTHOR_MAX_AGE_MS = 30 * 24 * HOUR_MS;
-
-/** The digest of a post whose thread we have never read. */
-const UNREAD_THREAD = digestComments([]);
 
 export type ScanOutcome = {
   candidates: number;
@@ -128,12 +118,11 @@ async function fetchAvatars(ctx: FetchContext, usernames: string[]): Promise<voi
  * post Reddit has taken away is dropped here, before a title is triaged or a
  * body is bought: there is nothing left to read and nobody left to answer.
  */
-export async function unjudged(
+export function unjudged(
   project: ScanProject,
   stored: Map<string, StoredJudgement>,
   posts: StoredPost[],
-): Promise<StoredPost[]> {
-  const digests = await commentDigests(posts.map((post) => post.id));
+): StoredPost[] {
   return posts.filter(
     (post) =>
       !isSentinel(post) &&
@@ -141,17 +130,16 @@ export async function unjudged(
         stored,
         leadKey(post.id, null),
         project.profileVersion,
-        postHash(post.title, post.body, digests.get(post.id) ?? UNREAD_THREAD),
+        postHash(post.title, post.body),
       ),
   );
 }
 
-export async function evaluationsFor(
+export function evaluationsFor(
   project: ScanProject,
   posts: StoredPost[],
   judgements: Judgement[],
-): Promise<EvaluationRecord[]> {
-  const digests = await commentDigests(posts.map((post) => post.id));
+): EvaluationRecord[] {
   const byId = new Map(posts.map((post) => [post.id, post]));
   return judgements.map((judgement) => {
     const post = byId.get(judgement.id) as StoredPost;
@@ -161,7 +149,7 @@ export async function evaluationsFor(
       commentId: null,
       judgement,
       profileVersion: project.profileVersion,
-      contentHash: postHash(post.title, post.body, digests.get(post.id) ?? UNREAD_THREAD),
+      contentHash: postHash(post.title, post.body),
     };
   });
 }
@@ -169,22 +157,24 @@ export async function evaluationsFor(
 /**
  * One scan: run the retrieval plan, triage the titles, read the shortlist in
  * full, take the shared reading of each one, judge whatever that reading left,
- * and write what qualified. Only then are comment threads bought, for two separate
- * purposes: checking whether each qualified need is still open, and finding the
- * other people in the thread who have a need of their own. Leads are already
- * committed by that point, so a thread we cannot read costs a scan nothing.
+ * and write what qualified. Only then are comment threads bought, once per
+ * lead and again only when the reply count moves, for two purposes: naming
+ * the competitors being recommended in the thread, and finding the other
+ * people in it who have a need of their own. Leads are already committed by
+ * that point, so a thread we cannot read costs a scan nothing.
  */
 export async function runScan(projectId: string, jobId: string): Promise<ScanOutcome> {
   const project = await loadScanProject(projectId);
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const { limits } = await tierForUser(project.userId);
+  const { limits, settings } = await tierForUser(project.userId);
+  const cadence = cadenceFor(settings.settings.cadence);
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = {
     projectId,
     funded,
-    maxAgeMs: scanIntervalHours(limits) * HOUR_MS,
+    maxAgeMs: cadence.intervalHours() * HOUR_MS,
   };
   const windowMs = (limits?.feedWindowDays ?? RETENTION_DAYS) * 24 * HOUR_MS;
   const hydration = hydrationCap(limits);
@@ -196,7 +186,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
     ctx,
     limits,
     windowMs,
-    scanIntervalHours: scanIntervalHours(limits),
+    intervalHours: cadence.intervalHours(),
     hydration,
   });
   const sourcesByPost = new Map<string, CandidateSource[]>(
@@ -260,14 +250,14 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   });
 
   await writeProgress(jobId, `Checking who is asking in ${full.length} posts`);
-  const unjudgedPosts = await unjudged(project, stored, full);
+  const unjudgedPosts = unjudged(project, stored, full);
   const sources = unjudgedPosts.map(postItem);
   const readings = await readPosts(projectId, sources);
   const { toJudge, cut } = splitByReading(sources, readings);
 
   await writeProgress(jobId, `Scoring ${toJudge.length} of ${sources.length} posts`);
   const judgements = [...cut, ...(await judgeItems(projectId, project.product, toJudge, readings))];
-  await writeEvaluations(await evaluationsFor(project, unjudgedPosts, judgements));
+  await writeEvaluations(evaluationsFor(project, unjudgedPosts, judgements));
   for (const entry of retrieval.covered) {
     await markCovered(entry.row, entry.at);
   }
@@ -279,9 +269,9 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   await writeLeads(postLeads);
   /**
    * A post this run judged again and no longer routes anywhere loses its lead.
-   * The feed is what the current verdict says, so a lead the profile edit or
-   * the thread turned into a review belongs in the held pile, not in front of
-   * a person as a buyer we no longer believe in.
+   * The feed is what the current verdict says, so a lead a profile edit turned
+   * into a review belongs in the held pile, not in front of a person as a
+   * buyer we no longer believe in.
    */
   const kept = new Set(postLeads.map((lead) => lead.postId));
   await demoteLeads(
@@ -292,34 +282,17 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   );
 
   await writeProgress(jobId, "Reading comment threads");
-  const threadBudget = limits?.commentThreadsPerScan ?? null;
-  const threadPosts = await openPostLeads(projectId, threadBudget);
-  const held = await heldForComments(
-    projectId,
-    threadBudget,
-    windowMs,
-    threadPosts.map((post) => post.id),
-  );
-  const { threads } = await readThreads(ctx, [...threadPosts, ...held]);
+  const threadPosts = await threadsToRead(projectId, threadPolicyFor(settings.settings.threads));
+  const { threads } = await readThreads(ctx, threadPosts);
+  await writeThreadMentions(projectId, project.competitors, threads);
   const judged = await judgeThreads(project, threads, stored);
   await writeEvaluations(judged.records);
-  await resolveLeads(
-    projectId,
-    judged.verification
-      .filter((item) => item.judgement.needState === "resolved")
-      .map((item) => item.post.id),
-  );
   const commentLeads = qualified(judged.discovery).map((item) =>
     toLead(project, item.judgement, item.postId, item.comment.id, "buyer"),
   );
-  const rejudged = qualified(judged.verification).map((item) =>
-    toLead(project, item.judgement, item.post.id, null, "buyer"),
-  );
-  await writeLeads([...rejudged, ...commentLeads]);
+  await writeLeads(commentLeads);
   const committed = new Set(
-    [...postLeads, ...rejudged, ...commentLeads].map((lead) =>
-      leadKey(lead.postId, lead.commentId),
-    ),
+    [...postLeads, ...commentLeads].map((lead) => leadKey(lead.postId, lead.commentId)),
   );
 
   await writeProgress(jobId, "Looking up who posted");
@@ -331,14 +304,14 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   await creditSources(
     sourcesByPost,
     unjudgedPosts.map((post) => post.id),
-    [...postLeads, ...rejudged].map((lead) => lead.postId),
+    postLeads.map((lead) => lead.postId),
   );
 
   await writeProgress(
     jobId,
     retrieval.gaps.length === 0 ? "Finished" : `Finished. ${retrieval.gaps.join(" ")}`,
   );
-  await enqueueJob("scan", projectId, new Date(Date.now() + scanIntervalHours(limits) * HOUR_MS));
+  await enqueueJob("scan", projectId, cadence.nextRunAt(new Date()));
   return {
     candidates: candidates.length,
     read: full.length,

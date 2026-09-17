@@ -18,7 +18,7 @@ const SUBREDDIT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  * that has heard of this company cannot hand the scan a community nobody has
  * ever seen a relevant thread in.
  */
-const profileSchema = z.object({
+export const profileSchema = z.object({
   name: z.string(),
   pain: z.string(),
   solution: z.string(),
@@ -29,12 +29,44 @@ const profileSchema = z.object({
   serviceGeography: z.string(),
   destinations: z.array(z.object({ name: z.string(), sourceText: z.string() })),
   problemPhrasings: z.array(z.string()),
+  /** The systems, sites and kinds of data the page says it works with. */
+  platforms: z.array(z.string()),
   budgetFit: z.string(),
 });
 
 export type ProductProfile = z.infer<typeof profileSchema>;
 
 export type ProfileStep = "scrape" | "profile" | "done";
+
+/**
+ * What a buyer types for one platform, in both forms they type it in. On Google
+ * "<platform> api" outsells "<platform> scraper api" by ten to seventy times,
+ * and on Reddit the same person says scraper, so discovery asks both: one
+ * Google query is $0.0005 and the two forms return different threads.
+ *
+ * They are built here and not asked for. Asked for, the count moved run to run
+ * against one unchanged page - 25, 5, 25 phrasings over three runs of
+ * getanyapi.com on 2026-09-16 - so a platform the page names silently had no
+ * search bought for it at all, and the name itself drifted between "twitter
+ * api", "x twitter scraper" and "github api".
+ */
+export function platformPhrasings(platforms: string[]): string[] {
+  const phrasings: string[] = [];
+  const said = new Set<string>();
+  for (const platform of platforms) {
+    const name = platform.trim().replace(/\s+/g, " ").toLowerCase();
+    if (!name) {
+      continue;
+    }
+    for (const phrasing of [`${name} api`, `${name} scraper`]) {
+      if (!said.has(phrasing)) {
+        said.add(phrasing);
+        phrasings.push(phrasing);
+      }
+    }
+  }
+  return phrasings;
+}
 
 /**
  * Reads the product page. It buys no shared run, so it counts against the house
@@ -160,6 +192,11 @@ export async function buildProfile(
     ].join("\n"),
   });
 
+  const problemPhrasings = [
+    ...profile.problemPhrasings,
+    ...platformPhrasings(profile.platforms),
+  ];
+
   await db()
     .update(projects)
     .set({
@@ -173,7 +210,7 @@ export async function buildProfile(
       exclusions: profile.exclusions,
       notBuyers: profile.notBuyers,
       destinations: profile.destinations,
-      problemPhrasings: profile.problemPhrasings,
+      problemPhrasings,
       ...(options.rejudge
         ? { profileVersion: sql`${projects.profileVersion} + 1` }
         : {}),
@@ -181,5 +218,5 @@ export async function buildProfile(
     .where(eq(projects.id, projectId));
 
   await onStep?.("done");
-  return profile;
+  return { ...profile, problemPhrasings };
 }

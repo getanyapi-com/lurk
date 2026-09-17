@@ -9,15 +9,15 @@ export type TierLimits = {
   projects: number | null;
   keywordsPerProject: number | null;
   subredditsPerProject: number | null;
-  scanIntervalHours: number;
-  commentThreadsPerScan: number | null;
   feedWindowDays: number;
-  alertWebhooks: number | null;
+  /** Custom webhooks. Slack and Discord are free to post to, so they are uncapped. */
+  customWebhooks: number | null;
   alertCadence: "daily" | "hourly";
   seoKeywords: number | null;
   seoRefreshDays: number;
   competitors: number | null;
-  apiRequestsPerDay: number;
+  /** Null means no daily cap, which is what a connected wallet buys. */
+  apiRequestsPerDay: number | null;
   /**
    * What discovery and one scan may buy. The starting values come from the
    * accepted second opinion and Kevin reviews them.
@@ -38,10 +38,8 @@ export const TIERS: Record<TierName, TierLimits> = {
     projects: 2,
     keywordsPerProject: 25,
     subredditsPerProject: 10,
-    scanIntervalHours: 6,
-    commentThreadsPerScan: 20,
     feedWindowDays: 30,
-    alertWebhooks: 1,
+    customWebhooks: 1,
     alertCadence: "daily",
     seoKeywords: 10,
     seoRefreshDays: 7,
@@ -61,15 +59,13 @@ export const TIERS: Record<TierName, TierLimits> = {
     projects: null,
     keywordsPerProject: null,
     subredditsPerProject: null,
-    scanIntervalHours: 1,
-    commentThreadsPerScan: null,
     feedWindowDays: 30,
-    alertWebhooks: null,
+    customWebhooks: null,
     alertCadence: "hourly",
     seoKeywords: null,
     seoRefreshDays: 1,
     competitors: null,
-    apiRequestsPerDay: 10000,
+    apiRequestsPerDay: null,
     discoveryQueries: 12,
     discoveryQueriesMax: 20,
     searchesPerScan: 16,

@@ -15,7 +15,12 @@ import { compileBooleanQuery, scopedBooleanQuery } from "./rank";
 
 export type PlannedSubreddit = { name: string; state: "active" | "candidate"; evidence: number };
 export type PlannedKeyword = { keyword: string; evidence: number };
-export type PlannedCompetitor = { name: string; role: string; evidence: number };
+export type PlannedCompetitor = {
+  name: string;
+  role: string;
+  evidence: number;
+  domain: string | null;
+};
 
 export type DiscoveryPlan = {
   subreddits: PlannedSubreddit[];
@@ -115,6 +120,7 @@ export function planFromRanks(input: PlanInput): DiscoveryPlan {
         name: item.name,
         role: item.role,
         evidence: item.evidence,
+        domain: item.domain,
       })),
       input.limits?.competitors,
     ),
@@ -204,6 +210,7 @@ export async function publishDiscoveryPlan(projectId: string, plan: DiscoveryPla
         competitors.map((row) => ({
           projectId,
           name: row.name,
+          domain: row.domain,
           role: row.role,
           source: "serp",
           state: "active",

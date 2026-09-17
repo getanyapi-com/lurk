@@ -7,16 +7,19 @@ import {
   UNLABELED,
   writeObservations,
 } from "@/lib/discovery/store";
+import { competitorsInThread, writeThreadMentions } from "@/lib/competitors/threads";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost } from "@/lib/reddit/skus";
-import type { StoredPost } from "@/lib/reddit/store";
+import { commentsOfPost, type StoredPost } from "@/lib/reddit/store";
+import { readThreads, type ThreadRead } from "@/lib/scan/comments";
 import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
+import { threadPolicyFor } from "@/lib/settings";
+import type { ThreadPolicy } from "@/lib/settings/types";
 import { loadScanProject, type ScanProject } from "@/lib/scan/project";
 import { readPosts, splitByReading } from "@/lib/scan/reading";
 import { evaluationsFor, postItem, unjudged } from "@/lib/scan/run";
 import { judgeItems } from "@/lib/scan/score";
 import { tierForUser } from "@/lib/tier";
-import { competitorNamed } from "./competitors";
 import { fetchRankingThreads, googleQuery } from "./fetch";
 import { seoSettings } from "./limits";
 import { writeOpportunities, type OpportunityRow } from "./opportunities";
@@ -48,17 +51,61 @@ async function readThread(
   }
 }
 
+/**
+ * Whether a thread's replies are worth buying: the policy reads replies here
+ * at all, there are enough of them to name anyone, and the thread was either
+ * never read or has grown since. The same reply rule a scan applies to a
+ * lead's thread, so a thread both surfaces hold is bought once between them.
+ *
+ * Age gates nothing here. A thread Google still ranks is worth its replies
+ * however old the post is; what earns the call is the ranking, not the clock.
+ * When the policy reads no SEO replies, nothing is bought and the competitor
+ * flag rests on the post's own text and whatever an earlier read stored.
+ *
+ * Exported for its own test: the refresh around it needs a funded client.
+ */
+export function repliesWorthReading(policy: ThreadPolicy, post: StoredPost): boolean {
+  const replies = post.numComments ?? 0;
+  return (
+    policy.readSeoReplies &&
+    replies >= policy.minReplies &&
+    (post.commentsObservedAt === null || post.numComments !== post.commentsReadCount)
+  );
+}
+
+/**
+ * Each opened thread with its replies: bought now when they are worth reading,
+ * otherwise whatever an earlier read stored, which is what the flag is judged on.
+ */
+async function threadsOf(
+  ctx: FetchContext,
+  policy: ThreadPolicy,
+  posts: StoredPost[],
+): Promise<ThreadRead[]> {
+  const { threads } = await readThreads(
+    ctx,
+    posts.filter((post) => repliesWorthReading(policy, post)),
+  );
+  const read = new Map(threads.map((thread) => [thread.post.id, thread]));
+  return Promise.all(
+    posts.map(
+      async (post) => read.get(post.id) ?? { post, comments: await commentsOfPost(post.id) },
+    ),
+  );
+}
+
 async function refreshPhrasing(
   project: ScanProject,
   ctx: FetchContext,
+  policy: ThreadPolicy,
   phrasing: string,
   maxAgeMs: number,
 ): Promise<{ threads: number; costUsd: number; seen: Seen[]; opened: StoredPost[] }> {
   const ranked = await fetchRankingThreads(ctx, phrasing, maxAgeMs);
   let costUsd = ranked.costUsd;
-  const rows: OpportunityRow[] = [];
   const seen: Seen[] = [];
   const opened: StoredPost[] = [];
+  const positions = new Map<string, number>();
   for (const result of ranked.value) {
     const thread = await readThread(ctx, result.url, maxAgeMs);
     costUsd += thread.costUsd;
@@ -66,15 +113,7 @@ async function refreshPhrasing(
       continue;
     }
     opened.push(thread.post);
-    rows.push({
-      postId: thread.post.id,
-      position: result.position,
-      competitorPresent: competitorNamed(
-        project.competitors,
-        thread.post.title,
-        thread.post.body,
-      ),
-    });
+    positions.set(thread.post.id, result.position);
     seen.push({
       postId: thread.post.id,
       canonicalUrl: result.url,
@@ -85,6 +124,13 @@ async function refreshPhrasing(
       snippet: result.snippet,
     });
   }
+  const threads = await threadsOf(ctx, policy, opened);
+  await writeThreadMentions(project.id, project.competitors, threads);
+  const rows: OpportunityRow[] = threads.map((thread) => ({
+    postId: thread.post.id,
+    position: positions.get(thread.post.id) as number,
+    competitorPresent: competitorsInThread(project.competitors, thread).length > 0,
+  }));
   await writeOpportunities(project.id, phrasing, rows);
   return { threads: rows.length, costUsd, seen, opened };
 }
@@ -110,7 +156,7 @@ async function judgeOpened(project: ScanProject, opened: StoredPost[]): Promise<
     return;
   }
   const stored = await loadEvaluations(project.id);
-  const candidates = await unjudged(project, stored, posts);
+  const candidates = unjudged(project, stored, posts);
   if (candidates.length === 0) {
     return;
   }
@@ -121,7 +167,7 @@ async function judgeOpened(project: ScanProject, opened: StoredPost[]): Promise<
     ...cut,
     ...(await judgeItems(project.id, project.product, toJudge, readings)),
   ];
-  await writeEvaluations(await evaluationsFor(project, candidates, judgements));
+  await writeEvaluations(evaluationsFor(project, candidates, judgements));
 }
 
 /** One ranking thread, as discovery files what it has seen of a thread. */
@@ -181,7 +227,7 @@ export async function judgeUnseen(project: ScanProject, seen: Seen[]): Promise<v
 /**
  * One Reddit SEO refresh: for every problem phrasing the tier allows, which
  * Reddit threads Google ranks, what each thread looks like now, and whether a
- * competitor is named in it. It searches the way buyers say the problem, not
+ * competitor is named in it or recommended in its replies. It searches the way buyers say the problem, not
  * the plan's Reddit queries, because those are Boolean expressions Google
  * cannot read. Every project books its next refresh on the way out, at its tier's refresh
  * interval, including one with no phrasings yet: a project that booked nothing
@@ -195,7 +241,7 @@ export async function runSeoRefresh(
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const { limits } = await tierForUser(project.userId);
+  const { limits, settings: scanSettings } = await tierForUser(project.userId);
   const settings = seoSettings(limits, project.phrasings);
   const maxAgeMs = settings.refreshDays * DAY_MS;
   if (settings.phrasings.length === 0) {
@@ -205,6 +251,7 @@ export async function runSeoRefresh(
   }
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs };
+  const policy = threadPolicyFor(scanSettings.settings.threads);
 
   let threads = 0;
   let costUsd = 0;
@@ -215,7 +262,7 @@ export async function runSeoRefresh(
       jobId,
       `Searching ${index + 1} of ${settings.phrasings.length}: ${phrasing}`,
     );
-    const done = await refreshPhrasing(project, ctx, phrasing, maxAgeMs);
+    const done = await refreshPhrasing(project, ctx, policy, phrasing, maxAgeMs);
     threads += done.threads;
     costUsd += done.costUsd;
     seen.push(...done.seen);

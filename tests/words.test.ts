@@ -25,14 +25,35 @@ describe("the words a card says instead of a percent", () => {
     expect(judgementSentence(null, null)).toBeNull();
   });
 
-  it("keeps the rubric's own sentences for the detail view", () => {
-    expect(judgementSentence(4, 3)).toBe(`${FIT[4]}. ${INTENT_LEVELS[3]}.`);
+  it("keeps the rubric's own sentences for the detail view, one labelled line each", () => {
+    expect(judgementSentence(4, 3)).toBe(
+      `Where they are: an explicit ask for a recommendation, a replacement or a comparison.\n` +
+        `Whether you fit: ${FIT[4]}.`,
+    );
+  });
+
+  it("labels a single answer when only one was judged", () => {
+    expect(judgementSentence(2, null)).toBe(`Whether you fit: ${FIT[2]}.`);
+    expect(judgementSentence(null, 0)).toBe("Where they are: no need of their own.");
   });
 
   it("never reads as a percent of anything", () => {
     const fold = [4, 3, 2, 1, 0].flatMap((fit) =>
-      [4, 3, 2, 1, 0].map((intent) => `${fitWord(fit)} / ${intentWord(intent)}`),
+      [4, 3, 2, 1, 0].map((intent) => `${intentWord(intent)} ${fitWord(fit)}`),
     );
     expect(fold.some((words) => /\d/.test(words))).toBe(false);
+  });
+
+  /**
+   * The complaint that started this: "Fits fully / Asking" named neither the
+   * product nor the person, so a reader had to know the rubric to read it.
+   */
+  it("names its own subject in every word, so no word is a bare adjective", () => {
+    for (const level of Object.keys(FIT).map(Number)) {
+      expect(fitWord(level)).toMatch(/your/i);
+    }
+    for (let level = 0; level < INTENT_LEVELS.length; level += 1) {
+      expect(intentWord(level)!.split(" ").length).toBeGreaterThan(1);
+    }
   });
 });

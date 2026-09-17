@@ -2,12 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SCORE_BATCH_SIZE } from "@/lib/scan/constants";
 import { leadKey } from "@/lib/scan/leads";
 import { judgeAnswers, product } from "./jevAnswers";
-import {
-  alreadyJudged,
-  contentHash,
-  digestComments,
-  postHash,
-} from "@/lib/scan/evaluations";
+import { alreadyJudged, contentHash, postHash } from "@/lib/scan/evaluations";
 
 /**
  * What a stored verdict is worth on the next scan, and what a thread is read
@@ -22,9 +17,7 @@ vi.mock("@/lib/jev", async (importOriginal) => ({
   askJev,
 }));
 
-const { judgeThreads, representativeComments, verificationText } = await import(
-  "@/lib/scan/comments"
-);
+const { judgeThreads, representativeComments } = await import("@/lib/scan/comments");
 
 describe("reusing a stored verdict", () => {
   const stored = new Map([[leadKey("abc", null), { profileVersion: 3, contentHash: "hash" }]]);
@@ -45,19 +38,9 @@ describe("reusing a stored verdict", () => {
     expect(alreadyJudged(stored, leadKey("def", null), 3, "hash")).toBe(false);
   });
 
-  it("hashes only the text a verdict was made on", () => {
-    expect(postHash("t", "b", digestComments([]))).toBe(postHash("t", "b", digestComments([])));
-    expect(postHash("t", "b", digestComments([]))).not.toBe(
-      postHash("t", "b", digestComments([{ id: "c1", body: "new reply" }])),
-    );
-  });
-
-  it("reads a thread the same whatever order its comments arrive in", () => {
-    const one = [
-      { id: "c1", body: "first" },
-      { id: "c2", body: "second" },
-    ];
-    expect(digestComments(one)).toBe(digestComments([...one].reverse()));
+  it("hashes only the post's own text, so a new reply never re-judges the post", () => {
+    expect(postHash("t", "b")).toBe(postHash("t", "b"));
+    expect(postHash("t", "b")).not.toBe(postHash("t", "other"));
   });
 
   it("separates a comment's verdict from its parent post's", () => {
@@ -94,27 +77,6 @@ describe("what a thread is read for", () => {
       ...patch,
     } as never as import("@/lib/reddit/store").StoredComment;
   }
-
-  it("gives the post its author's follow-ups and the answers others gave", () => {
-    const text = verificationText({
-      post,
-      comments: [
-        comment({ id: "c1", author: "asker", body: "We went with Formcraft, thanks." }),
-        comment({ id: "c2", author: "helper", body: "Try Formcraft." }),
-      ],
-    });
-    expect(text).toContain("We went with Formcraft, thanks.");
-    expect(text).toContain("u/helper: Try Formcraft.");
-    expect(text).toContain("Our signup form needs conditional logic.");
-  });
-
-  it("verifies a thread with one reply, because one reply can end it", () => {
-    const text = verificationText({
-      post,
-      comments: [comment({ author: "asker", body: "Solved." })],
-    });
-    expect(text).toContain("Solved.");
-  });
 
   it("turns one author's four comments into one opportunity", () => {
     const kept = representativeComments({
@@ -212,8 +174,8 @@ describe("judging one comment once", () => {
       .map((call) => call[0])
       .filter((call) => call.purpose === "score")
       .reduce((total, call) => total + call.itemsAsked, 0);
-    // The two posts and one call's worth of each distinct comment, never two
-    // for the comment both threads carry.
-    expect(asked).toBe(SCORE_BATCH_SIZE + 3);
+    // One call's worth of each distinct comment, never two for the comment
+    // both threads carry, and nothing for the posts themselves.
+    expect(asked).toBe(SCORE_BATCH_SIZE + 1);
   });
 });

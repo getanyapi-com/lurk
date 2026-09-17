@@ -8,22 +8,22 @@ const COLUMNS: { title: string; links: [React.ReactNode, string, string][] }[] =
     links: [
       ["Leads", "#features", "leads"],
       [<BrandWord name="Reddit" label="Reddit SEO" key="seo" />, "#seo", "seo"],
-      ["Competitors", "#drafts", "competitors"],
+      ["Competitors", "#decide", "competitors"],
     ],
   },
   {
     title: "Understand",
     links: [
       ["Scores and reasons", "#features", "scores"],
-      ["Community rules", "#drafts", "rules"],
-      ["Insights", "#drafts", "insights"],
+      ["Community rules", "#decide", "rules"],
+      ["Insights", "#decide", "insights"],
     ],
   },
   {
     title: "Your workflow",
     links: [
-      ["Copy a draft", "#drafts", "draft"],
-      ["Alerts", "#drafts", "alerts"],
+      ["Why it scored", "#decide", "reason"],
+      ["Alerts", "#decide", "alerts"],
       ["Data costs", "#costs", "costs"],
     ],
   },

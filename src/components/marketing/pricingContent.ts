@@ -2,13 +2,13 @@
 export const PRICING_OBSERVED = "2026-09-06";
 
 export const MONTHLY_PLANS = [
-  { name: "lurk", domain: "lurk.so", mark: "/icon.svg", usd: 0, note: "Dashboard, AI scoring, reply drafts, Reddit SEO" },
+  { name: "lurk", domain: "lurk.so", mark: "/icon.svg", usd: 0, note: "Dashboard, AI scoring, competitors, Reddit SEO" },
   {
     name: "F5Bot",
     domain: "f5bot.com",
     usd: 0,
     note: "Email keyword alerts",
-    callout: "Also free, but it only emails you every keyword match. No dashboard, no AI scoring, no reply drafts, no SEO.",
+    callout: "Also free, but it only emails you every keyword match. No dashboard, no AI scoring, no competitor tracking, no SEO.",
   },
   { name: "ReplyGuy", domain: "replyguy.com", usd: 10, note: "Small plan" },
   { name: "LeadsRover", domain: "leadsrover.io", usd: 13.99, note: "Starter plan" },

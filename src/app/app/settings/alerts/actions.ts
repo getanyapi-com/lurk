@@ -6,7 +6,7 @@ import { addChannel, channelForProject, removeChannel } from "@/lib/alerts/chann
 import { sampleDigest } from "@/lib/alerts/fixtures";
 import { CHAT_LEAD_CAP } from "@/lib/alerts/select";
 import { sendToChannel } from "@/lib/alerts/send";
-import { isAlertChannel } from "@/lib/alerts/types";
+import { CHANNEL_LABELS, isAlertChannel } from "@/lib/alerts/types";
 import { requireLocalUser } from "@/lib/auth";
 import { projectForUser } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
@@ -62,7 +62,10 @@ export async function sendTestAction(
   const leads = channel.channel === "email" ? digest.leads : digest.leads.slice(0, CHAT_LEAD_CAP);
   try {
     await sendToChannel(channel.channel, channel.target, { ...digest, leads });
-    return { ok: true, message: `Sent a sample to ${channel.target}` };
+    // A webhook URL is a secret, so the reply names the channel, not the address.
+    const where =
+      channel.label ?? (channel.channel === "email" ? channel.target : CHANNEL_LABELS[channel.channel]);
+    return { ok: true, message: `Sent a sample to ${where}` };
   } catch (error) {
     return { ok: false, message: String(error instanceof Error ? error.message : error) };
   }

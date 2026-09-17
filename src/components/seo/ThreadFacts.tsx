@@ -2,7 +2,7 @@ import { ArrowUp, ArrowUpRight, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { relativeAge, shortAge } from "@/lib/format";
 import { fitWord, intentWord, judgementSentence } from "@/lib/scan/words";
-import { namedCompetitors } from "@/lib/seo/competitors";
+import { competitorsNamed } from "@/lib/competitors/match";
 import {
   BAND_FILLS,
   BAND_TONES,
@@ -82,7 +82,7 @@ export function ThreadFacts({
   competitors: string[];
 }) {
   const band = scoreBand(thread.scored);
-  const named = namedCompetitors(competitors, thread.title, thread.body);
+  const named = competitorsNamed(competitors, `${thread.title}\n${thread.body ?? ""}`);
   const judgement = [intentWord(thread.intent), fitWord(thread.fit)].filter(Boolean).join(" / ");
 
   return (

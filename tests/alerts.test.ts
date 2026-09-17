@@ -32,11 +32,11 @@ import {
   effectiveCadence,
   isDue,
   selectLeads,
-  webhookAllowance,
-  webhookCapText,
+  customWebhookAllowance,
+  customWebhookCapText,
   type SelectableLead,
 } from "@/lib/alerts/select";
-import { normalizeTarget } from "@/lib/alerts/channels";
+import { describeTarget, normalizeTarget } from "@/lib/alerts/channels";
 import type { Digest, DigestLead } from "@/lib/alerts/types";
 import { TIERS } from "@/lib/tiers";
 
@@ -119,19 +119,22 @@ describe("what one message carries", () => {
   });
 });
 
-describe("webhook allowance", () => {
-  it("counts webhooks and not email against the free cap", () => {
-    expect(webhookAllowance(["email"], TIERS.free)).toMatchObject({ used: 0, atCap: false });
-    expect(webhookAllowance(["email", "slack"], TIERS.free)).toMatchObject({
+describe("custom webhook allowance", () => {
+  it("counts only custom webhooks against the free cap", () => {
+    expect(customWebhookAllowance(["email", "slack", "discord"], TIERS.free)).toMatchObject({
+      used: 0,
+      atCap: false,
+    });
+    expect(customWebhookAllowance(["slack", "webhook"], TIERS.free)).toMatchObject({
       used: 1,
       atCap: true,
     });
-    expect(webhookCapText(["email", "slack"], TIERS.free)).toBe("1 of 1 webhooks");
+    expect(customWebhookCapText(["slack", "webhook"], TIERS.free)).toBe("1 of 1 custom webhook");
   });
 
   it("caps nothing for a connected wallet or a self-hosted instance", () => {
-    expect(webhookAllowance(["slack", "discord"], TIERS.connected).atCap).toBe(false);
-    expect(webhookCapText(["slack"], null)).toBeNull();
+    expect(customWebhookAllowance(["webhook", "webhook"], TIERS.connected).atCap).toBe(false);
+    expect(customWebhookCapText(["webhook"], null)).toBeNull();
   });
 });
 
@@ -154,6 +157,20 @@ describe("targets", () => {
     expect(() => normalizeTarget("discord", "https://example.com/x")).toThrow(/discord.com/);
     expect(() => normalizeTarget("email", "not-an-address")).toThrow(/email address/);
   });
+
+  it("describes a pasted webhook without its secret segment", () => {
+    expect(
+      describeTarget("discord", "https://discord.com/api/webhooks/1550230446191808572/tok3n", null),
+    ).toBe("discord.com/api/webhooks/1550230446191808572/...");
+    expect(describeTarget("slack", "https://hooks.slack.com/services/T1/B2/s3cret", null)).toBe(
+      "hooks.slack.com/services/T1/B2/...",
+    );
+    expect(describeTarget("slack", "https://hooks.slack.com/services/T1/B2/s3cret", "#alerts")).toBe(
+      "#alerts",
+    );
+    expect(describeTarget("email", "you@company.com", null)).toBe("you@company.com");
+    expect(describeTarget("webhook", "not-a-url", null)).toBe("Webhook");
+  });
 });
 
 describe("chat payloads", () => {
@@ -161,6 +178,13 @@ describe("chat payloads", () => {
     const payload = payloadFor("slack", digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
     expect(payload).toMatchObject({ text: "1 new lead for Acme in the last 24 hours." });
     expect(JSON.stringify(payload)).toContain("https://www.reddit.com/r/SaaS/comments/x/");
+  });
+
+  it("keeps the Slack reason on its own line under the title", () => {
+    const one = lead({ id: "a", reason: "Ready to switch." });
+    const payload = payloadFor("slack", digestOf(selectLeads([one], SINCE, null)));
+    const section = (payload as { blocks: Array<{ text: { text: string } }> }).blocks[1];
+    expect(section.text.text).toMatch(/- .*\n_Ready to switch\._\n<https/);
   });
 
   it("gives Discord one embed per lead with the score and subreddit", () => {

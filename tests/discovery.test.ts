@@ -690,17 +690,74 @@ describe("competitors", () => {
 
   it("keeps only what does the same job for the same person", () => {
     expect(competitorsFrom(labels)).toEqual([
-      { name: "hotelages.com", role: "direct_substitute", evidence: 2 },
+      { name: "hotelages.com", role: "direct_substitute", evidence: 2, domain: "hotelages.com" },
     ]);
+  });
+
+  it("pairs a brand with the site the same evidence named", () => {
+    const named: ThreadLabel[] = [
+      {
+        id: "t9",
+        relevance: "relevant",
+        destination: null,
+        entities: [
+          { name: "Hotel Ages", role: "direct_substitute" },
+          { name: "hotelages.com", role: "reference" },
+        ],
+      },
+    ];
+    expect(competitorsFrom(named)).toEqual([
+      { name: "Hotel Ages", role: "direct_substitute", evidence: 1, domain: "hotelages.com" },
+    ]);
+  });
+
+  it("leaves a name no thread named a site for without one", () => {
+    const unnamed: ThreadLabel[] = [
+      {
+        id: "t10",
+        relevance: "relevant",
+        destination: null,
+        entities: [{ name: "Typeform", role: "direct_substitute" }],
+      },
+    ];
+    expect(competitorsFrom(unnamed)[0].domain).toBeNull();
   });
 
   it("adds a delta's evidence to what already stood", () => {
     expect(
       mergeCompetitors(
-        [{ name: "hotelages.com", role: "direct_substitute", evidence: 2 }],
+        [
+          {
+            name: "hotelages.com",
+            role: "direct_substitute",
+            evidence: 2,
+            domain: "hotelages.com",
+          },
+        ],
         competitorsFrom(labels),
       ),
-    ).toEqual([{ name: "hotelages.com", role: "direct_substitute", evidence: 4 }]);
+    ).toEqual([
+      { name: "hotelages.com", role: "direct_substitute", evidence: 4, domain: "hotelages.com" },
+    ]);
+  });
+
+  it("keeps a site already standing when a delta names none", () => {
+    const delta: ThreadLabel[] = [
+      {
+        id: "t11",
+        relevance: "relevant",
+        destination: null,
+        entities: [{ name: "Hotel Ages", role: "direct_substitute" }],
+      },
+    ];
+    expect(
+      mergeCompetitors(
+        [{ name: "Hotel Ages", role: "direct_substitute", evidence: 2, domain: "hotelages.com" }],
+        competitorsFrom(delta),
+      ),
+    ).toEqual([
+      { name: "Hotel Ages", role: "direct_substitute", evidence: 3, domain: "hotelages.com" },
+    ]);
   });
 });
 
@@ -708,7 +765,9 @@ describe("the plan the ranking publishes", () => {
   const plan = planFromRanks({
     communities: rankCommunities(EVIDENCE, DESTINATION_NAMES),
     families: rankFamilies(EVIDENCE, DESTINATION_NAMES, PHRASINGS),
-    competitors: [{ name: "hotelages.com", role: "direct_substitute", evidence: 2 }],
+    competitors: [
+      { name: "hotelages.com", role: "direct_substitute", evidence: 2, domain: "hotelages.com" },
+    ],
     scopedCommunities: ["vegas"],
     productNumbers: PRODUCT_NUMBERS,
     limits: { ...TIERS.free, subredditsPerProject: 3 },

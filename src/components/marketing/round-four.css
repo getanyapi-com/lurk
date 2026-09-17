@@ -181,51 +181,6 @@
 .collage-actions svg {
   color: var(--fg-muted);
 }
-.mock-drafts {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.mock-body {
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--fg-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.mock-draft-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border-radius: var(--radius-card);
-  background: var(--m-stage);
-  font-size: 11px;
-}
-.mock-draft-panel small {
-  color: var(--fg-muted);
-}
-.mock-generate {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.mock-draft-text {
-  padding: 12px;
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font-size: 12px;
-  line-height: 1.55;
-}
-.mock-draft-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .seo-tiles {
   padding-bottom: 80px;
   border-bottom: 1px solid var(--m-rule);
@@ -413,37 +368,11 @@
   flex-direction: column;
   gap: 2px;
 }
-.quiet-tabs {
-  display: flex;
-  gap: 6px;
-}
-.quiet-tabs span {
-  padding: 4px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--m-outline);
-  color: var(--fg-muted);
-  font-size: 11px;
-}
-.quiet-tabs span[data-on] {
-  background: var(--fg);
-  color: var(--bg);
-  border-color: var(--fg);
-}
-.quiet-draft p {
+.quiet-reason p {
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.quiet-button {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: var(--radius-control);
-  border: 1px solid var(--m-outline);
-  font-size: 12px;
 }
 .quiet-channels {
   display: grid;

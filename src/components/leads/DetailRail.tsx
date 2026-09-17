@@ -3,6 +3,7 @@ import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { SubredditChip } from "@/components/SubredditChip";
 import { Meter } from "@/components/leads/Meter";
 import { accountAge } from "@/components/leads/workspace";
+import { judgementSentence } from "@/lib/scan/words";
 
 export type DetailRailProps = {
   author: string | null;
@@ -20,6 +21,8 @@ export type DetailRailProps = {
   fit: number | null;
   intent: number | null;
   engagement: number | null;
+  /** The project's competitors named in this thread, post or replies. */
+  competitors: string[];
 };
 
 /** Nothing here is estimated, so a fact Reddit never gave reads as a dash. */
@@ -91,10 +94,28 @@ export function DetailRail(props: DetailRailProps) {
         </a>
       </Block>
 
+      {props.competitors.length > 0 ? (
+        <Block label="Competitors named">
+          <span className="text-small text-fg">{props.competitors.join(", ")}</span>
+        </Block>
+      ) : null}
+
       <Block label="How it scored">
-        <Meter label="Fit" value={props.fit} />
-        <Meter label="Intent" value={props.intent} />
-        <Meter label="Engagement" value={props.engagement} />
+        <Meter
+          label="Fit"
+          value={props.fit}
+          hint={judgementSentence(props.fit, null) ?? "Whether your product is what they need"}
+        />
+        <Meter
+          label="Intent"
+          value={props.intent}
+          hint={judgementSentence(null, props.intent) ?? "How far along they are toward changing it"}
+        />
+        <Meter
+          label="Engagement"
+          value={props.engagement}
+          hint="How much the thread itself is moving"
+        />
       </Block>
     </aside>
   );

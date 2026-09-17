@@ -1,7 +1,9 @@
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditPosts } from "@/db/schema";
+import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import type { StoredPost } from "@/lib/reddit/store";
+import type { ThreadPolicy } from "@/lib/settings/types";
 import type { LeadKind } from "./gates";
 
 export type LeadRow = {
@@ -76,51 +78,51 @@ export async function writeLeads(input: LeadRow[]): Promise<number> {
       .returning({ id: leads.id });
     written += done.length;
   }
+  forgetProjectFeed(new Set(rows.map((row) => row.projectId)));
   return written;
 }
 
 /**
- * The threads worth checking again: every post lead still in the feed, best
- * first. Verification is not limited to the leads this scan happened to find,
- * because a need found yesterday is the one most likely to have been answered.
+ * The threads worth buying this scan, best score first: every post lead still
+ * in the feed whose post carries at least the policy's minimum replies and
+ * whose thread has never been read, or whose reply count has moved since it
+ * was. An unchanged thread has nothing new to name a competitor in, and a
+ * thread under the minimum has too little to be worth its price.
+ *
+ * Age decides which of those two the policy still pays for. A post inside the
+ * reply window is bought whenever its count moves, because that is where the
+ * replies still arrive. A post older than the window is bought only once, and
+ * only when the policy reads old threads at all: for the competitors already
+ * named in it, never again for a count that moved. `threadsPerScan` caps how
+ * many are bought; null buys every one that qualifies.
  */
-export async function openPostLeads(
+export async function threadsToRead(
   projectId: string,
-  budget: number | null,
+  policy: ThreadPolicy,
+  now: Date = new Date(),
 ): Promise<StoredPost[]> {
+  const fresh = gte(redditPosts.createdAt, policy.freshSince(now));
   const query = db()
     .select({ post: redditPosts })
     .from(leads)
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .where(
-      and(eq(leads.projectId, projectId), eq(leads.status, "new"), sql`${leads.commentId} is null`),
-    )
-    .orderBy(desc(leads.score));
-  const rows = budget === null ? await query : await query.limit(budget);
-  return rows.map((row) => row.post);
-}
-
-/**
- * Takes the post leads whose author says the need is met out of the feed. The
- * lead is kept, because what it cost and what it taught are still true.
- */
-export async function resolveLeads(projectId: string, postIds: string[]): Promise<number> {
-  if (postIds.length === 0) {
-    return 0;
-  }
-  const done = await db()
-    .update(leads)
-    .set({ status: "resolved" })
-    .where(
       and(
         eq(leads.projectId, projectId),
-        inArray(leads.postId, postIds),
-        sql`${leads.commentId} is null`,
         eq(leads.status, "new"),
+        isNull(leads.commentId),
+        sql`coalesce(${redditPosts.numComments}, 0) >= ${policy.minReplies}`,
+        policy.readOldThreadsOnce ? or(fresh, isNull(redditPosts.commentsObservedAt)) : fresh,
+        or(
+          isNull(redditPosts.commentsObservedAt),
+          sql`${redditPosts.numComments} is distinct from ${redditPosts.commentsReadCount}`,
+        ),
       ),
     )
-    .returning({ id: leads.id });
-  return done.length;
+    .orderBy(desc(leads.score));
+  const rows =
+    policy.threadsPerScan === null ? await query : await query.limit(policy.threadsPerScan);
+  return rows.map((row) => row.post);
 }
 
 /** One candidate a re-judgement no longer puts in the feed. */
@@ -154,5 +156,6 @@ export async function demoteLeads(projectId: string, keys: LeadKeyRow[]): Promis
       ),
     )
     .returning({ id: leads.id });
+  forgetProjectFeed(projectId);
   return done.length;
 }

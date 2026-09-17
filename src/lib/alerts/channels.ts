@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { alerts, projects } from "@/db/schema";
 import type { TierLimits } from "@/lib/tiers";
-import { isWebhookChannel, webhookAllowance } from "./select";
+import { customWebhookAllowance, isCustomWebhook } from "./select";
 import { CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "./types";
 
 export type AlertRow = typeof alerts.$inferSelect;
@@ -59,6 +59,32 @@ export function normalizeTarget(channel: AlertChannel, raw: string): string {
   return target;
 }
 
+/**
+ * How the settings screen names one channel. The last path segment of a webhook
+ * URL is its secret half, so a pasted webhook is described by everything up to
+ * that segment and never reaches the browser whole.
+ */
+export function describeTarget(
+  channel: AlertChannel,
+  target: string,
+  label: string | null,
+): string {
+  if (label) {
+    return label;
+  }
+  if (channel === "email") {
+    return target;
+  }
+  let url: URL;
+  try {
+    url = new URL(target);
+  } catch {
+    return CHANNEL_LABELS[channel];
+  }
+  const kept = url.pathname.split("/").filter(Boolean).slice(0, -1).join("/");
+  return `${url.host}/${kept ? `${kept}/` : ""}...`;
+}
+
 export type AddChannelInput = {
   projectId: string;
   channel: AlertChannel;
@@ -73,14 +99,14 @@ export type AddChannelInput = {
 export async function addChannel(input: AddChannelInput): Promise<ProjectChannel> {
   const target = normalizeTarget(input.channel, input.target);
   const existing = await listChannels(input.projectId);
-  if (isWebhookChannel(input.channel)) {
-    const allowance = webhookAllowance(
+  if (isCustomWebhook(input.channel)) {
+    const allowance = customWebhookAllowance(
       existing.map((one) => one.channel),
       input.limits,
     );
     if (allowance.atCap) {
       throw new Error(
-        `This tier allows ${allowance.limit} webhook. Connect a wallet for more.`,
+        `This tier allows ${allowance.limit} custom webhook${allowance.limit === 1 ? "" : "s"}. Connect a wallet for more.`,
       );
     }
   }

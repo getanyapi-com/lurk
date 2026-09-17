@@ -127,10 +127,6 @@ export const MOCK_SEO = [
   },
 ];
 
-export const MOCK_DRAFT =
-  "Which decision do you want your budget to help with first: what is safe to spend, which category is drifting, or what to change next month? That would help narrow down the kind of tool you need.";
-
-
 export const MOCK_RAIL: {
   label: string;
   items: { name: string; icon: RailIcon }[];
@@ -153,6 +149,7 @@ export const MOCK_RAIL: {
     label: "Workspace",
     items: [
       { name: "Product", icon: "box" },
+      { name: "Alerts", icon: "bell" },
       { name: "Data usage", icon: "receipt" },
       { name: "Settings", icon: "settings" },
     ],
@@ -173,16 +170,6 @@ export const RULE_THREAD: MockThread = {
   title: "Tally alternative with better survey analysis?",
   url: "https://www.reddit.com/r/nocode/comments/1w7fzbr/tally_alternative_with_better_survey_analysis/",
   body: "I neI've been using Tally for client intake and it's honestly been great for basic forms.\n\nMy workflow has changed though. I'm doing more post-project questionnaires now and getting longer written responses from clients. The form itself isn't really the problem anymore. It's going back through all those answers and figuring out which issues or themes keep showing up across projects.\n\nI'm looking for a Tally alternative that's still straightforward to build with but puts more emphasis on actually analyzing survey responses.\n\nHas anyone made a similar switch?",
-};
-export const DRAFT_THREAD: MockThread = {
-  author: "Common-Parfait21",
-  avatar:
-    "https://i.redd.it/snoovatar/avatars/ed935e67-f6a7-4a94-befc-59a75af7cd37-headshot.png",
-  subreddit: "personalfinance",
-  subredditIcon: "",
-  title: "Any budgeting app for people who enjoy the budgeting process?",
-  url: "https://www.reddit.com/r/personalfinance/comments/1w792xg/any_budgeting_app_for_people_who_enjoy_the/",
-  body: "Im probably the opposite of someone who needs budgeting 101 because I check my accounts basically every day and genuinely enjoy messing with categories and spreadsheets. My issue is that Im spending a lot of time maintaining the system without always getting a clear answer on whether I should change anything. What budgeting app works well for someone who wants detail but also wants the numbers to actually point toward a next move?",
 };
 export const ALERT_THREAD: MockThread = {
   author: "SenorSmartyPantz",
