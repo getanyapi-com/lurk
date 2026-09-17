@@ -91,8 +91,8 @@ export function OpportunityCard({ thread, showJudgement = false }: OpportunityCa
           />
           {showJudgement ? (
             <>
-              <Chip title={sentence}>{fit ?? "Not judged"}</Chip>
-              {intent ? <Chip title={sentence}>{intent}</Chip> : null}
+              <Chip title={sentence}>{intent ?? "Not judged"}</Chip>
+              {fit ? <Chip title={sentence}>{fit}</Chip> : null}
             </>
           ) : thread.verdict && VERDICT_WORDS[thread.verdict] ? (
             <Chip>{VERDICT_WORDS[thread.verdict]}</Chip>
