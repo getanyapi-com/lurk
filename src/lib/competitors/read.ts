@@ -150,8 +150,9 @@ export async function competitorsNamedIn(projectId: string, postId: string): Pro
 export type MentionSeries = { competitor: string; days: number[]; total: number };
 
 /**
- * One bar per day per competitor, oldest day first, so a row of bars reads
- * left to right as the last thirty days.
+ * One bar per day per competitor, newest day first, so a row of bars reads left
+ * to right as today and then backwards. The bars are filled oldest first, the
+ * way a window is counted, and turned around once at the end.
  */
 export function mentionSeries(
   mentions: Pick<MentionView, "competitor" | "createdAt">[],
@@ -175,8 +176,68 @@ export function mentionSeries(
   }
   return names.map((competitor) => {
     const row = buckets.get(competitor) as number[];
-    return { competitor, days: row, total: row.reduce((sum, one) => sum + one, 0) };
+    const total = row.reduce((sum, one) => sum + one, 0);
+    // Filled oldest first, because that is what the index off `start` means;
+    // handed back newest first, because that is the end a reader starts at.
+    return { competitor, days: row.reverse(), total };
   });
+}
+
+/**
+ * How many competitors a stacked bar can tell apart. The palette holds eight
+ * colours, and their fixed order is what keeps two touching segments separable
+ * under colour blindness; a ninth would have to repeat one of them.
+ */
+export const SERIES_SLOTS = 8;
+
+/** What the rest are called, once a project watches more names than that. */
+export const OTHER_COMPETITORS = "Everyone else";
+
+/** One row of a stacked bar: a competitor, its days, and the colour it keeps. */
+export type MentionRow = MentionSeries & {
+  /**
+   * Its place in the palette, 1-based, taken from where the project lists the
+   * competitor rather than from how often it was named. Null is the folded row.
+   */
+  slot: number | null;
+};
+
+/** The stacked bar as it is drawn: its rows, and the day that sets the scale. */
+export type MentionStack = { rows: MentionRow[]; peak: number };
+
+/**
+ * The series a stacked bar can draw. Three things happen here, and all three
+ * are about the bar staying readable rather than about the data:
+ *
+ * - Competitors past the eighth the project lists are added together into one
+ *   row, because there is no ninth colour that stays apart from the other
+ *   eight for a reader who cannot tell red from green.
+ * - A competitor nobody named in the window is dropped. It adds no height to
+ *   any bar, and a legend of names with nothing behind them is just the list
+ *   of competitors, which is the card above this one.
+ * - Dropping it moves nobody else's colour. The slot comes from the project's
+ *   own order, so a quiet week never repaints the chart under you.
+ */
+export function stackMentions(series: MentionSeries[]): MentionStack {
+  const rows: MentionRow[] = series
+    .slice(0, SERIES_SLOTS)
+    .map((row, index) => ({ ...row, slot: index + 1 }));
+  const rest = series.slice(SERIES_SLOTS);
+  if (rest.length > 0) {
+    rows.push({
+      competitor: OTHER_COMPETITORS,
+      days: rest[0].days.map((_, index) => rest.reduce((sum, row) => sum + row.days[index], 0)),
+      total: rest.reduce((sum, row) => sum + row.total, 0),
+      slot: null,
+    });
+  }
+  const drawn = rows.filter((row) => row.total > 0);
+  const totals = (drawn[0]?.days ?? []).map((_, index) =>
+    drawn.reduce((sum, row) => sum + row.days[index], 0),
+  );
+  // Never zero: the scale divides by it, and a card with no mentions in it
+  // still has to draw thirty empty days rather than thirty NaNs.
+  return { rows: drawn, peak: Math.max(1, ...totals) };
 }
 
 export type CompetitorCount = {

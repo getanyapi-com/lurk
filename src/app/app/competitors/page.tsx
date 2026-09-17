@@ -96,7 +96,7 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
       ) : (
         <>
           {ranked.length > 0 ? <TopCompetitors rows={ranked} domains={domains} /> : null}
-          <MentionsBar series={mentionSeries(mentions, names)} domains={domains} />
+          <MentionsBar series={mentionSeries(mentions, names)} />
           {mentions.length === 0 ? (
             <EmptyState
               title="No mentions yet"

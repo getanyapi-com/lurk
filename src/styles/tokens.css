@@ -14,6 +14,24 @@
   --score-cool: var(--fg-muted);
   --reddit: oklch(0.66 0.2 40);
 
+  /* Series colours, for the one chart that has to tell competitors apart.
+     A validated categorical palette: the slot order is the mechanism that
+     keeps two touching segments separable under colour blindness, so slots
+     are assigned in order and never cycled or reordered. Hexes are the
+     documented palette's, written here in the oklch this file speaks:
+     #2a78d6 #eb6834 #1baf7a #eda100 #e87ba4 #008300 #4a3aa7 #e34948. */
+  --series-1: oklch(0.575 0.163 255.5);
+  --series-2: oklch(0.671 0.175 40.6);
+  --series-3: oklch(0.669 0.141 162.1);
+  --series-4: oklch(0.764 0.161 75.1);
+  --series-5: oklch(0.716 0.141 357.4);
+  --series-6: oklch(0.529 0.18 142.5);
+  --series-7: oklch(0.433 0.167 283.6);
+  --series-8: oklch(0.623 0.191 24.9);
+  /* Everyone past the eighth, added together. Grey on purpose: it is a
+     leftover rather than a competitor, and must not read as one. */
+  --series-other: var(--fg-muted);
+
   --radius-control: 12px;
   --radius-card: 16px;
   --radius-frame: 20px;
@@ -34,6 +52,17 @@
   --primary: var(--fg);
   --primary-fg: oklch(0.17 0 0);
   --score-cool: var(--fg-muted);
+
+  /* The same eight hues, stepped for the dark surface rather than flipped:
+     #3987e5 #d95926 #199e70 #c98500 #d55181 #008300 #9085e9 #e66767. */
+  --series-1: oklch(0.622 0.161 255.1);
+  --series-2: oklch(0.622 0.173 40.1);
+  --series-3: oklch(0.621 0.128 163.1);
+  --series-4: oklch(0.67 0.143 73.2);
+  --series-5: oklch(0.622 0.171 0.8);
+  --series-6: oklch(0.529 0.18 142.5);
+  --series-7: oklch(0.67 0.145 286.8);
+  --series-8: oklch(0.669 0.159 22.3);
 }
 
 /* Scoped marketing palette: no changes to the authenticated application. */

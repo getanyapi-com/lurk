@@ -7,7 +7,9 @@ const generateStructured = vi.fn();
 vi.mock("@/lib/llm", () => ({ generateStructured }));
 vi.mock("@/db", () => ({ db: () => ({}) }));
 
-const { mentionSeries, topCompetitors } = await import("@/lib/competitors/read");
+const { OTHER_COMPETITORS, mentionSeries, stackMentions, topCompetitors } = await import(
+  "@/lib/competitors/read",
+);
 const { classifyMentions } = await import("@/lib/competitors/classify");
 const { competitorsToScan, keepMentions } = await import("@/lib/competitors/scan");
 const { competitorsNamed, quoteNaming } = await import("@/lib/competitors/match");
@@ -183,7 +185,10 @@ describe("mentions over time", () => {
     const typeform = series.find((row) => row.competitor === "Typeform");
     expect(typeform?.days).toHaveLength(30);
     expect(typeform?.total).toBe(3);
-    expect(typeform?.days[29]).toBe(2);
+    // Newest first, so the two from today are the first bar and the one from
+    // nine days ago is the tenth.
+    expect(typeform?.days[0]).toBe(2);
+    expect(typeform?.days[9]).toBe(1);
     expect(series.find((row) => row.competitor === "Jotform")?.total).toBe(0);
   });
 
@@ -195,6 +200,55 @@ describe("mentions over time", () => {
       now,
     );
     expect(series[0].total).toBe(0);
+  });
+});
+
+describe("stacking the mentions into one bar per day", () => {
+  /** A row as `mentionSeries` hands it over: one number per day, newest first. */
+  function row(competitor: string, days: number[]) {
+    return { competitor, days, total: days.reduce((sum, one) => sum + one, 0) };
+  }
+
+  it("keeps the project's own order and measures the busiest day", () => {
+    const { rows, peak } = stackMentions([
+      row("Typeform", [2, 0, 1]),
+      row("Jotform", [3, 0, 0]),
+    ]);
+    expect(rows.map((one) => one.competitor)).toEqual(["Typeform", "Jotform"]);
+    expect(rows.map((one) => one.slot)).toEqual([1, 2]);
+    // Five on the first day, not three: the peak is the whole stack's height.
+    expect(peak).toBe(5);
+  });
+
+  it("drops a competitor nobody named without moving anyone's colour", () => {
+    const { rows } = stackMentions([
+      row("Typeform", [1]),
+      row("Jotform", [0]),
+      row("Tally", [2]),
+    ]);
+    expect(rows.map((one) => one.competitor)).toEqual(["Typeform", "Tally"]);
+    // Tally keeps slot 3. Sliding it into the gap would repaint the chart on
+    // the week Jotform happens to go quiet.
+    expect(rows.map((one) => one.slot)).toEqual([1, 3]);
+  });
+
+  it("adds everyone past the eighth name together into one grey row", () => {
+    const named = Array.from({ length: 8 }, (_, index) => row(`Rival ${index + 1}`, [1, 0]));
+    const { rows, peak } = stackMentions([...named, row("Ninth", [1, 2]), row("Tenth", [0, 3])]);
+    expect(rows).toHaveLength(9);
+    const folded = rows[8];
+    expect(folded.competitor).toBe(OTHER_COMPETITORS);
+    expect(folded.days).toEqual([1, 5]);
+    expect(folded.total).toBe(6);
+    // Null is what tells the chart to draw it grey rather than as a ninth hue.
+    expect(folded.slot).toBeNull();
+    expect(peak).toBe(9);
+  });
+
+  it("draws nothing, and never divides by zero, on a silent window", () => {
+    const { rows, peak } = stackMentions([row("Typeform", [0, 0, 0])]);
+    expect(rows).toEqual([]);
+    expect(peak).toBe(1);
   });
 });
 
