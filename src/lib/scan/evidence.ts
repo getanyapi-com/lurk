@@ -1,4 +1,4 @@
-import type { ScorableItem, TriageCandidate } from "./judgement";
+import type { ScorableItem } from "./judgement";
 
 /**
  * The text each model call sees, and nothing else. The quote validator checks
@@ -44,44 +44,6 @@ export function truncateBody(body: string, budget = BODY_CHAR_BUDGET): string {
   return `${body.slice(0, head)}${ELISION}${body.slice(body.length - tail)}`;
 }
 
-export function describeCandidate(candidate: TriageCandidate): string {
-  return [
-    `id: ${candidate.id}`,
-    `title: ${candidate.title}`,
-    `subreddit: r/${candidate.subreddit}`,
-    `author: ${candidate.author ?? "unknown"}`,
-    `upvotes: ${candidate.score ?? 0}`,
-    `age: ${Math.round(candidate.ageHours)}h`,
-  ].join(" | ");
-}
-
-function describe(item: ScorableItem, body: string, parentBody: string | null): string {
-  return [
-    `id: ${item.id}`,
-    `subreddit: r/${item.subreddit}`,
-    `target author: ${item.author ?? "unknown"}`,
-    `age: ${Math.round(item.ageHours)}h`,
-    `upvotes: ${item.upvotes ?? 0}`,
-    `comments on the thread: ${item.numComments ?? 0}`,
-    `title: ${plainTypography(item.title)}`,
-    parentBody === null
-      ? null
-      : `parent post the target is replying to: ${plainTypography(parentBody)}`,
-    `target text: ${plainTypography(body)}`,
-  ]
-    .filter((line): line is string => line !== null)
-    .join("\n");
-}
-
-/** Everything the judgement prompt says it receives, for one candidate. */
-export function describeItem(item: ScorableItem): string {
-  return describe(
-    item,
-    truncateBody(item.body),
-    item.parentBody === null ? null : truncateBody(item.parentBody, PARENT_CHAR_BUDGET),
-  );
-}
-
 /**
  * The target person's own words, cut and uncut. A need quote is checked against
  * this and never against the whole formatted candidate, because that string
@@ -90,15 +52,6 @@ export function describeItem(item: ScorableItem): string {
  */
 export function ownTexts(item: ScorableItem): string[] {
   return [item.title, truncateBody(item.body), item.body].map(plainTypography);
-}
-
-/**
- * The same fields with nothing cut. A quote the model took from either side of
- * an elision is still the person's own words, so the validator checks this text
- * as well as the excerpt the model was shown.
- */
-export function describeItemUncut(item: ScorableItem): string {
-  return describe(item, item.body, item.parentBody);
 }
 
 /** Reddit's own markers for a body or an author it has taken away. */

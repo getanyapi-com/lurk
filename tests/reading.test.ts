@@ -8,9 +8,12 @@ import type { ScorableItem } from "@/lib/scan/judgement";
  * costs a judgement rather than a lead.
  */
 
-const generateStructured = vi.fn();
+const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
 
-vi.mock("@/lib/llm", () => ({ generateStructured }));
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev,
+}));
 vi.mock("@/db", () => ({
   db: () => ({
     select: () => ({ from: () => ({ where: async () => [] }) }),
@@ -18,7 +21,8 @@ vi.mock("@/db", () => ({
   }),
 }));
 
-const { readPosts, splitByReading } = await import("@/lib/scan/reading");
+const { isAskingBuyer, readPosts, splitByReading } = await import("@/lib/scan/reading");
+type Reading = import("@/lib/scan/reading").Reading;
 
 function post(id: string): ScorableItem {
   return {
@@ -34,20 +38,18 @@ function post(id: string): ScorableItem {
   };
 }
 
-function read(speaker: string, asking: boolean) {
+function read(relationship: string, needState: string) {
   return {
-    speaker: speaker as "buyer",
-    asking,
-    need: asking ? "a form builder that takes payments" : "",
-    category: asking ? "form builder" : "",
-    constraints: [],
+    relationship: relationship as Reading["relationship"],
+    needState: needState as Reading["needState"],
+    quote: "Ours cannot and we are stuck.",
   };
 }
 
 describe("what the shared reading keeps from the judge", () => {
   it("sends a buyer who is asking to the judge and cuts nothing", () => {
     const items = [post("p1")];
-    const split = splitByReading(items, new Map([["p1", read("buyer", true)]]));
+    const split = splitByReading(items, new Map([["p1", read("buyer", "open")]]));
     expect(split.toJudge.map((item) => item.id)).toEqual(["p1"]);
     expect(split.cut).toEqual([]);
   });
@@ -59,13 +61,14 @@ describe("what the shared reading keeps from the judge", () => {
    * is held for review, which is the rejection invariant in gates.ts.
    */
   it.each([
-    ["seller", true, "seller_only", "reject"],
-    ["helper", true, "helper_only", "reject"],
-    ["buyer", false, "no_active_need", "reject"],
-    ["unknown", true, "insufficient_evidence", "reject"],
-    ["discussion", true, "no_active_need", "review"],
-  ])("keeps a %s from the judge", (speaker, asking, code, decision) => {
-    const split = splitByReading([post("p1")], new Map([["p1", read(speaker, asking)]]));
+    ["seller", "open", "seller_only", "reject"],
+    ["helper", "open", "helper_only", "reject"],
+    ["buyer", "no_active_need", "no_active_need", "reject"],
+    ["buyer", "resolved", "resolved", "reject"],
+    ["unknown", "unknown", "insufficient_evidence", "reject"],
+    ["discussion", "unknown", "no_active_need", "review"],
+  ])("keeps a %s whose need is %s from the judge", (relationship, needState, code, decision) => {
+    const split = splitByReading([post("p1")], new Map([["p1", read(relationship, needState)]]));
     expect(split.toJudge).toEqual([]);
     expect(split.cut).toHaveLength(1);
     expect(split.cut[0].id).toBe("p1");
@@ -79,17 +82,24 @@ describe("what the shared reading keeps from the judge", () => {
     expect(split.cut).toEqual([]);
   });
 
+  it("sends a buyer still weighing named options to the judge", () => {
+    expect(isAskingBuyer(read("buyer", "evaluating"))).toBe(true);
+    const split = splitByReading([post("p1")], new Map([["p1", read("buyer", "evaluating")]]));
+    expect(split.toJudge.map((item) => item.id)).toEqual(["p1"]);
+  });
+
   it("returns no reading when the model call fails, so the post is judged", async () => {
-    generateStructured.mockRejectedValueOnce(new Error("upstream is down"));
+    askJev.mockReset();
+    askJev.mockRejectedValueOnce(new Error("upstream is down"));
     const readings = await readPosts("project", [post("p1")]);
     expect(readings.size).toBe(0);
     expect(splitByReading([post("p1")], readings).toJudge).toHaveLength(1);
   });
 
   it("never reads a post Reddit has taken away", async () => {
-    generateStructured.mockClear();
+    askJev.mockClear();
     const removed = { ...post("p1"), body: "[deleted]" };
     expect((await readPosts("project", [removed])).size).toBe(0);
-    expect(generateStructured).not.toHaveBeenCalled();
+    expect(askJev).not.toHaveBeenCalled();
   });
 });

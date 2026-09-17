@@ -221,8 +221,8 @@ export async function judgeThreads(
     }
   }
 
-  const verified = await judgeItems(project.id, project.productText, verifyItems);
-  const discovered = await judgeItems(project.id, project.productText, discoverItems);
+  const verified = await judgeItems(project.id, project.product, verifyItems);
+  const discovered = await judgeItems(project.id, project.product, discoverItems);
   return {
     verification: verified.map((judgement) => ({
       post: postOf.get(judgement.id) as StoredPost,

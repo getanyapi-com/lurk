@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { JUDGEMENT_SYSTEM } from "@/lib/prompts";
+import { JevRequestTooLargeError } from "@/lib/jev";
 import {
   TRIAGE_BATCH_SIZE,
   engagementScore,
@@ -7,15 +7,20 @@ import {
   hydrationCap,
   retrievalBudgets,
 } from "@/lib/scan/constants";
-import { BODY_CHAR_BUDGET, describeItem, truncateBody } from "@/lib/scan/evidence";
+import { BODY_CHAR_BUDGET, truncateBody } from "@/lib/scan/evidence";
 import { judge, routeLead } from "@/lib/scan/gates";
 import type { Assessment, ScorableItem, TriageItem } from "@/lib/scan/judgement";
+import { itemState, spans } from "@/lib/scan/spans";
 import { retentionCutoff } from "@/lib/retention";
 import { TIERS } from "@/lib/tiers";
+import { judgeAnswers, product, triageAnswers } from "./jevAnswers";
 
-const generateStructured = vi.fn();
+const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
 
-vi.mock("@/lib/llm", () => ({ generateStructured }));
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev,
+}));
 
 const { judgeItems, readOrder, triageTitles } = await import("@/lib/scan/score");
 
@@ -193,59 +198,67 @@ describe("content Reddit has taken away", () => {
   const deletedAuthor: ScorableItem = { ...item, id: "ghost", author: "[deleted]" };
 
   it("never sends a sentinel body or a deleted author to the model", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({ items: [assessment()] });
-    const judged = await judgeItems("project-1", "A form builder", [
+    askJev.mockReset();
+    askJev.mockResolvedValueOnce(judgeAnswers([{}]));
+    const judged = await judgeItems("project-1", product, [
       item,
       deletedBody,
       removedBody,
       deletedAuthor,
     ]);
-    expect(generateStructured).toHaveBeenCalledTimes(1);
-    const prompt = generateStructured.mock.calls[0][0].prompt;
-    for (const id of ["gone", "removed", "ghost"]) {
-      expect(prompt).not.toContain(`id: ${id}`);
-    }
+    expect(askJev).toHaveBeenCalledTimes(1);
+    const call = askJev.mock.calls[0][0];
+    expect(call.itemsAsked).toBe(1);
+    expect(Object.keys((call.state as { posts: Record<string, unknown> }).posts)).toEqual(["p0"]);
+    expect(JSON.stringify(call.state)).not.toContain("deleted");
     expect(judged.map((one) => one.id)).toEqual(["p1"]);
   });
 
   it("makes no model call at all when every candidate is a sentinel", async () => {
-    generateStructured.mockReset();
-    const judged = await judgeItems("project-1", "A form builder", [deletedBody, deletedAuthor]);
-    expect(generateStructured).not.toHaveBeenCalled();
+    askJev.mockReset();
+    const judged = await judgeItems("project-1", product, [deletedBody, deletedAuthor]);
+    expect(askJev).not.toHaveBeenCalled();
     expect(judged).toEqual([]);
   });
 });
 
 describe("judging a batch", () => {
-  it("drops a judgement for an id that was never in the batch", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: [assessment(), assessment({ id: "not_ours" })],
-    });
-    generateStructured.mockResolvedValueOnce({ items: [] });
-    const judged = await judgeItems("project-1", "A form builder", [item]);
-    expect(judged.map((one) => one.id)).toEqual(["p1"]);
-    expect(generateStructured.mock.calls[0][0].system).toBe(JUDGEMENT_SYSTEM);
+  const commenter: ScorableItem = {
+    ...item,
+    id: "c1",
+    body: "Same boat here, following this thread.",
+    parentBody: "Our signup form needs conditional logic and it has to take payments.",
+  };
+
+  it("keeps no verdict for a batch the model never answered, so the next run judges it again", async () => {
+    askJev.mockReset();
+    askJev.mockRejectedValueOnce(new Error("upstream is down"));
+    expect(await judgeItems("project-1", product, [item])).toEqual([]);
   });
 
-  it("asks once more for an id the model skipped, and never treats it as rejected", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({ items: [assessment()] });
-    generateStructured.mockResolvedValueOnce({ items: [assessment({ id: "p2" })] });
-    const judged = await judgeItems("project-1", "A form builder", [item, { ...item, id: "p2" }]);
-    expect(generateStructured).toHaveBeenCalledTimes(2);
-    expect(generateStructured.mock.calls[1][0].prompt).toContain("id: p2");
-    expect(generateStructured.mock.calls[1][0].prompt).not.toContain("id: p1\n");
+  it("splits a batch the model refuses as too large and asks for each half", async () => {
+    askJev.mockReset();
+    askJev.mockRejectedValueOnce(new JevRequestTooLargeError());
+    askJev.mockResolvedValue(judgeAnswers([{}]));
+    const judged = await judgeItems("project-1", product, [item, { ...item, id: "p2" }]);
+    expect(askJev).toHaveBeenCalledTimes(3);
+    expect(askJev.mock.calls[1][0].itemsAsked).toBe(1);
     expect(judged.map((one) => one.id).sort()).toEqual(["p1", "p2"]);
   });
 
-  it("leaves an id the model skipped twice unevaluated rather than rejected", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({ items: [] });
-    generateStructured.mockResolvedValueOnce({ items: [] });
-    const judged = await judgeItems("project-1", "A form builder", [item]);
-    expect(judged).toEqual([]);
+  it("asks the three reading questions only for a candidate no reading covers", async () => {
+    askJev.mockReset();
+    askJev.mockResolvedValueOnce(judgeAnswers([{}, {}]));
+    await judgeItems(
+      "project-1",
+      product,
+      [item, { ...item, id: "p2" }],
+      new Map([["p1", { relationship: "buyer" as const, needState: "open" as const, quote: null }]]),
+    );
+    const questions = askJev.mock.calls[0][0].questions as Record<string, unknown>;
+    expect(questions).not.toHaveProperty("p0__relationship");
+    expect(questions).toHaveProperty("p0__solves_problem");
+    expect(questions).toHaveProperty("p1__relationship");
   });
 
   it("shows the model plain typography, so a curly apostrophe cannot be garbled back", () => {
@@ -254,74 +267,60 @@ describe("judging a batch", () => {
       title: "Hotels that \u201Callow\u201D 18 \u2013 cheap?",
       body: "some that wouldn\u2019t cost that much\u2026 \u0019ok",
     };
-    const shown = describeItem(curly);
-    expect(shown).toContain('title: Hotels that "allow" 18 - cheap?');
-    expect(shown).toContain("target text: some that wouldn't cost that much... ok");
+    const shown = Object.values(spans(curly.title, curly.body)).join(" ");
+    expect(shown).toContain('Hotels that "allow" 18 - cheap?');
+    expect(shown).toContain("some that wouldn't cost that much...");
     expect(shown).not.toMatch(/[\u2018\u2019\u201C\u201D\u2013\u2026\u0019]/);
   });
 
-  it("keeps a lead whose quote differs from the text only in typography", async () => {
+  it("copies the quote from the sentence the model picked, in the person's own words", async () => {
     const typography: ScorableItem = {
       ...item,
       body: "Our signup form needs\n\n  conditional logic \u2013 and it\u2019s got to take \\*payments\\*.",
     };
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: [
-        assessment({
-          needEvidence: { quote: "conditional logic - and it's got to take *payments*." },
-        }),
-      ],
-    });
-    const judged = await judgeItems("project-1", "A form builder", [typography]);
-    expect(judged[0].decision).toBe("qualify");
-    expect(judged[0].reasonCode).not.toBe("insufficient_evidence");
-  });
-
-  it("keeps a lead whose quote the head-and-tail excerpt cut in half", async () => {
-    const long: ScorableItem = {
-      ...item,
-      body: `${"a".repeat(BODY_CHAR_BUDGET)} we need webhooks on every submission. ${"b".repeat(BODY_CHAR_BUDGET)}`,
-    };
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: [assessment({ needEvidence: { quote: "we need webhooks on every submission." } })],
-    });
-    const judged = await judgeItems("project-1", "A form builder", [long]);
-    expect(describeItem(long)).not.toContain("we need webhooks on every submission.");
+    const sentences = spans(typography.title, typography.body);
+    const picked = Object.keys(sentences)[2];
+    askJev.mockReset();
+    askJev.mockResolvedValueOnce(judgeAnswers([{ quote: picked }]));
+    const judged = await judgeItems("project-1", product, [typography]);
+    expect(judged[0].needEvidence).toEqual({ quote: sentences[picked] });
+    expect(judged[0].needEvidence?.quote).toContain("it's got to take");
     expect(judged[0].decision).toBe("qualify");
   });
 
-  it("holds a commenter whose only quote comes from the post they are answering", async () => {
-    const commenter: ScorableItem = {
-      ...item,
-      id: "c1",
-      body: "Same boat here, following this thread.",
-      parentBody: "Our signup form needs conditional logic and it has to take payments.",
-    };
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: [
-        assessment({
-          id: "c1",
-          needEvidence: { quote: "it has to take payments" },
-        }),
-      ],
-    });
-    generateStructured.mockResolvedValueOnce({ items: [] });
-    const judged = await judgeItems("project-1", "A form builder", [commenter]);
-    expect(describeItem(commenter)).toContain("it has to take payments");
+  it("leaves a lead no sentence speaks for with no evidence, and holds it for review", async () => {
+    askJev.mockReset();
+    askJev.mockResolvedValueOnce(judgeAnswers([{ quote: "none" }]));
+    const judged = await judgeItems("project-1", product, [item]);
+    expect(judged[0].needEvidence).toBeNull();
     expect(judged[0].decision).toBe("review");
     expect(judged[0].reasonCode).toBe("insufficient_evidence");
   });
 
-  it("sends a judgement whose quote is not in the supplied text to review", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: [assessment({ needEvidence: { quote: "we have a budget of ten thousand" } })],
-    });
-    generateStructured.mockResolvedValueOnce({ items: [] });
-    const judged = await judgeItems("project-1", "A form builder", [item]);
+  it("never offers a commenter the words of the post they are answering", () => {
+    const sentences = Object.values(spans(commenter.title, commenter.body));
+    expect(sentences.some((one) => one.includes("it has to take payments"))).toBe(false);
+    expect(itemState(commenter).parent_post_replied_to).toContain("it has to take payments");
+  });
+
+  it("holds a commenter whose only quote comes from the post they are answering", async () => {
+    askJev.mockReset();
+    askJev.mockResolvedValueOnce(judgeAnswers([{}]));
+    const judged = await judgeItems(
+      "project-1",
+      product,
+      [commenter],
+      new Map([
+        [
+          "c1",
+          {
+            relationship: "buyer" as const,
+            needState: "open" as const,
+            quote: "it has to take payments",
+          },
+        ],
+      ]),
+    );
     expect(judged[0].decision).toBe("review");
     expect(judged[0].reasonCode).toBe("insufficient_evidence");
   });
@@ -348,17 +347,14 @@ describe("triage", () => {
     { id: "c", title: "C", subreddit: "SaaS", author: null, score: null, ageHours: 1 },
   ];
 
-  it("keeps the model's order and priority, and never rejects a candidate it skipped", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: [
-        { id: "c", disposition: "read", priority: "medium", reasonCode: "relevant_pain", reason: "c" },
-        { id: "b", disposition: "read", priority: "high", reasonCode: "explicit_ask", reason: "b" },
-      ],
-    });
-    const triage = await triageTitles("project-1", "A form builder", candidates);
-    expect(triage.map((one) => one.id)).toEqual(["c", "b", "a"]);
-    expect(triage[2].disposition).toBe("uncertain");
+  it("reads the likeliest asker first and keeps the unsure one in the queue", async () => {
+    askJev.mockReset();
+    askJev.mockResolvedValueOnce(
+      triageAnswers([{ asking: 0.2 }, { asking: 0.9 }, { asking: 0.6 }]),
+    );
+    const triage = await triageTitles("project-1", product, candidates);
+    expect(triage.map((one) => one.id)).toEqual(["a", "b", "c"]);
+    expect(triage[0].disposition).toBe("uncertain");
     expect(readOrder(triage, new Map())).toEqual(["b", "c", "a"]);
   });
 
@@ -371,45 +367,42 @@ describe("triage", () => {
       score: null,
       ageHours: 1,
     }));
-    const verdict = (id: string, priority: "high" | "low") => ({
-      id,
-      disposition: "read" as const,
-      priority,
-      reasonCode: "relevant_pain" as const,
-    });
-    const last = `p${TRIAGE_BATCH_SIZE - 1}`;
-    const first = `p${TRIAGE_BATCH_SIZE}`;
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      items: many
-        .slice(0, TRIAGE_BATCH_SIZE)
-        .map((one) => verdict(one.id, one.id === last ? "high" : "low")),
-    });
-    generateStructured.mockResolvedValueOnce({
-      items: many
-        .slice(TRIAGE_BATCH_SIZE)
-        .map((one) => verdict(one.id, one.id === first ? "high" : "low")),
-    });
+    const last = `Title ${TRIAGE_BATCH_SIZE - 1}`;
+    const first = `Title ${TRIAGE_BATCH_SIZE}`;
+    askJev.mockReset();
+    askJev.mockImplementation(async (call: { state: { titles: Record<string, { title: string }> } }) =>
+      triageAnswers(
+        Object.values(call.state.titles).map((title) => ({
+          asking: title.title === last || title.title === first ? 0.9 : 0.6,
+        })),
+      ),
+    );
 
-    const triage = await triageTitles("project-1", "A form builder", many);
+    const triage = await triageTitles("project-1", product, many);
 
-    expect(generateStructured).toHaveBeenCalledTimes(2);
-    expect(generateStructured.mock.calls[0][0].prompt).toContain("Title 0");
-    expect(generateStructured.mock.calls[0][0].prompt).not.toContain(`Title ${TRIAGE_BATCH_SIZE}`);
+    expect(askJev).toHaveBeenCalledTimes(2);
+    const asked = (index: number) =>
+      Object.values(
+        askJev.mock.calls[index][0].state.titles as Record<string, { title: string }>,
+      ).map((title) => title.title);
+    expect(asked(0)).toContain("Title 0");
+    expect(asked(0)).not.toContain(first);
     expect(triage).toHaveLength(many.length);
     expect(new Set(triage.map((one) => one.id)).size).toBe(many.length);
     expect(triage.every((one) => one.disposition === "read")).toBe(true);
     const order = readOrder(triage, new Map());
-    expect(order.slice(0, 2)).toEqual([last, first]);
+    expect(order.slice(0, 2)).toEqual([`p${TRIAGE_BATCH_SIZE - 1}`, `p${TRIAGE_BATCH_SIZE}`]);
     expect(order.slice(2)).toEqual(
-      many.map((one) => one.id).filter((id) => id !== last && id !== first),
+      many
+        .map((one) => one.id)
+        .filter((id) => id !== `p${TRIAGE_BATCH_SIZE - 1}` && id !== `p${TRIAGE_BATCH_SIZE}`),
     );
   });
 
   it("reads the uncertain, never the rejected", () => {
     const triage: TriageItem[] = [
-      { id: "a", disposition: "reject", priority: "high", reasonCode: "wrong_topic" },
-      { id: "b", disposition: "uncertain", priority: "low", reasonCode: "insufficient_context" },
+      { id: "a", disposition: "reject", asking: 0.9 },
+      { id: "b", disposition: "uncertain", asking: 0.1 },
     ];
     expect(readOrder(triage, new Map())).toEqual(["b"]);
   });

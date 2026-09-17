@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { keepCitedLabels, labelThreads, type ThreadLabel } from "@/lib/discovery/label";
+import {
+  entityCandidates,
+  keepCitedLabels,
+  labelThreads,
+  type ThreadLabel,
+} from "@/lib/discovery/label";
+import { JevRequestTooLargeError, type JevCall, type Question } from "@/lib/jev";
+import type { ProductFacts } from "@/lib/product";
 import { planFromRanks } from "@/lib/discovery/plan";
 import { numberTerms, stripRedditSuffix } from "@/lib/discovery/phrases";
 import {
@@ -25,8 +32,11 @@ import { askedQueries } from "@/lib/discovery/refresh";
 import { googleQuery } from "@/lib/seo/fetch";
 import { TIERS } from "@/lib/tiers";
 
-const generateStructured = vi.fn();
-vi.mock("@/lib/llm", () => ({ generateStructured: (...args: unknown[]) => generateStructured(...args) }));
+const askJev = vi.fn();
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev: (call: JevCall) => askJev(call),
+}));
 
 /**
  * HotelsAllow is the project the plan is proved against: a site that lists
@@ -52,6 +62,24 @@ const DESTINATIONS: Destination[] = [
 ];
 
 const DESTINATION_NAMES = DESTINATIONS.map((place) => place.name);
+
+/** The product every judgement in this file is made against, as Jev reads it. */
+const PRODUCT: ProductFacts = {
+  name: "HotelsAllow",
+  url: "https://hotelsallow.com",
+  pain: "Hotels turn away guests under 21.",
+  solution: "Lists hotels that check in guests aged 18 and over.",
+  targetUsers: "People under 21 booking a hotel room",
+  serviceGeography: "The United States",
+  budgetFit: "Free to search",
+  capabilities: ["check the minimum check-in age of a hotel"],
+  exclusions: ["anything outside the United States"],
+  notBuyers: [],
+  competitors: [],
+};
+
+/** The option a thread about none of the project's places takes. */
+const NO_PLACE = "none";
 
 /** The ages this product itself talks about, which is what makes one a term. */
 const PRODUCT_NUMBERS = numberTerms([
@@ -264,27 +292,144 @@ describe("labels the model has to cite", () => {
     expect(kept[0].relevance).toBe("relevant");
   });
 
-  it("asks again for the threads the model left out", async () => {
-    generateStructured.mockReset();
-    generateStructured.mockResolvedValueOnce({
-      results: [{ id: "a1", relevance: "relevant", destination: null, entities: [] }],
+  /** Every question Jev is asked, answered by whatever this test picks. */
+  const answering = (pick: (key: string, question: Question) => string) => async (call: JevCall) =>
+    Object.fromEntries(
+      Object.entries(call.questions).map(([key, question]) => [
+        key,
+        { type: "choice", choice: pick(key, question), probabilities: {}, confidence: 1 },
+      ]),
+    );
+
+  /** The entity a role question is about, which is the only name it quotes. */
+  const entityAsked = (question: Question) =>
+    String(question.instructions).split('"')[1] ?? "";
+
+  const thread = (id: string, title: string, subreddit = "hotels") => ({
+    id,
+    subreddit,
+    title,
+    snippet: "",
+  });
+
+  it("files the relevance and the place the thread is about", async () => {
+    askJev.mockReset();
+    askJev.mockImplementation(
+      answering((key) => {
+        if (key.endsWith("__relevance")) {
+          return key.startsWith("t0") ? "relevant" : "plausible";
+        }
+        if (key.endsWith("__destination")) {
+          return key.startsWith("t0") ? "Las Vegas" : NO_PLACE;
+        }
+        return "not_a_product";
+      }),
+    );
+    const labels = await labelThreads({
+      projectId: "p1",
+      product: PRODUCT,
+      destinations: DESTINATION_NAMES,
+      candidates: [thread("a1", "turning 19 next week"), thread("a2", "hotel desks these days")],
     });
-    generateStructured.mockResolvedValueOnce({
-      results: [{ id: "a2", relevance: "plausible", destination: null, entities: [] }],
+    expect(askJev).toHaveBeenCalledTimes(1);
+    const call = askJev.mock.calls[0][0] as JevCall;
+    expect(call.purpose).toBe("discovery_label");
+    expect((call.state as { product: { name: string } }).product.name).toBe("HotelsAllow");
+    expect(Object.keys(call.questions["t0__destination"].criteria!)).toEqual([
+      ...DESTINATION_NAMES,
+      NO_PLACE,
+    ]);
+    expect(labels).toEqual([
+      { id: "a1", relevance: "relevant", destination: "Las Vegas", entities: [] },
+      { id: "a2", relevance: "plausible", destination: null, entities: [] },
+    ]);
+  });
+
+  it("asks about no place at all when the project serves none", async () => {
+    askJev.mockReset();
+    askJev.mockImplementation(answering(() => "irrelevant"));
+    const labels = await labelThreads({
+      projectId: "p1",
+      product: PRODUCT,
+      destinations: [],
+      candidates: [thread("a1", "turning 19 next week")],
+    });
+    const call = askJev.mock.calls[0][0] as JevCall;
+    expect(Object.keys(call.questions)).toEqual(["t0__relevance"]);
+    expect(labels[0].destination).toBeNull();
+  });
+
+  /**
+   * Jev can only pick an option it was handed, so the names come out of the
+   * title and the snippet before the call. The finder over-finds on purpose,
+   * and `not_a_product` is what throws the rest away.
+   */
+  it("finds the names in the text and drops the ones that are not products", async () => {
+    expect(
+      entityCandidates({
+        id: "a1",
+        subreddit: "hotels",
+        title: "Refused at 20 in Las Vegas, anyone tried HotelsAllow or Booking.com?",
+        snippet: "",
+      }),
+    ).toEqual(["Booking.com", "Las Vegas", "HotelsAllow"]);
+
+    askJev.mockReset();
+    askJev.mockImplementation(
+      answering((key, question) => {
+        if (key.endsWith("__relevance")) {
+          return "relevant";
+        }
+        const name = entityAsked(question);
+        if (name === "HotelsAllow") {
+          return "direct_substitute";
+        }
+        return name === "Booking.com" ? "booking_alternative" : "not_a_product";
+      }),
+    );
+    const labels = await labelThreads({
+      projectId: "p1",
+      product: PRODUCT,
+      destinations: [],
+      candidates: [
+        thread("a1", "Refused at 20 in Las Vegas, anyone tried HotelsAllow or Booking.com?"),
+      ],
+    });
+    expect(labels[0].entities).toEqual([
+      { name: "Booking.com", role: "booking_alternative" },
+      { name: "HotelsAllow", role: "direct_substitute" },
+    ]);
+  });
+
+  it("splits a request the model refuses as too large and asks each half", async () => {
+    askJev.mockReset();
+    const answer = answering(() => "relevant");
+    askJev.mockImplementation(async (call: JevCall) => {
+      if ((call.itemsAsked ?? 0) > 2) {
+        throw new JevRequestTooLargeError();
+      }
+      return answer(call);
     });
     const labels = await labelThreads({
       projectId: "p1",
-      productText: "Product: HotelsAllow",
-      candidates: ["a1", "a2", "a3"].map((id) => ({
-        id,
-        subreddit: "hotels",
-        title: `Thread ${id}`,
-        snippet: "",
-      })),
+      product: PRODUCT,
+      destinations: [],
+      candidates: ["a1", "a2", "a3", "a4"].map((id) => thread(id, `Thread ${id}`)),
     });
-    expect(generateStructured).toHaveBeenCalledTimes(2);
-    expect(String(generateStructured.mock.calls[1][0].prompt)).toContain("id: a3");
-    expect(labels.map((item) => item.id)).toEqual(["a1", "a2"]);
+    expect(askJev).toHaveBeenCalledTimes(3);
+    expect(labels.map((label) => label.id)).toEqual(["a1", "a2", "a3", "a4"]);
+  });
+
+  it("leaves a batch the model never answered unlabeled", async () => {
+    askJev.mockReset();
+    askJev.mockRejectedValue(new Error("the connection dropped"));
+    const labels = await labelThreads({
+      projectId: "p1",
+      product: PRODUCT,
+      destinations: [],
+      candidates: [thread("a1", "turning 19 next week")],
+    });
+    expect(labels).toEqual([]);
   });
 });
 

@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projectCompetitors, projectKeywords, projectSubreddits, projects } from "@/db/schema";
-import { parseTextList } from "@/lib/discovery/store";
+import { parseDestinations, parseTextList } from "@/lib/discovery/store";
+import { productFacts, productText, type ProductFacts } from "@/lib/product";
 import { DEFAULT_SCORE_THRESHOLD } from "./constants";
 import { retrieved, type PlanRow } from "./coverage";
 
@@ -23,29 +24,13 @@ export type ScanProject = {
   /** How buyers say the problem, which is what the SEO refresh asks Google. */
   phrasings: string[];
   competitors: string[];
+  /** The places the product page named, which discovery and the SEO refresh label threads against. */
+  destinations: string[];
+  /** The product facts every judgement is made against. */
+  product: ProductFacts;
+  /** The same facts as prose, for the calls that still read text. */
   productText: string;
 };
-
-function productText(row: typeof projects.$inferSelect, competitors: string[]): string {
-  const capabilities = parseTextList(row.capabilities);
-  const exclusions = parseTextList(row.exclusions);
-  const notBuyers = parseTextList(row.notBuyers);
-  return [
-    `Product: ${row.name}`,
-    row.url ? `Website: ${row.url}` : "",
-    row.pain ? `Pain it solves: ${row.pain}` : "",
-    row.solution ? `What it does: ${row.solution}` : "",
-    row.targetUsers ? `Who buys it: ${row.targetUsers}` : "",
-    capabilities.length > 0 ? `Can: ${capabilities.join("; ")}` : "",
-    exclusions.length > 0 ? `Does not: ${exclusions.join("; ")}` : "",
-    notBuyers.length > 0 ? `Not a buyer: ${notBuyers.join("; ")}` : "",
-    row.geography ? `Sells in: ${row.geography}` : "",
-    row.budgetFit ? `Budget: ${row.budgetFit}` : "",
-    competitors.length > 0 ? `Competitors: ${competitors.join(", ")}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
 
 /**
  * The competitors a scan is allowed to use. A competitor row carries the plan's
@@ -114,6 +99,8 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
     subreddits: retrieved(communities).map((row) => row.key),
     competitors: competitorNames,
     phrasings: parseTextList(row.problemPhrasings),
-    productText: productText(row, competitorNames),
+    destinations: parseDestinations(row.destinations).map((place) => place.name),
+    product: productFacts(row, competitorNames),
+    productText: productText(productFacts(row, competitorNames)),
   };
 }

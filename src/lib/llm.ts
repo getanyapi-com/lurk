@@ -101,7 +101,8 @@ export async function llmSpendToday(): Promise<number> {
   return Number(rows[0]?.total ?? 0);
 }
 
-async function assertUnderCap() {
+/** Refuses any model call once today's house spend, muse and Jev together, is at the cap. */
+export async function assertUnderLlmCap() {
   const cap = config().HOUSE_LLM_CAP_USD_PER_DAY;
   if ((await llmSpendToday()) >= cap) {
     throw new LlmCapReachedError(cap);
@@ -224,7 +225,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
   if (!OPENROUTER_API_KEY) {
     throw new LlmNotConfiguredError();
   }
-  await assertUnderCap();
+  await assertUnderLlmCap();
   const openrouter = createOpenRouter({ apiKey: OPENROUTER_API_KEY });
   const startedAt = Date.now();
   let result;

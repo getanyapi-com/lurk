@@ -1,5 +1,4 @@
 import {
-  boolean,
   index,
   integer,
   jsonb,
@@ -51,11 +50,12 @@ export const postReadings = pgTable("post_readings", {
   postId: text("post_id")
     .primaryKey()
     .references(() => redditPosts.id, { onDelete: "cascade" }),
-  speaker: text("speaker").notNull(),
-  asking: boolean("asking").notNull(),
-  need: text("need").notNull(),
-  category: text("category").notNull(),
-  constraints: jsonb("constraints").$type<string[]>().notNull(),
+  /** Who is speaking: buyer, seller, helper, discussion or unknown. */
+  relationship: text("relationship").notNull(),
+  /** The state of their own need: open, evaluating, resolved, no_active_need or unknown. */
+  needState: text("need_state").notNull(),
+  /** The sentence of their own that states the need, or null when none does. */
+  quote: text("quote"),
   /** The hash of the title and body this reading was made from. */
   contentHash: text("content_hash").notNull(),
   /** Bumped when the prompt changes what a stored reading means. */

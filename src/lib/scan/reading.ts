@@ -1,55 +1,49 @@
 import { inArray, sql } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db";
 import { postReadings } from "@/db/schema";
-import { generateStructured } from "@/lib/llm";
-import { READING_SYSTEM } from "@/lib/prompts";
-import { MODEL_CONCURRENCY } from "./constants";
+import { askJev } from "@/lib/jev";
+import { askInBatches } from "./batches";
+import { SCORE_BATCH_SIZE } from "./constants";
+import { readingFrom, type ReadingAnswers } from "./derive";
 import { contentHash } from "./evaluations";
 import { isSentinel } from "./evidence";
 import { judge } from "./gates";
 import type { Assessment, Judgement, ScorableItem } from "./judgement";
+import { keyed, readingQuestions } from "./questions";
+import { itemState, spans } from "./spans";
 
 /**
- * The shared reading: one small model call per post, before any product is
- * considered, answering who is speaking and whether they are asking for
- * anything. Every project watching a post reads the same answer, so the first
- * project to see it pays for all of them.
+ * The shared reading: who is speaking, what state their own need is in, and
+ * which of their sentences says so, answered before any product is
+ * considered. Every project watching a post reads the same answer, so the
+ * first project to see it pays for all of them, and the judge asks these
+ * three questions only for a candidate no reading covers.
  *
- * It exists to keep the judgement call away from posts no product would ever
- * qualify. Over the 540 judged posts replayed in .context/embed-test/report3.md,
- * requiring a buyer who is asking cut 55 to 78% of the rejections on all five
- * products and lost no lead on any of them, and it agreed with the judge on
- * every post the judge called a seller and every post the judge qualified.
+ * It keeps the judgement away from posts no product would ever qualify. Over
+ * the 540 judged posts replayed in .context/embed-test/report3.md, requiring a
+ * buyer whose need is open cut 55 to 78% of the rejections on all five
+ * products and lost no lead on any of them.
  */
 
-const readingSchema = z.object({
-  speaker: z.enum(["buyer", "seller", "helper", "discussion", "unknown"]),
-  asking: z.boolean(),
-  need: z.string(),
-  category: z.string(),
-  constraints: z.array(z.string()),
-});
-
-export type Reading = z.infer<typeof readingSchema>;
+export type Reading = ReadingAnswers;
 
 /**
- * Bumped when READING_SYSTEM or this schema changes what a stored reading
- * means. A reading made under an older version is read again.
+ * Bumped when the questions or this shape change what a stored reading means.
+ * A reading made under an older version is read again.
  */
-export const READING_VERSION = "2026-09-07.1";
-
-/** The most characters of one body the reading sees, as measured. */
-const READING_CHAR_BUDGET = 6000;
+export const READING_VERSION = "2026-09-17.1";
 
 /** The hash of the post's own words. Replies do not change who is speaking. */
 export function readingHash(title: string, body: string | null): string {
   return contentHash([title, body]);
 }
 
-/** True when this reading found a buyer who is looking for something. */
+/** True when this reading found a buyer whose own need is not settled. */
 export function isAskingBuyer(reading: Reading): boolean {
-  return reading.asking && reading.speaker === "buyer";
+  return (
+    reading.relationship === "buyer" &&
+    (reading.needState === "open" || reading.needState === "evaluating")
+  );
 }
 
 /** The readings already held for these posts, still current for their text. */
@@ -71,11 +65,9 @@ async function cached(items: ScorableItem[]): Promise<Map<string, Reading>> {
       .map((row) => [
         row.postId,
         {
-          speaker: row.speaker as Reading["speaker"],
-          asking: row.asking,
-          need: row.need,
-          category: row.category,
-          constraints: row.constraints,
+          relationship: row.relationship as Reading["relationship"],
+          needState: row.needState as Reading["needState"],
+          quote: row.quote,
         },
       ]),
   );
@@ -94,11 +86,9 @@ async function store(item: ScorableItem, reading: Reading): Promise<void> {
     .onConflictDoUpdate({
       target: postReadings.postId,
       set: {
-        speaker: sql`excluded.speaker`,
-        asking: sql`excluded.asking`,
-        need: sql`excluded.need`,
-        category: sql`excluded.category`,
-        constraints: sql`excluded.constraints`,
+        relationship: sql`excluded.relationship`,
+        needState: sql`excluded.need_state`,
+        quote: sql`excluded.quote`,
         contentHash: sql`excluded.content_hash`,
         readingVersion: sql`excluded.reading_version`,
         readAt: sql`excluded.read_at`,
@@ -106,20 +96,37 @@ async function store(item: ScorableItem, reading: Reading): Promise<void> {
     });
 }
 
-async function readOne(projectId: string, item: ScorableItem): Promise<Reading | null> {
-  try {
-    const reading = await generateStructured({
-      purpose: "reading",
-      projectId,
-      schema: readingSchema,
-      system: READING_SYSTEM,
-      prompt: `Title: ${item.title}\n\n${item.body.slice(0, READING_CHAR_BUDGET)}`,
-    });
-    await store(item, reading);
-    return reading;
-  } catch {
-    return null;
-  }
+/** One request: these posts, the three shared questions each. */
+async function readBatch(
+  projectId: string,
+  batch: ScorableItem[],
+): Promise<[string, Reading][]> {
+  const posts: Record<string, unknown> = {};
+  let questions = {};
+  batch.forEach((item, index) => {
+    const key = `p${index}`;
+    posts[key] = itemState(item);
+    questions = { ...questions, ...keyed(key, readingQuestions(`posts.${key}`, Object.keys(spans(item.title, item.body)))) };
+  });
+  const answers = await askJev({
+    purpose: "reading",
+    projectId,
+    state: { posts },
+    questions,
+    itemsAsked: batch.length,
+  });
+  const readings = batch.map((item, index): [string, Reading] => [
+    item.id,
+    readingFrom(answers, `p${index}`, spans(item.title, item.body)),
+  ]);
+  // A reading that could not be stored is still a reading: the answer is paid
+  // for and serves this scan, and the next one buys it again.
+  await Promise.all(
+    readings.map(([id, reading]) =>
+      store(batch.find((item) => item.id === id) as ScorableItem, reading).catch(() => undefined),
+    ),
+  );
+  return readings;
 }
 
 /**
@@ -134,22 +141,21 @@ export async function readPosts(
   const live = items.filter((item) => !isSentinel(item));
   const readings = await cached(live);
   const todo = live.filter((item) => !readings.has(item.id));
-  for (let start = 0; start < todo.length; start += MODEL_CONCURRENCY) {
-    const batch = todo.slice(start, start + MODEL_CONCURRENCY);
-    const done = await Promise.all(batch.map((item) => readOne(projectId, item)));
-    batch.forEach((item, index) => {
-      const reading = done[index];
-      if (reading) {
-        readings.set(item.id, reading);
-      }
-    });
+  const read = await askInBatches(
+    todo,
+    SCORE_BATCH_SIZE,
+    (batch) => readBatch(projectId, batch),
+    () => [],
+  );
+  for (const [id, reading] of read) {
+    readings.set(id, reading);
   }
   return readings;
 }
 
 /** What the reading found, in the words the verdict is written in. */
-const SPEAKER_PHRASE: Record<Reading["speaker"], string> = {
-  buyer: "someone talking about the topic without looking for anything",
+const SPEAKER_PHRASE: Record<Reading["relationship"], string> = {
+  buyer: "a buyer whose need is not open",
   seller: "someone announcing or promoting something of their own",
   helper: "someone answering others rather than asking",
   discussion: "a discussion with nobody asking for anything",
@@ -158,30 +164,30 @@ const SPEAKER_PHRASE: Record<Reading["speaker"], string> = {
 
 /**
  * The verdict for a post the reading kept away from the judge. It claims only
- * what the reading saw: who was speaking, and that they were not asking. Every
+ * what the reading saw: who was speaking, and the state of their need. Every
  * score is left null, so the existing gates in gates.ts settle the decision
  * from that reading alone and no second set of rules has to agree with them.
  */
 function notAsking(reading: Reading): Assessment {
   return {
     id: "",
-    relationship: reading.speaker,
-    needState: reading.asking ? "unknown" : "no_active_need",
+    relationship: reading.relationship,
+    needState: reading.needState,
     fit: null,
     intent: null,
     stage: "none",
     decision: "reject",
     // Every reading that reaches here fails a gate, so the gate names it.
     reasonCode: "insufficient_evidence",
-    needEvidence: null,
-    reason: `A first reading of this post found ${SPEAKER_PHRASE[reading.speaker]}, so it was not scored against the product.`,
+    needEvidence: reading.quote === null ? null : { quote: reading.quote },
+    reason: `A first reading of this post found ${SPEAKER_PHRASE[reading.relationship]}, so it was not scored against the product.`,
   };
 }
 
 /**
  * The posts the judge should read, and the verdicts for the ones it should not.
  * A post with no reading is judged, because only a reading that says the author
- * is not a buyer asking for something may keep a post off the judge's list.
+ * is not a buyer with an open need may keep a post off the judge's list.
  */
 export function splitByReading(
   items: ScorableItem[],

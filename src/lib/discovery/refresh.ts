@@ -3,6 +3,7 @@ import { enqueueJob, writeProgress } from "@/jobs/enqueue";
 import { db } from "@/db";
 import { projectCompetitors, projects } from "@/db/schema";
 import { clientForUser } from "@/lib/anyapi";
+import { productFacts, productText } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { tierForUser } from "@/lib/tier";
 import { labelThreads } from "./label";
@@ -23,7 +24,7 @@ import {
   parseTextList,
   UNLABELED,
 } from "./store";
-import { discoveryBudget, productBrief, publishFromEvidence } from "./run";
+import { discoveryBudget, publishFromEvidence } from "./run";
 
 /**
  * The weekly delta. Discovery does not run again from nothing: it buys a few
@@ -114,19 +115,15 @@ export async function runDiscoveryRefresh(
   const fresh = dedupeThreads(found.observations.map((row) => ({ ...row, relevance: UNLABELED })))
     .filter((thread) => !known.has(thread.postId));
 
-  const brief = productBrief({
-    name: project.name,
-    pain: project.pain ?? "",
-    solution: project.solution ?? "",
-    targetUsers: project.targetUsers ?? "",
-    serviceGeography: project.geography ?? "",
-    budgetFit: project.budgetFit ?? "",
-    capabilities: parseTextList(project.capabilities),
-    exclusions: parseTextList(project.exclusions),
-  });
+  const standing = await existingCompetitors(projectId);
+  const facts = productFacts(
+    project,
+    standing.map((row) => row.name),
+  );
   const labels = await labelThreads({
     projectId,
-    productText: brief,
+    product: facts,
+    destinations: destinations.map((place) => place.name),
     candidates: fresh.map((thread) => ({
       id: thread.postId,
       subreddit: thread.subreddit,
@@ -144,8 +141,8 @@ export async function runDiscoveryRefresh(
     rows: await loadEvidence(projectId),
     destinations,
     limits,
-    competitors: mergeCompetitors(await existingCompetitors(projectId), competitorsFrom(labels)),
-    productTexts: [brief, ...problemPhrasings],
+    competitors: mergeCompetitors(standing, competitorsFrom(labels)),
+    productTexts: [productText(facts), ...problemPhrasings],
     phrasings: problemPhrasings,
   });
   await enqueueJob("discovery_refresh", projectId, new Date(Date.now() + maxAgeMs));

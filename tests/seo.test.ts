@@ -281,7 +281,7 @@ describe.skipIf(!process.env.DATABASE_URL)("what a refresh pays to judge", () =>
       { id: fresh, relevance: "irrelevant", destination: null, entities: [] },
     ]);
     await judgeUnseen(
-      { id: project.id, productText: "One key for many data APIs" } as never,
+      { id: project.id, product: { name: "AnyAPI" } } as never,
       [judged, fresh].map((postId, index) => ({
         postId,
         canonicalUrl: `https://www.reddit.com/r/webscraping/comments/${postId}/x/`,

@@ -184,7 +184,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   await progress(jobId, `Reading ${candidates.length} titles`);
   const triage = await triageTitles(
     projectId,
-    project.productText,
+    project.product,
     candidates.map((post) => ({
       id: post.id,
       title: post.title,
@@ -228,8 +228,9 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   };
   const judgements = await judgeItems(
     projectId,
-    project.productText,
+    project.product,
     ordered.map(postItem),
+    new Map(),
     commit,
   );
   const uncommitted = judgements.filter((judgement) => !committed.has(judgement.id));

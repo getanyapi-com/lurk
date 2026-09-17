@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { judgeAnswers, readingAnswers, type JevSpec } from "./jevAnswers";
 
 /**
  * The one sweep a scorer change owes a project: every verdict an older scorer
@@ -8,15 +9,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * are both queries.
  */
 
-const generateStructured = vi.fn();
+const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
 
-vi.mock("@/lib/llm", () => ({ generateStructured }));
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev,
+}));
 
 const hasDatabase = !!process.env.DATABASE_URL;
-
-function idsIn(prompt: string): string[] {
-  return [...prompt.matchAll(/^id: (\S+)$/gm)].map((match) => match[1]);
-}
 
 describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
   let db: typeof import("@/db").db;
@@ -35,7 +35,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
     ({ SCORER_VERSION } = await import("@/lib/scan/evaluations"));
     ({ upsertPosts } = await import("@/lib/reddit/store"));
     ({ eq } = await import("drizzle-orm"));
-    generateStructured.mockReset();
+    askJev.mockReset();
   });
 
   /** One project holding one stale verdict on one post, with or without a lead. */
@@ -96,33 +96,14 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
     return { project, post };
   }
 
-  /** The model answers every id in the prompt with one assessment. */
-  function answers(patch: Record<string, unknown>) {
-    generateStructured.mockImplementation(async (input: { purpose: string; prompt: string }) => {
-      if (input.purpose === "reading") {
-        return {
-          speaker: "buyer",
-          asking: true,
-          need: "a form builder",
-          category: "form builder",
-          constraints: [],
-        };
-      }
-      return {
-        items: idsIn(input.prompt).map((id) => ({
-          id,
-          relationship: "buyer",
-          needState: "open",
-          fit: 4,
-          intent: 3,
-          stage: "solution_seeking",
-          decision: "qualify",
-          reasonCode: "supported_open_need",
-          needEvidence: { quote: "needs conditional logic" },
-          reason: "Wants a form that branches.",
-          ...patch,
-        })),
-      };
+  /**
+   * Jev answers every candidate of every call the same way: the shared reading
+   * first, then the judgement, both from one spec.
+   */
+  function answers(spec: JevSpec = {}) {
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) => {
+      const specs = Array.from({ length: call.itemsAsked }, () => ({ quote: "s0", ...spec }));
+      return call.purpose === "reading" ? readingAnswers(specs) : judgeAnswers(specs);
     });
   }
 
@@ -150,7 +131,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
 
   it("takes back a lead whose verdict dropped to review", async () => {
     const { project } = await fixture({ lead: { status: "new" } });
-    answers({ decision: "review", fit: 2 });
+    answers({ hardRequirement: "unknown" });
 
     const outcome = await runRescore(project.id, randomUUID());
 
@@ -162,7 +143,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
 
   it("takes back a lead whose verdict dropped to a rejection", async () => {
     const { project } = await fixture({ lead: { status: "new" } });
-    answers({ relationship: "seller", decision: "reject", reasonCode: "seller_only", fit: 1 });
+    answers({ relationship: "seller" });
 
     const outcome = await runRescore(project.id, randomUUID());
 
@@ -185,7 +166,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
   it("never touches a lead the person already acted on", async () => {
     for (const status of ["hidden", "not_fit", "resolved"]) {
       const { project } = await fixture({ lead: { status } });
-      answers({ decision: "review", fit: 2 });
+      answers({ hardRequirement: "unknown" });
 
       const outcome = await runRescore(project.id, randomUUID());
 
@@ -206,7 +187,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
     const outcome = await runRescore(project.id, randomUUID());
 
     expect(outcome).toEqual({ judged: 0, demoted: 0, promoted: 0, unchanged: 0 });
-    expect(generateStructured).not.toHaveBeenCalled();
+    expect(askJev).not.toHaveBeenCalled();
     expect((await projectsWithStaleEvaluations()).has(project.id)).toBe(false);
   });
 });

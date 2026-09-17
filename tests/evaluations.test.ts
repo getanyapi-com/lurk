@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SCORE_BATCH_SIZE } from "@/lib/scan/constants";
 import { leadKey } from "@/lib/scan/leads";
+import { judgeAnswers, product } from "./jevAnswers";
 import {
   alreadyJudged,
   contentHash,
@@ -10,11 +11,16 @@ import {
 
 /**
  * What a stored verdict is worth on the next scan, and what a thread is read
- * for. The scan module pulls in the language model client, so it is imported
- * after the mock the way the rest of the suite does it.
+ * for. The scan module pulls in the model client, so it is imported after the
+ * mock the way the rest of the suite does it.
  */
 
-vi.mock("@/lib/llm", () => ({ generateStructured: vi.fn() }));
+const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
+
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev,
+}));
 
 const { judgeThreads, representativeComments, verificationText } = await import(
   "@/lib/scan/comments"
@@ -136,6 +142,8 @@ describe("judging one comment once", () => {
     subreddits: [],
     phrasings: [],
     competitors: [],
+    destinations: [],
+    product,
     productText: "Product: Formcraft",
   };
 
@@ -173,24 +181,9 @@ describe("judging one comment once", () => {
    * post it was first stored under, so both threads carry it.
    */
   it("gives a comment two threads carry one verdict and one model call", async () => {
-    const { generateStructured } = await import("@/lib/llm");
-    const model = vi.mocked(generateStructured);
-    model.mockReset();
-    model.mockImplementation(async (input) =>
-      ({
-        items: [...(input.prompt as string).matchAll(/^id: (\S+)$/gm)].map((match) => ({
-          id: match[1],
-          relationship: "buyer",
-          needState: "open",
-          fit: 4,
-          intent: 3,
-          stage: "solution_seeking",
-          decision: "qualify",
-          reasonCode: "supported_open_need",
-          needEvidence: { quote: "conditional logic" },
-          reason: "Wants a form that branches.",
-        })),
-      }) as never,
+    askJev.mockReset();
+    askJev.mockImplementation(async (call: { itemsAsked: number }) =>
+      judgeAnswers(Array.from({ length: call.itemsAsked }, () => ({ quote: "s0" }))),
     );
 
     const judged = await judgeThreads(
@@ -215,11 +208,12 @@ describe("judging one comment once", () => {
       .map((record) => record.commentId);
     expect(commentIds.filter((id) => id === "shared-comment")).toEqual(["shared-comment"]);
     expect(new Set(commentIds).size).toBe(commentIds.length);
-    const scored = model.mock.calls
+    const asked = askJev.mock.calls
       .map((call) => call[0])
-      .filter((input) => input.purpose === "score");
-    expect(scored.filter((input) => input.prompt.includes("id: shared-comment"))).toHaveLength(
-      1,
-    );
+      .filter((call) => call.purpose === "score")
+      .reduce((total, call) => total + call.itemsAsked, 0);
+    // The two posts and one call's worth of each distinct comment, never two
+    // for the comment both threads carry.
+    expect(asked).toBe(SCORE_BATCH_SIZE + 3);
   });
 });

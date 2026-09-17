@@ -3,32 +3,10 @@ import { downgradeToReview } from "./gates";
 import type { Judgement, ScorableItem } from "./judgement";
 
 /**
- * Structured output proves the shape of an answer, never its truth. These
- * checks prove the two things the shape cannot: that every judgement belongs to
- * an item we actually sent, and that every quote is really in the text we sent.
+ * A typed answer proves the shape of a verdict, never its truth. This check
+ * proves the one thing the shape cannot: that every quote is really in the
+ * text of the person it is about.
  */
-
-export type Reconciled<T> = { items: T[]; missing: string[] };
-
-/**
- * Drops ids that were never in the batch and duplicate answers, and reports the
- * ids the model left out. A missing id is unevaluated, never a rejection.
- */
-export function reconcileIds<T extends { id: string }>(
-  returned: T[],
-  expected: string[],
-): Reconciled<T> {
-  const wanted = new Set(expected);
-  const seen = new Set<string>();
-  const items: T[] = [];
-  for (const item of returned) {
-    if (wanted.has(item.id) && !seen.has(item.id)) {
-      seen.add(item.id);
-      items.push(item);
-    }
-  }
-  return { items, missing: expected.filter((id) => !seen.has(id)) };
-}
 
 /**
  * One text as a quote can be compared against it. Reddit and the model disagree

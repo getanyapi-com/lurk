@@ -120,6 +120,13 @@
       "when": 1789350257627,
       "tag": "0016_drop_keyword_volumes",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789603809787,
+      "tag": "0017_readings_by_jev",
+      "breakpoints": true
     }
   ]
 }

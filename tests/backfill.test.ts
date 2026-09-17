@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
+import { judgeAnswers, triageAnswers } from "./jevAnswers";
 
 /**
  * The one-time backfill, against a real database with only AnyAPI and the
@@ -11,7 +12,7 @@ import type { StoredPost } from "@/lib/reddit/store";
  * opened with `reddit.post`, and that the Reddit SEO tab stays Google's.
  */
 
-const generateStructured = vi.fn();
+const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
 const fetchSearch = vi.fn();
 const fetchSubredditPosts = vi.fn();
 const fetchPost = vi.fn();
@@ -20,7 +21,10 @@ const fetchAuthorProfile = vi.fn();
 const fetchSubredditDetails = vi.fn();
 const fetchFeedThreads = vi.fn();
 
-vi.mock("@/lib/llm", () => ({ generateStructured }));
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev,
+}));
 vi.mock("@/lib/reddit/skus", () => ({
   fetchSearch,
   fetchSubredditPosts,
@@ -42,28 +46,6 @@ vi.mock("@/lib/anyapi", () => ({
 const hasDatabase = !!process.env.DATABASE_URL;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-type Assessment = Record<string, unknown>;
-
-function assessment(id: string, patch: Assessment = {}): Assessment {
-  return {
-    id,
-    relationship: "buyer",
-    needState: "open",
-    fit: 4,
-    intent: 3,
-    stage: "solution_seeking",
-    decision: "qualify",
-    reasonCode: "supported_open_need",
-    needEvidence: { quote: "needs conditional logic" },
-    reason: "Wants a form that branches.",
-    ...patch,
-  };
-}
-
-function idsIn(prompt: string): string[] {
-  return [...prompt.matchAll(/^id: (\S+)$/gm)].map((match) => match[1]);
-}
 
 /** One search call as the test reads it: the query, the sort, the timeframe. */
 type Call = { query: string; sort: string; timeframe: string; cursor: string | undefined };
@@ -96,7 +78,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     ({ runBackfill } = await import("@/lib/scan/backfill"));
     ({ upsertPosts } = await import("@/lib/reddit/store"));
     ({ eq } = await import("drizzle-orm"));
-    generateStructured.mockReset();
+    askJev.mockReset();
     for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchPostComments]) {
       mock.mockReset();
     }
@@ -143,21 +125,13 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     );
   }
 
-  /** Triage that wants every id read, then one assessment per id shown. */
-  function model(score: (id: string) => Assessment = (id) => assessment(id)) {
-    generateStructured.mockImplementation(async (input: { purpose: string; prompt: string }) => {
-      if (input.purpose === "triage") {
-        return {
-          items: idsIn(input.prompt).map((id) => ({
-            id,
-            disposition: "read",
-            priority: "medium",
-            reasonCode: "explicit_ask",
-          })),
-        };
-      }
-      return { items: idsIn(input.prompt).map((id) => score(id)) };
-    });
+  /** Triage that wants every title read, then one qualifying judgement each. */
+  function model() {
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) =>
+      call.purpose === "triage"
+        ? triageAnswers(Array.from({ length: call.itemsAsked }, () => ({})))
+        : judgeAnswers(Array.from({ length: call.itemsAsked }, () => ({ quote: "s0" }))),
+    );
   }
 
   /** Every page of a walk, in order, replayed per query and sort. */
@@ -303,22 +277,15 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
       release = resolve;
     });
     let scoringCalls = 0;
-    generateStructured.mockImplementation(async (input: { purpose: string; prompt: string }) => {
-      if (input.purpose === "triage") {
-        return {
-          items: idsIn(input.prompt).map((id) => ({
-            id,
-            disposition: "read",
-            priority: "medium",
-            reasonCode: "explicit_ask",
-          })),
-        };
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) => {
+      if (call.purpose === "triage") {
+        return triageAnswers(Array.from({ length: call.itemsAsked }, () => ({})));
       }
       scoringCalls += 1;
       if (scoringCalls === 1) {
         await held;
       }
-      return { items: idsIn(input.prompt).map((id) => assessment(id)) };
+      return judgeAnswers(Array.from({ length: call.itemsAsked }, () => ({ quote: "s0" })));
     });
 
     const sweep = runBackfill(row.id);
@@ -432,11 +399,11 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     model();
 
     await runBackfill(row.id);
-    expect(generateStructured).toHaveBeenCalled();
+    expect(askJev).toHaveBeenCalled();
 
-    generateStructured.mockClear();
+    askJev.mockClear();
     const second = await runBackfill(row.id);
-    expect(generateStructured).not.toHaveBeenCalled();
+    expect(askJev).not.toHaveBeenCalled();
     expect(second.judged).toBe(0);
   });
 

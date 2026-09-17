@@ -88,7 +88,9 @@ npm run anyapi:register
 | `ANYAPI_BASE_URL` | no | `https://api.getanyapi.com` | AnyAPI gateway. |
 | `ANYAPI_OAUTH_CLIENT_ID` | no | - | Printed by `npm run anyapi:register`. Needed for wallet connect. |
 | `ANYAPI_HOUSE_API_KEY` | no | - | The key used when a user has not connected a wallet. |
-| `OPENROUTER_API_KEY` | no | - | Pays for scoring, drafting and clustering. Without it nothing is scored. |
+| `TYPESAFE_API_KEY` | no | - | Judges every title, post and comment the scan reads (TypeSafe Jev). Without it nothing is scored. |
+| `TYPESAFE_MODEL` | no | `jev-latest` | Override the model. |
+| `OPENROUTER_API_KEY` | no | - | Pays for the product profile, drafting and clustering. |
 | `OPENROUTER_MODEL` | no | `meta/muse-spark-1.3-contributor` | Override the model. |
 | `RESEND_API_KEY` | no | - | Sends the digest email. |
 | `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and the Resend key. |
@@ -207,6 +209,7 @@ cat > deploy/env.production <<'EOF'
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 ANYAPI_HOUSE_API_KEY=
+TYPESAFE_API_KEY=
 OPENROUTER_API_KEY=
 RESEND_API_KEY=
 ALERTS_FROM_EMAIL=

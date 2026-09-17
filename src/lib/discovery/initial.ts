@@ -5,6 +5,7 @@ import { writeProgress } from "@/jobs/enqueue";
 import { resolveActiveSubreddits } from "@/lib/profile";
 import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
+import { productFacts } from "@/lib/product";
 import { scanIntervalHours, tierForUser } from "@/lib/tier";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -83,16 +84,8 @@ export async function runInitialDiscovery(
   await runDiscovery({
     projectId,
     userId: project.userId,
-    facts: {
-      name: project.name,
-      pain: project.pain ?? "",
-      solution: project.solution ?? "",
-      targetUsers: project.targetUsers ?? "",
-      serviceGeography: project.geography ?? "",
-      budgetFit: project.budgetFit ?? "",
-      capabilities: parseTextList(project.capabilities),
-      exclusions: parseTextList(project.exclusions),
-    },
+    // No competitor is known before discovery has looked for one.
+    facts: productFacts(project, []),
     destinations: parseDestinations(project.destinations),
     problemPhrasings: parseTextList(project.problemPhrasings),
     limits,

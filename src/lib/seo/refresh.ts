@@ -121,7 +121,8 @@ export async function judgeUnseen(project: ScanProject, seen: Seen[]): Promise<v
   );
   const labels = await labelThreads({
     projectId: project.id,
-    productText: project.productText,
+    product: project.product,
+    destinations: project.destinations,
     candidates: [...byPost.values()]
       .filter((thread) => !judged.has(thread.postId))
       .map((thread) => ({

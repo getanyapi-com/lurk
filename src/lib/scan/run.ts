@@ -211,7 +211,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   await writeProgress(jobId, `Reading ${candidates.length} titles`);
   const triage = await triageTitles(
     projectId,
-    project.productText,
+    project.product,
     candidates.map((post) => ({
       id: post.id,
       title: post.title,
@@ -264,10 +264,11 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   await writeProgress(jobId, `Checking who is asking in ${full.length} posts`);
   const unjudgedPosts = await unjudged(project, stored, full);
   const sources = unjudgedPosts.map(postItem);
-  const { toJudge, cut } = splitByReading(sources, await readPosts(projectId, sources));
+  const readings = await readPosts(projectId, sources);
+  const { toJudge, cut } = splitByReading(sources, readings);
 
   await writeProgress(jobId, `Scoring ${toJudge.length} of ${sources.length} posts`);
-  const judgements = [...cut, ...(await judgeItems(projectId, project.productText, toJudge))];
+  const judgements = [...cut, ...(await judgeItems(projectId, project.product, toJudge, readings))];
   await writeEvaluations(await evaluationsFor(project, unjudgedPosts, judgements));
   for (const entry of retrieval.covered) {
     await markCovered(entry.row, entry.at);

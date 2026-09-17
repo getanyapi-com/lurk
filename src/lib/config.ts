@@ -27,6 +27,10 @@ const schema = z.object({
     z.string().default("meta/muse-spark-1.3-contributor"),
   ),
 
+  /** TypeSafe (https://typesafe.ai) judges every candidate the scan reads. */
+  TYPESAFE_API_KEY: optional(z.string()),
+  TYPESAFE_MODEL: z.preprocess(blankIsAbsent, z.string().default("jev-latest")),
+
   RESEND_API_KEY: optional(z.string()),
   ALERTS_FROM_EMAIL: optional(z.email()),
 

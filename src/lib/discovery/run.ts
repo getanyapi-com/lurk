@@ -1,4 +1,5 @@
 import { clientForUser } from "@/lib/anyapi";
+import { productText, type ProductFacts } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { TIERS, type TierLimits } from "@/lib/tiers";
 import { labelThreads, type ThreadLabel } from "./label";
@@ -43,33 +44,6 @@ export function discoveryBudget(limits: TierLimits | null) {
   };
 }
 
-/** What the model judges relevance against: the product, in its own words. */
-export type ProductFacts = {
-  name: string;
-  pain: string;
-  solution: string;
-  targetUsers: string;
-  serviceGeography: string;
-  budgetFit: string;
-  capabilities: string[];
-  exclusions: string[];
-};
-
-export function productBrief(facts: ProductFacts): string {
-  return [
-    `Product: ${facts.name}`,
-    facts.pain ? `Problem it solves: ${facts.pain}` : "",
-    facts.solution ? `What it does: ${facts.solution}` : "",
-    facts.targetUsers ? `Who buys it: ${facts.targetUsers}` : "",
-    facts.capabilities.length > 0 ? `It can: ${facts.capabilities.join("; ")}` : "",
-    facts.exclusions.length > 0 ? `It cannot: ${facts.exclusions.join("; ")}` : "",
-    facts.serviceGeography ? `Where it works: ${facts.serviceGeography}` : "",
-    facts.budgetFit ? `Budget: ${facts.budgetFit}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
 type RoundOutcome = { labels: ThreadLabel[]; newRelevant: number; costUsd: number };
 
 /**
@@ -78,7 +52,8 @@ type RoundOutcome = { labels: ThreadLabel[]; newRelevant: number; costUsd: numbe
  */
 async function runRound(
   ctx: FetchContext,
-  brief: string,
+  product: ProductFacts,
+  destinations: Destination[],
   queries: DiscoveryQuery[],
   maxAgeMs: number,
   labelled: Set<string>,
@@ -88,7 +63,8 @@ async function runRound(
   const fresh = dedupeThreads(seen).filter((thread) => !labelled.has(thread.postId));
   const labels = await labelThreads({
     projectId: ctx.projectId,
-    productText: brief,
+    product,
+    destinations: destinations.map((place) => place.name),
     candidates: fresh.map((thread) => ({
       id: thread.postId,
       subreddit: thread.subreddit,
@@ -168,7 +144,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
   const maxAgeMs = budget.refreshDays * DAY_MS;
   const funded = await clientForUser(input.userId);
   const ctx: FetchContext = { projectId: input.projectId, funded, maxAgeMs };
-  const brief = productBrief(input.facts);
+  const brief = productText(input.facts);
 
   const used: DiscoveryQuery[] = [];
   const labelled = new Set<string>();
@@ -187,7 +163,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
   const ceiling = opening + Math.max(budget.max - budget.queries, 0);
 
   while (queries.length > 0) {
-    const round = await runRound(ctx, brief, queries, maxAgeMs, labelled);
+    const round = await runRound(ctx, input.facts, input.destinations, queries, maxAgeMs, labelled);
     used.push(...queries);
     labels.push(...round.labels);
     costUsd += round.costUsd;

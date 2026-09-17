@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
+import { judgeAnswers, readingAnswers, triageAnswers, type JevSpec } from "./jevAnswers";
 
 /**
  * The scan's order of operations, against a real database with only AnyAPI and
@@ -10,7 +11,7 @@ import type { StoredPost } from "@/lib/reddit/store";
  * need is met takes their lead out of the feed.
  */
 
-const generateStructured = vi.fn();
+const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
 const fetchSearch = vi.fn();
 const fetchSubredditPosts = vi.fn();
 const fetchPost = vi.fn();
@@ -19,7 +20,10 @@ const fetchAuthorProfile = vi.fn();
 const fetchSubredditDetails = vi.fn();
 const fetchFeedThreads = vi.fn();
 
-vi.mock("@/lib/llm", () => ({ generateStructured }));
+vi.mock("@/lib/jev", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/jev")>()),
+  askJev,
+}));
 vi.mock("@/lib/reddit/skus", () => ({
   fetchSearch,
   fetchSubredditPosts,
@@ -40,26 +44,12 @@ vi.mock("@/lib/anyapi", () => ({
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
-type Assessment = Record<string, unknown>;
+/** One candidate as a Jev request carries it: a title, or a post's sentences. */
+type Asked = { title?: string; sentences?: Record<string, string> };
 
-function assessment(id: string, patch: Assessment = {}): Assessment {
-  return {
-    id,
-    relationship: "buyer",
-    needState: "open",
-    fit: 4,
-    intent: 3,
-    stage: "solution_seeking",
-    decision: "qualify",
-    reasonCode: "supported_open_need",
-    needEvidence: { quote: "needs conditional logic" },
-    reason: "Wants a form that branches.",
-    ...patch,
-  };
-}
-
-function idsIn(prompt: string): string[] {
-  return [...prompt.matchAll(/^id: (\S+)$/gm)].map((match) => match[1]);
+/** Everything the model was shown about one candidate, as one string. */
+function wordsOf(one: Asked): string {
+  return one.title ?? Object.values(one.sentences ?? {}).join(" ");
 }
 
 describe.skipIf(!hasDatabase)("runScan against a database", () => {
@@ -80,7 +70,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     ({ upsertPosts, upsertComments } = await import("@/lib/reddit/store"));
     ({ listLeads, listReviewItems } = await import("@/lib/leads"));
     ({ eq } = await import("drizzle-orm"));
-    generateStructured.mockReset();
+    askJev.mockReset();
     for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchPostComments]) {
       mock.mockReset();
     }
@@ -161,46 +151,42 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     );
   }
 
-  /** What the shared reading says about a post, before any product. */
-  function reading(patch: Record<string, unknown> = {}) {
-    return {
-      speaker: "buyer",
-      asking: true,
-      need: "a form builder with conditional logic",
-      category: "form builder",
-      constraints: [],
-      ...patch,
-    };
-  }
-
   /**
-   * Triage in a fixed order, the shared reading of each post, then one
-   * assessment per id the judgement prompt carries. `read` says what the
-   * reading found; by default a buyer who is asking, which is the only reading
-   * that lets a post reach the judge at all.
+   * Jev's answers for every call of the sweep, from the words each candidate
+   * was shown with. `asking` orders the triage, and `judgement` says what the
+   * reading and the judgement found; by default every title is worth reading
+   * and every author is a buyer with an open need the product covers.
    */
   function model(
-    order: string[],
-    score: (id: string, prompt: string) => Assessment,
-    read: (prompt: string) => Record<string, unknown> = () => reading(),
+    asking: (title: string) => number = () => 0.9,
+    judgement: (words: string) => JevSpec = () => ({}),
   ) {
-    generateStructured.mockImplementation(async (input: { purpose: string; prompt: string }) => {
-      if (input.purpose === "reading") {
-        return read(input.prompt);
-      }
-      if (input.purpose === "triage") {
-        return {
-          items: order.map((id, index) => ({
-            id,
-            disposition: "read",
-            priority: index === 0 ? "high" : "medium",
-            reasonCode: "explicit_ask",
-          })),
-        };
-      }
-      return { items: idsIn(input.prompt).map((id) => score(id, input.prompt)) };
-    });
+    askJev.mockImplementation(
+      async (call: {
+        purpose: string;
+        state: { titles?: Record<string, Asked>; posts?: Record<string, Asked> };
+      }) => {
+        if (call.purpose === "triage") {
+          return triageAnswers(
+            Object.values(call.state.titles ?? {}).map((one) => ({
+              asking: asking(one.title ?? ""),
+            })),
+          );
+        }
+        const specs = Object.values(call.state.posts ?? {}).map((one) => ({
+          quote: "s0",
+          ...judgement(wordsOf(one)),
+        }));
+        return call.purpose === "reading" ? readingAnswers(specs) : judgeAnswers(specs);
+      },
+    );
   }
+
+  /** A judgement the gates reject as a job the product does not do. */
+  const wrongJob: JevSpec = { solvesProblem: 0.1, audience: 0.1 };
+
+  /** A judgement the gates hold for review: a requirement the facts cannot settle. */
+  const oneUnknown: JevSpec = { hardRequirement: "unknown" };
 
   async function evaluations(projectId: string) {
     return db()
@@ -218,8 +204,9 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: true,
       costUsd: 0,
     }));
-    model([second.id, third.id, first.id], (id) =>
-      id === second.id ? assessment(id) : assessment(id, { decision: "reject", fit: 0 }),
+    model(
+      (title) => ({ [second.title]: 0.9, [third.title]: 0.6 })[title] ?? 0.3,
+      (words) => (words.includes(second.title) ? {} : wrongJob),
     );
 
     const outcome = await runScan(row.id, randomUUID());
@@ -233,7 +220,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     expect(stored).toHaveLength(3);
     expect(stored.filter((one) => one.decision === "reject")).toHaveLength(2);
 
-    generateStructured.mockClear();
+    askJev.mockClear();
     // The second scan finds the same posts, and by now we hold their text.
     fetchSearch.mockResolvedValue({
       value: {
@@ -244,7 +231,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       costUsd: 0,
     });
     await runScan(row.id, randomUUID());
-    expect(generateStructured).not.toHaveBeenCalled();
+    expect(askJev).not.toHaveBeenCalled();
     expect(fetchPost).toHaveBeenCalledTimes(3);
   });
 
@@ -252,7 +239,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const row = await project();
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id));
+    model();
 
     const outcome = await runScan(row.id, randomUUID());
     expect(fetchPost).not.toHaveBeenCalled();
@@ -272,10 +259,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
         reused: true,
         costUsd: 0,
       });
-      model(
-        carried.map((post) => post.id),
-        (id) => assessment(id),
-      );
+      model();
 
       await runScan(row.id, randomUUID());
       expect(fetchPost).not.toHaveBeenCalled();
@@ -290,10 +274,10 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id), () => reading({ speaker: "seller", asking: false }));
+    model(undefined, () => ({ relationship: "seller", needState: "no_active_need" }));
 
     const outcome = await runScan(row.id, randomUUID());
-    const judged = generateStructured.mock.calls.filter((call) => call[0].purpose === "score");
+    const judged = askJev.mock.calls.filter((call) => call[0].purpose === "score");
     expect(judged).toHaveLength(0);
     expect(outcome.leads).toBe(0);
     const stored = await evaluations(row.id);
@@ -306,15 +290,15 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id));
+    model();
 
     const readings = () =>
-      generateStructured.mock.calls.filter((call) => call[0].purpose === "reading");
+      askJev.mock.calls.filter((call) => call[0].purpose === "reading");
 
     await runScan((await project()).id, randomUUID());
     expect(readings()).toHaveLength(1);
 
-    generateStructured.mockClear();
+    askJev.mockClear();
     await runScan((await project()).id, randomUUID());
     expect(readings()).toHaveLength(0);
   });
@@ -326,13 +310,12 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [ghost] = await posts(1, { author: "[deleted]" });
     fetchSearch.mockResolvedValue({ value: { posts: [live, gone, ghost], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [live], reused: true, costUsd: 0 });
-    model([live.id], (id) => assessment(id));
+    model();
 
     const outcome = await runScan(row.id, randomUUID());
-    const prompts: string[] = generateStructured.mock.calls.map((call) => call[0].prompt);
-    expect(prompts).not.toHaveLength(0);
-    expect(prompts.some((prompt: string) => prompt.includes(gone.id))).toBe(false);
-    expect(prompts.some((prompt: string) => prompt.includes(ghost.id))).toBe(false);
+    const asked = askJev.mock.calls.map((call) => call[0]);
+    expect(asked).not.toHaveLength(0);
+    expect(asked.every((call) => call.itemsAsked === 1)).toBe(true);
     expect(outcome.candidates).toBe(1);
     expect((await evaluations(row.id)).map((one) => one.postId)).toEqual([live.id]);
   });
@@ -342,7 +325,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id, { decision: "review", fit: 2 }));
+    model(undefined, () => oneUnknown);
 
     await runScan(row.id, randomUUID());
     const held = await listReviewItems(row.id, 30);
@@ -362,7 +345,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id, { decision: "qualify", fit: 3, intent: 3 }));
+    model(undefined, () => ({ hardRequirement: "none_stated" }));
     await runScan(row.id, randomUUID());
     expect(await listLeads(row.id, { status: "new", days: 30 })).toHaveLength(1);
 
@@ -370,7 +353,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       .update(schema.projects)
       .set({ profileVersion: 2, solution: "A form builder that also analyses answers." })
       .where(eq(schema.projects.id, row.id));
-    model([only.id], (id) => assessment(id, { decision: "review", fit: 2 }));
+    model(undefined, () => oneUnknown);
     await runScan(row.id, randomUUID());
 
     expect(await listLeads(row.id, { status: "new", days: 30 })).toHaveLength(0);
@@ -382,7 +365,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id, { decision: "qualify", fit: 3, intent: 3 }));
+    model(undefined, () => ({ hardRequirement: "none_stated" }));
     await runScan(row.id, randomUUID());
     await db()
       .update(schema.leads)
@@ -393,7 +376,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       .update(schema.projects)
       .set({ profileVersion: 2, solution: "A form builder that also analyses answers." })
       .where(eq(schema.projects.id, row.id));
-    model([only.id], (id) => assessment(id, { decision: "review", fit: 2 }));
+    model(undefined, () => oneUnknown);
     await runScan(row.id, randomUUID());
 
     const kept = await db()
@@ -410,16 +393,16 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const [only] = await posts(1);
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id, { decision: "reject", fit: 0 }));
+    model(undefined, () => wrongJob);
     await runScan(row.id, randomUUID());
 
     await db()
       .update(schema.projects)
       .set({ profileVersion: 2, solution: "A form builder that also analyses answers." })
       .where(eq(schema.projects.id, row.id));
-    generateStructured.mockClear();
+    askJev.mockClear();
     await runScan(row.id, randomUUID());
-    expect(generateStructured).toHaveBeenCalled();
+    expect(askJev).toHaveBeenCalled();
     expect(await evaluations(row.id)).toHaveLength(1);
   });
 
@@ -429,7 +412,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
     fetchPostComments.mockRejectedValue(new Error("upstream is down"));
-    model([only.id], (id) => assessment(id));
+    model();
 
     await runScan(row.id, randomUUID());
     const rows = await db().select().from(schema.leads).where(eq(schema.leads.projectId, row.id));
@@ -457,11 +440,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: false,
       costUsd: 0,
     }));
-    model([only.id], (id) =>
-      assessment(id, {
-        needEvidence: { quote: id === commentId ? "conditional logic" : "conditional logic" },
-      }),
-    );
+    model();
 
     const outcome = await runScan(row.id, randomUUID());
     const rows = await db().select().from(schema.leads).where(eq(schema.leads.projectId, row.id));
@@ -497,7 +476,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       costUsd: 0,
     });
     fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
-    model([only.id], (id) => assessment(id));
+    model();
 
     const outcome = await runScan(row.id, randomUUID());
     expect(outcome.candidates).toBe(1);
@@ -561,19 +540,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: true,
       costUsd: 0,
     }));
-    generateStructured.mockImplementation(async (input: { purpose: string; prompt: string }) => {
-      if (input.purpose === "triage") {
-        return {
-          items: [older.id, younger.id].map((id) => ({
-            id,
-            disposition: "read",
-            priority: "medium",
-            reasonCode: "explicit_ask",
-          })),
-        };
-      }
-      return { items: idsIn(input.prompt).map((id) => assessment(id)) };
-    });
+    model();
 
     await runScan(row.id, randomUUID());
     expect(fetchPost.mock.calls.map((call) => call[1])).toEqual([younger.url, older.url]);
@@ -598,7 +565,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: true,
       costUsd: 0,
     }));
-    model([first.id, second.id], (id) => assessment(id, { decision: "reject", fit: 0 }));
+    model(undefined, () => wrongJob);
 
     const { retrievalBudgets } = await import("@/lib/scan/constants");
     const { limitsFor } = await import("@/lib/tiers");
@@ -649,7 +616,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       costUsd: 0.0009,
     });
     fetchPost.mockResolvedValue({ value: [stale], reused: true, costUsd: 0 });
-    model([], () => assessment("none"));
+    model();
 
     const outcome = await runScan(row.id, randomUUID());
     expect(fetchPost).toHaveBeenCalledTimes(1);
@@ -670,11 +637,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: true,
       costUsd: 0,
     }));
-    model([held.id, other.id], (id) =>
-      id === held.id
-        ? assessment(id, { decision: "review", fit: 2, reasonCode: "insufficient_evidence" })
-        : assessment(id, { decision: "reject", fit: 0 }),
-    );
+    model(undefined, (words) => (words.includes(held.title) ? oneUnknown : wrongJob));
 
     await runScan(row.id, randomUUID());
     expect(fetchPostComments.mock.calls.map((call) => call[1])).toEqual([held.id]);
@@ -699,15 +662,8 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: false,
       costUsd: 0,
     }));
-    model([only.id], (id, prompt) =>
-      prompt.includes("this is solved")
-        ? assessment(id, {
-            needState: "resolved",
-            decision: "reject",
-            reasonCode: "resolved",
-            needEvidence: { quote: "We bought Formcraft, this is solved." },
-          })
-        : assessment(id),
+    model(undefined, (words) =>
+      words.includes("this is solved") ? { needState: "resolved" } : {},
     );
 
     await runScan(row.id, randomUUID());

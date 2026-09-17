@@ -1,37 +1,21 @@
 import { z } from "zod";
 
 /**
- * The shapes the two scan model calls return, and the shapes the rest of the
- * scan reads. Kept apart from the calls themselves so the code that validates a
- * result and the code that asks for one do not import each other.
+ * The shapes the scan reads and stores. Kept apart from the calls that
+ * produce them so the code that validates a verdict and the code that asks
+ * for one do not import each other.
  */
 
 /**
- * Triage carries no free-text reason. Nothing reads one: the disposition and
- * the code decide the reading order, and the judgement that follows writes the
- * sentence a person sees. Measured 2026-09-10, a sentence per title was most of
- * the 749k output tokens the 4,295-title sweep spent in its slowest phase.
+ * One title's triage. `asking` is the probability the author is looking for
+ * something, which is what orders the reading queue; a disposition is the
+ * code's reading of it and of the not-a-buyer answer (scan/derive.ts).
  */
-export const triageItemSchema = z.object({
-  id: z.string(),
-  disposition: z.enum(["read", "uncertain", "reject"]),
-  priority: z.enum(["high", "medium", "low"]),
-  reasonCode: z.enum([
-    "explicit_ask",
-    "relevant_pain",
-    "switching",
-    "insufficient_context",
-    "wrong_topic",
-    "seller_only",
-    "helper_only",
-    "no_active_need",
-    "unavailable",
-  ]),
-});
-
-export const triageSchema = z.object({ items: z.array(triageItemSchema) });
-
-export type TriageItem = z.infer<typeof triageItemSchema>;
+export type TriageItem = {
+  id: string;
+  disposition: "read" | "uncertain" | "reject";
+  asking: number;
+};
 
 export const REASON_CODES = [
   "supported_open_need",
@@ -50,18 +34,11 @@ export type ReasonCode = (typeof REASON_CODES)[number];
 const evidenceSchema = z.object({ quote: z.string() });
 
 /**
- * What the judgement call returns for one candidate. Nine fields beside the
- * id, where there were twelve, because the
- * measured slim prompt (.context/probe-prompt.ts, 100 judged posts, two Opus
- * labellers on the contested ones) agreed with the long one on every settled
- * post at a quarter less cost and half the wall time. The three fields it
- * dropped - a requirement list, an answer-coverage grade and an unanswered
- * angle - were the most expensive part of the answer and nothing on any screen
- * read them.
- *
- * `reasonCode` is one code, not a list. The model gives its own reading a name
- * and the gates in gates.ts overwrite it with the gate the item failed, so a
- * second code was never a second fact.
+ * One candidate's assessment as the gates read it and the evaluations table
+ * stores it. Since 2026-09-17 no model returns this shape: Jev answers typed
+ * questions and scan/derive.ts assembles it, deriving `fit` from three
+ * narrow answers and writing `reason` from the rest. `reasonCode` is one code;
+ * gates.ts overwrites it with the gate the item failed.
  */
 export const assessmentSchema = z.object({
   id: z.string(),
@@ -75,8 +52,6 @@ export const assessmentSchema = z.object({
   needEvidence: evidenceSchema.nullable(),
   reason: z.string(),
 });
-
-export const judgementSchema = z.object({ items: z.array(assessmentSchema) });
 
 /** One item as the model judged it, before any code gate is applied. */
 export type Assessment = z.infer<typeof assessmentSchema>;

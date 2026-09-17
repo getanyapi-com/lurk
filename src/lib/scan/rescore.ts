@@ -188,10 +188,11 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
   const byId = new Map(stale.map((row) => [row.item.id, row]));
   const posts = stale.filter((row) => row.commentId === null).map((row) => row.item);
   const comments = stale.filter((row) => row.commentId !== null).map((row) => row.item);
-  const { toJudge, cut } = splitByReading(posts, await readPosts(projectId, posts));
+  const readings = await readPosts(projectId, posts);
+  const { toJudge, cut } = splitByReading(posts, readings);
   const judgements = [
     ...cut,
-    ...(await judgeItems(projectId, project.productText, [...toJudge, ...comments])),
+    ...(await judgeItems(projectId, project.product, [...toJudge, ...comments], readings)),
   ];
   const judged = judgements.flatMap((judgement) => {
     const row = byId.get(judgement.id);
