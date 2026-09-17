@@ -20,6 +20,8 @@ export type DetailRailProps = {
   fit: number | null;
   intent: number | null;
   engagement: number | null;
+  /** The project's competitors named in this thread, post or replies. */
+  competitors: string[];
 };
 
 /** Nothing here is estimated, so a fact Reddit never gave reads as a dash. */
@@ -90,6 +92,12 @@ export function DetailRail(props: DetailRailProps) {
           Open on Reddit
         </a>
       </Block>
+
+      {props.competitors.length > 0 ? (
+        <Block label="Competitors named">
+          <span className="text-small text-fg">{props.competitors.join(", ")}</span>
+        </Block>
+      ) : null}
 
       <Block label="How it scored">
         <Meter label="Fit" value={props.fit} />

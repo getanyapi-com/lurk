@@ -43,6 +43,12 @@ export const redditPosts = pgTable(
      */
     bodyObservedAt: timestamp("body_observed_at", { withTimezone: true }),
     commentsObservedAt: timestamp("comments_observed_at", { withTimezone: true }),
+    /**
+     * The reply count Reddit reported when the thread was last read. A thread
+     * is bought again only once a listing or a post open reports a different
+     * count, so an unchanged thread costs nothing after its first read.
+     */
+    commentsReadCount: integer("comments_read_count"),
     raw: jsonb("raw"),
   },
   (t) => [index("reddit_posts_subreddit_created_at_idx").on(t.subreddit, t.createdAt)],

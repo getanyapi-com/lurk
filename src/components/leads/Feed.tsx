@@ -19,6 +19,7 @@ import {
   type LeadStatus,
   type ReviewItem,
 } from "@/lib/feed";
+import { competitorsNamedIn } from "@/lib/competitors/read";
 import { countLeads, feedFacets, findLead, listLeadFaces, listLeads, listReviewItems } from "@/lib/leads";
 import { isBusy, projectActivity } from "@/lib/projectActivity";
 import { scanReport, verdictSentence } from "@/lib/scan/report";
@@ -113,6 +114,10 @@ export async function Feed({ projectId, params }: FeedProps) {
   const entries = buildStream(rows.map(toCard));
   const held = filter.status === "new" ? review : [];
   const selection = await openOn(projectId, entries, held, params.lead);
+  const competitors =
+    selection?.kind === "lead" && selection.entry.lead.postId
+      ? await competitorsNamedIn(projectId, selection.entry.lead.postId)
+      : [];
   const selectedId =
     selection === null ? null : selection.kind === "lead" ? selection.entry.id : params.lead ?? null;
   // One sentence, in one of two places: over the list when it has leads to
@@ -200,7 +205,9 @@ export async function Feed({ projectId, params }: FeedProps) {
             </>
           }
           pane={
-            selection ? <LeadDetail selection={selection} projectId={projectId} /> : null
+            selection ? (
+              <LeadDetail selection={selection} projectId={projectId} competitors={competitors} />
+            ) : null
           }
         />
       </OpeningProvider>

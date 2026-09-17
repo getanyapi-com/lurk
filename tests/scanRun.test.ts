@@ -60,6 +60,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
   let upsertComments: typeof import("@/lib/reddit/store").upsertComments;
   let listLeads: typeof import("@/lib/leads").listLeads;
   let listReviewItems: typeof import("@/lib/leads").listReviewItems;
+  let competitorsNamedIn: typeof import("@/lib/competitors/read").competitorsNamedIn;
   let eq: typeof import("drizzle-orm").eq;
 
   beforeEach(async () => {
@@ -69,6 +70,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     ({ runScan } = await import("@/lib/scan/run"));
     ({ upsertPosts, upsertComments } = await import("@/lib/reddit/store"));
     ({ listLeads, listReviewItems } = await import("@/lib/leads"));
+    ({ competitorsNamedIn } = await import("@/lib/competitors/read"));
     ({ eq } = await import("drizzle-orm"));
     askJev.mockReset();
     for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchPostComments]) {
@@ -132,7 +134,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
    */
   async function posts(
     count: number,
-    patch: { body?: string | undefined; author?: string } = {},
+    patch: { body?: string | undefined; author?: string; numComments?: number } = {},
   ) {
     const now = Math.floor(Date.now() / 1000);
     return upsertPosts(
@@ -144,7 +146,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
         body: BODY,
         permalink: `/r/SaaS/comments/x${index}/form/`,
         score: 3,
-        numComments: 2,
+        numComments: 3,
         createdUtc: now - 3600,
         ...patch,
       })),
@@ -624,36 +626,14 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     expect(await sourcesOf(row.id)).toHaveLength(0);
   });
 
-  it("reads the thread of a held candidate whose verdict asked for more evidence", async () => {
-    const row = await project();
-    const [held, other] = await posts(2);
-    fetchSearch.mockResolvedValue({
-      value: { posts: [held, other], nextCursor: null },
-      reused: true,
-      costUsd: 0,
-    });
-    fetchPost.mockImplementation(async (_ctx: unknown, url: string) => ({
-      value: [[held, other].find((post) => post.url === url)],
-      reused: true,
-      costUsd: 0,
-    }));
-    model(undefined, (words) => (words.includes(held.title) ? oneUnknown : wrongJob));
-
-    await runScan(row.id, randomUUID());
-    expect(fetchPostComments.mock.calls.map((call) => call[1])).toEqual([held.id]);
-  });
-
-  it("takes a lead out of the feed once its author says the need is met", async () => {
-    const row = await project();
-    const [only] = await posts(1);
-    fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
-    fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
+  /** One reply under a lead's thread, as the comment fetch hands it back. */
+  function replies(postId: string, body: string, author = "helper") {
     fetchPostComments.mockImplementation(async () => ({
-      value: await upsertComments(only.id, [
+      value: await upsertComments(postId, [
         {
           id: `c${randomUUID().slice(0, 8)}`,
-          author: only.author ?? "asker0",
-          body: "We bought Formcraft, this is solved.",
+          author,
+          body,
           score: 2,
           url: "/r/SaaS/comments/x0/form/c1/",
           createdUtc: Math.floor(Date.now() / 1000),
@@ -662,15 +642,69 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       reused: false,
       costUsd: 0,
     }));
-    model(undefined, (words) =>
-      words.includes("this is solved") ? { needState: "resolved" } : {},
-    );
+  }
+
+  it("reads a lead's thread once, and again only when its reply count moves", async () => {
+    const row = await project();
+    const [only] = await posts(1);
+    fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
+    fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
+    replies(only.id, "Have you tried a spreadsheet?");
+    model();
 
     await runScan(row.id, randomUUID());
-    const rows = await db().select().from(schema.leads).where(eq(schema.leads.projectId, row.id));
-    expect(rows[0].status).toBe("resolved");
-    const feed = await listLeads(row.id, { status: "new", days: 30 });
-    expect(feed).toHaveLength(0);
+    expect(fetchPostComments).toHaveBeenCalledTimes(1);
+    await runScan(row.id, randomUUID());
+    expect(fetchPostComments).toHaveBeenCalledTimes(1);
+
+    const [grown] = await upsertPosts([
+      {
+        id: only.id,
+        subreddit: only.subreddit,
+        title: only.title,
+        body: BODY,
+        url: only.url,
+        numComments: 5,
+        createdUtc: Math.floor(only.createdAt.getTime() / 1000),
+      },
+    ]);
+    fetchSearch.mockResolvedValue({ value: { posts: [grown], nextCursor: null }, reused: true, costUsd: 0 });
+    await runScan(row.id, randomUUID());
+    expect(fetchPostComments).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not buy a thread with fewer replies than the minimum", async () => {
+    const row = await project();
+    const [quiet] = await posts(1, { numComments: 2 });
+    fetchSearch.mockResolvedValue({ value: { posts: [quiet], nextCursor: null }, reused: true, costUsd: 0 });
+    fetchPost.mockResolvedValue({ value: [quiet], reused: true, costUsd: 0 });
+    model();
+
+    const outcome = await runScan(row.id, randomUUID());
+    expect(outcome.leads).toBe(1);
+    expect(fetchPostComments).not.toHaveBeenCalled();
+  });
+
+  it("names the competitor a reply recommends, with the sentence that named it", async () => {
+    const row = await project();
+    await db().insert(schema.projectCompetitors).values({ projectId: row.id, name: "Typeform" });
+    const [only] = await posts(1);
+    fetchSearch.mockResolvedValue({ value: { posts: [only], nextCursor: null }, reused: true, costUsd: 0 });
+    fetchPost.mockResolvedValue({ value: [only], reused: true, costUsd: 0 });
+    replies(only.id, "Honestly just use Typeform. It does conditional logic out of the box.");
+    model(undefined, (words) => (words.includes("just use") ? wrongJob : {}));
+
+    await runScan(row.id, randomUUID());
+    const mentions = await db()
+      .select()
+      .from(schema.competitorMentions)
+      .where(eq(schema.competitorMentions.projectId, row.id));
+    expect(mentions).toHaveLength(1);
+    expect(mentions[0].competitor).toBe("Typeform");
+    expect(mentions[0].commentId).not.toBeNull();
+    expect(mentions[0].sentiment).toBeNull();
+    expect(mentions[0].quote).toBe("Honestly just use Typeform.");
+    expect(await competitorsNamedIn(row.id, only.id)).toEqual(["Typeform"]);
   });
 
   it("opens posts and reads threads several at a time", async () => {

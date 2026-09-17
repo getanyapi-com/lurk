@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
-import { competitorNamed } from "@/lib/seo/competitors";
+import { competitorNamed } from "@/lib/competitors/match";
 import { seoSettings } from "@/lib/seo/limits";
 import { redditResults, redditThread } from "@/lib/seo/links";
 import { TIERS } from "@/lib/tiers";

@@ -4,6 +4,8 @@ import type { FeedLead } from "@/lib/leads";
 /** One lead as the workspace shows it: the post or comment, and how it judged. */
 export type CardLead = {
   id: string;
+  /** The thread the lead sits in, its own post or the post its comment answers. */
+  postId: string | null;
   score: number;
   fit: number | null;
   intent: number | null;
@@ -42,6 +44,7 @@ export function toCard(lead: FeedLead): CardLead {
   const isComment = lead.commentId !== null;
   return {
     id: lead.id,
+    postId: lead.postId,
     score: lead.score,
     fit: lead.fit,
     intent: lead.intent,

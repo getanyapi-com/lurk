@@ -10,6 +10,8 @@ vi.mock("@/db", () => ({ db: () => ({}) }));
 const { mentionSeries, topCompetitors } = await import("@/lib/competitors/read");
 const { classifyMentions } = await import("@/lib/competitors/classify");
 const { competitorsToScan, keepMentions } = await import("@/lib/competitors/scan");
+const { competitorsNamed, quoteNaming } = await import("@/lib/competitors/match");
+const { threadMentions, competitorsInThread } = await import("@/lib/competitors/threads");
 
 describe("competitor cap", () => {
   const names = ["Typeform", "Jotform", "Tally", "Fillout"];
@@ -193,5 +195,60 @@ describe("mentions over time", () => {
       now,
     );
     expect(series[0].total).toBe(0);
+  });
+});
+
+describe("competitors named in a thread", () => {
+  const post = {
+    id: "p1",
+    title: "Which form builder?",
+    body: "We are on Google Forms and it is not enough.",
+  } as never as import("@/lib/reddit/store").StoredPost;
+
+  function reply(id: string, body: string) {
+    return { id, postId: "p1", author: "helper", body } as never as import("@/lib/reddit/store").StoredComment;
+  }
+
+  it("matches a name however a redditor writes it, each once", () => {
+    expect(competitorsNamed(["Typeform", "Tally"], "typeform beats TYPEFORM for me")).toEqual([
+      "Typeform",
+    ]);
+    expect(competitorsNamed(["  ", "Tally"], "anything")).toEqual([]);
+  });
+
+  it("quotes the sentence that named the competitor", () => {
+    expect(quoteNaming("Skip Jotform. Honestly just use Typeform, it has logic.", "typeform")).toBe(
+      "Honestly just use Typeform, it has logic.",
+    );
+    expect(quoteNaming("No product here.", "Typeform")).toBeNull();
+  });
+
+  it("names a competitor in the post, and each one a reply recommends", () => {
+    const rows = threadMentions("proj", ["Typeform", "Google Forms", "Tally"], {
+      post,
+      comments: [reply("c1", "Try Typeform or Tally."), reply("c2", "Typeform again.")],
+    });
+    expect(rows.map((row) => [row.competitor, row.commentId])).toEqual([
+      ["Google Forms", null],
+      ["Typeform", "c1"],
+      ["Tally", "c1"],
+      ["Typeform", "c2"],
+    ]);
+    expect(rows[1].quote).toBe("Try Typeform or Tally.");
+    expect(
+      competitorsInThread(["Typeform", "Google Forms", "Tally"], {
+        post,
+        comments: [reply("c1", "Try Typeform or Tally.")],
+      }),
+    ).toEqual(["Typeform", "Google Forms", "Tally"]);
+  });
+
+  it("counts a mention with no sentiment in the total only", () => {
+    const counts = topCompetitors([
+      { competitor: "Typeform", sentiment: null },
+      { competitor: "Typeform", sentiment: "negative" },
+    ]);
+    expect(counts[0].total).toBe(2);
+    expect(counts[0].sentiments).toEqual({ positive: 0, neutral: 0, negative: 1 });
   });
 });

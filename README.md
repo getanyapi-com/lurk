@@ -27,9 +27,9 @@ fee. Self-hosting has no limits at all.
   a Copy button and nothing else.
 - **Sends alerts.** A digest email, a Slack or Discord post, or your own webhook.
 - **Finds the Reddit threads Google already ranks** for your keywords, with position, thread
-  age and whether a competitor is named in it.
-- **Watches your competitors** on Reddit and says whether each mention was positive, negative
-  or neutral.
+  age and whether a competitor is named in it or recommended in its replies.
+- **Watches your competitors** on Reddit: which ones are being recommended in the threads
+  your leads sit in, and what new posts naming them say, positive, negative or neutral.
 - **Groups your leads into pain themes**, over data you already paid for.
 - **Answers all of it over a read-only API and MCP**, so an agent can triage for you.
 
