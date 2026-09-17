@@ -10,9 +10,10 @@ import {
 const INITIAL: NewProjectState = { error: null };
 
 /**
- * Name and product URL, then one submit that reads the site and opens the
- * project. Everything after the page read happens in the background, so the
- * wait here is one page read and the copy says exactly that.
+ * The product URL, then one submit that reads the site and opens the project.
+ * The site names the project, so nothing else is asked. Everything after the
+ * page read happens in the background, so the wait here is one page read and
+ * the copy says exactly that.
  */
 export function NewProjectForm() {
   const [state, formAction, pending] = useActionState(
@@ -25,16 +26,6 @@ export function NewProjectForm() {
       action={formAction}
       className="flex flex-col gap-4 rounded-card border bg-surface p-6"
     >
-      <label className="flex flex-col gap-1 text-small text-fg-muted">
-        Project name
-        <input
-          name="name"
-          required
-          disabled={pending}
-          placeholder="Acme"
-          className="h-10 rounded-control border bg-surface px-2 text-body text-fg"
-        />
-      </label>
       <label className="flex flex-col gap-1 text-small text-fg-muted">
         Product URL
         <input

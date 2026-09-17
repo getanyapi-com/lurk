@@ -83,8 +83,7 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
     signedIn = { id: user.id };
 
     const form = new FormData();
-    form.set("name", "Formcraft");
-    form.set("url", "https://formcraft.test");
+    form.set("url", "https://www.formcraft.test");
     await createProjectAndProfileAction({ error: null }, form);
 
     expect(runDiscovery).not.toHaveBeenCalled();
@@ -94,6 +93,8 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
       .select()
       .from(schema.projects)
       .where(eq(schema.projects.userId, user.id));
+    // The page read names the project; the form never asked.
+    expect(project.name).toBe("Formcraft");
     expect(project.pain).toBe(profile.pain);
     // The platform the page names is stored as the searches a buyer types.
     expect(project.problemPhrasings).toEqual([

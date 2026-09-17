@@ -14,7 +14,20 @@ function sentence(error: unknown): string {
 }
 
 /**
- * Creates the project, reads its page, and hands the rest to a job. Reading
+ * The name the project carries until the page read names it: the host, less
+ * its "www.", so a broken read still leaves a project the switcher can show.
+ */
+function nameFromUrl(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Creates the project, reads its page, and hands the rest to a job. The page
+ * read names the project, so the form asks for the URL and nothing else. Reading
  * Google for where the buyers ask takes minutes, and a browser waiting on a
  * Server Action for minutes is a request an ingress cuts off, so the only work
  * inside this action is the page read the profile needs.
@@ -24,14 +37,11 @@ export async function createProjectAndProfileAction(
   formData: FormData,
 ): Promise<NewProjectState> {
   const user = await requireLocalUser();
-  const name = String(formData.get("name") ?? "").trim();
   const url = String(formData.get("url") ?? "").trim();
-  if (!name) {
-    return { error: "A project needs a name." };
-  }
   if (!url) {
     return { error: "A product URL is needed before we can read your site." };
   }
+  const name = nameFromUrl(url);
 
   let projectId: string;
   try {

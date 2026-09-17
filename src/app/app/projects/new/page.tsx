@@ -10,7 +10,7 @@ export default async function NewProjectPage() {
           New project
         </h1>
         <p className="text-body text-fg-muted">
-          Give us the product URL and we read the page, work out who buys it,
+          Give us the product URL and we read the page, name the project, work out who buys it,
           and pick the subreddits worth watching.
         </p>
       </div>
