@@ -14,3 +14,20 @@ export function competitorNamed(
     return needle.length > 0 && haystack.includes(needle);
   });
 }
+
+/**
+ * Which competitors are named in a thread, rather than only whether any is.
+ * The stored flag answers the filter; this answers the reader looking at one
+ * thread and asking who is already being talked about in it.
+ */
+export function namedCompetitors(
+  competitors: string[],
+  title: string,
+  body: string | null,
+): string[] {
+  const haystack = `${title}\n${body ?? ""}`.toLowerCase();
+  return competitors.filter((name) => {
+    const needle = name.trim().toLowerCase();
+    return needle.length > 0 && haystack.includes(needle);
+  });
+}

@@ -468,14 +468,21 @@ describe.skipIf(!process.env.DATABASE_URL)("closed ranking threads", () => {
 
 /**
  * The discovery verdict answers whether anybody is asking; it does not say how
- * far along they are. The refresh now judges every thread it opens the way the
- * scan judges a candidate, so the tab can be ordered on that judgement instead.
+ * far along they are. The refresh judges every thread it opens the way the scan
+ * judges a candidate, so the tab can be read in that order.
+ *
+ * The order is applied over the rows now rather than in SQL, because three of
+ * the four orders the tab offers fold a score no column holds. This pins both
+ * halves: that the read still hands the judgement over, and that the order puts
+ * it to use.
  */
 describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer intent", () => {
   it("puts the higher intent first and an unjudged thread last", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const { BY_INTENT, listOpportunities } = await import("@/lib/seo/read");
+    const { listOpportunities, toThread } = await import("@/lib/seo/read");
+    const { scoreThreads } = await import("@/lib/seo/score");
+    const { orderThreads } = await import("@/lib/seo/views");
 
     const [user] = await db()
       .insert(schema.users)
@@ -532,18 +539,20 @@ describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer int
       });
     }
 
-    const byIntent = await listOpportunities(project.id, { sort: BY_INTENT });
-    expect(byIntent.map((row) => row.postId)).toEqual([
+    const held = scoreThreads((await listOpportunities(project.id, {})).map(toThread));
+
+    const byIntent = orderThreads(held, "intent");
+    expect(byIntent.map((thread) => thread.postId)).toEqual([
       `${run}strong`,
       `${run}weak`,
       `${run}unjudged`,
     ]);
-    expect(byIntent.map((row) => row.intent)).toEqual([4, 2, null]);
-    expect(byIntent.map((row) => row.fit)).toEqual([3, 3, null]);
+    expect(byIntent.map((thread) => thread.intent)).toEqual([4, 2, null]);
+    expect(byIntent.map((thread) => thread.fit)).toEqual([3, 3, null]);
 
-    // The default order is still Google's, so the toggle is what moved them.
-    const byDefault = await listOpportunities(project.id, {});
-    expect(byDefault.map((row) => row.postId)).toEqual([
+    // Google's own order is one of the four the tab offers, and it disagrees
+    // with the other three, which is the whole reason the tab offers a choice.
+    expect(orderThreads(held, "google").map((thread) => thread.postId)).toEqual([
       `${run}unjudged`,
       `${run}weak`,
       `${run}strong`,
@@ -558,5 +567,126 @@ describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer int
           threads.map((thread) => `${run}${thread.suffix}`),
         ),
       );
+  });
+});
+
+/**
+ * Everything the refresh already paid for and the tab never showed: what Google
+ * put under the link, who asked, how established they are, what the community
+ * allows. It is one query, and the part that can quietly go wrong is the
+ * snippet: a post can carry evidence from several phrasings, and a snippet from
+ * the wrong one is a claim about what a searcher saw that is simply false.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("the facts a thread arrives with", () => {
+  it("takes the snippet Google showed for this phrasing, not for another one", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { listOpportunities, toThread, watchedCompetitors } = await import("@/lib/seo/read");
+
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "AnyAPI" })
+      .returning();
+
+    const run = randomUUID().replace(/-/g, "").slice(0, 8);
+    const postId = `${run}post`;
+    const url = `https://www.reddit.com/r/webscraping/comments/${postId}/x/`;
+    await db().insert(schema.redditAuthors).values({
+      username: `u_${run}`,
+      avatarUrl: "https://example.com/face.png",
+      karma: 4120,
+      accountCreatedAt: new Date("2019-04-01T00:00:00Z"),
+    });
+    await db()
+      .insert(schema.subreddits)
+      .values({
+        name: `webscraping_${run}`,
+        subscribers: 91000,
+        promoPolicy: "No self-promotion outside the Saturday thread",
+        rulesText: "Rule 4: no advertising.",
+      });
+    await db().insert(schema.redditPosts).values({
+      id: postId,
+      subreddit: `webscraping_${run}`,
+      author: `U_${run}`,
+      title: "What do people use to pull Reddit data now?",
+      body: "Tried a few and none of them keep up.",
+      url,
+      score: 240,
+      numComments: 31,
+      createdAt: new Date(),
+    });
+    await db().insert(schema.seoOpportunities).values({
+      projectId: project.id,
+      keyword: "  reddit scraper  ",
+      postId,
+      position: 2,
+    });
+    // Two phrasings found the same thread. Only one of them is this row's.
+    await db()
+      .insert(schema.discoveryEvidence)
+      .values([
+        {
+          projectId: project.id,
+          postId,
+          canonicalUrl: url,
+          subreddit: `webscraping_${run}`,
+          query: "reddit scraper reddit",
+          position: 2,
+          title: "What do people use to pull Reddit data now?",
+          snippet: "The snippet for this phrasing.",
+          relevance: "relevant",
+        },
+        {
+          projectId: project.id,
+          postId,
+          canonicalUrl: url,
+          subreddit: `webscraping_${run}`,
+          query: "some other way of asking reddit",
+          position: 7,
+          title: "What do people use to pull Reddit data now?",
+          snippet: "The snippet for a different phrasing.",
+          relevance: "relevant",
+        },
+      ]);
+
+    const [held] = (await listOpportunities(project.id, {})).map(toThread);
+
+    // The stored keyword has the padding `googleQuery` trims, so this also
+    // pins that the join is built the way the refresh wrote the query.
+    expect(held.snippet).toBe("The snippet for this phrasing.");
+    expect(held.author).toBe(`U_${run}`);
+    expect(held.authorKarma).toBe(4120);
+    expect(held.authorAvatarUrl).toBe("https://example.com/face.png");
+    expect(held.authorCreatedAt).toBeInstanceOf(Date);
+    expect(held.subredditSubscribers).toBe(91000);
+    expect(held.promoPolicy).toBe("No self-promotion outside the Saturday thread");
+    expect(held.rulesText).toBe("Rule 4: no advertising.");
+    expect(held.body).toBe("Tried a few and none of them keep up.");
+    expect(held.postId).toBe(postId);
+    expect(held.refreshedAt).toBeInstanceOf(Date);
+
+    // A competitor a person excluded on the Product page is not named here.
+    await db()
+      .insert(schema.projectCompetitors)
+      .values([
+        { projectId: project.id, name: "Apify", state: "active" },
+        { projectId: project.id, name: "Bright Data", state: "pinned" },
+        { projectId: project.id, name: "Dropped", state: "excluded" },
+      ]);
+    expect((await watchedCompetitors(project.id)).sort()).toEqual(["Apify", "Bright Data"]);
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+    await db().delete(schema.redditPosts).where(eq(schema.redditPosts.id, postId));
+    await db()
+      .delete(schema.redditAuthors)
+      .where(eq(schema.redditAuthors.username, `u_${run}`));
+    await db()
+      .delete(schema.subreddits)
+      .where(eq(schema.subreddits.name, `webscraping_${run}`));
   });
 });

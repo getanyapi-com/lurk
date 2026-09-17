@@ -1,13 +1,16 @@
-import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
+import { aliasedTable, and, asc, count, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   discoveryEvidence,
   leadEvaluations,
+  projectCompetitors,
+  redditAuthors,
   redditPosts,
   seoOpportunities,
   subreddits,
 } from "@/db/schema";
 import type { Relevance } from "@/lib/discovery/label";
+import type { RankingThread } from "./thread";
 
 /**
  * What a refresh writes as its progress when the project has no problem
@@ -46,21 +49,20 @@ function verdicts(projectId: string) {
 export type SeoRow = Awaited<ReturnType<typeof listOpportunities>>[number];
 
 /**
- * How the tab is read. `closed` is the only filter that hides anything by
- * default, because a thread nobody can reply in is not an opportunity; set it
- * to "yes" to see them anyway. `sort` picks between Google's own ranking and
- * this project's judgement of the person posting.
+ * What the tab hides, which is the only thing a filter does here. `closed` is
+ * the one that hides anything by default, because a thread nobody can reply in
+ * is not an opportunity; set it to "yes" to see them anyway.
+ *
+ * Nothing here says what order to read the rows in. Three of the four orders
+ * the tab offers fold a score the database does not hold, so ordering happens
+ * once, over the rows in hand, in `views.ts`.
  */
 export type SeoFilter = {
   keyword?: string;
   subreddit?: string;
   competitor?: string;
   closed?: string;
-  sort?: string;
 };
-
-/** The sort the page offers besides the default one. */
-export const BY_INTENT = "intent";
 
 /**
  * True when Reddit archived the thread or a moderator locked it: either one
@@ -75,9 +77,26 @@ export function verdictOf(rank: number | null): Relevance | null {
   return verdict && verdict !== "unlabeled" ? verdict : null;
 }
 
-/** What one Google search cost this project, for the cost line on its threads. */
-
 export type SeoFacets = { keywords: string[]; subreddits: string[] };
+
+/**
+ * The Google search one phrasing was asked, written the way `googleQuery`
+ * writes it. Expressed in SQL rather than imported so the snippet join can be
+ * made against the phrasing on the row; `fetch.ts` opens a funded client on
+ * import, and the read of a page has no business doing that.
+ */
+const googleQueryOf = sql`btrim(${seoOpportunities.keyword}) || ' reddit'`;
+
+/**
+ * What Google showed under this link for this phrasing. Discovery files one
+ * evidence row per post per query and the table is unique on the three, so
+ * matching the phrasing's own query joins at most one row: the snippet a
+ * searcher actually read before clicking, not one from some other phrasing.
+ */
+const shown = aliasedTable(discoveryEvidence, "shown");
+
+/** The account that posted, for the face and the two facts about it. */
+const poster = aliasedTable(redditAuthors, "poster");
 
 const columns = {
   id: seoOpportunities.id,
@@ -88,12 +107,24 @@ const columns = {
   postId: redditPosts.id,
   title: redditPosts.title,
   url: redditPosts.url,
+  body: redditPosts.body,
+  snippet: shown.snippet,
   subreddit: redditPosts.subreddit,
   subredditIconUrl: subreddits.iconUrl,
+  subredditSubscribers: subreddits.subscribers,
+  promoPolicy: subreddits.promoPolicy,
+  rulesText: subreddits.rulesText,
+  author: redditPosts.author,
+  authorAvatarUrl: poster.avatarUrl,
+  authorKarma: poster.karma,
+  authorCreatedAt: poster.accountCreatedAt,
   score: redditPosts.score,
   numComments: redditPosts.numComments,
   createdAt: redditPosts.createdAt,
   closed: closedThread,
+  /** Which of the two closed it, so a card can say why rather than only that. */
+  isArchived: redditPosts.isArchived,
+  isLocked: redditPosts.isLocked,
   /** This project's own judgement of the person posting, or null if none. */
   fit: leadEvaluations.fit,
   intent: leadEvaluations.intent,
@@ -133,15 +164,26 @@ function conditions(filter: SeoFilter) {
  * replying in first and Google's own rank breaking the tie. It sorts rather
  * than hides: a thread with nobody asking in it still ranks, and one reply in
  * it still works, which is what this tab is for.
+ *
+ * This is the base order every view starts from and the tiebreak underneath
+ * whichever order the reader asked for, never the last word on it.
  */
 export async function listOpportunities(projectId: string, filter: SeoFilter) {
   const judged = verdicts(projectId);
-  const byIntent = filter.sort === BY_INTENT;
   return db()
     .select({ ...columns, verdictRank: judged.rank })
     .from(seoOpportunities)
     .innerJoin(redditPosts, eq(redditPosts.id, seoOpportunities.postId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
+    .leftJoin(poster, eq(poster.username, sql`lower(${redditPosts.author})`))
+    .leftJoin(
+      shown,
+      and(
+        eq(shown.projectId, projectId),
+        eq(shown.postId, seoOpportunities.postId),
+        eq(shown.query, googleQueryOf),
+      ),
+    )
     .leftJoin(judged, eq(judged.postId, seoOpportunities.postId))
     .leftJoin(leadEvaluations, judgementOf(projectId))
     .where(and(eq(seoOpportunities.projectId, projectId), ...conditions(filter)))
@@ -150,12 +192,7 @@ export async function listOpportunities(projectId: string, filter: SeoFilter) {
       // A closed thread sorts after every open one, whichever order is asked
       // for, because no reply is possible in it.
       asc(closedThread),
-      ...(byIntent
-        ? [
-            sql`${leadEvaluations.intent} desc nulls last`,
-            sql`${leadEvaluations.fit} desc nulls last`,
-          ]
-        : [sql`coalesce(${judged.rank}, ${VERDICT_ORDER.indexOf("unlabeled") + 1})`]),
+      sql`coalesce(${judged.rank}, ${VERDICT_ORDER.indexOf("unlabeled") + 1})`,
       asc(seoOpportunities.position),
     );
 }
@@ -192,5 +229,62 @@ export async function seoFacets(projectId: string, filter: SeoFilter = {}): Prom
   return {
     keywords: [...new Set(rows.map((row) => row.keyword))].sort(),
     subreddits: [...new Set(rows.map((row) => row.subreddit))].sort(),
+  };
+}
+
+/**
+ * The competitors this project watches, for naming the ones a thread mentions.
+ * A refresh stores only that some competitor was named, which is the fact worth
+ * indexing; which one it was is a plain match on text the page already holds,
+ * so it is done here rather than stored twice.
+ *
+ * It reads the same states a scan retrieves, so a competitor excluded on the
+ * Product page is not named on this page either.
+ */
+export async function watchedCompetitors(projectId: string): Promise<string[]> {
+  const rows = await db()
+    .select({ name: projectCompetitors.name, state: projectCompetitors.state })
+    .from(projectCompetitors)
+    .where(eq(projectCompetitors.projectId, projectId));
+  return rows
+    .filter((row) => row.state === "active" || row.state === "pinned")
+    .map((row) => row.name);
+}
+
+/**
+ * One row as every view of the tab consumes it. The mapping lives beside the
+ * columns it maps rather than in the page, so a view can be added without
+ * copying a list of thirty field names to read the same rows.
+ */
+export function toThread(row: SeoRow): RankingThread {
+  return {
+    id: row.id,
+    postId: row.postId,
+    position: row.position,
+    competitorPresent: row.competitorPresent,
+    verdict: verdictOf(row.verdictRank),
+    title: row.title,
+    url: row.url,
+    body: row.body,
+    keyword: row.keyword,
+    snippet: row.snippet,
+    subreddit: row.subreddit,
+    subredditIconUrl: row.subredditIconUrl,
+    subredditSubscribers: row.subredditSubscribers,
+    promoPolicy: row.promoPolicy,
+    rulesText: row.rulesText,
+    author: row.author,
+    authorAvatarUrl: row.authorAvatarUrl,
+    authorKarma: row.authorKarma,
+    authorCreatedAt: row.authorCreatedAt,
+    score: row.score,
+    numComments: row.numComments,
+    createdAt: row.createdAt,
+    closed: row.closed,
+    isArchived: row.isArchived,
+    isLocked: row.isLocked,
+    fit: row.fit,
+    intent: row.intent,
+    refreshedAt: row.refreshedAt,
   };
 }

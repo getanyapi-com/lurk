@@ -1,64 +1,61 @@
 import { refreshSeoAction } from "@/app/app/seo/actions";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import { KeywordSection } from "@/components/seo/KeywordSection";
 import { NoPhrasings } from "@/components/seo/NoPhrasings";
-import type { RankingThread } from "@/components/seo/OpportunityCard";
 import { RefreshStatus } from "@/components/seo/RefreshStatus";
 import { SeoFilters } from "@/components/seo/SeoFilters";
+import { SplitView } from "@/components/seo/SplitView";
+import { ThreadTable } from "@/components/seo/ThreadTable";
 import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { activeProject } from "@/lib/projects";
 import {
-  BY_INTENT,
   listOpportunities,
   NO_PHRASINGS_PROGRESS,
   seoFacets,
-  verdictOf,
-  type SeoRow,
+  toThread,
+  watchedCompetitors,
 } from "@/lib/seo/read";
+import { scoreThreads } from "@/lib/seo/score";
+import { orderThreads, seoOrder, seoView, worthReplying, type SeoOrder } from "@/lib/seo/views";
 
-type SeoPageProps = {
-  searchParams: Promise<{
-    project?: string;
-    keyword?: string;
-    subreddit?: string;
-    competitor?: string;
-    closed?: string;
-    sort?: string;
-  }>;
+type SeoParams = {
+  project?: string;
+  keyword?: string;
+  subreddit?: string;
+  competitor?: string;
+  closed?: string;
+  view?: string;
+  order?: string;
+  /** The thread the list-and-thread view is showing. */
+  thread?: string;
 };
+
+type SeoPageProps = { searchParams: Promise<SeoParams> };
 
 const EMPTY_SENTENCE =
   "A refresh asks Google which Reddit threads rank for each way your buyers say the problem, then opens every thread for its score, replies and age. At catalog prices the search is about $0.001 per phrasing, and each thread it opens is about $0.001 more.";
 
-function toThread(row: SeoRow): RankingThread {
-  return {
-    id: row.id,
-    position: row.position,
-    competitorPresent: row.competitorPresent,
-    verdict: verdictOf(row.verdictRank),
-    title: row.title,
-    url: row.url,
-    subreddit: row.subreddit,
-    subredditIconUrl: row.subredditIconUrl,
-    score: row.score,
-    numComments: row.numComments,
-    createdAt: row.createdAt,
-    closed: row.closed,
-    fit: row.fit,
-    intent: row.intent,
+/** The same URL with one parameter changed, so a column head or a row is a link. */
+function linker(params: SeoParams) {
+  return (changes: Partial<Record<string, string | undefined>>): string => {
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries({ ...params, ...changes })) {
+      if (value) {
+        next.set(key, value);
+      }
+    }
+    return `?${next.toString()}`;
   };
 }
 
-function byPhrasing(rows: SeoRow[]): Map<string, RankingThread[]> {
-  const grouped = new Map<string, RankingThread[]>();
-  for (const row of rows) {
-    const threads = grouped.get(row.keyword) ?? [];
-    threads.push(toThread(row));
-    grouped.set(row.keyword, threads);
-  }
-  return grouped;
+/** What the whole tab holds, before any of it is read. */
+function tally(phrasings: number, threads: number, strong: number): string {
+  return [
+    `${phrasings} ${phrasings === 1 ? "phrasing" : "phrasings"}`,
+    `${threads} ranking ${threads === 1 ? "thread" : "threads"}`,
+    strong > 0 ? `${strong} worth replying in` : "none worth replying in yet",
+  ].join(" · ");
 }
 
 export default async function SeoPage({ searchParams }: SeoPageProps) {
@@ -74,22 +71,28 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
     );
   }
 
+  const view = seoView(params.view);
+  const order = seoOrder(params.order);
   const filter = {
     keyword: params.keyword,
     subreddit: params.subreddit,
     competitor: params.competitor,
     closed: params.closed,
-    sort: params.sort,
   };
-  const [rows, facets, last, next] = await Promise.all([
+  const [rows, facets, last, next, competitors] = await Promise.all([
     listOpportunities(project.id, filter),
     seoFacets(project.id, filter),
     lastRunJob("seo_refresh", project.id),
     nextQueuedJob("seo_refresh", project.id),
+    watchedCompetitors(project.id),
   ]);
   const nothingToLookUp = Boolean(last?.finishedAt) && last?.progress === NO_PHRASINGS_PROGRESS;
-  const grouped = byPhrasing(rows);
-  const phrasings = [...grouped.keys()];
+  // The order is decided here, over the rows in hand, because three of the four
+  // orders fold a score the database does not hold. The read's own order is the
+  // tiebreak underneath it.
+  const threads = orderThreads(scoreThreads(rows.map(toThread)), order);
+  const href = linker(params);
+  const selected = threads.find((thread) => thread.id === params.thread) ?? threads[0] ?? null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -99,6 +102,15 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
             Reddit SEO
           </h2>
           <RefreshStatus last={last} next={next} />
+          {threads.length > 0 ? (
+            <p className="text-mono text-fg-muted">
+              {tally(
+                new Set(threads.map((thread) => thread.keyword)).size,
+                threads.length,
+                threads.filter(worthReplying).length,
+              )}
+            </p>
+          ) : null}
         </div>
         <form action={refreshSeoAction.bind(null, project.id)}>
           <Button type="submit" size="lg">
@@ -107,23 +119,26 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
         </form>
       </div>
       <SeoFilters facets={facets} />
-      {phrasings.length === 0 ? (
+      {threads.length === 0 ? (
         nothingToLookUp ? (
           <NoPhrasings projectId={project.id} />
         ) : (
           <EmptyState title="Nothing ranked yet" sentence={EMPTY_SENTENCE} />
         )
+      ) : view === "split" ? (
+        <SplitView
+          threads={threads}
+          selected={selected}
+          hrefFor={(id) => href({ thread: id })}
+          competitors={competitors}
+        />
       ) : (
-        <div className="flex flex-col gap-6">
-          {phrasings.map((phrasing) => (
-            <KeywordSection
-              key={phrasing}
-              keyword={phrasing}
-              threads={grouped.get(phrasing) ?? []}
-              showJudgement={params.sort === BY_INTENT}
-            />
-          ))}
-        </div>
+        <ThreadTable
+          threads={threads}
+          order={order}
+          hrefFor={(asked: SeoOrder) => href({ order: asked })}
+          competitors={competitors}
+        />
       )}
     </div>
   );

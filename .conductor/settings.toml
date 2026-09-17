@@ -1,0 +1,29 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+setup = "npm install"
+
+# One Postgres on a fixed port, one scheduler and one set of house spend caps,
+# shared by every workspace of this repo. Two workspaces running at once would
+# double-run the job tick against the same database.
+run_mode = "nonconcurrent"
+
+# The app to look at, without the job tick. RUN_SCHEDULER=false is the whole
+# point of this one: the scheduler runs every minute and a scan it starts buys
+# real Reddit and model calls against the house key. Reading a page should not
+# cost anything.
+[scripts.run.dev]
+available_in = [ "local" ]
+command = "./scripts/workspace-dev.sh"
+default = true
+icon = "play"
+
+# The same, with the scheduler on, for work that needs jobs to actually run.
+[scripts.run."dev with scheduler"]
+available_in = [ "local" ]
+command = "RUN_SCHEDULER=true ./scripts/workspace-dev.sh"
+icon = "timer"
+
+[scripts.run.test]
+command = "npm run test -- --watch"
+icon = "test-tube"

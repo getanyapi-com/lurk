@@ -1,18 +1,36 @@
-import { ArrowDownWideNarrow, Hash, Lock, Search, Users } from "lucide-react";
+import { ArrowDownWideNarrow, Hash, LayoutGrid, Lock, Search, Users } from "lucide-react";
 import { FilterPills, type FilterSpec } from "@/components/FilterPills";
-import { BY_INTENT, type SeoFacets } from "@/lib/seo/read";
+import type { SeoFacets } from "@/lib/seo/read";
+import { DEFAULT_ORDER, DEFAULT_VIEW, SEO_ORDERS, SEO_VIEWS } from "@/lib/seo/views";
 
 type SeoFiltersProps = { facets: SeoFacets };
 
 const ICON = "size-3.5 shrink-0 text-fg-muted";
 
 /**
- * Narrow the rankings to one phrasing, one community, or the ones a rival is
- * in, choose whether to see the threads nobody can reply in, and pick what the
- * list is ordered by.
+ * Pick how the rankings are drawn and what they are ordered by, narrow them to
+ * one phrasing, one community or the ones a rival is in, and choose whether to
+ * see the threads nobody can reply in.
+ *
+ * The view and the order lead, because they are what the tab was missing: it
+ * had one shape and one order, and the order was the alphabet.
  */
 export function SeoFilters({ facets }: SeoFiltersProps) {
   const filters: FilterSpec[] = [
+    {
+      name: "view",
+      ariaLabel: "view",
+      icon: <LayoutGrid className={ICON} aria-hidden="true" />,
+      fallback: DEFAULT_VIEW,
+      options: SEO_VIEWS.map((view) => ({ value: view.id, label: view.label })),
+    },
+    {
+      name: "order",
+      ariaLabel: "order",
+      icon: <ArrowDownWideNarrow className={ICON} aria-hidden="true" />,
+      fallback: DEFAULT_ORDER,
+      options: SEO_ORDERS.map((order) => ({ value: order.id, label: order.label })),
+    },
     {
       name: "keyword",
       ariaLabel: "keyword",
@@ -45,16 +63,6 @@ export function SeoFilters({ facets }: SeoFiltersProps) {
       options: [
         { value: "", label: "Open threads" },
         { value: "yes", label: "Include closed" },
-      ],
-    },
-    {
-      name: "sort",
-      ariaLabel: "order",
-      icon: <ArrowDownWideNarrow className={ICON} aria-hidden="true" />,
-      fallback: "",
-      options: [
-        { value: "", label: "Best to reply in" },
-        { value: BY_INTENT, label: "By buyer intent" },
       ],
     },
     {

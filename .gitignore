@@ -17,3 +17,6 @@ CLAUDE.md
 deploy/
 
 .context/
+
+# Conductor machine-local settings, which override the shared ones.
+.conductor/settings.local.toml
