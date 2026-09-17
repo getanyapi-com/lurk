@@ -116,7 +116,7 @@ A hosted instance has two tiers. Self-hosting is neither: it has no limits at al
 | Comment scan | top 20 scored threads per scan | every thread over your threshold |
 | Feed window | 30 days | 30 days |
 | Drafts | unlimited | unlimited |
-| Alerts | daily digest + 1 webhook | hourly, unlimited webhooks |
+| Alerts | daily digest, Slack and Discord, + 1 custom webhook | hourly, unlimited custom webhooks |
 | Reddit SEO | 10 keywords, refreshed weekly | unlimited, refreshed daily |
 | Competitors | 3 | unlimited |
 | Insights | full | full |
@@ -136,7 +136,9 @@ the token here and revokes it at AnyAPI.
 ## Alerts
 
 Settings -> Alerts is where new leads land. Add an email digest, a Slack or Discord webhook,
-or a generic webhook that receives the same digest as JSON. Email needs `ALERTS_FROM_EMAIL`
+or a generic webhook that receives the same digest as JSON. Slack and Discord cost nothing to
+post to, so a project may add as many of those as it likes; the generic webhook is the one the
+free tier caps, at one. Email needs `ALERTS_FROM_EMAIL`
 and one carrier: `AZURE_EMAIL_CONNECTION_STRING` or `SMTP_URL`, in that order. On Azure, the local part of `ALERTS_FROM_EMAIL` must also be added as a sender
 username on the domain, or every send is refused. The webhooks need nothing. A digest carries the day's new leads with
 their score, reason, community and link, in the same shapes the feed uses, and sends nothing

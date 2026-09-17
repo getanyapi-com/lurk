@@ -4,8 +4,11 @@ export const ALERT_CHANNELS = ["email", "slack", "discord", "webhook"] as const;
 
 export type AlertChannel = (typeof ALERT_CHANNELS)[number];
 
-/** Every channel except email counts against the tier's webhook allowance. */
-export const WEBHOOK_CHANNELS: AlertChannel[] = ["slack", "discord", "webhook"];
+/**
+ * The only capped channel: posting a Slack or Discord message costs us nothing,
+ * so a project may have as many of those as it likes.
+ */
+export const CUSTOM_WEBHOOK_CHANNEL: AlertChannel = "webhook";
 
 export type AlertCadence = "daily" | "hourly";
 

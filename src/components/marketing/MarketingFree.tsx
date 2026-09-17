@@ -145,7 +145,7 @@ export function MarketingFree() {
         </dl>
         <small>
           {limits
-            ? `${limits.alertCadence === "daily" ? "Daily" : "Hourly"} alerts / ${count(limits.alertWebhooks)} webhook${limits.alertWebhooks === 1 ? "" : "s"}`
+            ? `${limits.alertCadence === "daily" ? "Daily" : "Hourly"} alerts / Slack and Discord, plus ${count(limits.customWebhooks)} custom webhook${limits.customWebhooks === 1 ? "" : "s"}`
             : "Configure Docker, Postgres, Clerk, AnyAPI and OpenRouter. Model usage is billed separately."}
         </small>
       </div>

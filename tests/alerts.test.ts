@@ -32,8 +32,8 @@ import {
   effectiveCadence,
   isDue,
   selectLeads,
-  webhookAllowance,
-  webhookCapText,
+  customWebhookAllowance,
+  customWebhookCapText,
   type SelectableLead,
 } from "@/lib/alerts/select";
 import { normalizeTarget } from "@/lib/alerts/channels";
@@ -119,19 +119,22 @@ describe("what one message carries", () => {
   });
 });
 
-describe("webhook allowance", () => {
-  it("counts webhooks and not email against the free cap", () => {
-    expect(webhookAllowance(["email"], TIERS.free)).toMatchObject({ used: 0, atCap: false });
-    expect(webhookAllowance(["email", "slack"], TIERS.free)).toMatchObject({
+describe("custom webhook allowance", () => {
+  it("counts only custom webhooks against the free cap", () => {
+    expect(customWebhookAllowance(["email", "slack", "discord"], TIERS.free)).toMatchObject({
+      used: 0,
+      atCap: false,
+    });
+    expect(customWebhookAllowance(["slack", "webhook"], TIERS.free)).toMatchObject({
       used: 1,
       atCap: true,
     });
-    expect(webhookCapText(["email", "slack"], TIERS.free)).toBe("1 of 1 webhooks");
+    expect(customWebhookCapText(["slack", "webhook"], TIERS.free)).toBe("1 of 1 custom webhook");
   });
 
   it("caps nothing for a connected wallet or a self-hosted instance", () => {
-    expect(webhookAllowance(["slack", "discord"], TIERS.connected).atCap).toBe(false);
-    expect(webhookCapText(["slack"], null)).toBeNull();
+    expect(customWebhookAllowance(["webhook", "webhook"], TIERS.connected).atCap).toBe(false);
+    expect(customWebhookCapText(["webhook"], null)).toBeNull();
   });
 });
 

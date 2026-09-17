@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { alerts, projects } from "@/db/schema";
 import type { TierLimits } from "@/lib/tiers";
-import { isWebhookChannel, webhookAllowance } from "./select";
+import { customWebhookAllowance, isCustomWebhook } from "./select";
 import { CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "./types";
 
 export type AlertRow = typeof alerts.$inferSelect;
@@ -73,14 +73,14 @@ export type AddChannelInput = {
 export async function addChannel(input: AddChannelInput): Promise<ProjectChannel> {
   const target = normalizeTarget(input.channel, input.target);
   const existing = await listChannels(input.projectId);
-  if (isWebhookChannel(input.channel)) {
-    const allowance = webhookAllowance(
+  if (isCustomWebhook(input.channel)) {
+    const allowance = customWebhookAllowance(
       existing.map((one) => one.channel),
       input.limits,
     );
     if (allowance.atCap) {
       throw new Error(
-        `This tier allows ${allowance.limit} webhook. Connect a wallet for more.`,
+        `This tier allows ${allowance.limit} custom webhook${allowance.limit === 1 ? "" : "s"}. Connect a wallet for more.`,
       );
     }
   }

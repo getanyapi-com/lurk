@@ -4,7 +4,7 @@ import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChan
 import { EmptyState } from "@/components/EmptyState";
 import { listChannels } from "@/lib/alerts/channels";
 import { slackApp } from "@/lib/alerts/config";
-import { webhookAllowance, webhookCapText } from "@/lib/alerts/select";
+import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
 import { activeProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
@@ -39,7 +39,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const { limits } = await tierForUser(user.id);
   const channels = await listChannels(project.id);
   const kinds = channels.map((one) => one.channel);
-  const allowance = webhookAllowance(kinds, limits);
+  const allowance = customWebhookAllowance(kinds, limits);
   const rows: ChannelRow[] = channels.map((one) => ({
     id: one.id,
     channel: one.channel,
@@ -67,9 +67,9 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
         <h2 className="text-h3" style={{ fontWeight: 500 }}>
           Channels
         </h2>
-        {webhookCapText(kinds, limits) ? (
+        {customWebhookCapText(kinds, limits) ? (
           <span className="rounded-control bg-surface-2 px-2 py-0.5 text-small text-fg-muted">
-            {webhookCapText(kinds, limits)}
+            {customWebhookCapText(kinds, limits)}
           </span>
         ) : null}
       </div>
@@ -79,7 +79,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
       <AlertChannelList projectId={project.id} channels={rows} />
       <AddChannelForm
         projectId={project.id}
-        webhooksAtCap={allowance.atCap}
+        customWebhooksAtCap={allowance.atCap}
         hourlyAllowed={limits?.alertCadence !== "daily"}
         slackInstall={slackApp() !== null}
       />

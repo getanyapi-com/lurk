@@ -12,7 +12,8 @@ export type TierLimits = {
   scanIntervalHours: number;
   commentThreadsPerScan: number | null;
   feedWindowDays: number;
-  alertWebhooks: number | null;
+  /** Custom webhooks. Slack and Discord are free to post to, so they are uncapped. */
+  customWebhooks: number | null;
   alertCadence: "daily" | "hourly";
   seoKeywords: number | null;
   seoRefreshDays: number;
@@ -41,7 +42,7 @@ export const TIERS: Record<TierName, TierLimits> = {
     scanIntervalHours: 6,
     commentThreadsPerScan: 20,
     feedWindowDays: 30,
-    alertWebhooks: 1,
+    customWebhooks: 1,
     alertCadence: "daily",
     seoKeywords: 10,
     seoRefreshDays: 7,
@@ -64,7 +65,7 @@ export const TIERS: Record<TierName, TierLimits> = {
     scanIntervalHours: 1,
     commentThreadsPerScan: null,
     feedWindowDays: 30,
-    alertWebhooks: null,
+    customWebhooks: null,
     alertCadence: "hourly",
     seoKeywords: null,
     seoRefreshDays: 1,
