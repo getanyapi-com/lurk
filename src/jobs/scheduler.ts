@@ -57,23 +57,40 @@ export async function seedProjectScans(): Promise<void> {
     .from(projects);
   const stale = await projectsWithStaleEvaluations();
   for (const row of rows) {
-    if (!row.discoveredAt) {
-      /**
-       * A project whose first discovery never finished has no plan at all, so
-       * a scan, an SEO pass or a competitor scan would have nothing to read
-       * and would spend a person's money proving it. The initial discovery
-       * queues all of those itself once it has a plan.
-       */
-      await enqueueOnce("discovery_initial", new Date(), row.id);
-      continue;
+    try {
+      await seedProject(row, stale.has(row.id));
+    } catch (error) {
+      /** The project was deleted between the read above and its insert. Nothing to seed. */
+      if (!isMissingProject(error)) {
+        throw error;
+      }
     }
-    await enqueueOnce("scan", new Date(), row.id);
-    await enqueueOnce("discovery_refresh", new Date(), row.id);
-    await enqueueOnce("competitor_scan", new Date(), row.id);
-    await enqueueOnce("seo_refresh", new Date(), row.id);
-    if (stale.has(row.id)) {
-      await enqueueOnce("rescore", new Date(), row.id);
-    }
+  }
+}
+
+/** Postgres 23503: the row a job would point at is gone. Drizzle wraps it as the cause. */
+function isMissingProject(error: unknown): boolean {
+  const cause = error instanceof Error && error.cause ? error.cause : error;
+  return (cause as { code?: string } | null)?.code === "23503";
+}
+
+async function seedProject(row: { id: string; discoveredAt: Date | null }, stale: boolean): Promise<void> {
+  if (!row.discoveredAt) {
+    /**
+     * A project whose first discovery never finished has no plan at all, so
+     * a scan, an SEO pass or a competitor scan would have nothing to read
+     * and would spend a person's money proving it. The initial discovery
+     * queues all of those itself once it has a plan.
+     */
+    await enqueueOnce("discovery_initial", new Date(), row.id);
+    return;
+  }
+  await enqueueOnce("scan", new Date(), row.id);
+  await enqueueOnce("discovery_refresh", new Date(), row.id);
+  await enqueueOnce("competitor_scan", new Date(), row.id);
+  await enqueueOnce("seo_refresh", new Date(), row.id);
+  if (stale) {
+    await enqueueOnce("rescore", new Date(), row.id);
   }
 }
 
