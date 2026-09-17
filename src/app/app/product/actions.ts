@@ -17,6 +17,7 @@ import { competitorHost } from "@/lib/competitors/host";
 import type { Destination } from "@/lib/discovery/queries";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { buildProfile } from "@/lib/profile";
+import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import { projectForUser } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
@@ -100,6 +101,9 @@ export async function saveProfileAction(
         ...(edited ? { profileVersion: sql`${projects.profileVersion} + 1` } : {}),
       })
       .where(eq(projects.id, project.id));
+    // The feed applies this project's own minimum score when it is read, so the
+    // read it is holding was made against the old floor.
+    forgetProjectFeed(project.id);
     revalidatePath("/app", "layout");
     return { error: null, saved: true };
   } catch (error) {

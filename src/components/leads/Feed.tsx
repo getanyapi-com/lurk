@@ -12,17 +12,12 @@ import { ScanStatus } from "@/components/leads/ScanStatus";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
-import {
-  FEED_PAGE_SIZE,
-  feedFilter,
-  type FeedParams,
-  type LeadStatus,
-  type ReviewItem,
-} from "@/lib/feed";
+import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
 import { competitorsNamedIn } from "@/lib/competitors/read";
-import { countLeads, feedFacets, findLead, listLeadFaces, listLeads, listReviewItems } from "@/lib/leads";
+import { feedPage } from "@/lib/feedPage";
+import { findLead } from "@/lib/leads";
 import { isBusy, projectActivity } from "@/lib/projectActivity";
-import { scanReport, verdictSentence } from "@/lib/scan/report";
+import { verdictSentence } from "@/lib/scan/report";
 
 import type { StreamEntry } from "@/components/leads/stream";
 
@@ -99,20 +94,24 @@ async function openOn(
  * skeleton. It reads one page of leads and how many there are in all: a
  * project with a backfill behind it holds hundreds, and reading every one of
  * them was the whole of the wait before the feed appeared.
+ *
+ * Everything one set of filter pills decides is read through lib/feedPage,
+ * which answers a project's repeat of the same filter from what it already
+ * read, so selecting a lead - which changes only `?lead=` - reads nothing
+ * again. The two things a selection does move are read here: what the project
+ * is doing, because a running scan writes a progress line every few seconds
+ * and ActivityPoll re-renders this to show it, and the thread the pane opens
+ * on.
  */
 export async function Feed({ projectId, params }: FeedProps) {
   const filter = feedFilter(params);
-  const [rows, total, faces, facets, activity, review, report] = await Promise.all([
-    listLeads(projectId, filter, { limit: FEED_PAGE_SIZE, offset: 0 }),
-    countLeads(projectId, filter),
-    listLeadFaces(projectId, filter),
-    feedFacets(projectId),
+  const [page, activity] = await Promise.all([
+    feedPage(projectId, filter),
     projectActivity(projectId),
-    listReviewItems(projectId, filter.days),
-    scanReport(projectId, filter.days),
   ]);
-  const entries = buildStream(rows.map(toCard));
-  const held = filter.status === "new" ? review : [];
+  const { total, faces, facets, elsewhere } = page;
+  const entries = buildStream(page.rows.map(toCard));
+  const held = filter.status === "new" ? page.review : [];
   const selection = await openOn(projectId, entries, held, params.lead);
   const competitors =
     selection?.kind === "lead" && selection.entry.lead.postId
@@ -122,17 +121,7 @@ export async function Feed({ projectId, params }: FeedProps) {
     selection === null ? null : selection.kind === "lead" ? selection.entry.id : params.lead ?? null;
   // One sentence, in one of two places: over the list when it has leads to
   // count, and inside it when it is empty and has to say why.
-  const sentence = verdictSentence(report, total);
-  /**
-   * A window that holds nothing is not the same as a project that holds
-   * nothing: the first sweep reaches back a year, so the leads it found are
-   * usually outside the window the feed opens on. Counted only when there is
-   * an empty feed to explain.
-   */
-  const elsewhere =
-    total === 0 && filter.status === "new" && filter.days !== "all"
-      ? await countLeads(projectId, { ...filter, days: "all" })
-      : 0;
+  const sentence = verdictSentence(page.report, total);
 
   return (
     // Its own column, so the status line sits tight under the project's name

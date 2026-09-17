@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditPosts } from "@/db/schema";
+import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import type { StoredPost } from "@/lib/reddit/store";
 import { MIN_COMMENTS_FOR_THREAD } from "./constants";
 import type { LeadKind } from "./gates";
@@ -77,6 +78,7 @@ export async function writeLeads(input: LeadRow[]): Promise<number> {
       .returning({ id: leads.id });
     written += done.length;
   }
+  forgetProjectFeed(new Set(rows.map((row) => row.projectId)));
   return written;
 }
 
@@ -142,5 +144,6 @@ export async function demoteLeads(projectId: string, keys: LeadKeyRow[]): Promis
       ),
     )
     .returning({ id: leads.id });
+  forgetProjectFeed(projectId);
   return done.length;
 }

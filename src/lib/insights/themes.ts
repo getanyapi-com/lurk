@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { leads, painThemes, redditComments, redditPosts } from "@/db/schema";
 import { generateStructured } from "@/lib/llm";
+import { forgetProjectFeed } from "@/lib/projectFeedCache";
 
 /** How many leads one clustering call reads. */
 export const THEME_BATCH_SIZE = 40;
@@ -145,6 +146,8 @@ export async function clusterLeads(projectId: string, items: ThemeInput[]): Prom
 /** The new set replaces the old one, so a theme never outlives its leads. */
 export async function replaceThemes(projectId: string, themes: Theme[]): Promise<void> {
   await db().delete(painThemes).where(eq(painThemes.projectId, projectId));
+  // A theme owns the list of leads the feed shows when it is narrowed to one.
+  forgetProjectFeed(projectId);
   if (themes.length === 0) {
     return;
   }

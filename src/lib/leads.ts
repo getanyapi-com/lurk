@@ -12,6 +12,7 @@ import {
   subreddits,
   usageLedger,
 } from "@/db/schema";
+import { forgetProjectFeed } from "./projectFeedCache";
 import { DEFAULT_SCORE_THRESHOLD } from "./scan/constants";
 
 import type {
@@ -355,4 +356,5 @@ export async function setLeadStatus(
     .update(leads)
     .set({ status, notFitReason })
     .where(and(eq(leads.id, leadId), eq(leads.projectId, projectId)));
+  forgetProjectFeed(projectId);
 }
