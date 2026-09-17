@@ -1,8 +1,8 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditPosts } from "@/db/schema";
 import type { StoredPost } from "@/lib/reddit/store";
-import { MIN_COMMENTS_FOR_THREAD } from "./constants";
+import type { ThreadPolicy } from "@/lib/settings/types";
 import type { LeadKind } from "./gates";
 
 export type LeadRow = {
@@ -81,15 +81,25 @@ export async function writeLeads(input: LeadRow[]): Promise<number> {
 }
 
 /**
- * The threads worth buying this scan: every post lead still in the feed whose
- * thread has never been read, or whose reply count has moved since it was,
- * best first. An unchanged thread has nothing new to name a competitor in, and
- * a thread under the minimum has too little to be worth its price.
+ * The threads worth buying this scan, best score first: every post lead still
+ * in the feed whose post carries at least the policy's minimum replies and
+ * whose thread has never been read, or whose reply count has moved since it
+ * was. An unchanged thread has nothing new to name a competitor in, and a
+ * thread under the minimum has too little to be worth its price.
+ *
+ * Age decides which of those two the policy still pays for. A post inside the
+ * reply window is bought whenever its count moves, because that is where the
+ * replies still arrive. A post older than the window is bought only once, and
+ * only when the policy reads old threads at all: for the competitors already
+ * named in it, never again for a count that moved. `threadsPerScan` caps how
+ * many are bought; null buys every one that qualifies.
  */
 export async function threadsToRead(
   projectId: string,
-  budget: number | null,
+  policy: ThreadPolicy,
+  now: Date = new Date(),
 ): Promise<StoredPost[]> {
+  const fresh = gte(redditPosts.createdAt, policy.freshSince(now));
   const query = db()
     .select({ post: redditPosts })
     .from(leads)
@@ -99,7 +109,8 @@ export async function threadsToRead(
         eq(leads.projectId, projectId),
         eq(leads.status, "new"),
         isNull(leads.commentId),
-        sql`coalesce(${redditPosts.numComments}, 0) >= ${MIN_COMMENTS_FOR_THREAD}`,
+        sql`coalesce(${redditPosts.numComments}, 0) >= ${policy.minReplies}`,
+        policy.readOldThreadsOnce ? or(fresh, isNull(redditPosts.commentsObservedAt)) : fresh,
         or(
           isNull(redditPosts.commentsObservedAt),
           sql`${redditPosts.numComments} is distinct from ${redditPosts.commentsReadCount}`,
@@ -107,7 +118,8 @@ export async function threadsToRead(
       ),
     )
     .orderBy(desc(leads.score));
-  const rows = budget === null ? await query : await query.limit(budget);
+  const rows =
+    policy.threadsPerScan === null ? await query : await query.limit(policy.threadsPerScan);
   return rows.map((row) => row.post);
 }
 

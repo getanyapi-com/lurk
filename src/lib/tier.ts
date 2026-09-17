@@ -1,18 +1,25 @@
 import { walletConnection } from "./anyapi";
 import { config } from "./config";
-import { limitsFor, TIERS, type TierLimits, type TierName } from "./tiers";
+import { presetFor, settingsForPreset } from "./settings";
+import type { ResolvedSettings } from "./settings";
+import { limitsFor, type TierLimits, type TierName } from "./tiers";
 
-export type UserTier = { name: TierName; limits: TierLimits | null };
+export type UserTier = {
+  name: TierName;
+  limits: TierLimits | null;
+  /** Cadence and thread policy, which the tier presets and the user may edit. */
+  settings: ResolvedSettings;
+};
 
-/** Which tier a user is on, and the limits that go with it. */
+/** Which tier a user is on, the limits that go with it, and their settings. */
 export async function tierForUser(userId: string): Promise<UserTier> {
   const name: TierName = (await walletConnection(userId)) ? "connected" : "free";
-  return { name, limits: limitsFor(name, config().SELF_HOSTED) };
-}
-
-/** Hours between scheduled scans; a self-hosted instance scans hourly. */
-export function scanIntervalHours(limits: TierLimits | null): number {
-  return limits?.scanIntervalHours ?? TIERS.connected.scanIntervalHours;
+  const selfHosted = config().SELF_HOSTED;
+  return {
+    name,
+    limits: limitsFor(name, selfHosted),
+    settings: await settingsForPreset(userId, presetFor(name, selfHosted)),
+  };
 }
 
 /** Trims a list to a tier cap, keeping the model's own ordering. */

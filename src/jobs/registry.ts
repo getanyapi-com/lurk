@@ -9,7 +9,9 @@ import { discoveryBudget } from "@/lib/discovery/run";
 import { runBackfill } from "@/lib/scan/backfill";
 import { runRescore } from "@/lib/scan/rescore";
 import { runScan } from "@/lib/scan/run";
-import { scanIntervalHours, tierForUser } from "@/lib/tier";
+import type { ScanCadence } from "@/lib/settings";
+import { cadenceFor, PRESETS, settingsForUser } from "@/lib/settings";
+import { tierForUser } from "@/lib/tier";
 import { runCompetitorsJob } from "./competitors";
 import { runDigest } from "./digest";
 import { runInsightsJob } from "./insights";
@@ -101,14 +103,17 @@ export function handlerFor(kind: string): JobHandler | null {
   return JOB_HANDLERS[kind] ?? null;
 }
 
-/** Hours between this project's scheduled scans, which its tier decides. */
-async function scanIntervalHoursFor(projectId: string): Promise<number> {
+/** How this project's scans are spaced, which its settings decide. */
+async function scanCadenceFor(projectId: string): Promise<ScanCadence> {
   const rows = await db()
     .select({ userId: projects.userId })
     .from(projects)
     .where(eq(projects.id, projectId));
   const userId = rows[0]?.userId;
-  return scanIntervalHours(userId ? (await tierForUser(userId)).limits : null);
+  const cadence = userId
+    ? (await settingsForUser(userId)).settings.cadence
+    : PRESETS.connected.cadence;
+  return cadenceFor(cadence);
 }
 
 /** Days between this project's discovery deltas, which its tier decides. */
@@ -132,7 +137,7 @@ export async function nextRunAt(job: Job): Promise<Date | null> {
   const now = Date.now();
   const scanCadence = job.kind === "scan" || job.kind === "backfill" || job.kind === "discovery_initial";
   if (scanCadence && job.projectId) {
-    return new Date(now + (await scanIntervalHoursFor(job.projectId)) * HOUR_MS);
+    return (await scanCadenceFor(job.projectId)).nextRunAt(new Date(now));
   }
   if (job.kind === "discovery_refresh" && job.projectId) {
     return new Date(now + (await discoveryRefreshDaysFor(job.projectId)) * DAY_MS);

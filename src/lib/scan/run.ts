@@ -3,7 +3,8 @@ import { clientForUser } from "@/lib/anyapi";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchAuthorProfile, fetchPost } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
-import { scanIntervalHours, tierForUser } from "@/lib/tier";
+import { cadenceFor, threadPolicyFor } from "@/lib/settings";
+import { tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { writeThreadMentions } from "@/lib/competitors/threads";
 import { judgeThreads, readThreads } from "./comments";
@@ -167,12 +168,13 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const { limits } = await tierForUser(project.userId);
+  const { limits, settings } = await tierForUser(project.userId);
+  const cadence = cadenceFor(settings.settings.cadence);
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = {
     projectId,
     funded,
-    maxAgeMs: scanIntervalHours(limits) * HOUR_MS,
+    maxAgeMs: cadence.intervalHours() * HOUR_MS,
   };
   const windowMs = (limits?.feedWindowDays ?? RETENTION_DAYS) * 24 * HOUR_MS;
   const hydration = hydrationCap(limits);
@@ -184,7 +186,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
     ctx,
     limits,
     windowMs,
-    scanIntervalHours: scanIntervalHours(limits),
+    intervalHours: cadence.intervalHours(),
     hydration,
   });
   const sourcesByPost = new Map<string, CandidateSource[]>(
@@ -280,7 +282,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   );
 
   await writeProgress(jobId, "Reading comment threads");
-  const threadPosts = await threadsToRead(projectId, limits?.commentThreadsPerScan ?? null);
+  const threadPosts = await threadsToRead(projectId, threadPolicyFor(settings.settings.threads));
   const { threads } = await readThreads(ctx, threadPosts);
   await writeThreadMentions(projectId, project.competitors, threads);
   const judged = await judgeThreads(project, threads, stored);
@@ -309,7 +311,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
     jobId,
     retrieval.gaps.length === 0 ? "Finished" : `Finished. ${retrieval.gaps.join(" ")}`,
   );
-  await enqueueJob("scan", projectId, new Date(Date.now() + scanIntervalHours(limits) * HOUR_MS));
+  await enqueueJob("scan", projectId, cadence.nextRunAt(new Date()));
   return {
     candidates: candidates.length,
     read: full.length,

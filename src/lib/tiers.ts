@@ -9,8 +9,6 @@ export type TierLimits = {
   projects: number | null;
   keywordsPerProject: number | null;
   subredditsPerProject: number | null;
-  scanIntervalHours: number;
-  commentThreadsPerScan: number | null;
   feedWindowDays: number;
   alertWebhooks: number | null;
   alertCadence: "daily" | "hourly";
@@ -38,8 +36,6 @@ export const TIERS: Record<TierName, TierLimits> = {
     projects: 2,
     keywordsPerProject: 25,
     subredditsPerProject: 10,
-    scanIntervalHours: 6,
-    commentThreadsPerScan: 20,
     feedWindowDays: 30,
     alertWebhooks: 1,
     alertCadence: "daily",
@@ -61,8 +57,6 @@ export const TIERS: Record<TierName, TierLimits> = {
     projects: null,
     keywordsPerProject: null,
     subredditsPerProject: null,
-    scanIntervalHours: 1,
-    commentThreadsPerScan: null,
     feedWindowDays: 30,
     alertWebhooks: null,
     alertCadence: "hourly",

@@ -141,6 +141,13 @@
       "when": 1789668226971,
       "tag": "0019_competitors_in_threads",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789672907673,
+      "tag": "0020_user_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,13 @@ import { captureRequestId, withRequestId } from "@/lib/anyapi";
 import { HEARTBEAT_MS, LEASE_MS } from "@/jobs/lease";
 import { reasonFor } from "@/jobs/runner";
 import { LlmTimeoutError, LLM_CALL_TIMEOUT_MS, withCallTimeout } from "@/lib/llm";
+import { cadenceFor } from "@/lib/settings/cadence";
+import { PRESETS } from "@/lib/settings/presets";
+
+/** When a failed job of a free user is due again: its own cadence, not sooner. */
+function nextFreeScan(): Date {
+  return cadenceFor(PRESETS.free.cadence).nextRunAt(new Date());
+}
 
 /**
  * The scan itself is not under test here, only what the registry does with what
@@ -184,9 +191,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
       .from(jobs)
       .where(and(eq(jobs.kind, "scan"), eq(jobs.projectId, project.id), isNull(jobs.startedAt)));
     expect(pending).toHaveLength(1);
-    const waitHours = (pending[0].runAt.getTime() - Date.now()) / (60 * 60 * 1000);
-    expect(waitHours).toBeGreaterThan(5);
-    expect(waitHours).toBeLessThanOrEqual(6);
+    expect(pending[0].runAt.getTime()).toBeCloseTo(nextFreeScan().getTime(), -4);
 
     await db().delete(users).where(eq(users.id, user.id));
   });
@@ -216,9 +221,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
       await runClaimedJob(failed);
       const retried = await pendingBackfills();
       expect(retried).toHaveLength(1);
-      const waitHours = (retried[0].runAt.getTime() - Date.now()) / (60 * 60 * 1000);
-      expect(waitHours).toBeGreaterThan(5);
-      expect(waitHours).toBeLessThanOrEqual(6);
+      expect(retried[0].runAt.getTime()).toBeCloseTo(nextFreeScan().getTime(), -4);
       await db().delete(jobs).where(eq(jobs.id, retried[0].id));
 
       const [done] = await db()

@@ -214,7 +214,8 @@ export type RetrieveInput = {
   ctx: FetchContext;
   limits: TierLimits | null;
   windowMs: number;
-  scanIntervalHours: number;
+  /** Hours a scan reaches back over what the last one covered. */
+  intervalHours: number;
   /** reddit.post calls this scan may spend in total; null means no cap. */
   hydration: number | null;
   now?: Date;
@@ -233,7 +234,7 @@ export async function retrieve(input: RetrieveInput): Promise<Retrieval> {
     ctx,
     now,
     windowMs,
-    overlapMs: input.scanIntervalHours * HOUR_MS,
+    overlapMs: input.intervalHours * HOUR_MS,
     pages: budgets.pages,
     found: new Map(),
     gaps: [],

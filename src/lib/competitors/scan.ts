@@ -7,7 +7,8 @@ import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost, fetchSearch } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
 import { loadScanProject } from "@/lib/scan/project";
-import { capped, scanIntervalHours, tierForUser } from "@/lib/tier";
+import { cadenceFor } from "@/lib/settings";
+import { capped, tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS, type TierLimits } from "@/lib/tiers";
 import { classifyMentions, type MentionCandidate, type Verdict } from "./classify";
 
@@ -140,7 +141,8 @@ export async function runCompetitorScan(
   if (!project) {
     throw new Error("That project no longer exists");
   }
-  const { limits } = await tierForUser(project.userId);
+  const { limits, settings } = await tierForUser(project.userId);
+  const cadence = cadenceFor(settings.settings.cadence);
   const names = competitorsToScan(project.competitors, limits);
   if (names.length === 0) {
     await writeProgress(jobId, "No competitors to watch yet");
@@ -149,7 +151,7 @@ export async function runCompetitorScan(
   const ctx: FetchContext = {
     projectId,
     funded: await clientForUser(project.userId),
-    maxAgeMs: scanIntervalHours(limits) * HOUR_MS,
+    maxAgeMs: cadence.intervalHours() * HOUR_MS,
   };
   const outcome: CompetitorScanOutcome = {
     competitors: names.length,
@@ -166,10 +168,6 @@ export async function runCompetitorScan(
     outcome.costUsd += one.costUsd;
   }
   await writeProgress(jobId, "Finished");
-  await enqueueJob(
-    "competitor_scan",
-    projectId,
-    new Date(Date.now() + scanIntervalHours(limits) * HOUR_MS),
-  );
+  await enqueueJob("competitor_scan", projectId, cadence.nextRunAt(new Date()));
   return outcome;
 }
