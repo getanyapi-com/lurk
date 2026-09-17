@@ -67,9 +67,11 @@ describe("the lead stream", () => {
 
     expect(grain).toBe("day");
     expect(columns).toHaveLength(7);
-    expect(columns.at(-1)?.faces.map((one) => one.id)).toEqual(["today"]);
-    expect(columns.at(-1)?.key).toBe("2026-09-17");
-    expect(columns.at(-6)?.faces.map((one) => one.id)).toEqual(["older"]);
+    // Newest first: today is the column on the left, and a face five days old
+    // is five columns to the right of it.
+    expect(columns[0]?.faces.map((one) => one.id)).toEqual(["today"]);
+    expect(columns[0]?.key).toBe("2026-09-17");
+    expect(columns[5]?.faces.map((one) => one.id)).toEqual(["older"]);
     // The quiet days between the two keep their room rather than closing up.
     expect(columns.filter((column) => column.faces.length === 0)).toHaveLength(5);
     expect(live).toBe(true);
@@ -93,9 +95,10 @@ describe("the lead stream", () => {
 
     expect(day.grain).toBe("hour");
     expect(day.columns).toHaveLength(24);
-    expect(day.columns[9].faces.map((one) => one.id)).toEqual(["best", "morning"]);
-    expect(day.columns[9].key).toBe("2026-09-14T09");
-    expect(day.columns[22].faces.map((one) => one.id)).toEqual(["night"]);
+    // The day runs backwards too, so 9am is fourteen columns in from 11pm.
+    expect(day.columns[14].faces.map((one) => one.id)).toEqual(["best", "morning"]);
+    expect(day.columns[14].key).toBe("2026-09-14T09");
+    expect(day.columns[1].faces.map((one) => one.id)).toEqual(["night"]);
     // A day already gone by has no "now" on it to colour.
     expect(day.live).toBe(false);
 
@@ -103,14 +106,14 @@ describe("the lead stream", () => {
     // there to move to and the one picked is there to click off again.
     const hour = timeline([morning, best, night], { days: 30, at: "2026-09-14T09" }, now);
     expect(hour.grain).toBe("hour");
-    expect(hour.columns[9].key).toBe("2026-09-14T09");
+    expect(hour.columns[14].key).toBe("2026-09-14T09");
 
     const month = timeline([morning, best, night], { days: 30, at: "2026-09" }, now);
     expect(month.grain).toBe("day");
     // September, all thirty days of it, whatever window it was picked from.
     expect(month.columns).toHaveLength(30);
-    expect(month.columns[13].key).toBe("2026-09-14");
-    expect(month.columns[13].faces).toHaveLength(3);
+    expect(month.columns[16].key).toBe("2026-09-14");
+    expect(month.columns[16].faces).toHaveLength(3);
   });
 
   it("reads a long backfill in months, and a short one still in days", () => {
@@ -127,15 +130,16 @@ describe("the lead stream", () => {
     const long = timeline([face("old", 300), face("new", 0)], { days: "all" }, now);
 
     expect(long.grain).toBe("month");
-    expect(long.columns.at(-1)?.key).toBe("2026-09");
-    expect(long.columns.at(-1)?.faces.map((one) => one.id)).toEqual(["new"]);
-    expect(long.columns[0].faces.map((one) => one.id)).toEqual(["old"]);
+    // This month leads, and the oldest month it reaches back to is last.
+    expect(long.columns[0].key).toBe("2026-09");
+    expect(long.columns[0].faces.map((one) => one.id)).toEqual(["new"]);
+    expect(long.columns.at(-1)?.faces.map((one) => one.id)).toEqual(["old"]);
     // Eleven months, one column each: a year of leads still fits the card.
     expect(long.columns.length).toBeLessThanOrEqual(31);
 
     const short = timeline([face("old", 20), face("new", 0)], { days: "all" }, now);
     expect(short.grain).toBe("day");
-    expect(short.columns.at(-1)?.key).toBe("2026-09-17");
+    expect(short.columns[0].key).toBe("2026-09-17");
   });
 
   it("labels the axis often enough to read, and thins it for a narrow card", () => {

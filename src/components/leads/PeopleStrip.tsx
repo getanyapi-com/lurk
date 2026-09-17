@@ -81,6 +81,9 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
   const { columns, ticks, grain, live: now } = timeline(faces, { days, at });
   const label = new Map(ticks.map((tick) => [tick.index, tick]));
   const last = columns.length - 1;
+  // The strip is drawn newest first, so the slice happening now is the one on
+  // the left rather than the one at the far end.
+  const NOW = 0;
   return (
     <figure className="@container flex flex-col gap-3 rounded-card border bg-surface px-4 pt-4 pb-3">
       <figcaption className="flex flex-wrap items-baseline gap-x-2">
@@ -160,7 +163,7 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
                       tick.sparse ? null : "hidden @2xl:block",
                       picked
                         ? "text-fg"
-                        : index === last && now
+                        : index === NOW && now
                           ? "text-score-hot"
                           : "text-fg-muted",
                     )}

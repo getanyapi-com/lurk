@@ -275,9 +275,15 @@ function ticksOn(columns: StreamColumn[]): StreamTick[] {
 
 /**
  * The faces laid along the window they were posted in, one column per slice of
- * it, oldest on the left. Empty slices are columns too: the strip is a clock,
+ * it, newest on the left. Empty slices are columns too: the strip is a clock,
  * and a quiet day has to take up the room it happened in rather than closing
  * the gap and reading as a busy one.
+ *
+ * The columns are built oldest first, because that is the order a clock counts
+ * in and the order every face is bucketed by, and handed back reversed, because
+ * that is the order they are drawn in. What is happening now is what you came
+ * to the page for, so it is the first thing under your eye rather than the last
+ * thing at the far edge of the card.
  *
  * It is read from every lead in the window rather than from the rows on screen,
  * because the list holds one page: a day missing from here would read as a day
@@ -314,12 +320,13 @@ export function timeline(
   for (const column of columns) {
     column.faces.sort((a, b) => b.score - a.score);
   }
-  return {
-    columns,
-    ticks: ticksOn(columns),
-    grain,
-    live: now >= columns[count - 1].at && now < end,
-  };
+  // Read off the chronological array, before it is turned around: "the last
+  // column is the slice happening now" is a fact about the clock, not about
+  // which end of the card it is drawn at.
+  const live = now >= columns[count - 1].at && now < end;
+  const drawn = columns.reverse();
+  // The ticks index into the drawn order, so they are taken from it.
+  return { columns: drawn, ticks: ticksOn(drawn), grain, live };
 }
 
 /**
