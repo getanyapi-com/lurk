@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { requireLocalUser } from "@/lib/auth";
-import { setLeadStatus } from "@/lib/leads";
+import { toRow } from "@/components/leads/stream";
+import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
+import { listLeads, setLeadStatus } from "@/lib/leads";
 import { projectForUser } from "@/lib/projects";
 
 async function ownedProject(projectId: string) {
@@ -28,4 +30,22 @@ export async function markNotFitAction(projectId: string, leadId: string, formDa
   }
   await setLeadStatus(projectId, leadId, "not_fit", reason);
   revalidatePath("/app", "layout");
+}
+
+/**
+ * The next page of the feed the list is already showing, read in the same
+ * order it is drawn in. The filters arrive as the query string the page is on
+ * and are read back through `feedFilter`, so a caller can only ask for a feed
+ * the pills can ask for.
+ */
+export async function moreLeadsAction(
+  projectId: string,
+  search: string,
+  offset: number,
+): Promise<FeedRow[]> {
+  await ownedProject(projectId);
+  const params = Object.fromEntries(new URLSearchParams(search));
+  const page = { limit: FEED_PAGE_SIZE, offset: Math.max(0, Math.trunc(offset)) };
+  const rows = await listLeads(projectId, feedFilter(params), page);
+  return rows.map(toRow);
 }

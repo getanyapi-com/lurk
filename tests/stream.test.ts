@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildStream, groupByDay, type CardLead } from "@/components/leads/stream";
+import type { LeadFace } from "@/lib/feed";
 
 /**
  * The feed opens on the best lead, not the newest thing found. Sorting the
@@ -51,11 +52,17 @@ describe("the lead stream", () => {
   });
 
   it("still groups the people strip by day, newest day first", () => {
-    const days = groupByDay(buildStream([card("strong", 75, 20), card("weak", 55, 1)]));
+    const face = (id: string, ageDays: number): LeadFace => ({
+      id,
+      at: new Date(Date.now() - ageDays * DAY_MS),
+      score: 70,
+      author: "asker",
+      avatarUrl: null,
+      subreddit: "hotels",
+    });
 
-    expect(days.map((day) => day.entries.map((entry) => entry.lead.id))).toEqual([
-      ["weak"],
-      ["strong"],
-    ]);
+    const days = groupByDay([face("strong", 20), face("weak", 1)]);
+
+    expect(days.map((day) => day.faces.map((one) => one.id))).toEqual([["weak"], ["strong"]]);
   });
 });

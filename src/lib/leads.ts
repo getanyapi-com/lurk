@@ -14,9 +14,15 @@ import {
 } from "@/db/schema";
 import { DEFAULT_SCORE_THRESHOLD } from "./scan/constants";
 
-import type { FeedFacets, FeedFilter, FeedWindow, LeadCost, ReviewItem } from "./feed";
-
-export type FeedLead = Awaited<ReturnType<typeof listLeads>>[number];
+import type {
+  FeedFacets,
+  FeedFilter,
+  FeedPage,
+  FeedWindow,
+  LeadCost,
+  LeadFace,
+  ReviewItem,
+} from "./feed";
 
 const postAuthors = aliasedTable(redditAuthors, "post_authors");
 
@@ -59,19 +65,30 @@ const feedColumns = {
   subredditWeeklyActive: subreddits.subscribers,
 };
 
+/** The author behind a lead, for the face a row and the strip both show. */
+const AUTHOR_JOIN = eq(
+  redditAuthors.username,
+  sql`lower(coalesce(${redditComments.author}, ${redditPosts.author}))`,
+);
+
+/**
+ * A whole lead: the thread, the comment it may be, the project whose score
+ * floor it is measured against, its community and the two faces on it.
+ */
 function feedQuery() {
   return db()
     .select(feedColumns)
     .from(leads)
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
+    .innerJoin(projects, eq(projects.id, leads.projectId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
-    .leftJoin(
-      redditAuthors,
-      eq(redditAuthors.username, sql`lower(coalesce(${redditComments.author}, ${redditPosts.author}))`),
-    )
+    .leftJoin(redditAuthors, AUTHOR_JOIN)
     .leftJoin(postAuthors, eq(postAuthors.username, sql`lower(${redditPosts.author})`));
 }
+
+/** One lead as every read of the feed hands it over. */
+export type FeedLead = Awaited<ReturnType<typeof feedQuery>>[number];
 
 function since(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -117,23 +134,91 @@ function leadIdsOfTheme(projectId: string, themeId: string) {
   )`;
 }
 
-/** The feed, best first, for one set of filter pills. */
-export async function listLeads(projectId: string, filter: FeedFilter) {
-  return feedQuery()
+/** One set of filter pills, as SQL. Read by every query on this page. */
+function feedWhere(projectId: string, filter: FeedFilter) {
+  return and(
+    eq(leads.projectId, projectId),
+    eq(leads.status, filter.status),
+    OVER_THRESHOLD,
+    newerThan(filter.days),
+    filter.kind ? eq(leads.kind, filter.kind) : undefined,
+    filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
+    filter.stage ? eq(leads.stage, filter.stage) : undefined,
+    filter.theme ? inArray(leads.id, leadIdsOfTheme(projectId, filter.theme)) : undefined,
+  );
+}
+
+/**
+ * The feed's order: best first, then the newer need, then the row's own id.
+ * The id decides nothing a person can see; it is there because two leads can
+ * hold the same score and the same minute, and a page boundary that falls
+ * between them would otherwise show one of them twice and the other never.
+ */
+const FEED_ORDER = [desc(leads.score), desc(NEED_AT), asc(leads.id)];
+
+/**
+ * The feed, best first, for one set of filter pills. A page is a slice of that
+ * order; without one the whole feed is read, which is what the alerts digest
+ * and the API want and what the page itself no longer asks for.
+ */
+export async function listLeads(
+  projectId: string,
+  filter: FeedFilter,
+  page?: FeedPage,
+): Promise<FeedLead[]> {
+  const query = feedQuery()
+    .where(feedWhere(projectId, filter))
+    .orderBy(...FEED_ORDER);
+  return page ? query.limit(page.limit).offset(page.offset) : query;
+}
+
+/** How many leads those pills hold, which is what the list column counts. */
+export async function countLeads(projectId: string, filter: FeedFilter): Promise<number> {
+  const rows = await db()
+    .select({ total: count() })
+    .from(leads)
+    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
+    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
     .innerJoin(projects, eq(projects.id, leads.projectId))
-    .where(
-      and(
-        eq(leads.projectId, projectId),
-        eq(leads.status, filter.status),
-        OVER_THRESHOLD,
-        newerThan(filter.days),
-        filter.kind ? eq(leads.kind, filter.kind) : undefined,
-        filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
-        filter.stage ? eq(leads.stage, filter.stage) : undefined,
-        filter.theme ? inArray(leads.id, leadIdsOfTheme(projectId, filter.theme)) : undefined,
-      ),
-    )
-    .orderBy(desc(leads.score), desc(NEED_AT));
+    .where(feedWhere(projectId, filter));
+  return rows[0]?.total ?? 0;
+}
+
+/**
+ * Every person the window holds, for the strip of faces over the feed. The
+ * strip is a calendar of who asked and when, so it stays whole while the list
+ * under it is read a page at a time; this reads the six columns a face needs
+ * and none of the prose a row does.
+ */
+export async function listLeadFaces(projectId: string, filter: FeedFilter): Promise<LeadFace[]> {
+  return db()
+    .select({
+      id: sql<string>`'lead-' || ${leads.id}`,
+      at: sql`${NEED_AT}`.mapWith(redditPosts.createdAt),
+      score: leads.score,
+      author: sql<string | null>`coalesce(${redditComments.author}, ${redditPosts.author})`,
+      avatarUrl: redditAuthors.avatarUrl,
+      subreddit: redditPosts.subreddit,
+    })
+    .from(leads)
+    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
+    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
+    .innerJoin(projects, eq(projects.id, leads.projectId))
+    .leftJoin(redditAuthors, AUTHOR_JOIN)
+    .where(feedWhere(projectId, filter))
+    .orderBy(...FEED_ORDER);
+}
+
+/**
+ * One lead by its own id, whatever page of the feed it sits on. Clicking the
+ * fortieth row asks the server for a thread the first page never held, and the
+ * pane has to open on it rather than falling back to the best lead.
+ */
+export async function findLead(projectId: string, leadId: string): Promise<FeedLead | undefined> {
+  const rows = await feedQuery().where(
+    and(eq(leads.projectId, projectId), eq(leads.id, leadId)),
+  );
+  return rows[0];
 }
 
 /**

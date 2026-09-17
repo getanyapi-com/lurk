@@ -1,3 +1,6 @@
+import type { FeedRow, LeadFace } from "@/lib/feed";
+import type { FeedLead } from "@/lib/leads";
+
 /** One lead as the workspace shows it: the post or comment, and how it judged. */
 export type CardLead = {
   id: string;
@@ -30,11 +33,70 @@ export type CardLead = {
   postAuthorAvatar: string | null;
 };
 
+/**
+ * A lead as the feed reads it, as the card the workspace draws. A comment lead
+ * is its comment throughout: its author, its age, its body and its permalink,
+ * with the thread only underneath.
+ */
+export function toCard(lead: FeedLead): CardLead {
+  const isComment = lead.commentId !== null;
+  return {
+    id: lead.id,
+    score: lead.score,
+    fit: lead.fit,
+    intent: lead.intent,
+    engagement: lead.engagement,
+    stage: lead.stage,
+    kind: lead.kind,
+    reason: lead.reason,
+    matchedPhrase: lead.matchedPhrase,
+    title: lead.title,
+    url: (isComment ? lead.commentPermalink : lead.url) ?? lead.url,
+    subreddit: lead.subreddit,
+    subredditIconUrl: lead.subredditIconUrl,
+    subredditWeeklyActive: lead.subredditWeeklyActive,
+    promoPolicy: lead.promoPolicy,
+    rulesText: lead.rulesText,
+    imageUrl: isComment ? null : lead.imageUrl,
+    numComments: lead.numComments,
+    points: isComment ? lead.commentScore : lead.postScore,
+    createdAt: (isComment ? lead.commentCreatedAt : lead.createdAt) ?? lead.createdAt,
+    body: (isComment ? lead.commentBody : lead.body) ?? "",
+    author: isComment ? lead.commentAuthor : lead.postAuthor,
+    avatarUrl: lead.authorAvatar,
+    authorKarma: lead.authorKarma,
+    authorCreatedAt: lead.authorCreatedAt,
+    isComment,
+    postAuthor: lead.postAuthor,
+    postAuthorAvatar: lead.postAuthorAvatar,
+  };
+}
+
+/**
+ * The same lead as one line in the list column. It is what crosses the wire
+ * when the next page is fetched, so it carries what a row draws and not the
+ * thread's body: the pane reads that from the server when a row is opened.
+ */
+export function toRow(lead: FeedLead): FeedRow {
+  const card = toCard(lead);
+  return {
+    id: `lead-${card.id}`,
+    title: card.title,
+    author: card.author,
+    avatarUrl: card.avatarUrl,
+    subreddit: card.subreddit,
+    subredditIconUrl: card.subredditIconUrl,
+    createdAt: card.createdAt,
+    fit: card.fit,
+    intent: card.intent,
+  };
+}
+
 /** One thing in the feed: a lead the gates qualified. Nothing else. */
 export type StreamEntry = { id: string; at: Date; lead: CardLead };
 
-/** A run of entries that were posted on the same calendar day. */
-export type StreamDay = { day: number; label: string; entries: StreamEntry[] };
+/** A run of faces whose need was posted on the same calendar day. */
+export type StreamDay = { day: number; label: string; faces: LeadFace[] };
 
 /**
  * The leads this project holds, best first, in the order the feed query gave
@@ -56,22 +118,22 @@ function startOfDay(date: Date): number {
 }
 
 /**
- * The same entries bucketed into days, newest day first, for the people strip.
+ * The same faces bucketed into days, newest day first, for the people strip.
  * The strip is a calendar, so it sorts by date whatever order the feed is in.
  */
-export function groupByDay(entries: StreamEntry[]): StreamDay[] {
+export function groupByDay(faces: LeadFace[]): StreamDay[] {
   const days: StreamDay[] = [];
-  const byDate = [...entries].sort((a, b) => b.at.getTime() - a.at.getTime());
-  for (const entry of byDate) {
-    const day = startOfDay(entry.at);
+  const byDate = [...faces].sort((a, b) => b.at.getTime() - a.at.getTime());
+  for (const face of byDate) {
+    const day = startOfDay(face.at);
     const last = days.at(-1);
     if (last && last.day === day) {
-      last.entries.push(entry);
+      last.faces.push(face);
     } else {
       days.push({
         day,
-        label: entry.at.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-        entries: [entry],
+        label: face.at.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        faces: [face],
       });
     }
   }

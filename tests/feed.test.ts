@@ -38,6 +38,34 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     return { db, schema, project, post };
   }
 
+  /** Three leads on three threads of one project, best score first. */
+  async function threeLeads(
+    db: Awaited<ReturnType<typeof fixture>>["db"],
+    schema: Awaited<ReturnType<typeof fixture>>["schema"],
+    projectId: string,
+    firstPostId: string,
+  ) {
+    const rows = [{ postId: firstPostId, score: 70 }];
+    for (const score of [60, 50]) {
+      const [extra] = await db()
+        .insert(schema.redditPosts)
+        .values({
+          id: `p${randomUUID().slice(0, 8)}`,
+          subreddit: "SaaS",
+          author: "asker",
+          title: `Form question ${score}`,
+          url: `https://www.reddit.com/r/SaaS/comments/${score}/form/`,
+          createdAt: new Date(Date.now() - 10 * DAY_MS),
+        })
+        .returning();
+      rows.push({ postId: extra.id, score });
+    }
+    return db()
+      .insert(schema.leads)
+      .values(rows.map((row) => ({ projectId, ...row })))
+      .returning();
+  }
+
   it("hides a lead under the project's minimum score and shows it when that moves", async () => {
     const { db, schema, project, post } = await fixture(70);
     const { listLeads } = await import("@/lib/leads");
@@ -156,5 +184,39 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     expect(await listLeads(project.id, { status: "new", days: 30 })).toHaveLength(1);
     const everything = await listLeads(project.id, { status: "new", days: "all" });
     expect(everything.map((lead) => lead.postId).sort()).toEqual([old.id, post.id].sort());
+  });
+
+  /**
+   * The list column reads one page and counts the rest. Before this, arriving
+   * on a project with a backfill behind it read and drew every lead it had.
+   */
+  it("reads one page of the feed in its own order, and counts the whole window", async () => {
+    const { db, schema, project, post } = await fixture(null);
+    const { countLeads, findLead, listLeads } = await import("@/lib/leads");
+    const written = await threeLeads(db, schema, project.id, post.id);
+    const best = written.sort((a, b) => b.score - a.score);
+
+    const first = await listLeads(project.id, { status: "new", days: "all" }, { limit: 2, offset: 0 });
+    const second = await listLeads(project.id, { status: "new", days: "all" }, { limit: 2, offset: 2 });
+
+    expect(first.map((lead) => lead.id)).toEqual([best[0].id, best[1].id]);
+    expect(second.map((lead) => lead.id)).toEqual([best[2].id]);
+    expect(await countLeads(project.id, { status: "new", days: "all" })).toBe(3);
+    // The pane opens on a lead no page of the list is holding.
+    expect((await findLead(project.id, best[2].id))?.id).toBe(best[2].id);
+  });
+
+  /** Every face the window holds, however few of its leads have been read. */
+  it("strips the faces of the whole window, not of the page", async () => {
+    const { db, schema, project, post } = await fixture(null);
+    const { listLeadFaces } = await import("@/lib/leads");
+    await threeLeads(db, schema, project.id, post.id);
+
+    const faces = await listLeadFaces(project.id, { status: "new", days: "all" });
+
+    expect(faces).toHaveLength(3);
+    expect(faces[0].author).toBe("asker");
+    expect(faces[0].subreddit).toBe("SaaS");
+    expect(faces[0].at).toBeInstanceOf(Date);
   });
 });

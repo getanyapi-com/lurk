@@ -3,33 +3,32 @@ import { ActivityPoll } from "@/components/ActivityPoll";
 import { FeedFilters } from "@/components/leads/FeedFilters";
 import { HeldSection } from "@/components/leads/HeldSection";
 import { LeadDetail } from "@/components/leads/LeadDetail";
+import { LeadPages } from "@/components/leads/LeadPages";
 import { LeadRow } from "@/components/leads/LeadRow";
 import { OpeningProvider } from "@/components/leads/opening";
 import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
 import { VerdictBadge } from "@/components/VerdictBadge";
-import { buildStream, type CardLead } from "@/components/leads/stream";
-import { entryHref, selectEntry } from "@/components/leads/workspace";
-import type { FeedWindow, LeadStatus } from "@/lib/feed";
-import { feedFacets, listLeads, listReviewItems } from "@/lib/leads";
+import { buildStream, toCard } from "@/components/leads/stream";
+import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
+import {
+  FEED_PAGE_SIZE,
+  feedFilter,
+  type FeedParams,
+  type LeadStatus,
+  type ReviewItem,
+} from "@/lib/feed";
+import { countLeads, feedFacets, findLead, listLeadFaces, listLeads, listReviewItems } from "@/lib/leads";
 import { isBusy, projectActivity } from "@/lib/projectActivity";
 import { scanReport, verdictSentence } from "@/lib/scan/report";
 
-export type FeedParams = {
-  project?: string;
-  status?: string;
-  days?: string;
-  subreddit?: string;
-  stage?: string;
-  theme?: string;
-  lead?: string;
-};
+import type { StreamEntry } from "@/components/leads/stream";
+
+export type { FeedParams };
 
 type FeedProps = {
   projectId: string;
-  status: LeadStatus;
-  days: FeedWindow;
   params: FeedParams;
 };
 
@@ -39,6 +38,9 @@ const EMPTY_SENTENCE: Record<LeadStatus, string> = {
   not_fit: "You have not marked any leads as a miss yet.",
   resolved: "No lead has said in its thread that the need is already met.",
 };
+
+/** The prefix a lead's entry id carries, so a held item can never be one. */
+const LEAD_PREFIX = "lead-";
 
 /** The same page over the whole of time, keeping every other filter pill. */
 function allTimeHref(params: Record<string, string | undefined>): string {
@@ -52,38 +54,40 @@ function allTimeHref(params: Record<string, string | undefined>): string {
   return `?${query.toString()}`;
 }
 
-function toCard(lead: Awaited<ReturnType<typeof listLeads>>[number]): CardLead {
-  const isComment = lead.commentId !== null;
-  return {
-    id: lead.id,
-    score: lead.score,
-    fit: lead.fit,
-    intent: lead.intent,
-    engagement: lead.engagement,
-    stage: lead.stage,
-    kind: lead.kind,
-    reason: lead.reason,
-    matchedPhrase: lead.matchedPhrase,
-    title: lead.title,
-    url: (isComment ? lead.commentPermalink : lead.url) ?? lead.url,
-    subreddit: lead.subreddit,
-    subredditIconUrl: lead.subredditIconUrl,
-    subredditWeeklyActive: lead.subredditWeeklyActive,
-    promoPolicy: lead.promoPolicy,
-    rulesText: lead.rulesText,
-    imageUrl: isComment ? null : lead.imageUrl,
-    numComments: lead.numComments,
-    points: isComment ? lead.commentScore : lead.postScore,
-    createdAt: (isComment ? lead.commentCreatedAt : lead.createdAt) ?? lead.createdAt,
-    body: (isComment ? lead.commentBody : lead.body) ?? "",
-    author: isComment ? lead.commentAuthor : lead.postAuthor,
-    avatarUrl: lead.authorAvatar,
-    authorKarma: lead.authorKarma,
-    authorCreatedAt: lead.authorCreatedAt,
-    isComment,
-    postAuthor: lead.postAuthor,
-    postAuthorAvatar: lead.postAuthorAvatar,
-  };
+/** The filters the list is on, which is what the next page is asked for by. */
+function feedSearch(params: FeedParams): string {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(params)) {
+    if (value && name !== "lead") {
+      query.set(name, value);
+    }
+  }
+  return query.toString();
+}
+
+/**
+ * The thread the pane opens on. The list holds one page, so a lead the URL
+ * names can be one the page does not have - the fortieth row, clicked after
+ * scrolling - and that one is read on its own rather than falling back to the
+ * best lead in the window.
+ */
+async function openOn(
+  projectId: string,
+  entries: StreamEntry[],
+  held: ReviewItem[],
+  requestedId?: string,
+): Promise<Selection | null> {
+  const onPage = requestedEntry(entries, held, requestedId);
+  if (onPage) {
+    return onPage;
+  }
+  if (requestedId?.startsWith(LEAD_PREFIX)) {
+    const lead = await findLead(projectId, requestedId.slice(LEAD_PREFIX.length));
+    if (lead) {
+      return { kind: "lead", entry: buildStream([toCard(lead)])[0] };
+    }
+  }
+  return selectEntry(entries, held);
 }
 
 /**
@@ -91,32 +95,29 @@ function toCard(lead: Awaited<ReturnType<typeof listLeads>>[number]): CardLead {
  *
  * It is its own component so the page above it can answer at once with the
  * project's name and its Scan now button, and let this arrive behind a
- * skeleton. Against a real project the reads below take about nine tenths of
- * the second the whole page used to take, and nothing else on the page was
- * waiting on anything.
+ * skeleton. It reads one page of leads and how many there are in all: a
+ * project with a backfill behind it holds hundreds, and reading every one of
+ * them was the whole of the wait before the feed appeared.
  */
-export async function Feed({ projectId, status, days, params }: FeedProps) {
-  const [rows, facets, activity, review, report] = await Promise.all([
-    listLeads(projectId, {
-      status,
-      days,
-      subreddit: params.subreddit,
-      stage: params.stage,
-      theme: params.theme,
-    }),
+export async function Feed({ projectId, params }: FeedProps) {
+  const filter = feedFilter(params);
+  const [rows, total, faces, facets, activity, review, report] = await Promise.all([
+    listLeads(projectId, filter, { limit: FEED_PAGE_SIZE, offset: 0 }),
+    countLeads(projectId, filter),
+    listLeadFaces(projectId, filter),
     feedFacets(projectId),
     projectActivity(projectId),
-    listReviewItems(projectId, days),
-    scanReport(projectId, days),
+    listReviewItems(projectId, filter.days),
+    scanReport(projectId, filter.days),
   ]);
   const entries = buildStream(rows.map(toCard));
-  const held = status === "new" ? review : [];
-  const selection = selectEntry(entries, held, params.lead);
+  const held = filter.status === "new" ? review : [];
+  const selection = await openOn(projectId, entries, held, params.lead);
   const selectedId =
     selection === null ? null : selection.kind === "lead" ? selection.entry.id : params.lead ?? null;
   // One sentence, in one of two places: over the list when it has leads to
   // count, and inside it when it is empty and has to say why.
-  const sentence = verdictSentence(report, entries.length);
+  const sentence = verdictSentence(report, total);
   /**
    * A window that holds nothing is not the same as a project that holds
    * nothing: the first sweep reaches back a year, so the leads it found are
@@ -124,16 +125,8 @@ export async function Feed({ projectId, status, days, params }: FeedProps) {
    * an empty feed to explain.
    */
   const elsewhere =
-    entries.length === 0 && status === "new" && days !== "all"
-      ? buildStream(
-          (await listLeads(projectId, {
-            status,
-            days: "all",
-            subreddit: params.subreddit,
-            stage: params.stage,
-            theme: params.theme,
-          })).map(toCard),
-        ).length
+    total === 0 && filter.status === "new" && filter.days !== "all"
+      ? await countLeads(projectId, { ...filter, days: "all" })
       : 0;
 
   return (
@@ -141,12 +134,12 @@ export async function Feed({ projectId, status, days, params }: FeedProps) {
     // while everything below it keeps the page's own spacing.
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-baseline gap-x-1.5">
-        {entries.length > 0 ? <p className="text-small text-fg-muted">{sentence}</p> : null}
+        {total > 0 ? <p className="text-small text-fg-muted">{sentence}</p> : null}
         <ScanStatus activity={activity} />
       </div>
 
       <ActivityPoll busy={isBusy(activity)} />
-      <PeopleStrip entries={entries} />
+      <PeopleStrip faces={faces} />
       <FeedFilters facets={facets} />
 
       <OpeningProvider serverSelectedId={selectedId}>
@@ -155,12 +148,12 @@ export async function Feed({ projectId, status, days, params }: FeedProps) {
             <>
               <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-surface px-3 py-2">
                 <span className="text-mono tracking-wide text-fg-muted uppercase">Leads</span>
-                <span className="text-mono tabular-nums text-fg-muted">{entries.length}</span>
+                <span className="text-mono tabular-nums text-fg-muted">{total}</span>
               </div>
-              {entries.length === 0 ? (
+              {total === 0 ? (
                 <p className="text-small p-3 text-fg-muted">
-                  {status !== "new" ? (
-                    EMPTY_SENTENCE[status]
+                  {filter.status !== "new" ? (
+                    EMPTY_SENTENCE[filter.status]
                   ) : elsewhere > 0 ? (
                     <>
                       Nothing in this window.{" "}
@@ -174,21 +167,32 @@ export async function Feed({ projectId, status, days, params }: FeedProps) {
                   )}
                 </p>
               ) : (
-                entries.map((entry) => (
-                  <LeadRow
-                    key={entry.id}
-                    id={entry.id}
-                    href={entryHref(params, entry.id)}
-                    selected={entry.id === selectedId}
-                    title={entry.lead.title}
-                    author={entry.lead.author}
-                    avatarUrl={entry.lead.avatarUrl}
-                    subreddit={entry.lead.subreddit}
-                    subredditIconUrl={entry.lead.subredditIconUrl}
-                    createdAt={entry.lead.createdAt}
-                    trailing={<VerdictBadge fit={entry.lead.fit} intent={entry.lead.intent} />}
-                  />
-                ))
+                // Keyed by the filters, so changing a pill starts the pages
+                // again rather than keeping the rows the last one fetched.
+                <LeadPages
+                  key={feedSearch(params)}
+                  projectId={projectId}
+                  search={feedSearch(params)}
+                  drawn={entries.length}
+                  total={total}
+                  selectedId={selectedId}
+                >
+                  {entries.map((entry) => (
+                    <LeadRow
+                      key={entry.id}
+                      id={entry.id}
+                      href={entryHref(params, entry.id)}
+                      selected={entry.id === selectedId}
+                      title={entry.lead.title}
+                      author={entry.lead.author}
+                      avatarUrl={entry.lead.avatarUrl}
+                      subreddit={entry.lead.subreddit}
+                      subredditIconUrl={entry.lead.subredditIconUrl}
+                      createdAt={entry.lead.createdAt}
+                      trailing={<VerdictBadge fit={entry.lead.fit} intent={entry.lead.intent} />}
+                    />
+                  ))}
+                </LeadPages>
               )}
               {held.length > 0 ? (
                 <HeldSection items={held} params={params} selectedId={selectedId} />

@@ -1,16 +1,14 @@
 import { Suspense } from "react";
 import { EmptyState } from "@/components/EmptyState";
-import { Feed, type FeedParams } from "@/components/leads/Feed";
+import { Feed } from "@/components/leads/Feed";
 import { ListSkeleton, PillsSkeleton, Skeleton } from "@/components/Skeleton";
 import { Button } from "@/components/ui/button";
 import { scanNowAction } from "@/app/app/scan";
 import { requireLocalUser } from "@/lib/auth";
-import { FEED_WINDOWS, type FeedWindow, type LeadStatus } from "@/lib/feed";
+import type { FeedParams } from "@/lib/feed";
 import { activeProject } from "@/lib/projects";
 
 type LeadsPageProps = { searchParams: Promise<FeedParams> };
-
-const STATUSES: LeadStatus[] = ["new", "hidden", "not_fit", "resolved"];
 
 /** What stands in for the feed while it is read, in the feed's own shape. */
 function FeedSkeleton() {
@@ -48,9 +46,6 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
     );
   }
 
-  const status = STATUSES.find((one) => one === params.status) ?? "new";
-  const days: FeedWindow = FEED_WINDOWS.find((one) => String(one) === params.days) ?? 30;
-
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -70,7 +65,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         feed you can read with a skeleton is the worse of the two.
       */}
       <Suspense fallback={<FeedSkeleton />}>
-        <Feed projectId={project.id} status={status} days={days} params={params} />
+        <Feed projectId={project.id} params={params} />
       </Suspense>
     </div>
   );

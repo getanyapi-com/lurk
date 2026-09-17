@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildStream, type CardLead } from "@/components/leads/stream";
-import { entryHref, heldEntryId, selectEntry } from "@/components/leads/workspace";
+import { entryHref, heldEntryId, requestedEntry, selectEntry } from "@/components/leads/workspace";
 import type { ReviewItem } from "@/lib/feed";
 
 /**
@@ -92,6 +92,26 @@ describe("selectEntry", () => {
 
   it("has nothing to open when there are neither", () => {
     expect(selectEntry([], [], "lead-gone")).toBeNull();
+  });
+});
+
+describe("requestedEntry", () => {
+  const entries = buildStream([card("first"), card("second")]);
+  const held = [heldItem("held-one")];
+
+  /**
+   * The list holds one page of the feed. A row this page does not have is not
+   * a row that is gone: saying so is what lets the page read that one lead
+   * instead of opening the pane on the best one and losing the click.
+   */
+  it("says nothing when the asked-for row is not in this list", () => {
+    expect(requestedEntry(entries, held, "lead-fortieth")).toBeNull();
+    expect(requestedEntry(entries, held, undefined)).toBeNull();
+  });
+
+  it("finds the row when this list is holding it", () => {
+    expect(requestedEntry(entries, held, entries[1].id)).toEqual({ kind: "lead", entry: entries[1] });
+    expect(requestedEntry(entries, held, heldEntryId(held[0]))).toEqual({ kind: "held", item: held[0] });
   });
 });
 

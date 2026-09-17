@@ -17,6 +17,27 @@ export function heldEntryId(item: ReviewItem): string {
 }
 
 /**
+ * The row the URL names, when the list on screen is holding it. The feed is
+ * read a page at a time, so a lead can be asked for that this page does not
+ * have; the caller reads that one from the database rather than falling back.
+ */
+export function requestedEntry(
+  entries: StreamEntry[],
+  held: ReviewItem[],
+  requestedId?: string,
+): Selection | null {
+  if (!requestedId) {
+    return null;
+  }
+  const entry = entries.find((one) => one.id === requestedId);
+  if (entry) {
+    return { kind: "lead", entry };
+  }
+  const item = held.find((one) => heldEntryId(one) === requestedId);
+  return item ? { kind: "held", item } : null;
+}
+
+/**
  * What the workspace opens on: the row the URL asked for, or the best lead, or
  * the first held candidate when there are no leads at all. A `lead` left over
  * from a wider filter simply misses, so changing a pill never blanks the pane.
@@ -26,15 +47,9 @@ export function selectEntry(
   held: ReviewItem[],
   requestedId?: string,
 ): Selection | null {
-  if (requestedId) {
-    const entry = entries.find((one) => one.id === requestedId);
-    if (entry) {
-      return { kind: "lead", entry };
-    }
-    const item = held.find((one) => heldEntryId(one) === requestedId);
-    if (item) {
-      return { kind: "held", item };
-    }
+  const requested = requestedEntry(entries, held, requestedId);
+  if (requested) {
+    return requested;
   }
   if (entries[0]) {
     return { kind: "lead", entry: entries[0] };
