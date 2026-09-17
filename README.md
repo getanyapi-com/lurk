@@ -139,7 +139,8 @@ the token here and revokes it at AnyAPI.
 Settings -> Alerts is where new leads land. Add an email digest, a Slack or Discord webhook,
 or a generic webhook that receives the same digest as JSON. Email needs `ALERTS_FROM_EMAIL`
 and one carrier: `AZURE_EMAIL_CONNECTION_STRING`, `SMTP_URL` or `RESEND_API_KEY`, checked in
-that order. The webhooks need nothing. A digest carries the day's new leads with
+that order. On Azure, the local part of `ALERTS_FROM_EMAIL` must also be added as a sender
+username on the domain, or every send is refused. The webhooks need nothing. A digest carries the day's new leads with
 their score, reason, community and link, in the same shapes the feed uses, and sends nothing
 at all when there is nothing new. The scheduler queues one digest pass an hour and each
 channel decides whether its own cadence is due.
