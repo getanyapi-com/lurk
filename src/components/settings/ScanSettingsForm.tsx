@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { saveScanSettingsAction } from "@/app/app/settings/scanning/actions";
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/ui/searchSelect";
@@ -41,11 +42,27 @@ function Line({ label, hint, children }: { label: string; hint?: string; childre
   );
 }
 
-/** A value the preset owns: shown, not edited. */
+const LOCKED_TITLE = "Set by the free template. Connect an AnyAPI wallet to change it.";
+
+/**
+ * A value the preset owns: an input that looks like the editable ones but
+ * cannot be changed, and says why on hover.
+ */
 function Fixed({ label, hint, value }: { label: string; hint?: string; value: string }) {
   return (
     <Line label={label} hint={hint}>
-      <span className="text-body text-fg">{value}</span>
+      <span className="relative flex items-center" title={LOCKED_TITLE}>
+        <input
+          type="text"
+          value={value}
+          readOnly
+          disabled
+          aria-label={label}
+          title={LOCKED_TITLE}
+          className={`${INPUT} w-full cursor-not-allowed bg-surface-2 pr-8 text-fg-muted`}
+        />
+        <Lock className="pointer-events-none absolute right-2.5 size-4 text-fg-muted" aria-hidden="true" />
+      </span>
     </Line>
   );
 }

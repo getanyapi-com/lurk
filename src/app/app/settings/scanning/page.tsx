@@ -1,15 +1,8 @@
 import Link from "next/link";
 import { ScanSettingsForm } from "@/components/settings/ScanSettingsForm";
+import { TemplateCards } from "@/components/settings/TemplateCards";
 import { requireLocalUser } from "@/lib/auth";
 import { settingsForUser } from "@/lib/settings";
-import type { SettingsPreset } from "@/lib/settings/types";
-
-/** What each preset is called in the words a person here would use for it. */
-const PRESET_NAMES: Record<SettingsPreset, string> = {
-  free: "free wallet",
-  connected: "your wallet",
-  selfHost: "self-hosted",
-};
 
 /**
  * Every value that decides when a scan runs and what it buys from a thread,
@@ -32,12 +25,7 @@ export default async function ScanningSettingsPage() {
           </Link>
         </p>
       </div>
-      <p className="text-small text-fg-muted">
-        You are on{" "}
-        <span className="rounded-control bg-surface-2 px-2 py-0.5 text-small text-fg">
-          {PRESET_NAMES[resolved.preset]}
-        </span>
-      </p>
+      <TemplateCards preset={resolved.preset} />
       <ScanSettingsForm
         settings={resolved.settings}
         editable={[...resolved.editable]}

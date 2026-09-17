@@ -153,6 +153,7 @@ export const MOCK_RAIL: {
     label: "Workspace",
     items: [
       { name: "Product", icon: "box" },
+      { name: "Alerts", icon: "bell" },
       { name: "Data usage", icon: "receipt" },
       { name: "Settings", icon: "settings" },
     ],

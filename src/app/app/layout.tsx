@@ -30,6 +30,7 @@ const groupsFor = (counts: RailCounts): RailGroup[] => [
     label: "Setup",
     items: [
       { href: "/app/product", label: "Product", icon: "box" },
+      { href: "/app/settings/alerts", label: "Alerts", icon: "bell" },
       { href: "/app/usage", label: "Data usage", icon: "receipt" },
       { href: "/app/settings", label: "Settings", icon: "settings" },
     ],
