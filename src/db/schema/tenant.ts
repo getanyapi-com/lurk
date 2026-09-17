@@ -24,6 +24,12 @@ export const users = pgTable("users", {
   id: id(),
   clerkUserId: text("clerk_user_id").notNull().unique(),
   email: text("email"),
+  /**
+   * What this user changed about their scan settings, and only that: the
+   * preset owns every value they have not touched. `lib/settings` is the one
+   * reader and the one writer.
+   */
+  settings: jsonb("settings"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

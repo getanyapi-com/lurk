@@ -80,7 +80,7 @@ describe("the watermark a scan's retrieval has earned", () => {
       ctx: {} as FetchContext,
       limits: null,
       windowMs: 30 * 24 * HOUR,
-      scanIntervalHours: 6,
+      intervalHours: 6,
       hydration: null,
       now: NOW,
     });
@@ -131,7 +131,7 @@ describe("which rows a scan's budget buys", () => {
       // One search, so the budget has to choose between the two rows.
       limits: { ...TIERS.free, searchesPerScan: 1, serpQueriesPerDay: 0 },
       windowMs: 30 * 24 * HOUR,
-      scanIntervalHours: 6,
+      intervalHours: 6,
       hydration: null,
       now: NOW,
     });

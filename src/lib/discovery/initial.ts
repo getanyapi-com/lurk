@@ -6,7 +6,8 @@ import { resolveActiveSubreddits } from "@/lib/profile";
 import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts } from "@/lib/product";
-import { scanIntervalHours, tierForUser } from "@/lib/tier";
+import { cadenceFor } from "@/lib/settings";
+import { tierForUser } from "@/lib/tier";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -28,8 +29,8 @@ async function progress(jobId: string | undefined, text: string): Promise<void> 
  * The first jobs of a project's life, written in the same transaction as the
  * marker that says the project is set up. The backfill fills the leads feed
  * from a year of Reddit's own search, the Google pass fills the Reddit SEO tab
- * and the competitor scan fills its own; the recurring scan starts one interval
- * later, because the backfill has just read everything it would find; the
+ * and the competitor scan fills its own; the recurring scan starts at its own next
+ * scheduled time, because the backfill has just read everything it would find; the
  * discovery delta is the first weekly top-up.
  *
  * The marker is claimed with a conditional update, so a second run of this
@@ -38,7 +39,7 @@ async function progress(jobId: string | undefined, text: string): Promise<void> 
  */
 async function markDiscoveredAndQueue(
   projectId: string,
-  scanHours: number,
+  scanAt: Date,
   refreshDays: number,
 ): Promise<boolean> {
   return db().transaction(async (tx) => {
@@ -55,7 +56,7 @@ async function markDiscoveredAndQueue(
       { kind: "backfill", projectId, runAt: new Date(now) },
       { kind: "seo_refresh", projectId, runAt: new Date(now) },
       { kind: "competitor_scan", projectId, runAt: new Date(now) },
-      { kind: "scan", projectId, runAt: new Date(now + scanHours * HOUR_MS) },
+      { kind: "scan", projectId, runAt: scanAt },
       { kind: "discovery_refresh", projectId, runAt: new Date(now + refreshDays * DAY_MS) },
     ]);
     return true;
@@ -78,7 +79,7 @@ export async function runInitialDiscovery(
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const { limits } = await tierForUser(project.userId);
+  const { limits, settings } = await tierForUser(project.userId);
 
   await progress(jobId, "Asking Google where your buyers ask");
   await runDiscovery({
@@ -97,7 +98,7 @@ export async function runInitialDiscovery(
   await progress(jobId, "Booking the first sweep of the past year");
   const queuedChildren = await markDiscoveredAndQueue(
     projectId,
-    scanIntervalHours(limits),
+    cadenceFor(settings.settings.cadence).nextRunAt(new Date()),
     discoveryBudget(limits).refreshDays,
   );
   return { queuedChildren, subreddits };

@@ -70,9 +70,6 @@ export async function inFlight<T, R>(
  */
 export const TRIAGE_BATCH_SIZE = 70;
 
-/** A thread with fewer replies than this is not worth buying its comments. */
-export const MIN_COMMENTS_FOR_THREAD = 3;
-
 /**
  * How many posts one scan may open in full, whatever it opens them for. Both
  * hydrating a Google result and reading a shortlisted candidate buy the same
