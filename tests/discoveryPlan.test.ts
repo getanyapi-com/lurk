@@ -16,7 +16,9 @@ const PLAN: DiscoveryPlan = {
     { name: "askhotels", state: "candidate", evidence: 1 },
   ],
   keywords: [{ keyword: "(hotel OR hotels) AND (18 OR 19)", evidence: 4 }],
-  competitors: [{ name: "hotelages.com", role: "direct_substitute", evidence: 2 }],
+  competitors: [
+    { name: "hotelages.com", role: "direct_substitute", evidence: 2, domain: "hotelages.com" },
+  ],
 };
 
 describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => {

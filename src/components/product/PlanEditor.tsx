@@ -9,8 +9,10 @@ import {
   addChipAction,
   removeChipAction,
   setChipStateAction,
+  setCompetitorDomainAction,
   type ChipKind,
 } from "@/app/app/product/actions";
+import { competitorHost } from "@/lib/competitors/host";
 
 /** One row of the retrieval plan, with where it came from and what backs it. */
 export type PlanRow = {
@@ -21,6 +23,8 @@ export type PlanRow = {
   /** What this row has found and turned into leads since it was added. */
   freshCandidates: number;
   freshLeads: number;
+  /** The site a competitor sells from, which is where its logo comes from. */
+  domain?: string | null;
   /** Null until a scan has actually covered this row, which is what makes a
    * zero a measurement rather than a row nobody has read yet. */
   lastCoveredAt: Date | null;
@@ -51,29 +55,67 @@ const STATE_LABEL: Record<string, string> = {
   candidate: "Waiting",
 };
 
-/** A subreddit shows its own icon; a competitor shows its site's favicon. */
+/**
+ * A subreddit shows its own icon; a competitor shows the favicon of the site we
+ * know it sells from. A competitor with no site wears its initials, because a
+ * domain guessed off the spelling is how a row ends up wearing somebody else's
+ * logo - the box below the row is there to be told the right one.
+ */
 function RowMark({
   kind,
-  value,
+  row,
   icons,
 }: {
   kind: ChipKind;
-  value: string;
+  row: PlanRow;
   icons?: Record<string, string | null>;
 }) {
   if (kind === "subreddit") {
-    return <Avatar name={value} src={icons?.[value.toLowerCase()] ?? null} size={16} />;
+    return <Avatar name={row.value} src={icons?.[row.value.toLowerCase()] ?? null} size={16} />;
   }
   if (kind === "competitor") {
-    return (
-      <Favicon
-        url={`${value.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`}
-        name={value}
-        size={16}
-      />
-    );
+    return <Favicon url={row.domain ?? competitorHost(row.value)} name={row.value} size={16} />;
   }
   return null;
+}
+
+/**
+ * The site a competitor sells from, as a box a person can correct. It saves on
+ * blur and on Enter rather than behind a button, because the only thing it can
+ * change is which picture the row wears.
+ */
+function DomainField({
+  row,
+  disabled,
+  onSave,
+}: {
+  row: PlanRow;
+  disabled: boolean;
+  onSave: (raw: string) => void;
+}) {
+  const [draft, setDraft] = useState(row.domain ?? "");
+  return (
+    <input
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        if (draft.trim() !== (row.domain ?? "")) {
+          onSave(draft);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+      disabled={disabled}
+      placeholder="site"
+      aria-label={`Website for ${row.value}`}
+      title={`The site ${row.value} sells from, which is where its logo comes from`}
+      className="h-7 w-32 rounded-control border bg-surface px-2 text-small text-fg-muted"
+    />
+  );
 }
 
 /**
@@ -146,7 +188,7 @@ export function PlanEditor({
               key={row.value}
               className="flex flex-wrap items-center gap-2 rounded-control border bg-surface-2 px-3 py-2"
             >
-              <RowMark kind={kind} value={row.value} icons={icons} />
+              <RowMark kind={kind} row={row} icons={icons} />
               <span
                 className={`text-body ${row.state === "excluded" ? "text-fg-muted line-through" : "text-fg"}`}
               >
@@ -154,6 +196,18 @@ export function PlanEditor({
               </span>
               <span className="ml-auto flex items-center gap-2">
                 <Yield row={row} />
+                {kind === "competitor" ? (
+                  <DomainField
+                    // A saved site is normalised - a pasted URL comes back as a
+                    // bare host - so the box is redrawn from what was stored.
+                    key={row.domain ?? ""}
+                    row={row}
+                    disabled={pending}
+                    onSave={(raw) =>
+                      run(() => setCompetitorDomainAction(projectId, row.value, raw))
+                    }
+                  />
+                ) : null}
                 <Badge>{SOURCE_LABEL[row.source] ?? row.source}</Badge>
                 <Badge>
                   {row.evidence} {row.evidence === 1 ? "thread" : "threads"}

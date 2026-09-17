@@ -65,7 +65,12 @@ async function existingCompetitors(projectId: string): Promise<CompetitorRank[]>
     .where(eq(projectCompetitors.projectId, projectId));
   return rows
     .filter((row) => row.role === "direct_substitute")
-    .map((row) => ({ name: row.name, role: "direct_substitute" as const, evidence: row.evidence }));
+    .map((row) => ({
+      name: row.name,
+      role: "direct_substitute" as const,
+      evidence: row.evidence,
+      domain: row.domain,
+    }));
 }
 
 /**

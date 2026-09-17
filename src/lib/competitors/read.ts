@@ -23,13 +23,30 @@ export type MentionView = {
   createdAt: Date;
 };
 
+/** A competitor as the screen draws it: a name, and the site its logo comes from. */
+export type CompetitorRow = { name: string; domain: string | null };
+
 /** The competitors this project watches, in the order they were added. */
-export async function listCompetitorNames(projectId: string): Promise<string[]> {
-  const rows = await db()
-    .select({ name: projectCompetitors.name })
+export async function listCompetitors(projectId: string): Promise<CompetitorRow[]> {
+  return await db()
+    .select({ name: projectCompetitors.name, domain: projectCompetitors.domain })
     .from(projectCompetitors)
     .where(eq(projectCompetitors.projectId, projectId));
+}
+
+/** The same competitors as bare names, for the judgements that read prose. */
+export async function listCompetitorNames(projectId: string): Promise<string[]> {
+  const rows = await listCompetitors(projectId);
   return rows.map((row) => row.name);
+}
+
+/**
+ * The site each competitor sells from, keyed by name. A name discovery never
+ * found a site for still answers, with null, so the chip can fall back to the
+ * name itself being a domain.
+ */
+export function domainsByName(rows: CompetitorRow[]): Record<string, string | null> {
+  return Object.fromEntries(rows.map((row) => [row.name, row.domain]));
 }
 
 function windowStart(days: number, now = new Date()): Date {

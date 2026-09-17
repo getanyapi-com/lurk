@@ -4,10 +4,14 @@ import { SENTIMENTS } from "@/lib/competitors/classify";
 import type { CompetitorCount } from "@/lib/competitors/read";
 import { cn } from "@/lib/utils";
 
-type TopCompetitorsProps = { rows: CompetitorCount[] };
+type TopCompetitorsProps = {
+  rows: CompetitorCount[];
+  /** The site each competitor sells from, keyed by name. */
+  domains: Record<string, string | null>;
+};
 
 /** Who Reddit named most in the window, and how the people naming them talked. */
-export function TopCompetitors({ rows }: TopCompetitorsProps) {
+export function TopCompetitors({ rows, domains }: TopCompetitorsProps) {
   return (
     <div className="flex flex-col gap-2">
       <h2 className="text-small text-fg-muted">Top competitors</h2>
@@ -17,7 +21,11 @@ export function TopCompetitors({ rows }: TopCompetitorsProps) {
             key={row.competitor}
             className="flex flex-wrap items-center justify-between gap-3 px-3 py-2"
           >
-            <CompetitorChip name={row.competitor} count={row.total} />
+            <CompetitorChip
+              name={row.competitor}
+              domain={domains[row.competitor] ?? null}
+              count={row.total}
+            />
             <span className="flex items-center gap-3">
               {SENTIMENTS.map((sentiment) => (
                 <span

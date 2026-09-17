@@ -1,13 +1,17 @@
 import { CompetitorChip } from "@/components/competitors/CompetitorChip";
 import type { MentionSeries } from "@/lib/competitors/read";
 
-type MentionsBarProps = { series: MentionSeries[] };
+type MentionsBarProps = {
+  series: MentionSeries[];
+  /** The site each competitor sells from, keyed by name. */
+  domains: Record<string, string | null>;
+};
 
 /** A day with no mention still draws a hairline, so the axis stays readable. */
 const EMPTY_BAR_PERCENT = 4;
 
 /** One row of daily bars per competitor, all rows sharing one scale. */
-export function MentionsBar({ series }: MentionsBarProps) {
+export function MentionsBar({ series, domains }: MentionsBarProps) {
   const peak = Math.max(1, ...series.flatMap((row) => row.days));
   return (
     <div className="flex flex-col gap-4 rounded-card border bg-surface p-4">
@@ -20,7 +24,7 @@ export function MentionsBar({ series }: MentionsBarProps) {
       {series.map((row) => (
         <div key={row.competitor} className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <CompetitorChip name={row.competitor} />
+            <CompetitorChip name={row.competitor} domain={domains[row.competitor] ?? null} />
             <span className="text-small tabular-nums text-fg-muted">
               {row.total} {row.total === 1 ? "mention" : "mentions"}
             </span>

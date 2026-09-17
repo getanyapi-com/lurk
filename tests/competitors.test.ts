@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { competitorHost } from "@/lib/competitors/host";
+import { competitorHost, domainRoot, matchCompetitorDomain } from "@/lib/competitors/host";
 import { TIERS } from "@/lib/tiers";
 
 const generateStructured = vi.fn();
@@ -37,6 +37,33 @@ describe("competitor host", () => {
     expect(competitorHost("Google Forms")).toBeNull();
     expect(competitorHost("")).toBeNull();
     expect(competitorHost("survey.")).toBeNull();
+  });
+});
+
+describe("the label a brand owns", () => {
+  it("reads past the subdomain and past a two-part suffix", () => {
+    expect(domainRoot("typeform.com")).toBe("typeform");
+    expect(domainRoot("app.typeform.com")).toBe("typeform");
+    expect(domainRoot("typeform.co.uk")).toBe("typeform");
+  });
+});
+
+describe("pairing a competitor with its site", () => {
+  const seen = ["typeform.com", "www.hoteltonight.com", "old.reddit.com"];
+
+  it("takes a name that is already a domain as its own answer", () => {
+    expect(matchCompetitorDomain("Jotform.com", ["typeform.com"])).toBe("jotform.com");
+  });
+
+  it("finds the site a name spells, punctuation and case aside", () => {
+    expect(matchCompetitorDomain("Typeform", seen)).toBe("typeform.com");
+    expect(matchCompetitorDomain("Hotel Tonight", seen)).toBe("hoteltonight.com");
+  });
+
+  it("gives no site to a name nothing in the evidence matched", () => {
+    expect(matchCompetitorDomain("Google Forms", seen)).toBeNull();
+    expect(matchCompetitorDomain("Tally", [])).toBeNull();
+    expect(matchCompetitorDomain("   ", seen)).toBeNull();
   });
 });
 

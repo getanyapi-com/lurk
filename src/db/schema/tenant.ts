@@ -140,6 +140,12 @@ export const projectCompetitors = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /**
+     * The site this company sells from, which is where its logo comes from.
+     * Null when nothing we read told us, and then the name wears its initials
+     * rather than a favicon guessed off the spelling.
+     */
+    domain: text("domain"),
     /** What this company is to us: direct substitute, alternative, supplier, reference. */
     role: text("role"),
     ...planColumns(),

@@ -1,3 +1,4 @@
+import { competitorHost, matchCompetitorDomain } from "@/lib/competitors/host";
 import type { EntityRole, Relevance, ThreadLabel } from "./label";
 import type { Coverage } from "./queries";
 import {
@@ -430,28 +431,49 @@ export function scopedBooleanQuery(query: string, subreddit: string): string {
   return `subreddit:${subreddit} AND ${query}`;
 }
 
-export type CompetitorRank = { name: string; role: EntityRole; evidence: number };
+export type CompetitorRank = {
+  name: string;
+  role: EntityRole;
+  evidence: number;
+  /** The site it sells from, when the same evidence named one. */
+  domain: string | null;
+};
 
 /**
  * Only a direct substitute becomes a competitor. A booking alternative, a
  * supplier and a forum are all named in the same snippets, and calling any of
  * them a competitor is how a project ends up watching its own supplier.
+ *
+ * The threads name domains as well as brands, whatever role each was given, so
+ * a competitor called "Typeform" is paired with the typeform.com somebody else
+ * in the evidence linked to. That pairing is what puts a real logo on the
+ * competitor screen instead of a favicon guessed off the spelling.
  */
 export function competitorsFrom(labels: ThreadLabel[]): CompetitorRank[] {
   const counts = new Map<string, number>();
+  const domains = new Set<string>();
   for (const label of labels) {
     for (const entity of label.entities) {
-      if (entity.role !== "direct_substitute") {
+      const name = entity.name.trim();
+      if (!name) {
         continue;
       }
-      const name = entity.name.trim();
-      if (name) {
+      const host = competitorHost(name);
+      if (host) {
+        domains.add(host);
+      }
+      if (entity.role === "direct_substitute") {
         counts.set(name, (counts.get(name) ?? 0) + 1);
       }
     }
   }
   return [...counts.entries()]
-    .map(([name, evidence]) => ({ name, role: "direct_substitute" as EntityRole, evidence }))
+    .map(([name, evidence]) => ({
+      name,
+      role: "direct_substitute" as EntityRole,
+      evidence,
+      domain: matchCompetitorDomain(name, domains),
+    }))
     .sort((left, right) => right.evidence - left.evidence || left.name.localeCompare(right.name));
 }
 
@@ -470,6 +492,9 @@ export function mergeCompetitors(
       name: item.name,
       role: item.role,
       evidence: (current?.evidence ?? 0) + item.evidence,
+      // A domain already standing is kept: a delta reads a handful of threads,
+      // and none of them naming the site is not news that the site changed.
+      domain: current?.domain ?? item.domain,
     });
   }
   return [...merged.values()].sort(

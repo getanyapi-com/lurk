@@ -141,6 +141,13 @@
       "when": 1789668542836,
       "tag": "0019_alert_labels",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789673429553,
+      "tag": "0020_competitor_domain",
+      "breakpoints": true
     }
   ]
 }
