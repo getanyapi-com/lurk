@@ -1,29 +1,22 @@
-import { AnimatedScore } from "./AnimatedScore";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
-import { ScoreBadge } from "@/components/ScoreBadge";
+import { VerdictBadge } from "@/components/VerdictBadge";
 import { SubredditChip } from "@/components/SubredditChip";
 import type { MockLead } from "./mockContent";
 
-/** Real saved content, laid out like the dashboard card. */
-export function MockLeadCard({
-  lead,
-  animateScore = false,
-}: {
-  lead: MockLead;
-  animateScore?: boolean;
-}) {
+/**
+ * Real saved content, laid out like the dashboard card. The score used to count
+ * up from zero on the first card; there is no number on a card any more, so
+ * there is nothing to animate and the badge is drawn as it stands.
+ */
+export function MockLeadCard({ lead }: { lead: MockLead }) {
   return (
     <article className="mock-lead">
       <div className="mock-identity">
         <AuthorAvatar name={lead.author} src={lead.avatar} size={30} />
         <span>u/{lead.author}</span>
         <SubredditChip name={lead.subreddit} iconUrl={lead.subredditIcon} />
-        {animateScore ? (
-          <AnimatedScore score={lead.score} />
-        ) : (
-          <ScoreBadge score={lead.score} className="ml-auto" />
-        )}
+        <VerdictBadge fit={lead.fit} intent={lead.intent} className="ml-auto" />
       </div>
       <a
         className="mock-lead-title"

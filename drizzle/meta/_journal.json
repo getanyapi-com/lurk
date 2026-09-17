@@ -127,6 +127,13 @@
       "when": 1789603809787,
       "tag": "0017_readings_by_jev",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789610496133,
+      "tag": "0018_closed_thread_flags",
+      "breakpoints": true
     }
   ]
 }

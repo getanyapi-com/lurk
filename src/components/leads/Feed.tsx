@@ -8,7 +8,7 @@ import { OpeningProvider } from "@/components/leads/opening";
 import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
-import { ScoreBadge } from "@/components/ScoreBadge";
+import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, type CardLead } from "@/components/leads/stream";
 import { entryHref, selectEntry } from "@/components/leads/workspace";
 import type { FeedWindow, LeadStatus } from "@/lib/feed";
@@ -186,7 +186,7 @@ export async function Feed({ projectId, status, days, params }: FeedProps) {
                     subreddit={entry.lead.subreddit}
                     subredditIconUrl={entry.lead.subredditIconUrl}
                     createdAt={entry.lead.createdAt}
-                    trailing={<ScoreBadge score={entry.lead.score} />}
+                    trailing={<VerdictBadge fit={entry.lead.fit} intent={entry.lead.intent} />}
                   />
                 ))
               )}

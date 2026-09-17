@@ -25,7 +25,7 @@ export function AppMockLeads() {
           <small>Saved examples</small>
         </div>
         <MockTimeline />
-        <MockLeadCard lead={MOCK_LEADS[0]} animateScore />
+        <MockLeadCard lead={MOCK_LEADS[0]} />
         <div className="mock-comment">
           <span className="mock-meta">Also in this conversation</span>
           <MockLeadCard lead={MOCK_LEADS[1]} />

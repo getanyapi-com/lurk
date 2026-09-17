@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
-import { ScoreBadge } from "@/components/ScoreBadge";
+import { VerdictBadge } from "@/components/VerdictBadge";
 import { SubredditChip } from "@/components/SubredditChip";
 import { DetailRail } from "@/components/leads/DetailRail";
 import { HighlightedBody } from "@/components/leads/HighlightedBody";
@@ -113,7 +113,7 @@ export function LeadDetail({ selection, projectId }: LeadDetailProps) {
   return (
     <Pane>
       <header className="flex flex-col gap-2 border-b p-4">
-        <Title text={lead.title} badge={<ScoreBadge score={lead.score} />} />
+        <Title text={lead.title} badge={<VerdictBadge fit={lead.fit} intent={lead.intent} />} />
         <div className="flex flex-wrap items-center gap-2">
           <AuthorAvatar name={lead.author} src={lead.avatarUrl} size={24} />
           <span className="text-small text-fg-muted">u/{lead.author ?? "unknown"}</span>

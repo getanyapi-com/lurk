@@ -10,7 +10,11 @@ import {
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
+import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
 import { loadScanProject, type ScanProject } from "@/lib/scan/project";
+import { readPosts, splitByReading } from "@/lib/scan/reading";
+import { evaluationsFor, postItem, unjudged } from "@/lib/scan/run";
+import { judgeItems } from "@/lib/scan/score";
 import { tierForUser } from "@/lib/tier";
 import { competitorNamed } from "./competitors";
 import { fetchRankingThreads, googleQuery } from "./fetch";
@@ -49,17 +53,19 @@ async function refreshPhrasing(
   ctx: FetchContext,
   phrasing: string,
   maxAgeMs: number,
-): Promise<{ threads: number; costUsd: number; seen: Seen[] }> {
+): Promise<{ threads: number; costUsd: number; seen: Seen[]; opened: StoredPost[] }> {
   const ranked = await fetchRankingThreads(ctx, phrasing, maxAgeMs);
   let costUsd = ranked.costUsd;
   const rows: OpportunityRow[] = [];
   const seen: Seen[] = [];
+  const opened: StoredPost[] = [];
   for (const result of ranked.value) {
     const thread = await readThread(ctx, result.url, maxAgeMs);
     costUsd += thread.costUsd;
     if (!thread.post) {
       continue;
     }
+    opened.push(thread.post);
     rows.push({
       postId: thread.post.id,
       position: result.position,
@@ -80,7 +86,42 @@ async function refreshPhrasing(
     });
   }
   await writeOpportunities(project.id, phrasing, rows);
-  return { threads: rows.length, costUsd, seen };
+  return { threads: rows.length, costUsd, seen, opened };
+}
+
+/**
+ * The project's own judgement of every thread this refresh opened, written the
+ * way a scan writes one: the shared product-agnostic reading first, then the
+ * judge on whatever that reading left, then a `lead_evaluations` row.
+ *
+ * It is the same judgement a lead gets, not a second scorer, because the tab
+ * orders on it and two scorers would eventually disagree about one person. The
+ * text is already bought and in hand, so there is nothing to cap: what a
+ * refresh opened is exactly what it judges. The reading is shared across
+ * projects, so a thread another project has already read costs nothing here,
+ * and a post this project already holds a current verdict on is skipped.
+ *
+ * It writes no lead. The feed is what a scan found; this only gives the SEO tab
+ * something truer to order on than the discovery label.
+ */
+async function judgeOpened(project: ScanProject, opened: StoredPost[]): Promise<void> {
+  const posts = [...new Map(opened.map((post) => [post.id, post])).values()];
+  if (posts.length === 0) {
+    return;
+  }
+  const stored = await loadEvaluations(project.id);
+  const candidates = await unjudged(project, stored, posts);
+  if (candidates.length === 0) {
+    return;
+  }
+  const sources = candidates.map(postItem);
+  const readings = await readPosts(project.id, sources);
+  const { toJudge, cut } = splitByReading(sources, readings);
+  const judgements = [
+    ...cut,
+    ...(await judgeItems(project.id, project.product, toJudge, readings)),
+  ];
+  await writeEvaluations(await evaluationsFor(project, candidates, judgements));
 }
 
 /** One ranking thread, as discovery files what it has seen of a thread. */
@@ -168,6 +209,7 @@ export async function runSeoRefresh(
   let threads = 0;
   let costUsd = 0;
   const seen: Seen[] = [];
+  const opened: StoredPost[] = [];
   for (const [index, phrasing] of settings.phrasings.entries()) {
     await writeProgress(
       jobId,
@@ -177,10 +219,14 @@ export async function runSeoRefresh(
     threads += done.threads;
     costUsd += done.costUsd;
     seen.push(...done.seen);
+    opened.push(...done.opened);
   }
 
   await writeProgress(jobId, "Reading who is asking in each thread");
   await judgeUnseen(project, seen);
+
+  await writeProgress(jobId, `Judging ${opened.length} threads against your product`);
+  await judgeOpened(project, opened);
 
   await writeProgress(jobId, "Finished");
   await enqueueJob("seo_refresh", projectId, new Date(Date.now() + maxAgeMs));

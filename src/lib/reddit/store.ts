@@ -20,6 +20,10 @@ export type RawPost = {
   createdUtc?: number;
   subreddit: string;
   image?: string;
+  /** Reddit archived the thread; absent means the source did not say. */
+  isArchived?: boolean;
+  /** A moderator locked the thread; absent means the source did not say. */
+  isLocked?: boolean;
 };
 
 export type RawComment = {
@@ -63,6 +67,8 @@ function postValues(post: RawPost) {
     score: post.score ?? null,
     numComments: post.numComments ?? null,
     imageUrl: post.image ?? null,
+    isArchived: post.isArchived ?? null,
+    isLocked: post.isLocked ?? null,
     createdAt: at(post.createdUtc),
     fetchedAt: now,
     bodyObservedAt: body ? now : null,
@@ -75,6 +81,11 @@ function postValues(post: RawPost) {
  * neither ever overwrites a body we already hold. That also keeps the judged
  * text stable, which is what lets a stored verdict be reused. And
  * `bodyObservedAt` only moves on a fetch that really carried the text.
+ *
+ * The archive and lock flags go the other way. They are the thread's current
+ * state rather than text we judged, so a fetch that carries one overwrites what
+ * we hold, and only a fetch that carries nothing leaves it alone. Absent is
+ * unknown, never false, which is why null loses to a value from either side.
  */
 /**
  * A stored post turned back into the listing shape it came from, so a caller
@@ -96,6 +107,8 @@ export function asRawPost(post: StoredPost): RawPost {
     score: post.score ?? undefined,
     numComments: post.numComments ?? undefined,
     image: post.imageUrl ?? undefined,
+    isArchived: post.isArchived ?? undefined,
+    isLocked: post.isLocked ?? undefined,
     createdUtc: Math.floor(post.createdAt.getTime() / 1000),
   };
 }
@@ -129,6 +142,8 @@ export async function upsertPosts(posts: RawPost[]): Promise<StoredPost[]> {
         score: sql`excluded.score`,
         numComments: sql`excluded.num_comments`,
         imageUrl: sql`coalesce(excluded.image_url, ${redditPosts.imageUrl})`,
+        isArchived: sql`coalesce(excluded.is_archived, ${redditPosts.isArchived})`,
+        isLocked: sql`coalesce(excluded.is_locked, ${redditPosts.isLocked})`,
         fetchedAt: sql`excluded.fetched_at`,
         bodyObservedAt: sql`coalesce(excluded.body_observed_at, ${redditPosts.bodyObservedAt})`,
       },

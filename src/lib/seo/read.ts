@@ -1,6 +1,12 @@
-import { and, asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { discoveryEvidence, redditPosts, seoOpportunities, subreddits } from "@/db/schema";
+import {
+  discoveryEvidence,
+  leadEvaluations,
+  redditPosts,
+  seoOpportunities,
+  subreddits,
+} from "@/db/schema";
 import type { Relevance } from "@/lib/discovery/label";
 
 /**
@@ -39,7 +45,29 @@ function verdicts(projectId: string) {
 
 export type SeoRow = Awaited<ReturnType<typeof listOpportunities>>[number];
 
-export type SeoFilter = { keyword?: string; subreddit?: string; competitor?: string };
+/**
+ * How the tab is read. `closed` is the only filter that hides anything by
+ * default, because a thread nobody can reply in is not an opportunity; set it
+ * to "yes" to see them anyway. `sort` picks between Google's own ranking and
+ * this project's judgement of the person posting.
+ */
+export type SeoFilter = {
+  keyword?: string;
+  subreddit?: string;
+  competitor?: string;
+  closed?: string;
+  sort?: string;
+};
+
+/** The sort the page offers besides the default one. */
+export const BY_INTENT = "intent";
+
+/**
+ * True when Reddit archived the thread or a moderator locked it: either one
+ * closes it to new replies. An unknown flag is not a closed thread, so a null
+ * on both sides reads as open, which is what the list has always shown.
+ */
+const closedThread = sql<boolean>`(coalesce(${redditPosts.isArchived}, false) or coalesce(${redditPosts.isLocked}, false))`;
 
 /** The verdict one rank stands for, or null when nothing has judged the thread. */
 export function verdictOf(rank: number | null): Relevance | null {
@@ -65,7 +93,40 @@ const columns = {
   score: redditPosts.score,
   numComments: redditPosts.numComments,
   createdAt: redditPosts.createdAt,
+  closed: closedThread,
+  /** This project's own judgement of the person posting, or null if none. */
+  fit: leadEvaluations.fit,
+  intent: leadEvaluations.intent,
 };
+
+/** The verdict this project holds on the post itself, never on a comment. */
+function judgementOf(projectId: string) {
+  return and(
+    eq(leadEvaluations.projectId, projectId),
+    eq(leadEvaluations.postId, seoOpportunities.postId),
+    isNull(leadEvaluations.commentId),
+  );
+}
+
+/**
+ * The rule that hides a thread rather than ordering it: a closed one, unless
+ * the reader asked to see them. Shared by the list and the facets, so a pill
+ * never offers a phrasing whose threads the list will not show.
+ */
+function openOnly(filter: SeoFilter) {
+  return filter.closed === "yes" ? [] : [eq(closedThread, false)];
+}
+
+/** Everything the pills narrow the list by. */
+function conditions(filter: SeoFilter) {
+  return [
+    filter.keyword ? eq(seoOpportunities.keyword, filter.keyword) : undefined,
+    filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
+    filter.competitor === "yes" ? eq(seoOpportunities.competitorPresent, true) : undefined,
+    filter.competitor === "no" ? eq(seoOpportunities.competitorPresent, false) : undefined,
+    ...openOnly(filter),
+  ];
+}
 
 /**
  * Every ranking thread this project holds, keyword by keyword, the ones worth
@@ -75,24 +136,26 @@ const columns = {
  */
 export async function listOpportunities(projectId: string, filter: SeoFilter) {
   const judged = verdicts(projectId);
+  const byIntent = filter.sort === BY_INTENT;
   return db()
     .select({ ...columns, verdictRank: judged.rank })
     .from(seoOpportunities)
     .innerJoin(redditPosts, eq(redditPosts.id, seoOpportunities.postId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
     .leftJoin(judged, eq(judged.postId, seoOpportunities.postId))
-    .where(
-      and(
-        eq(seoOpportunities.projectId, projectId),
-        filter.keyword ? eq(seoOpportunities.keyword, filter.keyword) : undefined,
-        filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
-        filter.competitor === "yes" ? eq(seoOpportunities.competitorPresent, true) : undefined,
-        filter.competitor === "no" ? eq(seoOpportunities.competitorPresent, false) : undefined,
-      ),
-    )
+    .leftJoin(leadEvaluations, judgementOf(projectId))
+    .where(and(eq(seoOpportunities.projectId, projectId), ...conditions(filter)))
     .orderBy(
       asc(seoOpportunities.keyword),
-      sql`coalesce(${judged.rank}, ${VERDICT_ORDER.indexOf("unlabeled") + 1})`,
+      // A closed thread sorts after every open one, whichever order is asked
+      // for, because no reply is possible in it.
+      asc(closedThread),
+      ...(byIntent
+        ? [
+            sql`${leadEvaluations.intent} desc nulls last`,
+            sql`${leadEvaluations.fit} desc nulls last`,
+          ]
+        : [sql`coalesce(${judged.rank}, ${VERDICT_ORDER.indexOf("unlabeled") + 1})`]),
       asc(seoOpportunities.position),
     );
 }
@@ -108,19 +171,24 @@ export async function countOpportunities(projectId: string): Promise<number> {
     .from(seoOpportunities)
     // The same join the list makes, because a thread whose post has aged out
     // of our thirty days keeps its row with a null post and the list does not
-    // show it. A count that included it would promise a thread that is gone.
+    // show it. A count that included it would promise a thread that is gone,
+    // and the same goes for a closed one, which the tab opens without.
     .innerJoin(redditPosts, eq(redditPosts.id, seoOpportunities.postId))
-    .where(eq(seoOpportunities.projectId, projectId));
+    .where(and(eq(seoOpportunities.projectId, projectId), ...openOnly({})));
   return rows[0]?.total ?? 0;
 }
 
-/** The keywords and communities the filter pills can actually offer. */
-export async function seoFacets(projectId: string): Promise<SeoFacets> {
+/**
+ * The keywords and communities the filter pills can actually offer. It applies
+ * the same rule the list does, so a phrasing whose only threads are closed is
+ * not offered as a filter that would show nothing.
+ */
+export async function seoFacets(projectId: string, filter: SeoFilter = {}): Promise<SeoFacets> {
   const rows = await db()
     .select({ keyword: seoOpportunities.keyword, subreddit: redditPosts.subreddit })
     .from(seoOpportunities)
     .innerJoin(redditPosts, eq(redditPosts.id, seoOpportunities.postId))
-    .where(eq(seoOpportunities.projectId, projectId));
+    .where(and(eq(seoOpportunities.projectId, projectId), ...openOnly(filter)));
   return {
     keywords: [...new Set(rows.map((row) => row.keyword))].sort(),
     subreddits: [...new Set(rows.map((row) => row.subreddit))].sort(),

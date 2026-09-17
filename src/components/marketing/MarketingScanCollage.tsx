@@ -2,7 +2,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowUp, Copy, ExternalLink, EyeOff, MessageCircle, PenLine, Search, ShieldCheck, ThumbsDown } from "lucide-react";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
-import { ScoreBadge } from "@/components/ScoreBadge";
+import { VerdictBadge } from "@/components/VerdictBadge";
 import { AppMockLeads } from "./AppMockLeads";
 import { SCAN_LEAD, SCAN_LEAD_FACTS } from "./mockContent";
 
@@ -54,7 +54,7 @@ export function MarketingScanCollage() {
               <span>u/{SCAN_LEAD.author}</span>
               <small>r/{SCAN_LEAD.subreddit}</small>
               <small>{SCAN_LEAD_FACTS.age}</small>
-              <ScoreBadge score={SCAN_LEAD.score} className="ml-auto" />
+              <VerdictBadge fit={SCAN_LEAD.fit} intent={SCAN_LEAD.intent} className="ml-auto" />
             </div>
             <a className="fragment-subject" href={SCAN_LEAD.url} target="_blank" rel="noreferrer">
               {SCAN_LEAD.title}
@@ -71,11 +71,11 @@ export function MarketingScanCollage() {
             <dl className="collage-metrics">
               <div>
                 <dt>Fit</dt>
-                <dd>{SCAN_LEAD_FACTS.fit}</dd>
+                <dd>{SCAN_LEAD.fit}</dd>
               </div>
               <div>
                 <dt>Intent</dt>
-                <dd>{SCAN_LEAD_FACTS.intent}</dd>
+                <dd>{SCAN_LEAD.intent}</dd>
               </div>
               <div>
                 <dt>Engagement</dt>

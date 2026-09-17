@@ -22,7 +22,7 @@
     "@clerk/nextjs": "7.9.1",
     "@fontsource-variable/instrument-sans": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "5.2.8",
-    "@getanyapi/sdk": "0.36.0",
+    "@getanyapi/sdk": "^0.46.2",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@openrouter/ai-sdk-provider": "3.0.0",
     "ai": "7.0.93",

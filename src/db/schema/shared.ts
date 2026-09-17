@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -26,6 +27,13 @@ export const redditPosts = pgTable(
     score: integer("score"),
     numComments: integer("num_comments"),
     imageUrl: text("image_url"),
+    /**
+     * Whether Reddit archived the thread and whether a moderator locked it.
+     * Either one closes the thread to new replies. Null is unknown, never
+     * false: a source that does not report the flag says nothing about it.
+     */
+    isArchived: boolean("is_archived"),
+    isLocked: boolean("is_locked"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
     /**

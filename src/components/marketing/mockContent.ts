@@ -11,6 +11,10 @@
  * Public avatar/icon enrichment: 8 AnyAPI calls, $0.0096; missing community
  * icons remain absent. See round3-db-public.json and round3-anyapi-public.json.
  * No synthetic identities, live counts, request IDs or current-rank claims.
+ * The fit and intent levels on each lead were read from lead_evaluations for
+ * the same posts on 2026-09-16, on the current 0-4 scales. The folded score is
+ * gone from here because it is gone from the product's cards: it is a sort
+ * order, and no card shows it.
  */
 import type { RailIcon } from "@/components/Rail";
 
@@ -20,7 +24,9 @@ export type MockLead = {
   subreddit: string;
   subredditIcon: string;
   age: string;
-  score: number;
+  /** The saved fit and intent levels, 0-4, as the scan answered them. */
+  fit: number;
+  intent: number;
   stage: string;
   title: string;
   url: string;
@@ -40,7 +46,8 @@ export const MOCK_LEADS: MockLead[] = [
     subredditIcon:
       "https://styles.redditmedia.com/t5_3gbip/styles/communityIcon_99qld76bwkle1.png?width=64&frame=1&auto=webp&s=8ae23376d057ff01792c2af164cbfad72a78f9df",
     age: "Saved Sep 2",
-    score: 83,
+    fit: 3,
+    intent: 3,
     stage: "comparing",
     title: "Looking for a simpler Jotform alternative",
     url: "https://www.reddit.com/r/nocode/comments/1w5mqwf/looking_for_a_simpler_jotform_alternative/",
@@ -60,7 +67,8 @@ export const MOCK_LEADS: MockLead[] = [
     subredditIcon:
       "https://styles.redditmedia.com/t5_3gbip/styles/communityIcon_99qld76bwkle1.png?width=64&frame=1&auto=webp&s=8ae23376d057ff01792c2af164cbfad72a78f9df",
     age: "Saved Sep 2",
-    score: 75,
+    fit: 3,
+    intent: 2,
     stage: "solution seeking",
     title: "Looking for a simpler Jotform alternative",
     url: "https://www.reddit.com/r/nocode/comments/1w5mqwf/looking_for_a_simpler_jotform_alternative/p7gb2jb/",
@@ -196,7 +204,8 @@ export const SCAN_LEAD: MockLead = {
   title: "AI form builder that can create forms from training material?",
   url: "https://www.reddit.com/r/GPT/comments/1w4pynu/ai_form_builder_that_can_create_forms_from/",
   body: "I handle internal training at work and creating a new feedback form after every session gets repetitive. Looking for an AI form builder that can take a training doc, understand the topic, and generate relevant feedback questions that I can tweak afterward. Any recommendations? ",
-  score: 75,
+  fit: 2,
+  intent: 3,
   stage: "solution seeking",
   reason:
     "They waste time rebuilding training feedback forms and asked for an AI builder that generates editable questions from a doc.",
@@ -206,11 +215,14 @@ export const SCAN_LEAD: MockLead = {
   age: "Saved example",
   kind: "Post",
 };
-/** The same post's saved scoring parts and Reddit counts, read from the database on 2026-09-06. */
+/**
+ * The same post's saved scoring parts and Reddit counts. The counts were read
+ * on 2026-09-06; engagement was read again on 2026-09-16, because the value
+ * saved here was on a 0-10 scale the scan stopped using. Fit and intent live on
+ * SCAN_LEAD itself, so the badge and this list cannot disagree.
+ */
 export const SCAN_LEAD_FACTS = {
-  fit: 8,
-  intent: 7,
-  engagement: 8,
+  engagement: 0,
   points: 6,
   comments: 27,
   age: "Sep 1",

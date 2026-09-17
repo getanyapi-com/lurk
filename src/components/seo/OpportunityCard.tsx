@@ -2,6 +2,7 @@ import { ArrowUp, MessageCircle } from "lucide-react";
 import { SubredditChip } from "@/components/SubredditChip";
 import type { Relevance } from "@/lib/discovery/label";
 import { relativeAge } from "@/lib/format";
+import { fitWord, intentWord, judgementSentence } from "@/lib/scan/words";
 import { GoogleRankBadge } from "@/components/seo/GoogleRankBadge";
 
 export type RankingThread = {
@@ -17,6 +18,11 @@ export type RankingThread = {
   score: number | null;
   numComments: number | null;
   createdAt: Date;
+  /** Archived by Reddit or locked by a moderator: nobody can reply in it. */
+  closed: boolean;
+  /** What this project judged the person posting, or null if it never has. */
+  fit: number | null;
+  intent: number | null;
 };
 
 /**
@@ -29,7 +35,23 @@ const VERDICT_WORDS: Partial<Record<Relevance, string>> = {
   irrelevant: "Nobody asking",
 };
 
-type OpportunityCardProps = { thread: RankingThread };
+/** Why a closed thread is marked rather than only hidden. */
+const CLOSED_SENTENCE = "Archived or locked, so nobody can reply in it";
+
+type OpportunityCardProps = {
+  thread: RankingThread;
+  /** The intent-ordered view says what it ordered on; the default one does not. */
+  showJudgement?: boolean;
+};
+
+/** A small mono chip, the same one the verdict and the competitor mark use. */
+function Chip({ children, title }: { children: React.ReactNode; title?: string }) {
+  return (
+    <span className="rounded-control border px-2 py-0.5 text-mono text-fg-muted" title={title}>
+      {children}
+    </span>
+  );
+}
 
 function Count({ icon, value }: { icon: React.ReactNode; value: number | null }) {
   return (
@@ -41,8 +63,11 @@ function Count({ icon, value }: { icon: React.ReactNode; value: number | null })
 }
 
 /** One Reddit thread Google ranks for a keyword. */
-export function OpportunityCard({ thread }: OpportunityCardProps) {
+export function OpportunityCard({ thread, showJudgement = false }: OpportunityCardProps) {
   const iconClass = "size-3.5 shrink-0";
+  const fit = fitWord(thread.fit);
+  const intent = intentWord(thread.intent);
+  const sentence = judgementSentence(thread.fit, thread.intent) ?? undefined;
   return (
     <div className="flex items-start gap-3 rounded-card border bg-surface p-4">
       <GoogleRankBadge position={thread.position} />
@@ -64,11 +89,15 @@ export function OpportunityCard({ thread }: OpportunityCardProps) {
             icon={<MessageCircle className={iconClass} aria-hidden="true" />}
             value={thread.numComments}
           />
-          {thread.verdict && VERDICT_WORDS[thread.verdict] ? (
-            <span className="rounded-control border px-2 py-0.5 text-mono text-fg-muted">
-              {VERDICT_WORDS[thread.verdict]}
-            </span>
+          {showJudgement ? (
+            <>
+              <Chip title={sentence}>{fit ?? "Not judged"}</Chip>
+              {intent ? <Chip title={sentence}>{intent}</Chip> : null}
+            </>
+          ) : thread.verdict && VERDICT_WORDS[thread.verdict] ? (
+            <Chip>{VERDICT_WORDS[thread.verdict]}</Chip>
           ) : null}
+          {thread.closed ? <Chip title={CLOSED_SENTENCE}>Closed</Chip> : null}
           {thread.competitorPresent ? (
             <span className="rounded-control border px-2 py-0.5 text-mono text-fg">
               Competitor named

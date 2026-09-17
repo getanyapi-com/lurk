@@ -77,3 +77,57 @@ describe.skipIf(!process.env.DATABASE_URL)("the order posts are stored in", () =
     expect(stored.map((post) => post.id)).toEqual([`z${suffix}`, `a${suffix}`, `m${suffix}`]);
   });
 });
+
+/**
+ * A closed thread is one nobody can reply in, so the flags that say so are
+ * worth keeping. They are the opposite of the body rule: the body we hold is
+ * the text a verdict was made on and never moves, while these are the thread's
+ * current state, so a fetch that carries one overwrites it and a fetch that
+ * carries nothing leaves it alone. Absent is unknown, never false.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
+  it("keeps a flag a search carried, and lets a later fetch correct it", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const id = `t3_${randomUUID().slice(0, 8)}`;
+    const listing = {
+      id,
+      subreddit: "discgolf",
+      title: "A thread that closed and then did not",
+      permalink: `/r/discgolf/comments/${id}/a_thread/`,
+      createdUtc: Math.floor(Date.now() / 1000),
+    };
+
+    const [first] = await upsertPosts([{ ...listing, isArchived: true, isLocked: false }]);
+    expect(first.isArchived).toBe(true);
+    expect(first.isLocked).toBe(false);
+
+    // A source that does not report the flags says nothing about them.
+    const [silent] = await upsertPosts([listing]);
+    expect(silent.isArchived).toBe(true);
+    expect(silent.isLocked).toBe(false);
+
+    const [corrected] = await upsertPosts([{ ...listing, isArchived: false, isLocked: true }]);
+    expect(corrected.isArchived).toBe(false);
+    expect(corrected.isLocked).toBe(true);
+  });
+
+  it("leaves both unknown when nothing has ever reported them", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const id = `t3_${randomUUID().slice(0, 8)}`;
+
+    const [stored] = await upsertPosts([
+      {
+        id,
+        subreddit: "discgolf",
+        title: "Nothing has said whether this one is closed",
+        permalink: `/r/discgolf/comments/${id}/nothing_said/`,
+        createdUtc: Math.floor(Date.now() / 1000),
+      },
+    ]);
+
+    expect(stored.isArchived).toBeNull();
+    expect(stored.isLocked).toBeNull();
+  });
+});

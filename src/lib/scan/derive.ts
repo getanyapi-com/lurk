@@ -72,7 +72,7 @@ const NEED: Record<Assessment["needState"], string> = {
   unknown: "whose need the post does not settle",
 };
 
-const FIT: Record<number, string> = {
+export const FIT: Record<number, string> = {
   0: "the product does not do this job",
   1: "the product only overlaps this audience",
   2: "the product plausibly fits but a stated requirement is unknown",

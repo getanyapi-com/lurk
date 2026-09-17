@@ -10,6 +10,7 @@ import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { activeProject } from "@/lib/projects";
 import {
+  BY_INTENT,
   listOpportunities,
   NO_PHRASINGS_PROGRESS,
   seoFacets,
@@ -23,6 +24,8 @@ type SeoPageProps = {
     keyword?: string;
     subreddit?: string;
     competitor?: string;
+    closed?: string;
+    sort?: string;
   }>;
 };
 
@@ -42,6 +45,9 @@ function toThread(row: SeoRow): RankingThread {
     score: row.score,
     numComments: row.numComments,
     createdAt: row.createdAt,
+    closed: row.closed,
+    fit: row.fit,
+    intent: row.intent,
   };
 }
 
@@ -68,13 +74,16 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
     );
   }
 
+  const filter = {
+    keyword: params.keyword,
+    subreddit: params.subreddit,
+    competitor: params.competitor,
+    closed: params.closed,
+    sort: params.sort,
+  };
   const [rows, facets, last, next] = await Promise.all([
-    listOpportunities(project.id, {
-      keyword: params.keyword,
-      subreddit: params.subreddit,
-      competitor: params.competitor,
-    }),
-    seoFacets(project.id),
+    listOpportunities(project.id, filter),
+    seoFacets(project.id, filter),
     lastRunJob("seo_refresh", project.id),
     nextQueuedJob("seo_refresh", project.id),
   ]);
@@ -111,6 +120,7 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
               key={phrasing}
               keyword={phrasing}
               threads={grouped.get(phrasing) ?? []}
+              showJudgement={params.sort === BY_INTENT}
             />
           ))}
         </div>

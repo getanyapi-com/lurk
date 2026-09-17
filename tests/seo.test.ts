@@ -347,6 +347,22 @@ describe.skipIf(!process.env.DATABASE_URL)("the ranking-thread count in the rail
         position: index + 1,
       });
     }
+    // The closed thread the tab opens without, and so the pill counts without.
+    const closed = `${run}closed`;
+    await db().insert(schema.redditPosts).values({
+      id: closed,
+      subreddit: "webscraping",
+      title: "A locked ranking thread",
+      url: `https://www.reddit.com/r/webscraping/comments/${closed}/x/`,
+      isLocked: true,
+      createdAt: new Date(),
+    });
+    await db().insert(schema.seoOpportunities).values({
+      projectId: project.id,
+      keyword: "reddit scraper",
+      postId: closed,
+      position: 4,
+    });
     // The thread whose post retention already deleted, which set its post to
     // null rather than taking the row away.
     await db().insert(schema.seoOpportunities).values({
@@ -361,6 +377,186 @@ describe.skipIf(!process.env.DATABASE_URL)("the ranking-thread count in the rail
     expect(rows.length).toBe(held.length);
 
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
-    await db().delete(schema.redditPosts).where(inArray(schema.redditPosts.id, held));
+    await db().delete(schema.redditPosts).where(inArray(schema.redditPosts.id, [...held, closed]));
+  });
+});
+
+/**
+ * A thread Reddit archived or a moderator locked cannot be replied in, so the
+ * tab hides it by default rather than offering it as an opportunity. It is a
+ * filter and not a deletion: asking for them brings them back, after the open
+ * ones, because they are still evidence of what ranks.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("closed ranking threads", () => {
+  it("hides a closed thread until it is asked for, then sorts it last", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { listOpportunities, seoFacets } = await import("@/lib/seo/read");
+
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "AnyAPI" })
+      .returning();
+
+    const run = randomUUID().replace(/-/g, "").slice(0, 8);
+    // The closed ones rank above the open one, so Google's order alone would
+    // put them first and only the closed rule can move them.
+    const threads = [
+      { suffix: "archived", isArchived: true, isLocked: null, position: 1 },
+      { suffix: "locked", isArchived: null, isLocked: true, position: 2 },
+      { suffix: "open", isArchived: false, isLocked: false, position: 3 },
+      { suffix: "unknown", isArchived: null, isLocked: null, position: 4 },
+    ];
+    for (const thread of threads) {
+      const postId = `${run}${thread.suffix}`;
+      await db().insert(schema.redditPosts).values({
+        id: postId,
+        subreddit: "webscraping",
+        title: `A ${thread.suffix} thread`,
+        url: `https://www.reddit.com/r/webscraping/comments/${postId}/x/`,
+        isArchived: thread.isArchived,
+        isLocked: thread.isLocked,
+        createdAt: new Date(),
+      });
+      await db().insert(schema.seoOpportunities).values({
+        projectId: project.id,
+        keyword: "reddit scraper",
+        postId,
+        position: thread.position,
+      });
+    }
+
+    const open = await listOpportunities(project.id, {});
+    expect(open.map((row) => row.postId)).toEqual([`${run}open`, `${run}unknown`]);
+    expect(open.map((row) => row.closed)).toEqual([false, false]);
+
+    const all = await listOpportunities(project.id, { closed: "yes" });
+    expect(all.map((row) => row.postId)).toEqual([
+      `${run}open`,
+      `${run}unknown`,
+      `${run}archived`,
+      `${run}locked`,
+    ]);
+    expect(all.map((row) => row.closed)).toEqual([false, false, true, true]);
+
+    // A phrasing whose threads are all closed is not offered as a filter that
+    // would show nothing, so the facets apply the same rule.
+    await db().insert(schema.seoOpportunities).values({
+      projectId: project.id,
+      keyword: "only closed threads rank for this",
+      postId: `${run}archived`,
+      position: 1,
+    });
+    expect((await seoFacets(project.id)).keywords).toEqual(["reddit scraper"]);
+    expect((await seoFacets(project.id, { closed: "yes" })).keywords).toHaveLength(2);
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+    await db()
+      .delete(schema.redditPosts)
+      .where(
+        inArray(
+          schema.redditPosts.id,
+          threads.map((thread) => `${run}${thread.suffix}`),
+        ),
+      );
+  });
+});
+
+/**
+ * The discovery verdict answers whether anybody is asking; it does not say how
+ * far along they are. The refresh now judges every thread it opens the way the
+ * scan judges a candidate, so the tab can be ordered on that judgement instead.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer intent", () => {
+  it("puts the higher intent first and an unjudged thread last", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { BY_INTENT, listOpportunities } = await import("@/lib/seo/read");
+
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "AnyAPI" })
+      .returning();
+
+    const run = randomUUID().replace(/-/g, "").slice(0, 8);
+    // Google ranks them in exactly the order buyer intent does not.
+    const threads = [
+      { suffix: "unjudged", judgement: null, position: 1 },
+      { suffix: "weak", judgement: { fit: 3, intent: 2 }, position: 2 },
+      { suffix: "strong", judgement: { fit: 3, intent: 4 }, position: 3 },
+    ];
+    for (const thread of threads) {
+      const postId = `${run}${thread.suffix}`;
+      await db().insert(schema.redditPosts).values({
+        id: postId,
+        subreddit: "webscraping",
+        title: `A ${thread.suffix} thread`,
+        url: `https://www.reddit.com/r/webscraping/comments/${postId}/x/`,
+        createdAt: new Date(),
+      });
+      await db().insert(schema.seoOpportunities).values({
+        projectId: project.id,
+        keyword: "reddit scraper",
+        postId,
+        position: thread.position,
+      });
+      if (!thread.judgement) {
+        continue;
+      }
+      await db().insert(schema.leadEvaluations).values({
+        projectId: project.id,
+        postId,
+        commentId: null,
+        decision: "qualify",
+        relationship: "buyer",
+        needState: "open",
+        fit: thread.judgement.fit,
+        intent: thread.judgement.intent,
+        engagement: 0,
+        score: 0,
+        reasonCodes: ["supported_open_need"],
+        requirements: [],
+        answerCoverage: "complete",
+        reason: "Judged for this test.",
+        profileVersion: 1,
+        contentHash: postId,
+        scorerVersion: "test",
+      });
+    }
+
+    const byIntent = await listOpportunities(project.id, { sort: BY_INTENT });
+    expect(byIntent.map((row) => row.postId)).toEqual([
+      `${run}strong`,
+      `${run}weak`,
+      `${run}unjudged`,
+    ]);
+    expect(byIntent.map((row) => row.intent)).toEqual([4, 2, null]);
+    expect(byIntent.map((row) => row.fit)).toEqual([3, 3, null]);
+
+    // The default order is still Google's, so the toggle is what moved them.
+    const byDefault = await listOpportunities(project.id, {});
+    expect(byDefault.map((row) => row.postId)).toEqual([
+      `${run}unjudged`,
+      `${run}weak`,
+      `${run}strong`,
+    ]);
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+    await db()
+      .delete(schema.redditPosts)
+      .where(
+        inArray(
+          schema.redditPosts.id,
+          threads.map((thread) => `${run}${thread.suffix}`),
+        ),
+      );
   });
 });
