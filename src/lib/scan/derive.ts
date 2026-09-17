@@ -1,6 +1,6 @@
 import { choice, noul, score, type Answers } from "@/lib/jev";
 import type { Assessment, TriageItem } from "./judgement";
-import { INTENT_LEVELS, NEED_STATES, NO_QUOTE, RELATIONSHIPS, REQUIREMENT, STAGES } from "./questions";
+import { FIT, INTENT_LEVELS, NEED_STATES, NO_QUOTE, RELATIONSHIPS, REQUIREMENT, STAGES } from "./questions";
 import type { Spans } from "./spans";
 
 /**
@@ -70,14 +70,6 @@ const NEED: Record<Assessment["needState"], string> = {
   resolved: "whose need is already met",
   no_active_need: "with no need of their own",
   unknown: "whose need the post does not settle",
-};
-
-export const FIT: Record<number, string> = {
-  0: "the product does not do this job",
-  1: "the product only overlaps this audience",
-  2: "the product plausibly fits but a stated requirement is unknown",
-  3: "the product does this job",
-  4: "the product does this job and meets the stated requirements",
 };
 
 /**

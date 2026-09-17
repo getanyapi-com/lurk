@@ -1,5 +1,4 @@
-import { FIT } from "./derive";
-import { INTENT_LEVELS } from "./questions";
+import { FIT, INTENT_LEVELS } from "./questions";
 
 /**
  * The two answers the model actually gave, in words a person reads.

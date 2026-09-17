@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FIT } from "@/lib/scan/derive";
-import { INTENT_LEVELS } from "@/lib/scan/questions";
+import { FIT, INTENT_LEVELS } from "@/lib/scan/questions";
 import { fitWord, intentWord, judgementSentence } from "@/lib/scan/words";
 
 /**

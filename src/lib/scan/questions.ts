@@ -20,6 +20,20 @@ export const NEED_STATES = ["open", "evaluating", "resolved", "no_active_need", 
 export const REQUIREMENT = ["none_stated", "met", "unmet", "unknown"] as const;
 export const STAGES = ["none", "problem_aware", "solution_seeking", "comparing", "purchase_ready"] as const;
 
+/**
+ * lurk's 0-4 fit, in the words a verdict and a card are written in. It sits
+ * beside the intent levels because both are the rubric's own sentences, and
+ * because this file pulls in nothing at runtime: a card that says them has to
+ * reach the browser, and derive.ts reaches the database.
+ */
+export const FIT: Record<number, string> = {
+  0: "the product does not do this job",
+  1: "the product only overlaps this audience",
+  2: "the product plausibly fits but a stated requirement is unknown",
+  3: "the product does this job",
+  4: "the product does this job and meets the stated requirements",
+};
+
 /** The level descriptions of the intent Score, index is the level. */
 export const INTENT_LEVELS = [
   "No need of their own",
