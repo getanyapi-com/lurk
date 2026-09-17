@@ -333,6 +333,8 @@ export const alerts = pgTable("alerts", {
     .references(() => projects.id, { onDelete: "cascade" }),
   channel: text("channel").notNull(),
   target: text("target").notNull(),
+  /** How the list names the target when the address itself is a secret, as a Slack webhook is. */
+  label: text("label"),
   cadence: text("cadence").notNull(),
   lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
 });

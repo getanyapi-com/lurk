@@ -92,8 +92,12 @@ npm run anyapi:register
 | `TYPESAFE_MODEL` | no | `jev-latest` | Override the model. |
 | `OPENROUTER_API_KEY` | no | - | Pays for the product profile, drafting and clustering. |
 | `OPENROUTER_MODEL` | no | `meta/muse-spark-1.3-contributor` | Override the model. |
-| `RESEND_API_KEY` | no | - | Sends the digest email. |
-| `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and the Resend key. |
+| `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and one of the three below. |
+| `AZURE_EMAIL_CONNECTION_STRING` | no | - | Sends the digest through Azure Communication Services. Wins when more than one is set. |
+| `SMTP_URL` | no | - | Sends the digest through any SMTP server, as `smtps://user:pass@host:465`. |
+| `RESEND_API_KEY` | no | - | Sends the digest through Resend. |
+| `SLACK_CLIENT_ID` | no | - | With the secret, turns the Slack channel into an Add to Slack button. |
+| `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
 | `HOUSE_DATA_CAP_USD_PER_DAY` | no | `25` | Daily ceiling on data spend from the house key. |
 | `HOUSE_LLM_CAP_USD_PER_DAY` | no | `10` | Daily ceiling on language model spend. |
 
@@ -133,11 +137,19 @@ the token here and revokes it at AnyAPI.
 ## Alerts
 
 Settings -> Alerts is where new leads land. Add an email digest, a Slack or Discord webhook,
-or a generic webhook that receives the same digest as JSON. Email needs `RESEND_API_KEY` and
-`ALERTS_FROM_EMAIL`; the webhooks need nothing. A digest carries the day's new leads with
+or a generic webhook that receives the same digest as JSON. Email needs `ALERTS_FROM_EMAIL`
+and one carrier: `AZURE_EMAIL_CONNECTION_STRING`, `SMTP_URL` or `RESEND_API_KEY`, checked in
+that order. The webhooks need nothing. A digest carries the day's new leads with
 their score, reason, community and link, in the same shapes the feed uses, and sends nothing
 at all when there is nothing new. The scheduler queues one digest pass an hour and each
 channel decides whether its own cadence is due.
+
+Slack takes a pasted webhook URL by default. To let people pick a channel instead, create a
+Slack app at <https://api.slack.com/apps> with Incoming Webhooks on, the `incoming-webhook`
+bot scope, and `https://<your APP_URL>/connect/slack/callback` as a redirect URL. Slack only
+accepts https redirect URLs, so this does not work against `http://localhost`. Put the app's
+client id and secret in `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET` and the form shows an Add
+to Slack button; the pasted-URL path stays one click away.
 
 ## API and MCP
 
@@ -211,8 +223,12 @@ CLERK_SECRET_KEY=
 ANYAPI_HOUSE_API_KEY=
 TYPESAFE_API_KEY=
 OPENROUTER_API_KEY=
-RESEND_API_KEY=
 ALERTS_FROM_EMAIL=
+AZURE_EMAIL_CONNECTION_STRING=
+SMTP_URL=
+RESEND_API_KEY=
+SLACK_CLIENT_ID=
+SLACK_CLIENT_SECRET=
 EOF
 
 RESOURCE_GROUP=reddit-leads-prod scripts/azure-provision.sh --dry-run

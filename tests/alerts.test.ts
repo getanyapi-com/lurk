@@ -1,7 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const azureSend = vi.fn();
+const smtpSend = vi.fn();
+const smtpTransport = vi.fn();
+
+vi.mock("@azure/communication-email", () => ({
+  EmailClient: class {
+    constructor(public connectionString: string) {}
+    beginSend = (message: unknown) => azureSend(this.connectionString, message);
+  },
+}));
+
+vi.mock("nodemailer", () => ({
+  createTransport: (url: string) => {
+    smtpTransport(url);
+    return { sendMail: smtpSend };
+  },
+}));
 import { digestSubject, renderDigestHtml, renderDigestText } from "@/lib/alerts/digest";
 import { payloadFor, sendToChannel } from "@/lib/alerts/send";
-import { emailSender } from "@/lib/alerts/config";
+import { emailSender, slackApp } from "@/lib/alerts/config";
+import {
+  exchangeSlackCode,
+  slackInstallUrl,
+  slackLabel,
+  slackRedirectUri,
+} from "@/lib/alerts/slack";
 import {
   CADENCE_MS,
   CHAT_LEAD_CAP,
@@ -278,7 +302,118 @@ describe("delivery", () => {
     vi.stubEnv("ALERTS_FROM_EMAIL", "");
     expect(emailSender()).toBeNull();
     await expect(sendToChannel("email", "you@company.com", digestOf([]))).rejects.toThrow(
-      "Email alerts need RESEND_API_KEY and ALERTS_FROM_EMAIL",
+      "Email alerts need ALERTS_FROM_EMAIL and one of AZURE_EMAIL_CONNECTION_STRING, SMTP_URL or RESEND_API_KEY",
     );
+  });
+
+  it("hands Azure the sender, the recipient and both bodies", async () => {
+    vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "endpoint=https://x.communication.azure.com/;accesskey=k");
+    vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@lurk.so");
+    azureSend.mockReset();
+    await sendToChannel(
+      "email",
+      "you@company.com",
+      digestOf(selectLeads([lead({ id: "a" })], SINCE, null)),
+    );
+    expect(azureSend).toHaveBeenCalledTimes(1);
+    const [connection, message] = azureSend.mock.calls[0];
+    expect(connection).toContain("accesskey=k");
+    expect(message).toMatchObject({
+      senderAddress: "alerts@lurk.so",
+      recipients: { to: [{ address: "you@company.com" }] },
+      content: { subject: "1 new lead for Acme" },
+    });
+    expect(message.content.html).toContain("1 new lead for Acme in the last 24 hours.");
+    expect(message.content.plainText).toContain("Paying too much for a scraper");
+  });
+
+  it("hands an SMTP server the same message through its URL", async () => {
+    vi.stubEnv("SMTP_URL", "smtps://user:pass@smtp.example.com:465");
+    vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@lurk.so");
+    smtpSend.mockReset();
+    smtpTransport.mockReset();
+    await sendToChannel("email", "you@company.com", digestOf([]));
+    expect(smtpTransport).toHaveBeenCalledWith("smtps://user:pass@smtp.example.com:465");
+    expect(smtpSend.mock.calls[0][0]).toMatchObject({
+      from: "alerts@lurk.so",
+      to: "you@company.com",
+      subject: "0 new leads for Acme",
+    });
+  });
+
+  it("prefers Azure, then SMTP, then Resend when more than one is set", () => {
+    vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@lurk.so");
+    vi.stubEnv("RESEND_API_KEY", "re_x");
+    expect(emailSender()?.kind).toBe("resend");
+    vi.stubEnv("SMTP_URL", "smtp://localhost:25");
+    expect(emailSender()?.kind).toBe("smtp");
+    vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "endpoint=https://x/;accesskey=k");
+    expect(emailSender()?.kind).toBe("azure");
+  });
+
+  it("needs a From address whichever service is set", () => {
+    vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "endpoint=https://x/;accesskey=k");
+    vi.stubEnv("ALERTS_FROM_EMAIL", "");
+    expect(emailSender()).toBeNull();
+  });
+});
+
+describe("add to Slack", () => {
+  beforeEach(() => {
+    vi.stubEnv("DATABASE_URL", "postgres://reddit_leads@localhost:5433/reddit_leads");
+    vi.stubEnv("APP_ENCRYPTION_KEY", Buffer.alloc(32).toString("base64"));
+    vi.stubEnv("APP_URL", "https://lurk.so/");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("is off until both halves of the app are set", () => {
+    vi.stubEnv("SLACK_CLIENT_ID", "1.2");
+    expect(slackApp()).toBeNull();
+    expect(() => slackInstallUrl("s")).toThrow("SLACK_CLIENT_ID and SLACK_CLIENT_SECRET");
+  });
+
+  it("sends the person to Slack asking only for a webhook, back to this instance", () => {
+    vi.stubEnv("SLACK_CLIENT_ID", "1.2");
+    vi.stubEnv("SLACK_CLIENT_SECRET", "shh");
+    const url = new URL(slackInstallUrl("state-1"));
+    expect(url.origin + url.pathname).toBe("https://slack.com/oauth/v2/authorize");
+    expect(url.searchParams.get("scope")).toBe("incoming-webhook");
+    expect(url.searchParams.get("client_id")).toBe("1.2");
+    expect(url.searchParams.get("state")).toBe("state-1");
+    expect(url.searchParams.get("redirect_uri")).toBe("https://lurk.so/connect/slack/callback");
+    expect(slackRedirectUri()).toBe("https://lurk.so/connect/slack/callback");
+  });
+
+  it("swaps the code for the webhook and names the channel and workspace", async () => {
+    vi.stubEnv("SLACK_CLIENT_ID", "1.2");
+    vi.stubEnv("SLACK_CLIENT_SECRET", "shh");
+    const seen: { url: string; body: string }[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      seen.push({ url: String(input), body: String(init?.body ?? "") });
+      return Response.json({
+        ok: true,
+        team: { name: "AnyAPI" },
+        incoming_webhook: { url: "https://hooks.slack.com/services/T/B/x", channel: "#leads" },
+      });
+    });
+    const install = await exchangeSlackCode("code-9");
+    expect(seen[0].url).toBe("https://slack.com/api/oauth.v2.access");
+    const form = new URLSearchParams(seen[0].body);
+    expect(form.get("code")).toBe("code-9");
+    expect(form.get("client_secret")).toBe("shh");
+    expect(form.get("redirect_uri")).toBe("https://lurk.so/connect/slack/callback");
+    expect(install.webhookUrl).toBe("https://hooks.slack.com/services/T/B/x");
+    expect(slackLabel(install)).toBe("#leads in AnyAPI");
+  });
+
+  it("says why Slack refused", async () => {
+    vi.stubEnv("SLACK_CLIENT_ID", "1.2");
+    vi.stubEnv("SLACK_CLIENT_SECRET", "shh");
+    vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: "invalid_code" }));
+    await expect(exchangeSlackCode("stale")).rejects.toThrow("invalid_code");
   });
 });

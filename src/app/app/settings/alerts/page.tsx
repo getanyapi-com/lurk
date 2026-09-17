@@ -3,16 +3,30 @@ import { AddChannelForm } from "@/components/alerts/AddChannelForm";
 import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChannelList";
 import { EmptyState } from "@/components/EmptyState";
 import { listChannels } from "@/lib/alerts/channels";
+import { slackApp } from "@/lib/alerts/config";
 import { webhookAllowance, webhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
 import { activeProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
-type AlertsPageProps = { searchParams: Promise<{ project?: string }> };
+type AlertsPageProps = { searchParams: Promise<{ project?: string; slack?: string }> };
+
+/** What the page says after Add to Slack sends the person back. */
+function slackOutcome(status: string | undefined): { ok: boolean; text: string } | null {
+  if (!status) {
+    return null;
+  }
+  if (status === "connected") {
+    return { ok: true, text: "Slack is connected. The next digest lands in that channel." };
+  }
+  const reason = status.startsWith("failed:") ? status.slice("failed:".length) : null;
+  return { ok: false, text: reason ? `Slack did not connect: ${reason}` : "Slack did not connect." };
+}
 
 export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const user = await requireLocalUser();
-  const { project: requested } = await searchParams;
+  const { project: requested, slack } = await searchParams;
+  const outcome = slackOutcome(slack);
   const project = await activeProject(user.id, requested);
   if (!project) {
     return (
@@ -30,6 +44,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     id: one.id,
     channel: one.channel,
     target: one.target,
+    label: one.label,
     cadence: one.cadence,
     lastSentAt: one.lastSentAt ? one.lastSentAt.toISOString().slice(0, 16).replace("T", " ") : null,
   }));
@@ -58,11 +73,15 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
           </span>
         ) : null}
       </div>
+      {outcome ? (
+        <p className={`text-small ${outcome.ok ? "text-fg-muted" : "text-reddit"}`}>{outcome.text}</p>
+      ) : null}
       <AlertChannelList projectId={project.id} channels={rows} />
       <AddChannelForm
         projectId={project.id}
         webhooksAtCap={allowance.atCap}
         hourlyAllowed={limits?.alertCadence !== "daily"}
+        slackInstall={slackApp() !== null}
       />
     </div>
   );

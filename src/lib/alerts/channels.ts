@@ -63,6 +63,8 @@ export type AddChannelInput = {
   projectId: string;
   channel: AlertChannel;
   target: string;
+  /** Shown in place of the target when set. */
+  label?: string | null;
   cadence: AlertCadence;
   limits: TierLimits | null;
 };
@@ -91,6 +93,7 @@ export async function addChannel(input: AddChannelInput): Promise<ProjectChannel
       projectId: input.projectId,
       channel: input.channel,
       target,
+      label: input.label ?? null,
       cadence: input.cadence,
     })
     .returning();
