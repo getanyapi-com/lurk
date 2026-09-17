@@ -134,6 +134,13 @@
       "when": 1789610496133,
       "tag": "0018_closed_thread_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789668226971,
+      "tag": "0019_competitors_in_threads",
+      "breakpoints": true
     }
   ]
 }

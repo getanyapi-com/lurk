@@ -11,6 +11,7 @@ import type { ReviewItem } from "@/lib/feed";
 function card(id: string): CardLead {
   return {
     id,
+    postId: `post-${id}`,
     score: 70,
     fit: 3,
     intent: 2,

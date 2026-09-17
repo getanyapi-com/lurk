@@ -13,7 +13,12 @@ import { relativeAge } from "@/lib/format";
 
 import type { Selection } from "@/components/leads/workspace";
 
-type LeadDetailProps = { selection: Selection; projectId: string };
+type LeadDetailProps = {
+  selection: Selection;
+  projectId: string;
+  /** The project's competitors named in the selected lead's thread. */
+  competitors: string[];
+};
 
 function Pane({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
@@ -54,7 +59,7 @@ function ReplyingIn({ title, author, avatarUrl }: { title: string; author: strin
 }
 
 /** The whole post or comment, beside the ledger of facts about who wrote it. */
-export function LeadDetail({ selection, projectId }: LeadDetailProps) {
+export function LeadDetail({ selection, projectId, competitors }: LeadDetailProps) {
   if (selection.kind === "held") {
     const item = selection.item;
     const verdict = verdictFor(item);
@@ -103,6 +108,7 @@ export function LeadDetail({ selection, projectId }: LeadDetailProps) {
             fit={item.fit}
             intent={item.intent}
             engagement={null}
+            competitors={[]}
           />
         </div>
       </Pane>
@@ -156,6 +162,7 @@ export function LeadDetail({ selection, projectId }: LeadDetailProps) {
           fit={lead.fit}
           intent={lead.intent}
           engagement={lead.engagement}
+          competitors={competitors}
         />
       </div>
       <LeadActions

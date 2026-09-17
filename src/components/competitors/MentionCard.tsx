@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
 
 type MentionCardProps = { mention: MentionView };
 
-/** One post that named a competitor, and what it said. */
+/** What a mention with no sentiment is: named in a thread this project already reads. */
+const IN_YOUR_THREAD = "Named in one of your threads";
+
+/** One post or reply that named a competitor, and what it said. */
 export function MentionCard({ mention }: MentionCardProps) {
   return (
     <div className="flex flex-col gap-2.5 rounded-card border bg-surface p-4">
@@ -19,11 +22,17 @@ export function MentionCard({ mention }: MentionCardProps) {
         <SubredditChip name={mention.subreddit} iconUrl={mention.subredditIconUrl} />
         <span className="text-mono text-fg-muted">{relativeAge(mention.createdAt)}</span>
         <span className="ml-auto inline-flex items-center gap-1.5 text-small text-fg-muted">
-          <span
-            className={cn("size-2 rounded-full", SENTIMENT_DOT[mention.sentiment])}
-            aria-hidden="true"
-          />
-          {SENTIMENT_WORD[mention.sentiment]}
+          {mention.sentiment === null ? (
+            IN_YOUR_THREAD
+          ) : (
+            <>
+              <span
+                className={cn("size-2 rounded-full", SENTIMENT_DOT[mention.sentiment])}
+                aria-hidden="true"
+              />
+              {SENTIMENT_WORD[mention.sentiment]}
+            </>
+          )}
         </span>
       </div>
       <a
@@ -37,6 +46,10 @@ export function MentionCard({ mention }: MentionCardProps) {
       </a>
       {mention.summary ? (
         <p className="rounded-card bg-surface-2 p-3 text-small text-fg-muted">{mention.summary}</p>
+      ) : mention.quote ? (
+        <blockquote className="rounded-card bg-surface-2 p-3 text-small text-fg-muted">
+          {mention.quote}
+        </blockquote>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-mono text-fg-muted">about {mention.competitor}</span>

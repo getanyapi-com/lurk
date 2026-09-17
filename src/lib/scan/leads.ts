@@ -1,7 +1,8 @@
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditPosts } from "@/db/schema";
 import type { StoredPost } from "@/lib/reddit/store";
+import { MIN_COMMENTS_FOR_THREAD } from "./constants";
 import type { LeadKind } from "./gates";
 
 export type LeadRow = {
@@ -80,11 +81,12 @@ export async function writeLeads(input: LeadRow[]): Promise<number> {
 }
 
 /**
- * The threads worth checking again: every post lead still in the feed, best
- * first. Verification is not limited to the leads this scan happened to find,
- * because a need found yesterday is the one most likely to have been answered.
+ * The threads worth buying this scan: every post lead still in the feed whose
+ * thread has never been read, or whose reply count has moved since it was,
+ * best first. An unchanged thread has nothing new to name a competitor in, and
+ * a thread under the minimum has too little to be worth its price.
  */
-export async function openPostLeads(
+export async function threadsToRead(
   projectId: string,
   budget: number | null,
 ): Promise<StoredPost[]> {
@@ -93,34 +95,20 @@ export async function openPostLeads(
     .from(leads)
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .where(
-      and(eq(leads.projectId, projectId), eq(leads.status, "new"), sql`${leads.commentId} is null`),
+      and(
+        eq(leads.projectId, projectId),
+        eq(leads.status, "new"),
+        isNull(leads.commentId),
+        sql`coalesce(${redditPosts.numComments}, 0) >= ${MIN_COMMENTS_FOR_THREAD}`,
+        or(
+          isNull(redditPosts.commentsObservedAt),
+          sql`${redditPosts.numComments} is distinct from ${redditPosts.commentsReadCount}`,
+        ),
+      ),
     )
     .orderBy(desc(leads.score));
   const rows = budget === null ? await query : await query.limit(budget);
   return rows.map((row) => row.post);
-}
-
-/**
- * Takes the post leads whose author says the need is met out of the feed. The
- * lead is kept, because what it cost and what it taught are still true.
- */
-export async function resolveLeads(projectId: string, postIds: string[]): Promise<number> {
-  if (postIds.length === 0) {
-    return 0;
-  }
-  const done = await db()
-    .update(leads)
-    .set({ status: "resolved" })
-    .where(
-      and(
-        eq(leads.projectId, projectId),
-        inArray(leads.postId, postIds),
-        sql`${leads.commentId} is null`,
-        eq(leads.status, "new"),
-      ),
-    )
-    .returning({ id: leads.id });
-  return done.length;
 }
 
 /** One candidate a re-judgement no longer puts in the feed. */

@@ -1,7 +1,13 @@
 import { and, count, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { competitorMentions } from "@/db/schema/competitors";
-import { projectCompetitors, redditAuthors, redditPosts, subreddits } from "@/db/schema";
+import {
+  projectCompetitors,
+  redditAuthors,
+  redditComments,
+  redditPosts,
+  subreddits,
+} from "@/db/schema";
 import { SENTIMENTS, type Sentiment } from "./classify";
 
 /** The window the competitor screen shows, matching the feed window. */
@@ -10,14 +16,19 @@ export const MENTION_WINDOW_DAYS = 30;
 export type MentionView = {
   id: string;
   competitor: string;
-  sentiment: Sentiment;
+  /** Null for a mention found in a thread the project reads, which nobody judged. */
+  sentiment: Sentiment | null;
   summary: string | null;
+  /** The sentence that named the competitor, for a mention found in a thread. */
+  quote: string | null;
   foundAt: Date;
   postId: string;
   title: string;
+  /** The reply's own link when a reply named the competitor, else the post's. */
   url: string;
   subreddit: string;
   subredditIconUrl: string | null;
+  /** Who named the competitor: the reply's author, or the post's. */
   author: string | null;
   avatarUrl: string | null;
   createdAt: Date;
@@ -59,7 +70,10 @@ export async function countMentions(
   return rows[0]?.total ?? 0;
 }
 
-/** Every mention inside the window, newest first. */
+/** The one who named the competitor: the reply's author when a reply did. */
+const NAMED_BY = sql`coalesce(${redditComments.author}, ${redditPosts.author})`;
+
+/** Every mention inside the window, newest first. A reply is as old as itself. */
 export async function listMentions(
   projectId: string,
   days = MENTION_WINDOW_DAYS,
@@ -70,28 +84,50 @@ export async function listMentions(
       competitor: competitorMentions.competitor,
       sentiment: competitorMentions.sentiment,
       summary: competitorMentions.summary,
+      quote: competitorMentions.quote,
       foundAt: competitorMentions.foundAt,
       postId: competitorMentions.postId,
       title: redditPosts.title,
-      url: redditPosts.url,
+      url: sql<string>`coalesce(${redditComments.permalink}, ${redditPosts.url})`,
       subreddit: redditPosts.subreddit,
       subredditIconUrl: subreddits.iconUrl,
-      author: redditPosts.author,
+      author: sql<string | null>`${NAMED_BY}`,
       avatarUrl: redditAuthors.avatarUrl,
-      createdAt: redditPosts.createdAt,
+      createdAt: sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`,
     })
     .from(competitorMentions)
     .innerJoin(redditPosts, eq(redditPosts.id, competitorMentions.postId))
+    .leftJoin(redditComments, eq(redditComments.id, competitorMentions.commentId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
-    .leftJoin(redditAuthors, eq(redditAuthors.username, sql`lower(${redditPosts.author})`))
+    .leftJoin(redditAuthors, eq(redditAuthors.username, sql`lower(${NAMED_BY})`))
     .where(
       and(
         eq(competitorMentions.projectId, projectId),
         gte(redditPosts.createdAt, windowStart(days)),
       ),
     )
-    .orderBy(desc(redditPosts.createdAt));
-  return rows.map((row) => ({ ...row, sentiment: row.sentiment as Sentiment }));
+    .orderBy(desc(sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`));
+  return rows.map((row) => ({
+    ...row,
+    sentiment: (row.sentiment as Sentiment | null) ?? null,
+    createdAt: new Date(row.createdAt),
+  }));
+}
+
+/**
+ * The competitors named anywhere in one thread this project holds a lead in,
+ * each once, in the order the project lists them. The detail pane's line.
+ */
+export async function competitorsNamedIn(projectId: string, postId: string): Promise<string[]> {
+  const rows = await db()
+    .selectDistinct({ competitor: competitorMentions.competitor })
+    .from(competitorMentions)
+    .where(
+      and(eq(competitorMentions.projectId, projectId), eq(competitorMentions.postId, postId)),
+    );
+  const named = new Set(rows.map((row) => row.competitor));
+  const listed = await listCompetitorNames(projectId);
+  return listed.filter((name) => named.has(name));
 }
 
 export type MentionSeries = { competitor: string; days: number[]; total: number };
@@ -134,6 +170,7 @@ export type CompetitorCount = {
 
 /**
  * How often each competitor was mentioned, split by sentiment, loudest first.
+ * A mention found in a thread has no sentiment and counts in the total only.
  * Competitors tied on total keep the order they were first mentioned in.
  */
 export function topCompetitors(
@@ -150,7 +187,9 @@ export function topCompetitors(
       counts.set(mention.competitor, row);
     }
     row.total += 1;
-    row.sentiments[mention.sentiment] += 1;
+    if (mention.sentiment !== null) {
+      row.sentiments[mention.sentiment] += 1;
+    }
   }
   return [...counts.values()].sort((a, b) => b.total - a.total);
 }

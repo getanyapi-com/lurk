@@ -13,6 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function card(id: string, score: number, ageDays: number): CardLead {
   return {
     id,
+    postId: `post-${id}`,
     score,
     fit: 3,
     intent: 2,
