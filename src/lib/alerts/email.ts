@@ -1,6 +1,5 @@
 import { EmailClient } from "@azure/communication-email";
 import { createTransport } from "nodemailer";
-import { Resend } from "resend";
 import { EMAIL_SENDER_ENV, emailSender, type EmailSender } from "./config";
 
 /** One rendered email, the same whichever service carries it. */
@@ -16,7 +15,7 @@ async function viaAzure(sender: Extract<EmailSender, { kind: "azure" }>, mail: E
   /**
    * beginSend rejects a bad sender or recipient at once. Delivery itself is
    * asynchronous and can take half a minute, so the job does not wait on it,
-   * the same way Resend accepts a message before it has been delivered.
+   * the same way an SMTP server accepts a message before it has been delivered.
    */
   await client.beginSend({
     senderAddress: sender.from,
@@ -36,19 +35,6 @@ async function viaSmtp(sender: Extract<EmailSender, { kind: "smtp" }>, mail: Ema
   });
 }
 
-async function viaResend(sender: Extract<EmailSender, { kind: "resend" }>, mail: EmailMessage) {
-  const sent = await new Resend(sender.apiKey).emails.send({
-    from: sender.from,
-    to: mail.to,
-    subject: mail.subject,
-    html: mail.html,
-    text: mail.text,
-  });
-  if (sent.error) {
-    throw new Error(sent.error.message);
-  }
-}
-
 /** Sends one email down whichever service is configured. Throws with the reason. */
 export async function sendEmail(mail: EmailMessage): Promise<void> {
   const sender = emailSender();
@@ -57,9 +43,7 @@ export async function sendEmail(mail: EmailMessage): Promise<void> {
   }
   if (sender.kind === "azure") {
     await viaAzure(sender, mail);
-  } else if (sender.kind === "smtp") {
-    await viaSmtp(sender, mail);
   } else {
-    await viaResend(sender, mail);
+    await viaSmtp(sender, mail);
   }
 }

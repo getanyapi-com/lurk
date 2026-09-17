@@ -32,12 +32,11 @@ const schema = z.object({
   TYPESAFE_MODEL: z.preprocess(blankIsAbsent, z.string().default("jev-latest")),
 
   /**
-   * The digest email goes out through whichever of these is set, in this
-   * order: Azure Communication Services, a plain SMTP server, Resend.
+   * The digest email goes out through Azure Communication Services when its
+   * connection string is set, otherwise through the SMTP server named here.
    */
   AZURE_EMAIL_CONNECTION_STRING: optional(z.string()),
   SMTP_URL: optional(z.string()),
-  RESEND_API_KEY: optional(z.string()),
   ALERTS_FROM_EMAIL: optional(z.email()),
 
   /** A Slack app with the incoming-webhook scope turns the paste-a-URL step into Add to Slack. */

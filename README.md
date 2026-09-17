@@ -92,10 +92,9 @@ npm run anyapi:register
 | `TYPESAFE_MODEL` | no | `jev-latest` | Override the model. |
 | `OPENROUTER_API_KEY` | no | - | Pays for the product profile, drafting and clustering. |
 | `OPENROUTER_MODEL` | no | `meta/muse-spark-1.3-contributor` | Override the model. |
-| `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and one of the three below. |
-| `AZURE_EMAIL_CONNECTION_STRING` | no | - | Sends the digest through Azure Communication Services. Wins when more than one is set. |
+| `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and one of the two below. |
+| `AZURE_EMAIL_CONNECTION_STRING` | no | - | Sends the digest through Azure Communication Services. Wins when both are set. |
 | `SMTP_URL` | no | - | Sends the digest through any SMTP server, as `smtps://user:pass@host:465`. |
-| `RESEND_API_KEY` | no | - | Sends the digest through Resend. |
 | `SLACK_CLIENT_ID` | no | - | With the secret, turns the Slack channel into an Add to Slack button. |
 | `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
 | `HOUSE_DATA_CAP_USD_PER_DAY` | no | `25` | Daily ceiling on data spend from the house key. |
@@ -138,8 +137,7 @@ the token here and revokes it at AnyAPI.
 
 Settings -> Alerts is where new leads land. Add an email digest, a Slack or Discord webhook,
 or a generic webhook that receives the same digest as JSON. Email needs `ALERTS_FROM_EMAIL`
-and one carrier: `AZURE_EMAIL_CONNECTION_STRING`, `SMTP_URL` or `RESEND_API_KEY`, checked in
-that order. On Azure, the local part of `ALERTS_FROM_EMAIL` must also be added as a sender
+and one carrier: `AZURE_EMAIL_CONNECTION_STRING` or `SMTP_URL`, in that order. On Azure, the local part of `ALERTS_FROM_EMAIL` must also be added as a sender
 username on the domain, or every send is refused. The webhooks need nothing. A digest carries the day's new leads with
 their score, reason, community and link, in the same shapes the feed uses, and sends nothing
 at all when there is nothing new. The scheduler queues one digest pass an hour and each
@@ -227,7 +225,6 @@ OPENROUTER_API_KEY=
 ALERTS_FROM_EMAIL=
 AZURE_EMAIL_CONNECTION_STRING=
 SMTP_URL=
-RESEND_API_KEY=
 SLACK_CLIENT_ID=
 SLACK_CLIENT_SECRET=
 EOF

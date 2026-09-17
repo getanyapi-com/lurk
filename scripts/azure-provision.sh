@@ -214,13 +214,16 @@ add_secret app-encryption-key APP_ENCRYPTION_KEY
 add_secret clerk-secret-key CLERK_SECRET_KEY
 add_secret anyapi-house-api-key ANYAPI_HOUSE_API_KEY
 add_secret openrouter-api-key OPENROUTER_API_KEY
-add_secret resend-api-key RESEND_API_KEY
+add_secret azure-email-connection-string AZURE_EMAIL_CONNECTION_STRING
+add_secret smtp-url SMTP_URL
+add_secret slack-client-secret SLACK_CLIENT_SECRET
 
 add_plain NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 add_plain ANYAPI_BASE_URL https://api.getanyapi.com
 add_plain ANYAPI_OAUTH_CLIENT_ID
 add_plain OPENROUTER_MODEL
 add_plain ALERTS_FROM_EMAIL
+add_plain SLACK_CLIENT_ID
 add_plain HOUSE_DATA_CAP_USD_PER_DAY
 add_plain HOUSE_LLM_CAP_USD_PER_DAY
 ENV_ARGS+=("SELF_HOSTED=false")

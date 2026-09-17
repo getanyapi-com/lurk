@@ -278,31 +278,13 @@ describe("delivery", () => {
     expect(JSON.parse(seen[0].body)).toMatchObject({ project: "Acme" });
   });
 
-  it("hands Resend the from, the recipient, the subject and the html", async () => {
-    vi.stubEnv("RESEND_API_KEY", "re_test_key");
-    vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@leads.example.com");
-    const seen = captureRequest();
-    await sendToChannel(
-      "email",
-      "you@company.com",
-      digestOf(selectLeads([lead({ id: "a" })], SINCE, null)),
-    );
-    const body = JSON.parse(seen[0].body);
-    expect(seen[0].url).toContain("/emails");
-    expect(body).toMatchObject({
-      from: "alerts@leads.example.com",
-      to: "you@company.com",
-      subject: "1 new lead for Acme",
-    });
-    expect(body.html).toContain("1 new lead for Acme in the last 24 hours.");
-  });
-
   it("reads a blank variable as an unset one and says what is missing", async () => {
-    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "");
+    vi.stubEnv("SMTP_URL", "");
     vi.stubEnv("ALERTS_FROM_EMAIL", "");
     expect(emailSender()).toBeNull();
     await expect(sendToChannel("email", "you@company.com", digestOf([]))).rejects.toThrow(
-      "Email alerts need ALERTS_FROM_EMAIL and one of AZURE_EMAIL_CONNECTION_STRING, SMTP_URL or RESEND_API_KEY",
+      "Email alerts need ALERTS_FROM_EMAIL and one of AZURE_EMAIL_CONNECTION_STRING or SMTP_URL",
     );
   });
 
@@ -341,10 +323,8 @@ describe("delivery", () => {
     });
   });
 
-  it("prefers Azure, then SMTP, then Resend when more than one is set", () => {
+  it("prefers Azure over SMTP when both are set", () => {
     vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@lurk.so");
-    vi.stubEnv("RESEND_API_KEY", "re_x");
-    expect(emailSender()?.kind).toBe("resend");
     vi.stubEnv("SMTP_URL", "smtp://localhost:25");
     expect(emailSender()?.kind).toBe("smtp");
     vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "endpoint=https://x/;accesskey=k");

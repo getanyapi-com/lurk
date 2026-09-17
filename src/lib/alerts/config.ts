@@ -1,19 +1,18 @@
 import { config } from "@/lib/config";
 
 /**
- * Which service carries the digest email. Azure Communication Services and a
- * plain SMTP server are the self-hosted choices; Resend is the hosted default.
+ * Which service carries the digest email: Azure Communication Services, which
+ * the hosted instance uses, or any plain SMTP server.
  */
 export type EmailSender =
   | { kind: "azure"; connectionString: string; from: string }
-  | { kind: "smtp"; url: string; from: string }
-  | { kind: "resend"; apiKey: string; from: string };
+  | { kind: "smtp"; url: string; from: string };
 
-export const EMAIL_SENDER_ENV = "AZURE_EMAIL_CONNECTION_STRING, SMTP_URL or RESEND_API_KEY";
+export const EMAIL_SENDER_ENV = "AZURE_EMAIL_CONNECTION_STRING or SMTP_URL";
 
 /** What a real send needs, or null when no email service is configured. */
 export function emailSender(): EmailSender | null {
-  const { AZURE_EMAIL_CONNECTION_STRING, SMTP_URL, RESEND_API_KEY, ALERTS_FROM_EMAIL } = config();
+  const { AZURE_EMAIL_CONNECTION_STRING, SMTP_URL, ALERTS_FROM_EMAIL } = config();
   if (!ALERTS_FROM_EMAIL) {
     return null;
   }
@@ -23,9 +22,6 @@ export function emailSender(): EmailSender | null {
   }
   if (SMTP_URL) {
     return { kind: "smtp", url: SMTP_URL, from };
-  }
-  if (RESEND_API_KEY) {
-    return { kind: "resend", apiKey: RESEND_API_KEY, from };
   }
   return null;
 }
