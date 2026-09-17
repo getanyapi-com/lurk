@@ -7,7 +7,7 @@ function headline(digest: Digest): string {
 }
 
 function line(lead: DigestLead): string {
-  const reason = lead.reason ? ` ${lead.reason}` : "";
+  const reason = lead.reason ? `\n_${lead.reason}_` : "";
   return `*${lead.score}* r/${lead.subreddit} - ${lead.title}${reason}`;
 }
 

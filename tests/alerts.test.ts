@@ -163,6 +163,13 @@ describe("chat payloads", () => {
     expect(JSON.stringify(payload)).toContain("https://www.reddit.com/r/SaaS/comments/x/");
   });
 
+  it("keeps the Slack reason on its own line under the title", () => {
+    const one = lead({ id: "a", reason: "Ready to switch." });
+    const payload = payloadFor("slack", digestOf(selectLeads([one], SINCE, null)));
+    const section = (payload as { blocks: Array<{ text: { text: string } }> }).blocks[1];
+    expect(section.text.text).toMatch(/- .*\n_Ready to switch\._\n<https/);
+  });
+
   it("gives Discord one embed per lead with the score and subreddit", () => {
     const payload = payloadFor("discord", digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
     expect(payload).toMatchObject({
