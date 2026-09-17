@@ -13,6 +13,7 @@ describe("tiers", () => {
 
   it("makes a connected wallet buy freshness and breadth, not features", () => {
     expect(TIERS.connected.projects).toBeNull();
+    expect(TIERS.connected.apiRequestsPerDay).toBeNull();
     expect(TIERS.connected.feedWindowDays).toBe(TIERS.free.feedWindowDays);
   });
 

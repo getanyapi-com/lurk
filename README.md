@@ -118,7 +118,7 @@ A hosted instance has two tiers. Self-hosting is neither: it has no limits at al
 | Reddit SEO | 10 keywords, refreshed weekly | unlimited, refreshed daily |
 | Competitors | 3 | unlimited |
 | Insights | full | full |
-| API and MCP | read-only, 1,000 requests a day | read-only, 10,000 requests a day |
+| API and MCP | read-only, 1,000 requests a day | read-only, unlimited requests |
 
 Connecting a wallet buys freshness and breadth, not features. Every feature is on in every
 tier.

@@ -16,7 +16,8 @@ export type TierLimits = {
   seoKeywords: number | null;
   seoRefreshDays: number;
   competitors: number | null;
-  apiRequestsPerDay: number;
+  /** Null means no daily cap, which is what a connected wallet buys. */
+  apiRequestsPerDay: number | null;
   /**
    * What discovery and one scan may buy. The starting values come from the
    * accepted second opinion and Kevin reviews them.
@@ -64,7 +65,7 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoKeywords: null,
     seoRefreshDays: 1,
     competitors: null,
-    apiRequestsPerDay: 10000,
+    apiRequestsPerDay: null,
     discoveryQueries: 12,
     discoveryQueriesMax: 20,
     searchesPerScan: 16,

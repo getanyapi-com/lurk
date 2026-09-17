@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 type WalletPanelProps = { connectedAt: Date | null; selfHosted: boolean };
 
 function unlimited(value: number | null, unit: string): string {
-  return value === null ? "Unlimited" : `${value} ${unit}`;
+  return value === null ? "Unlimited" : `${value.toLocaleString()} ${unit}`;
 }
 
 /** One line per limit, in the words a person compares plans by. */
@@ -23,7 +23,7 @@ function rowsFor(name: TierName): string[] {
     unlimited(t.customWebhooks, t.customWebhooks === 1 ? "custom webhook" : "custom webhooks"),
     `Reddit SEO refreshed ${t.seoRefreshDays === 1 ? "daily" : `every ${t.seoRefreshDays} days`}`,
     name === "free" ? "Reads only fresh threads" : "Reads every thread a scan can use",
-    `${t.apiRequestsPerDay.toLocaleString()} API requests a day`,
+    unlimited(t.apiRequestsPerDay, "API requests a day"),
   ];
 }
 

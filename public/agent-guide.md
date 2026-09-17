@@ -33,10 +33,11 @@ The user creates keys in the app under Settings -> API. Keys are read-only
 `X-Request-Cost-Usd: 0`; the only money in this product is the Reddit data the
 scans buy, which is already spent by the time you read a lead.
 
-Each key has a daily request allowance: 1,000 requests a day, or 10,000 when the
-user has connected their own AnyAPI wallet. Over it you get `429` with a
+Each key has a daily request allowance of 1,000 requests a day, lifted entirely
+once the user has connected their own AnyAPI wallet. Over it you get `429` with a
 `Retry-After` header in seconds; the counter resets at UTC midnight. A
-self-hosted instance has no allowance at all.
+self-hosted instance has no allowance at all. `GET /me` reports the cap as
+`requestsPerDay`, which is `null` when there is none.
 
 ## The loop
 

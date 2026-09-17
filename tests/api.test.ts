@@ -150,5 +150,10 @@ describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a d
 
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
     expect((await consumeDailyRequest(id, 2, yesterday)).allowed).toBe(true);
+
+    const uncapped = await consumeDailyRequest(id, null);
+    expect(uncapped.allowed).toBe(true);
+    expect(uncapped.limit).toBeNull();
+    expect(uncapped.used).toBe(4);
   });
 });
