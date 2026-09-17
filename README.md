@@ -324,8 +324,8 @@ npm run dev
 `npm run check` runs the typecheck, the linter and the unit tests. The database-backed tests
 skip unless `DATABASE_URL` is set, and never write to that database: they use a sibling named
 `<database>_test` on the same server (or `TEST_DATABASE_URL`), created and migrated on the
-first run. They also drop every paid key from the environment, so a test cannot spend. `npm run db:generate` writes a new migration
-after a schema change.
+first run. They also drop every paid key from the environment, so a test cannot spend.
+`npm run db:generate` writes a new migration after a schema change.
 
 ## Licence
 
