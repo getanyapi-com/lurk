@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { forgetEveryProjectFeed } from "@/lib/projectFeedCache";
 
 /**
@@ -13,8 +13,27 @@ const hasDatabase = !!process.env.DATABASE_URL;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe.skipIf(!hasDatabase)("the leads page read", () => {
+  /** Every user this file made, so nothing it wrote outlives the test. */
+  const made: string[] = [];
+
   beforeEach(() => {
     forgetEveryProjectFeed();
+  });
+
+  /**
+   * The scheduler sweeps every project there is, so a project left behind here
+   * is one it seeds a scan for while another suite is counting what it seeded.
+   * Deleting the user cascades to the project and its leads; the posts are
+   * shared by every project and are left where they are.
+   */
+  afterEach(async () => {
+    if (made.length === 0) {
+      return;
+    }
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { inArray } = await import("drizzle-orm");
+    await db().delete(schema.users).where(inArray(schema.users.id, made.splice(0)));
   });
 
   async function fixture() {
@@ -25,6 +44,7 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
       .insert(schema.users)
       .values({ clerkUserId: `test_${randomUUID()}` })
       .returning();
+    made.push(user.id);
     const [project] = await db()
       .insert(schema.projects)
       .values({ userId: user.id, name: "Formcraft" })
