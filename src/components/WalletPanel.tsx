@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 
 type WalletPanelProps = { connectedAt: Date | null; selfHosted: boolean };
 
+/** Always names what is counted, so a row reads "Unlimited projects", never "Unlimited". */
 function unlimited(value: number | null, unit: string): string {
-  return value === null ? "Unlimited" : `${value.toLocaleString()} ${unit}`;
+  return `${value === null ? "Unlimited" : value.toLocaleString()} ${unit}`;
 }
 
 /** One line per limit, in the words a person compares plans by. */
