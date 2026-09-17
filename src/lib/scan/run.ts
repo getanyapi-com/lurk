@@ -6,7 +6,7 @@ import type { StoredPost } from "@/lib/reddit/store";
 import { scanIntervalHours, tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { heldForComments, judgeThreads, readThreads } from "./comments";
-import { hydrationCap } from "./constants";
+import { hydrationCap, inFlight } from "./constants";
 import { isSentinel } from "./evidence";
 import { routeLead, type LeadKind } from "./gates";
 import {
@@ -114,13 +114,13 @@ export function postItem(post: StoredPost): ScorableItem {
  * failed scan: the card falls back to the author's initials.
  */
 async function fetchAvatars(ctx: FetchContext, usernames: string[]): Promise<void> {
-  for (const username of new Set(usernames.filter(Boolean))) {
+  await inFlight([...new Set(usernames.filter(Boolean))], async (username) => {
     try {
       await fetchAuthorProfile(ctx, username, AUTHOR_MAX_AGE_MS);
     } catch {
       // An avatar is decoration; the lead is already written.
     }
-  }
+  });
 }
 
 /**
@@ -251,15 +251,13 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   const opening = shortlist.filter((post) => !post.bodyObservedAt);
 
   await writeProgress(jobId, `Opening ${opening.length} posts`);
-  const full: StoredPost[] = [];
-  for (const post of shortlist) {
-    if (!post.bodyObservedAt) {
-      const result = await fetchPost(ctx, post.url, RETENTION_MS);
-      full.push(result.value[0] ?? post);
-      continue;
+  const full = await inFlight(shortlist, async (post) => {
+    if (post.bodyObservedAt) {
+      return post;
     }
-    full.push(post);
-  }
+    const result = await fetchPost(ctx, post.url, RETENTION_MS);
+    return result.value[0] ?? post;
+  });
 
   await writeProgress(jobId, `Checking who is asking in ${full.length} posts`);
   const unjudgedPosts = await unjudged(project, stored, full);

@@ -14,6 +14,7 @@ import {
 } from "./evaluations";
 import type { Judgement, ScorableItem } from "./judgement";
 import { leadKey } from "./leads";
+import { inFlight } from "./constants";
 import type { ScanProject } from "./project";
 import { judgeItems } from "./score";
 
@@ -33,17 +34,16 @@ export async function readThreads(
   ctx: FetchContext,
   posts: StoredPost[],
 ): Promise<{ threads: ThreadRead[]; failures: number }> {
-  const threads: ThreadRead[] = [];
-  let failures = 0;
-  for (const post of posts) {
+  const reads = await inFlight(posts, async (post): Promise<ThreadRead | null> => {
     try {
       const result = await fetchPostComments(ctx, post.id, post.url);
-      threads.push({ post, comments: result.value });
+      return { post, comments: result.value };
     } catch {
-      failures += 1;
+      return null;
     }
-  }
-  return { threads, failures };
+  });
+  const threads = reads.filter((read): read is ThreadRead => read !== null);
+  return { threads, failures: reads.length - threads.length };
 }
 
 /**

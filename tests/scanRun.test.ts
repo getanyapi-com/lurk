@@ -672,4 +672,35 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     const feed = await listLeads(row.id, { status: "new", days: 30 });
     expect(feed).toHaveLength(0);
   });
+
+  it("opens posts and reads threads several at a time", async () => {
+    const row = await project();
+    const listed = await posts(4, { body: undefined });
+    fetchSearch.mockResolvedValue({ value: { posts: listed, nextCursor: null }, reused: true, costUsd: 0 });
+    /** How many calls of one kind were in flight at once, at the busiest moment. */
+    const peak = { posts: 0, threads: 0 };
+    let openPosts = 0;
+    fetchPost.mockImplementation(async (_ctx: unknown, url: string) => {
+      openPosts += 1;
+      peak.posts = Math.max(peak.posts, openPosts);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      openPosts -= 1;
+      return { value: [await opened(listed.find((post) => post.url === url)!)], reused: true, costUsd: 0 };
+    });
+    let openThreads = 0;
+    fetchPostComments.mockImplementation(async () => {
+      openThreads += 1;
+      peak.threads = Math.max(peak.threads, openThreads);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      openThreads -= 1;
+      return { value: [], reused: true, costUsd: 0 };
+    });
+    model();
+
+    const outcome = await runScan(row.id, randomUUID());
+    expect(outcome.leads).toBe(4);
+    expect(fetchPost).toHaveBeenCalledTimes(4);
+    expect(fetchPostComments).toHaveBeenCalledTimes(4);
+    expect(peak).toEqual({ posts: 4, threads: 4 });
+  });
 });

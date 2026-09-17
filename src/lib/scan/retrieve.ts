@@ -4,7 +4,7 @@ import type { StoredPost } from "@/lib/reddit/store";
 import type { RedditThread } from "@/lib/seo/links";
 import type { TierLimits } from "@/lib/tiers";
 import { serpCallsToday } from "@/lib/usage";
-import { retrievalBudgets } from "./constants";
+import { inFlight, retrievalBudgets } from "./constants";
 import {
   byWorth,
   coverageTimeframe,
@@ -168,27 +168,31 @@ async function runSerp(loop: Loop, row: PlanRow, budget: number): Promise<number
     loop.gaps.push(`The Google search for "${row.key}" failed.`);
     return 0;
   }
-  let spent = 0;
+  const source: CandidateSource = { kind: "serp", key: query, rows: [row] };
+  const unseen = new Map<string, RedditThread>();
   for (const thread of threads) {
-    if (loop.found.has(thread.postId)) {
-      loop.found.get(thread.postId)?.sources.push({ kind: "serp", key: query, rows: [row] });
-      continue;
+    const held = loop.found.get(thread.postId);
+    if (held) {
+      held.sources.push(source);
+    } else if (!unseen.has(thread.postId)) {
+      unseen.set(thread.postId, thread);
     }
-    if (spent >= budget) {
-      loop.gaps.push("The Google feed found more threads than this scan could open.");
-      return spent;
-    }
-    spent += 1;
+  }
+  const opening = [...unseen.values()].slice(0, budget);
+  if (opening.length < unseen.size) {
+    loop.gaps.push("The Google feed found more threads than this scan could open.");
+  }
+  await inFlight(opening, async (thread) => {
     try {
       const post = (await fetchPost(loop.ctx, thread.canonicalUrl, loop.ctx.maxAgeMs)).value[0];
       if (post) {
-        keep(loop, [post], { kind: "serp", key: query, rows: [row] });
+        keep(loop, [post], source);
       }
     } catch {
       loop.gaps.push(`Opening ${thread.canonicalUrl} failed.`);
     }
-  }
-  return spent;
+  });
+  return opening.length;
 }
 
 /** The rows this scan searches: the best active ones, plus the explorer. */
@@ -240,19 +244,20 @@ export async function retrieve(input: RetrieveInput): Promise<Retrieval> {
   const queries = searchSlots(project, budgets.searches, explorer);
   const wide = await lastWideSweeps(queries.map((row) => row.key));
 
-  for (const row of queries) {
-    await runSearch(loop, row, needsWideSweep(wide.get(row.key.toLowerCase()) ?? null, now));
-  }
   const communities = byWorth(retrieved(project.communities)).slice(0, budgets.scoped);
   const best = byWorth(retrieved(project.queries))[0] ?? queries[0];
-  if (best) {
-    for (const community of communities) {
-      await runScoped(loop, community, best);
-    }
-  }
-  for (const row of listingSlots(project, budgets.listings, explorer)) {
-    await runListing(loop, row);
-  }
+  // Every search, scoped search and listing walk is independent of the others,
+  // so they run CALL_CONCURRENCY at a time; each one keeps what it found and
+  // marks its own coverage, whichever order they answer in.
+  const walks: (() => Promise<void>)[] = [
+    ...queries.map(
+      (row) => () =>
+        runSearch(loop, row, needsWideSweep(wide.get(row.key.toLowerCase()) ?? null, now)),
+    ),
+    ...(best ? communities.map((community) => () => runScoped(loop, community, best)) : []),
+    ...listingSlots(project, budgets.listings, explorer).map((row) => () => runListing(loop, row)),
+  ];
+  await inFlight(walks, (walk) => walk());
 
   let hydrated = 0;
   const allowance = Math.max(budgets.serpPerDay - (await serpCallsToday(project.id)), 0);
