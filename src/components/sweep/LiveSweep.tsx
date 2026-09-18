@@ -23,27 +23,68 @@ const FOLD_AFTER_MS = 4000;
  * and a wall with nothing in them read as a page that had stopped, for the
  * half minute the site read and Google take.
  */
-function SweepSetup({ lines }: { lines: string[] }) {
-  const shown = lines.length > 0 ? lines : ["Starting"];
+type SetupLine = { text: string; at: number };
+
+/**
+ * About how long each part of the setup takes, by how its line opens. The site
+ * read is one model call, 15 s at the median of those measured 2026-09-18; the
+ * rest are a fetch, a round of Google searches and their labelling, and the
+ * wait for the sweep's first page. A line that only reports a result has none.
+ */
+const ABOUT_S: [RegExp, number][] = [
+  [/^Opening /, 3],
+  [/^Reading the page/, 15],
+  [/^Asking Google/, 8],
+  [/^Checked /, 3],
+  [/^Starting the sweep/, 5],
+];
+
+function aboutSeconds(text: string): number | null {
+  return ABOUT_S.find(([opens]) => opens.test(text))?.[1] ?? null;
+}
+
+const seconds = (ms: number) => `${(Math.max(0, ms) / 1000).toFixed(1)} s`;
+
+function SweepSetup({ lines }: { lines: SetupLine[] }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(timer);
+  }, []);
+  const shown = lines.length > 0 ? lines : [{ text: "Starting", at: now }];
   return (
     <section className="flex flex-col gap-3 rounded-card border bg-surface px-6 py-5" aria-live="polite">
-      <span className="text-[11px] uppercase tracking-wide text-fg-muted">Setting up your project</span>
+      <span className="flex items-baseline justify-between gap-3 text-[11px] uppercase tracking-wide text-fg-muted">
+        Setting up your project
+        <span className="font-mono normal-case tabular-nums">
+          {seconds(now - shown[0].at)} · about {ABOUT_S.reduce((sum, [, s]) => sum + s, 0)} s in all
+        </span>
+      </span>
       <ol className="flex flex-col gap-2">
         {shown.map((line, index) => {
-          const now = index === shown.length - 1;
+          const current = index === shown.length - 1;
+          const about = aboutSeconds(line.text);
+          const took = (current ? now : shown[index + 1].at) - line.at;
           return (
-            <li key={line} className="flex items-center gap-3 text-body" style={{ opacity: now ? 1 : 0.6 }}>
+            <li key={line.text} className="flex items-center gap-3 text-body" style={{ opacity: current ? 1 : 0.6 }}>
               <span
                 className="size-2 shrink-0 rounded-full"
                 style={{
-                  background: now ? "var(--score-warm)" : "var(--score-hot)",
-                  animation: now ? "sweepSetupPulse 1.2s ease-in-out infinite" : undefined,
+                  background: current ? "var(--score-warm)" : "var(--score-hot)",
+                  animation: current ? "sweepSetupPulse 1.2s ease-in-out infinite" : undefined,
                 }}
               />
-              <span className={now ? "text-fg" : "text-fg-muted"}>
-                {line}
-                {now ? "…" : ""}
+              <span className={`min-w-0 flex-1 ${current ? "text-fg" : "text-fg-muted"}`}>
+                {line.text}
+                {current ? "…" : ""}
               </span>
+              {/* A line that reports a result was never waited on, so it has no clock. */}
+              {about === null ? null : (
+                <span className="shrink-0 font-mono text-[12px] tabular-nums text-fg-muted">
+                  <span className={current ? "text-fg" : undefined}>{seconds(took)}</span>
+                  {current ? ` · about ${about} s` : ""}
+                </span>
+              )}
             </li>
           );
         })}
@@ -79,7 +120,9 @@ export function LiveSweep({ projectId, first }: { projectId: string; first: Swee
   // A sweep that was already over when the page loaded opens folded: the leads
   // are what the page is for, and the board is one click away.
   const [folded, setFolded] = useState(first.state === "done" || first.state === "stopped");
-  const [lines, setLines] = useState<string[]>(first.progress ? [first.progress] : []);
+  const [lines, setLines] = useState<SetupLine[]>(() =>
+    first.progress ? [{ text: first.progress, at: Date.now() }] : [],
+  );
   const wasEnded = useRef(ended);
   const setup = !ended && snapshot.counts.found === 0;
 
@@ -108,7 +151,9 @@ export function LiveSweep({ projectId, first }: { projectId: string; first: Swee
           setSnapshot(next);
           const line = next.progress;
           if (line && next.counts.found === 0) {
-            setLines((seen) => (seen.includes(line) ? seen : [...seen, line]));
+            setLines((seen) =>
+              seen.some((one) => one.text === line) ? seen : [...seen, { text: line, at: Date.now() }],
+            );
           }
         }
       } catch {
