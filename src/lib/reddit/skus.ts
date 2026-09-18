@@ -246,11 +246,19 @@ export type AuthorFace = {
   accountCreatedAt: Date | null;
 } | null;
 
+type AvatarData = { username?: string; avatarUrl?: string; karma?: number; createdUtc?: number };
+type AvatarOutput = { found: boolean; data: AvatarData | null };
+
 /**
  * One Reddit account's public facts, kept a month. Called only for authors whose
  * post already became a lead, so the cost follows leads and not candidates. The
  * karma and the account age ride along on that same call and cost nothing more.
+ *
+ * `reddit.avatar` and not `reddit.profile`: it returns the three facts kept
+ * here and nothing else, at $0.38 per 1,000 against $2.25. It is asked for by
+ * slug because the SDK this app pins was cut before the SKU existed.
  */
+
 export async function fetchAuthorProfile(
   ctx: FetchContext,
   username: string,
@@ -260,11 +268,11 @@ export async function fetchAuthorProfile(
   return fetchShared<AuthorFace>({
     ctx,
     kind: "profile",
-    sku: "reddit.profile",
+    sku: "reddit.avatar",
     normalizedQuery: key,
     maxAgeMs,
     run: async () => {
-      const res = await ctx.funded.client.reddit.profile({ username });
+      const res = await ctx.funded.client.run<AvatarOutput>("reddit.avatar", { username });
       return { data: res.output.found ? res.output.data : null, costUsd: res.costUsd };
     },
     store: async (data) => {
@@ -278,7 +286,7 @@ export async function fetchAuthorProfile(
         username: key,
         avatarUrl: profile.avatarUrl ?? null,
         karma: profile.karma ?? null,
-        // `createdUtc` is Unix seconds, as the reddit.profile schema states.
+        // `createdUtc` is Unix seconds, as the reddit.avatar schema states.
         accountCreatedAt:
           profile.createdUtc === undefined ? null : new Date(profile.createdUtc * 1000),
         fetchedAt: new Date(),

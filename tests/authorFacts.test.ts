@@ -28,20 +28,19 @@ describe.skipIf(!hasDatabase)("author facts from the profile call", () => {
     const funded = {
       funding: "wallet:test" as const,
       client: {
-        reddit: {
-          profile: async () => ({
-            output: {
-              found: true,
-              data: {
-                username,
-                avatarUrl: "https://example.com/a.png",
-                karma: 4321,
-                createdUtc: CREATED_UTC,
-              },
+        // `reddit.avatar` is asked for by slug: see fetchAuthorProfile.
+        run: async () => ({
+          output: {
+            found: true,
+            data: {
+              username,
+              avatarUrl: "https://example.com/a.png",
+              karma: 4321,
+              createdUtc: CREATED_UTC,
             },
-            costUsd: 0,
-          }),
-        },
+          },
+          costUsd: 0,
+        }),
       },
       call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
     };

@@ -42,8 +42,8 @@ import { creditSources, markCovered, recordSources, type CandidateSource } from 
 
 const HOUR_MS = 60 * 60 * 1000;
 
-/** Lead authors whose profile a sweep looks up, best leads first. About $0.002 each. */
-const FACES = 25;
+/** Lead authors a sweep looks up, best leads first. $0.00038 each through `reddit.avatar`, so 2¢. */
+const FACES = 50;
 
 /** Pages in a row carrying nothing new to their walk before the walk ends. */
 const STALE_PAGES = 3;
@@ -423,9 +423,9 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   await report();
   await judge.settle();
 
-  // Faces for the top of the feed only. A full sweep writes hundreds of leads
-  // and a profile costs twenty times a scored post: looked up for all 448 of
-  // them on 2026-09-18 they were $0.88 of a $1.27 sweep, and they shared
+  // Faces for the top of the feed only. A full sweep writes hundreds of leads:
+  // looked up for all 448 of them on 2026-09-18, through `reddit.profile` as
+  // it then was, they were $0.88 of a $1.27 sweep, and they shared
   // Reddit's pace with the searches, which tripled how long the sweep took.
   // The rest keep their initials until a scan or a refresh reaches them.
   const faces = [...judge.leads]
