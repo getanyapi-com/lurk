@@ -9,6 +9,7 @@ import { OpeningProvider } from "@/components/leads/opening";
 import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
+import { LiveSweep } from "@/components/sweep/LiveSweep";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
@@ -18,6 +19,7 @@ import { feedPage } from "@/lib/feedPage";
 import { findLead } from "@/lib/leads";
 import { isBusy, projectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
+import { sweepShown, sweepSnapshot } from "@/lib/sweep";
 
 import type { StreamEntry } from "@/components/leads/stream";
 
@@ -112,6 +114,10 @@ export async function Feed({ projectId, params }: FeedProps) {
     projectActivity(projectId),
   ]);
   const { total, faces, facets, elsewhere } = page;
+  // The first sweep is drawn while it runs and for a moment after, so the
+  // page a new project lands on shows the year being read rather than an
+  // empty feed and one line of text.
+  const sweep = sweepShown(activity) ? await sweepSnapshot(projectId) : null;
   const entries = buildStream(page.rows.map(toCard));
   const held = filter.status === "new" ? page.review : [];
   const selection = await openOn(projectId, entries, held, params.lead);
@@ -135,6 +141,7 @@ export async function Feed({ projectId, params }: FeedProps) {
       </div>
 
       <ActivityPoll busy={isBusy(activity)} />
+      {sweep ? <LiveSweep projectId={projectId} first={sweep} /> : null}
       <PeopleStrip faces={faces} days={filter.days} at={filter.at} params={params} />
       <FeedFilters facets={facets} at={filter.at} params={params} />
 

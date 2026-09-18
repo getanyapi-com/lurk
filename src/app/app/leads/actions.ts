@@ -6,6 +6,7 @@ import { toRow } from "@/components/leads/stream";
 import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
 import { listLeads, setLeadStatus } from "@/lib/leads";
 import { projectForUser } from "@/lib/projects";
+import { sweepSnapshot, type SweepSnapshot } from "@/lib/sweep";
 
 async function ownedProject(projectId: string) {
   const user = await requireLocalUser();
@@ -48,4 +49,10 @@ export async function moreLeadsAction(
   const page = { limit: FEED_PAGE_SIZE, offset: Math.max(0, Math.trunc(offset)) };
   const rows = await listLeads(projectId, feedFilter(params), page);
   return rows.map(toRow);
+}
+
+/** The first sweep as it stands, for the board that draws it while it runs. */
+export async function sweepAction(projectId: string): Promise<SweepSnapshot | null> {
+  await ownedProject(projectId);
+  return sweepSnapshot(projectId);
 }

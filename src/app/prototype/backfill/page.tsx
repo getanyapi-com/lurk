@@ -1,67 +1,92 @@
 "use client";
 
 /**
- * PROTOTYPE: three boards for showing the year's backfill happening live,
- * switchable with ?variant=A|B|C and the arrow keys. By default it replays
- * the recorded real run (replay.ts) from page load at real speed; ?speed=2
- * runs it twice as fast. ?project=<id> reads a live backfill from the database
- * instead, and ?sim=1 uses the synthetic simulation in sim.ts.
+ * PROTOTYPE: the recorded first sweep in recorded-run.json, replayed from page
+ * load through the same board the leads page draws over a live one. It is what
+ * the launch video is filmed from. ?speed=2 runs it twice as fast, ?theme=dark
+ * or light forces the theme, ?cols= and ?rows= size the wall.
  */
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
-import { useLiveBackfill } from "./live";
-import { useReplay } from "./replay";
-import { useBackfillSim } from "./sim";
-import { VariantA, VariantB, VariantC } from "./variants";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { SweepBoard } from "@/components/sweep/SweepBoard";
+import type { SweepSnapshot, SweepThread } from "@/lib/sweep";
+import recorded from "./recorded-run.json";
 
-const VARIANTS = [
-  ["A", "Reading a year"], ["B", "The 62 seconds"], ["C", "The sieve"],
-] as const;
+type Recorded = {
+  totalMs: number;
+  samples: { t: number; progress: string }[];
+  usage: { t: number; purpose: string; items: number; usd: number }[];
+  threads: (Omit<SweepThread, "verdict"> & {
+    seen: number;
+    verdict: (NonNullable<SweepThread["verdict"]> & { t: number }) | null;
+  })[];
+};
 
-function Board() {
-  const params = useSearchParams();
-  const router = useRouter();
-  const key = params.get("variant") ?? "A";
-  const speed = Number(params.get("speed") ?? "1") || 1;
-  const project = params.get("project");
-  const simulated = params.get("sim") === "1";
-  const sim = useBackfillSim(!project && simulated ? speed : 0);
-  const replay = useReplay(speed, !project && !simulated);
-  const live = useLiveBackfill(project);
-  const s = project ? live : simulated ? sim : replay;
-  const index = Math.max(0, VARIANTS.findIndex(([k]) => k === key));
-  const go = (delta: number) => {
-    const next = VARIANTS[(index + delta + VARIANTS.length) % VARIANTS.length][0];
-    const q = new URLSearchParams(params.toString());
-    q.set("variant", next);
-    router.replace(`?${q}`);
+const RUN = recorded as Recorded;
+/** The same reading the live board makes: once a second, and a title counts as set aside after six. */
+const READ_MS = 1000;
+const LAG_MS = 6000;
+const ANSWERS: Record<string, number> = { triage: 2, score: 5 };
+
+/** What the live reader would have answered `ms` into the recorded sweep. */
+function snapshotAt(ms: number): SweepSnapshot {
+  const done = ms >= RUN.totalMs;
+  const found = RUN.threads.filter((thread) => thread.seen <= ms);
+  const scored = found.filter((thread) => thread.verdict && thread.verdict.t <= ms);
+  const aside = found.filter((thread) => !thread.verdict && (done || thread.seen <= ms - LAG_MS));
+  const usage = RUN.usage.filter((row) => row.t <= ms);
+  const items = (purpose: string) => usage.filter((row) => row.purpose === purpose).reduce((n, row) => n + row.items, 0);
+  const triaged = Math.min(items("triage"), found.length);
+  const progress = [...RUN.samples].reverse().find((sample) => sample.t <= ms)?.progress ?? null;
+  const shown = (threads: typeof found, n: number): SweepThread[] => threads.slice(-n).reverse();
+  return {
+    state: done ? "done" : "running",
+    progress,
+    elapsedMs: Math.min(ms, RUN.totalMs),
+    counts: {
+      found: found.length,
+      triaged,
+      scored: scored.length,
+      asideAtTitle: done ? found.length - scored.length : Math.max(0, triaged - Math.max(items("score"), scored.length)),
+      buyers: scored.filter((thread) => thread.verdict?.relationship === "buyer").length,
+      review: scored.filter((thread) => thread.verdict?.decision === "review").length,
+      leads: scored.filter((thread) => thread.verdict?.decision === "qualify").length,
+    },
+    answers: usage.reduce((n, row) => n + row.items * (ANSWERS[row.purpose] ?? 0), 0),
+    costUsd: usage.reduce((n, row) => n + row.usd, 0),
+    threads: [
+      ...shown([...scored].sort((a, b) => (a.verdict?.t ?? 0) - (b.verdict?.t ?? 0)), 160),
+      ...shown(aside, 120),
+    ],
   };
+}
+
+function Replay() {
+  const params = useSearchParams();
+  const speed = Number(params.get("speed") ?? "1") || 1;
+  const theme = params.get("theme");
+  const cols = Number(params.get("cols")) || undefined;
+  const rows = Number(params.get("rows")) || undefined;
+  const [snapshot, setSnapshot] = useState<SweepSnapshot>(() => snapshotAt(0));
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
-      if (e.key === "ArrowLeft") go(-1);
-      if (e.key === "ArrowRight") go(1);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+    if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
+  }, [theme]);
+  useEffect(() => {
+    const started = performance.now();
+    const timer = setInterval(() => {
+      const next = snapshotAt((performance.now() - started) * speed);
+      setSnapshot(next);
+      if (next.state === "done") clearInterval(timer);
+    }, READ_MS / speed);
+    return () => clearInterval(timer);
+  }, [speed]);
   return (
-    <>
-      {key === "A" && <VariantA s={s} />}
-      {key === "B" && <VariantB s={s} />}
-      {key === "C" && <VariantC s={s} />}
-      {process.env.NODE_ENV !== "production" ? (
-        <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2 font-mono text-[12px] shadow-lg" style={{ background: "oklch(0.3 0.15 300)", color: "white" }}>
-          <button onClick={() => go(-1)}>←</button>
-          <span>{VARIANTS[index][0]} · {VARIANTS[index][1]}</span>
-          <button onClick={() => go(1)}>→</button>
-        </div>
-      ) : null}
-    </>
+    <main className="min-h-screen bg-bg p-6 text-fg">
+      <SweepBoard snapshot={snapshot} cols={cols} rows={rows} />
+    </main>
   );
 }
 
-export default function BackfillPrototypePage() {
-  return <Suspense><Board /></Suspense>;
+export default function BackfillReplayPage() {
+  return <Suspense><Replay /></Suspense>;
 }
