@@ -122,7 +122,9 @@ export function startScheduler(): Cron {
     const workers = config().SCHEDULER_WORKERS;
     void enqueueOnce("retention");
     void enqueueOnce("digest");
-    void seedProjectScans();
+    if (config().SCHEDULER_SEED) {
+      void seedProjectScans();
+    }
     (globalThis as Kickable)[KICK] = () => void pump(workers);
     started = new Cron("* * * * *", async () => {
       await pump(workers);

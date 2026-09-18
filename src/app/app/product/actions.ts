@@ -87,8 +87,8 @@ export async function saveProfileAction(
       pain: text(formData, "pain") || null,
       solution: text(formData, "solution") || null,
       targetUsers: text(formData, "targetUsers") || null,
-      geography: text(formData, "geography") || null,
-      budgetFit: text(formData, "budgetFit") || null,
+      // Asked only of a product with places. One that is not asked keeps what it had.
+      ...(formData.has("geography") ? { geography: text(formData, "geography") || null } : {}),
     };
     const edited = Object.entries(facts).some(
       ([field, value]) => project[field as keyof typeof facts] !== value,

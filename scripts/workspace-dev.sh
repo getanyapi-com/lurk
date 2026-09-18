@@ -16,6 +16,9 @@ if [ -f .env ]; then
 fi
 
 export RUN_SCHEDULER="${RUN_SCHEDULER:-false}"
+# With the scheduler on, run what somebody queued and nothing else. Seeding at
+# boot queues work for every project in the shared database, fixtures included.
+export SCHEDULER_SEED="${SCHEDULER_SEED:-false}"
 PORT="${CONDUCTOR_PORT:-3000}"
 export APP_URL="http://localhost:$PORT"
 

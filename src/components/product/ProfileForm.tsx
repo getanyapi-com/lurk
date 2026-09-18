@@ -14,8 +14,8 @@ export type ProfileFields = {
   pain: string;
   solution: string;
   targetUsers: string;
-  geography: string;
-  budgetFit: string;
+  /** Null for a product with no places, which is not asked where it works. */
+  geography: string | null;
   scoreThreshold: number;
 };
 
@@ -95,26 +95,11 @@ export function ProfileForm({ project }: ProfileFormProps) {
           className={AREA}
         />
       </Line>
-      <div className="grid gap-4 md:grid-cols-2">
+      {project.geography === null ? null : (
         <Line label="Where the product works">
-          <input
-            name="geography"
-            defaultValue={project.geography}
-            className={INPUT}
-          />
+          <input name="geography" defaultValue={project.geography} className={INPUT} />
         </Line>
-        <Line label="What they can spend">
-          <input
-            name="budgetFit"
-            defaultValue={project.budgetFit}
-            className={INPUT}
-          />
-          <span className="text-small text-fg-muted">
-            A lead is only dropped over money when the person says they cannot
-            pay. Someone who never mentions a budget is kept.
-          </span>
-        </Line>
-      </div>
+      )}
       <Line label="Minimum score to show a lead (0 to 100)">
         <input
           name="scoreThreshold"

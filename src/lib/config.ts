@@ -49,6 +49,16 @@ const schema = z.object({
    * and digest jobs, and stays well inside the ten-connection pool in
    * src/db/index.ts. Move it once real queue delay has been measured.
    */
+  /**
+   * Whether boot queues the jobs every project is missing. Production wants
+   * that: it is how a project whose job died gets scanned again. A dev database
+   * is shared and full of fixtures, and there it queued a discovery for each of
+   * 213 test projects the first time anybody turned the scheduler on.
+   */
+  SCHEDULER_SEED: z.preprocess(
+    blankIsAbsent,
+    z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
+  ),
   SCHEDULER_WORKERS: z.coerce.number().int().positive().default(3),
 
   /**

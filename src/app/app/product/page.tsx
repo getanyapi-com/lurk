@@ -41,6 +41,10 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
   }
 
   const activity = await projectActivity(project.id);
+  const places = parseDestinations(project.destinations).map((place) => ({
+    value: place.name,
+    sourceText: place.sourceText,
+  }));
 
   return (
     <div className="flex max-w-5xl flex-col gap-6">
@@ -65,23 +69,22 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
           pain: project.pain ?? "",
           solution: project.solution ?? "",
           targetUsers: project.targetUsers ?? "",
-          geography: project.geography ?? "",
-          budgetFit: project.budgetFit ?? "",
+          geography: places.length > 0 || project.geography ? (project.geography ?? "") : null,
           scoreThreshold: project.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD,
         }}
       />
 
-      <ListEditor
-        title="Places you serve"
-        hint="Read off your own page. Discovery asks Google about each of these."
-        placeholder="Las Vegas"
-        kind="destination"
-        projectId={project.id}
-        items={parseDestinations(project.destinations).map((place) => ({
-          value: place.name,
-          sourceText: place.sourceText,
-        }))}
-      />
+      {/* A product sold everywhere has no places, and an empty list of them only asks a question it has no use for. */}
+      {places.length > 0 ? (
+        <ListEditor
+          title="Places you serve"
+          hint="Read off your own page. Discovery asks Google about each of these."
+          placeholder="Las Vegas"
+          kind="destination"
+          projectId={project.id}
+          items={places}
+        />
+      ) : null}
       <ListEditor
         title="How buyers say it"
         hint="The problem in their words, which is what we search for."
@@ -106,27 +109,27 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
         }))}
       />
       <ListEditor
-        title="What it does not cover"
-        hint="What you cannot do or will not take. It keeps the wrong person out of the feed."
-        placeholder="anything outside the United States"
-        kind="exclusion"
-        projectId={project.id}
-        items={parseTextList(project.exclusions).map((phrase) => ({
-          value: phrase,
-          sourceText: null,
-        }))}
-      />
-
-      <ListEditor
-        title="Who is not a buyer"
-        hint="People who talk like your buyers but never buy. It keeps the wrong person out of the feed."
+        title="Keep out"
+        hint="What you cannot do, and people who talk like your buyers but never buy. Both keep the wrong person out of the feed."
         placeholder="students looking for a free plan"
         kind="not_buyer"
+        kinds={[
+          { value: "not_buyer", label: "Never buys" },
+          { value: "exclusion", label: "Not covered" },
+        ]}
         projectId={project.id}
-        items={parseTextList(project.notBuyers).map((phrase) => ({
-          value: phrase,
-          sourceText: null,
-        }))}
+        items={[
+          ...parseTextList(project.exclusions).map((phrase) => ({
+            value: phrase,
+            sourceText: null,
+            kind: "exclusion" as const,
+          })),
+          ...parseTextList(project.notBuyers).map((phrase) => ({
+            value: phrase,
+            sourceText: null,
+            kind: "not_buyer" as const,
+          })),
+        ]}
       />
 
       {/*
