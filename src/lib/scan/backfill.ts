@@ -19,7 +19,7 @@ import { creditSources, markCovered, recordSources, type CandidateSource } from 
 /**
  * The one-time sweep a new project starts with. A scan polls the last thirty
  * days; this asks Reddit's own search for a year of the problem's language, in
- * both orders it can be sorted, and keeps everything it finds however old it
+ * the order of relevance, and keeps everything it finds however old it
  * is, because a person who asked eleven months ago is still the person a
  * founder wants to answer. There is no reading gate and no `reddit.post` call
  * here: search now carries the body, and the reading costs more than judging
@@ -75,8 +75,14 @@ const POST_BUDGET = 2500;
  */
 const ASKING_FLOOR = 0.1;
 
-/** Both orders one query can be read in; see fetchSearch on why both are bought. */
-const SORTS = ["relevance", "new"] as const;
+/**
+ * The order a query is read in. It was both of Reddit's, until the newest-first
+ * copy of each search was measured 2026-09-18 on the first six pages of four
+ * projects' walks (a data API, a form builder, a hotel finder twice): 1,306 of
+ * the 2,095 posts scored were ones only it found, and 5 of the 289 leads. It
+ * doubled the search pages and more than doubled the scoring for 2% of the leads.
+ */
+const SORTS = ["relevance"] as const;
 
 export type BackfillOutcome = {
   /** Query and sort pairs walked. */

@@ -6,8 +6,8 @@ import { judgeAnswers, triageAnswers } from "./jevAnswers";
 /**
  * The one-time backfill, against a real database with only AnyAPI and the
  * language model faked. What a unit test cannot prove: that a year of one
- * query is walked to its end and no further, that both orders and both kinds
- * of query are asked, that a post far outside the feed window still becomes a
+ * query is walked to its end and no further, that both kinds of query are
+ * asked, that a post far outside the feed window still becomes a
  * lead, that a verdict already held is not bought again, that nothing is
  * opened with `reddit.post`, and that the Reddit SEO tab stays Google's.
  */
@@ -158,13 +158,8 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    // Three pages per sort, and the third ends the listing. The two sorts run
-    // at the same time, so only each one's own order is fixed.
-    expect(callsOf()).toHaveLength(6);
-    for (const sort of ["relevance", "new"]) {
-      const walked = callsOf().filter((call) => call.sort === sort);
-      expect(walked.map((call) => call.cursor)).toEqual([undefined, "page-2", "page-3"]);
-    }
+    // Three pages, and the third ends the listing.
+    expect(callsOf().map((call) => call.cursor)).toEqual([undefined, "page-2", "page-3"]);
   });
 
   it("ends a walk whose listing stops moving, however many cursors it is handed", async () => {
@@ -180,23 +175,22 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     const outcome = await runBackfill(row.id);
 
-    // Page one moved the walk; three more that did not end it. Two sorts.
-    expect(callsOf()).toHaveLength(8);
+    // Page one moved the walk; three more that did not end it.
+    expect(callsOf()).toHaveLength(4);
     expect(outcome.cutShort).toBe(0);
     expect(outcome.found).toBe(2);
   });
 
   it("ends only the walk whose page failed, and keeps the pages before it", async () => {
-    const row = await project();
+    const row = await project(["forms that branch"]);
     const first = await posts(2);
     const later = await posts(1);
     const at = new Map<string, number>();
     fetchSearch.mockImplementation(
-      async (_ctx: unknown, query: string, options: { sort?: string }) => {
-        const key = `${query} ${options.sort ?? "relevance"}`;
-        const index = at.get(key) ?? 0;
-        at.set(key, index + 1);
-        if (options.sort === "new" && index === 1) {
+      async (_ctx: unknown, query: string) => {
+        const index = at.get(query) ?? 0;
+        at.set(query, index + 1);
+        if (query === "forms that branch" && index === 1) {
           throw new Error("all providers failed");
         }
         const value =
@@ -211,8 +205,8 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(outcome.cutShort).toBe(1);
     expect(outcome.walks).toBe(2);
     expect(outcome.found).toBe(3);
-    expect(callsOf().filter((call) => call.sort === "relevance")).toHaveLength(2);
-    expect(callsOf().filter((call) => call.sort === "new")).toHaveLength(2);
+    expect(callsOf().filter((call) => call.query === "form builder")).toHaveLength(2);
+    expect(callsOf().filter((call) => call.query === "forms that branch")).toHaveLength(2);
   });
 
   it("keeps walking past a page that carried nothing new", async () => {
@@ -230,7 +224,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    expect(callsOf()).toHaveLength(6);
+    expect(callsOf()).toHaveLength(3);
     const found = await db().select().from(schema.leads).where(eq(schema.leads.projectId, row.id));
     expect(found.map((lead) => lead.postId)).toContain(behind[0].id);
   });
@@ -245,7 +239,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    expect(callsOf()).toHaveLength(4);
+    expect(callsOf()).toHaveLength(2);
   });
 
   /** A listing that never ends: a fresh page of new posts under every cursor. */
@@ -275,8 +269,8 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     const outcome = await runBackfill(row.id);
 
-    // Two pages of each sort, and no walk earned a third.
-    expect(callsOf()).toHaveLength(4);
+    // Two pages, and the walk did not earn a third.
+    expect(callsOf()).toHaveLength(2);
     expect(outcome.leads).toBe(0);
   });
 
@@ -287,8 +281,8 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    // Six pages of each sort.
-    expect(callsOf()).toHaveLength(12);
+    // Six pages.
+    expect(callsOf()).toHaveLength(6);
   });
 
   it("scores no post whose title triage says is asking for nothing", async () => {
@@ -310,15 +304,14 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
   it("stops finding posts once the sweep's budget is spent", async () => {
     const row = await project();
-    endless(300);
+    endless(600);
     model();
 
     const outcome = await runBackfill(row.id);
 
-    // Twelve pages were on offer; the budget ran out before the last of them.
-    expect(callsOf().length).toBeLessThan(12);
-    expect(outcome.found).toBeGreaterThanOrEqual(2500);
-    expect(outcome.found).toBeLessThan(3600);
+    // Six pages were on offer; the budget ran out before the last of them.
+    expect(callsOf().length).toBeLessThan(6);
+    expect(outcome.found).toBe(2500);
   }, 60_000);
 
   it("reuses no cached search, because a retry must not inherit a truncated walk", async () => {
@@ -328,7 +321,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    expect(maxAgesOf()).toEqual([0, 0]);
+    expect(maxAgesOf()).toEqual([0]);
   });
 
   it("starts every walk at once, and leaves the pace to the shared Reddit pace", async () => {
@@ -346,11 +339,11 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    // Six walks: three queries in both orders, all in flight together. How
-    // many calls that is allowed to be is decided in src/lib/reddit/pace.ts,
-    // underneath the fetch this test replaces.
-    expect(callsOf()).toHaveLength(6);
-    expect(peak).toBe(6);
+    // Three walks, one a query, all in flight together. How many calls that
+    // is allowed to be is decided in src/lib/reddit/pace.ts, underneath the
+    // fetch this test replaces.
+    expect(callsOf()).toHaveLength(3);
+    expect(peak).toBe(3);
   });
 
   /**
@@ -397,7 +390,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(midRun).toBe(SCORE_BATCH_SIZE * 2);
   });
 
-  it("asks both sorts of both the plan's keywords and the problem's phrasings", async () => {
+  it("asks both the plan's keywords and the problem's phrasings, by relevance over a year", async () => {
     const row = await project(["forms that branch"]);
     pages([{ posts: await posts(1), nextCursor: null }]);
     model();
@@ -405,9 +398,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     await runBackfill(row.id);
 
     expect(callsOf().map((call) => `${call.query} | ${call.sort}`).sort()).toEqual([
-      "form builder | new",
       "form builder | relevance",
-      "forms that branch | new",
       "forms that branch | relevance",
     ]);
     expect(callsOf().every((call) => call.timeframe === "year")).toBe(true);
@@ -427,7 +418,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     await runBackfill(row.id);
 
     const branch = callsOf().filter((call) => call.query === "(form OR forms) AND branch");
-    expect(branch.map((call) => call.sort).sort()).toEqual(["new", "relevance"]);
+    expect(branch.map((call) => call.sort)).toEqual(["relevance"]);
     const covered = await db()
       .select()
       .from(schema.projectKeywords)

@@ -60,8 +60,8 @@ async function loadPage(runId: string): Promise<PostPage> {
  * "Typeform alternatives" over one week returned 1 unrelated post sorted new
  * and 7 on-topic ones sorted by relevance, so newest-first threw the leads away
  * and left the title prefilter nothing to keep. The timeframe already bounds
- * how old a result can be. A caller sweeping a year wants both orders, so the
- * sort is theirs to pick and is part of the run key: relevance and new are two
+ * how old a result can be. The sort is still the caller's to pick and is part
+ * of the run key: relevance and new are two
  * different pages of the same query and must never serve each other.
  */
 export async function fetchSearch(

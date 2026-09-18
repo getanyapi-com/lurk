@@ -6,8 +6,14 @@ import type { ScorableItem } from "./judgement";
  * was allowed to read and what it is allowed to quote cannot drift apart.
  */
 
-/** The most characters of one body the scorer is given. */
-export const BODY_CHAR_BUDGET = 3000;
+/**
+ * The most characters of one body the scorer is given, half from each end. It
+ * was 3,000. Measured 2026-09-18 on 3,462 scored posts of four projects, 1,500
+ * is 15% to 36% fewer characters per project, because the long posts are the
+ * rejected ones: 9 of the 290 leads are longer than this, and 2 of them quote
+ * a sentence from the middle that is cut.
+ */
+export const BODY_CHAR_BUDGET = 1500;
 
 /** The most characters of a comment's parent post the scorer is given. */
 export const PARENT_CHAR_BUDGET = 1200;
