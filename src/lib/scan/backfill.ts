@@ -160,7 +160,10 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
         return;
       }
       walks += 1;
-      await progress(jobId, `Searching a year of "${item.query.text}"`);
+      await progress(
+        jobId,
+        `Searching a year of "${item.query.text}" · ${walks} of ${plan.length} searches · ${found.size} posts found`,
+      );
       const outcome = await walk(ctx, item.query, item.sort, found, sourcesByPost);
       if (outcome.cutShort) {
         cutShort += 1;
