@@ -26,16 +26,16 @@ const FOLD_AFTER_MS = 4000;
 type SetupLine = { text: string; at: number };
 
 /**
- * About how long each part of the setup takes, by how its line opens. The site
- * read is one model call, 15 s at the median of those measured 2026-09-18; the
- * rest are a fetch, a round of Google searches and their labelling, and the
- * wait for the sweep's first page. A line that only reports a result has none.
+ * About how long each part of the setup takes, by how its line opens, as timed
+ * on real signups 2026-09-18: the site read is one model call of about 25 s,
+ * and the Google rounds are about a second each. A line that only reports a
+ * result has none.
  */
 const ABOUT_S: [RegExp, number][] = [
   [/^Opening /, 3],
-  [/^Reading the page/, 15],
-  [/^Asking Google/, 8],
-  [/^Checked /, 3],
+  [/^Reading the page/, 25],
+  [/^Asking Google/, 1],
+  [/^Checked /, 1],
   [/^Starting the sweep/, 5],
 ];
 
@@ -74,7 +74,7 @@ function SweepSetup({ lines }: { lines: SetupLine[] }) {
                   animation: current ? "sweepSetupPulse 1.2s ease-in-out infinite" : undefined,
                 }}
               />
-              <span className={`min-w-0 flex-1 ${current ? "text-fg" : "text-fg-muted"}`}>
+              <span className={`min-w-0 ${current ? "text-fg" : "text-fg-muted"}`}>
                 {line.text}
                 {current ? "…" : ""}
               </span>
