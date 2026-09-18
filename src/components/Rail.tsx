@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords } from "lucide-react";
+import { NEW_PROJECT_PATH } from "@/components/ProjectSwitcher";
 import { cn } from "@/lib/utils";
 
 /** One icon per destination, so the rail reads at a glance. */
@@ -32,6 +33,9 @@ type RailProps = { groups: RailGroup[]; children?: React.ReactNode };
  */
 export function Rail({ groups, children }: RailProps) {
   const pathname = usePathname();
+  // A project that does not exist yet has no leads to count and no pages to
+  // open, so its rail is the shape of one with nothing in it.
+  const creating = pathname === NEW_PROJECT_PATH;
   return (
     <nav
       className="sticky flex shrink-0 flex-col gap-6 self-start overflow-y-auto border-r bg-bg px-4 py-5"
@@ -50,6 +54,18 @@ export function Rail({ groups, children }: RailProps) {
           {group.items.map((item) => {
             const active = pathname === item.href;
             const Icon = ICONS[item.icon];
+            if (creating) {
+              return (
+                <span
+                  key={item.href}
+                  aria-disabled="true"
+                  className="flex items-center gap-2 rounded-control px-2 py-1.5 text-body text-fg-muted opacity-50"
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  {item.label}
+                </span>
+              );
+            }
             return (
               <Link
                 key={item.href}

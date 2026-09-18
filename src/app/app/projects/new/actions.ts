@@ -41,6 +41,11 @@ export async function createProjectAndProfileAction(
   if (!url) {
     return { error: "A product URL is needed before we can read your site." };
   }
+  // The field is plain text with the scheme drawn beside it, so the browser
+  // no longer refuses an address that is not one.
+  if (!URL.canParse(url) || !new URL(url).hostname.includes(".")) {
+    return { error: "That does not look like a web address. Try something like yourproduct.com." };
+  }
   const name = nameFromUrl(url);
 
   let projectId: string;
