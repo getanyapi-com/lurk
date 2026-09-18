@@ -1,0 +1,1 @@
+lurk by AnyAPI: get cited by ChatGPT, Claude, Perplexity, Gemini and Google. Reddit threads with their authors, each marked as cited.
