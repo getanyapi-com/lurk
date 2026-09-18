@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { enqueueJob } from "@/jobs/enqueue";
+import { kickScheduler } from "@/jobs/scheduler";
 import { requireLocalUser } from "@/lib/auth";
 import { buildProfile } from "@/lib/profile";
 import { createProject } from "@/lib/projects";
@@ -62,6 +63,7 @@ export async function createProjectAndProfileAction(
   try {
     await buildProfile(projectId, user.id, url);
     await enqueueJob("discovery_initial", projectId);
+    kickScheduler();
   } catch (error) {
     return {
       error: `${name} was created but its profile could not be built: ${sentence(error)} Open the project and press Rebuild profile.`,

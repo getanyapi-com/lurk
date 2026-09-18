@@ -43,7 +43,7 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
   const activity = await projectActivity(project.id);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="flex max-w-5xl flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-h2" style={{ fontWeight: 500 }}>
           Product

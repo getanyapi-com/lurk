@@ -95,6 +95,23 @@ async function seedProject(row: { id: string; discoveredAt: Date | null }, stale
 }
 
 /**
+ * The running scheduler's pump, kept on the process rather than the module:
+ * Next bundles instrumentation apart from the routes, so a Server Action that
+ * imported this file would find its own copy, which never started.
+ */
+const KICK = Symbol.for("lurk.scheduler.kick");
+type Kickable = { [KICK]?: () => void };
+
+/**
+ * Hands out due jobs now rather than at the next tick. A job queued by a person
+ * who is watching, such as a new project's discovery, otherwise sits for up to
+ * a minute before anything reads it. It does nothing where no scheduler runs.
+ */
+export function kickScheduler(): void {
+  (globalThis as Kickable)[KICK]?.();
+}
+
+/**
  * One tick a minute, handing due jobs to a bounded set of workers. Startup
  * queues the two instance-wide jobs and any project schedule that went missing;
  * from then on each job queues its own next run, and the runner re-queues a
@@ -106,6 +123,7 @@ export function startScheduler(): Cron {
     void enqueueOnce("retention");
     void enqueueOnce("digest");
     void seedProjectScans();
+    (globalThis as Kickable)[KICK] = () => void pump(workers);
     started = new Cron("* * * * *", async () => {
       await pump(workers);
     });

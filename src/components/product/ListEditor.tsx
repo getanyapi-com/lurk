@@ -47,18 +47,19 @@ export function ListEditor({
         <span className="text-small text-fg-muted tabular-nums">{items.length}</span>
       </div>
       <p className="text-small text-fg-muted">{hint}</p>
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-wrap gap-2">
         {items.length === 0 ? (
           <li className="text-body text-fg-muted">The page named none.</li>
         ) : (
           items.map((item) => (
             <li
               key={item.value}
-              className="flex items-start gap-3 rounded-control border bg-surface-2 px-3 py-2"
+              className="flex max-w-full items-start gap-2 rounded-control border bg-surface-2 px-3 py-1.5"
             >
               <span className="flex flex-col gap-1">
                 <span className="text-body text-fg">{item.value}</span>
-                {item.sourceText ? (
+                {/* A place the page names outright quotes itself, which says nothing twice. */}
+                {item.sourceText && item.sourceText !== item.value ? (
                   <span className="text-small text-fg-muted">{item.sourceText}</span>
                 ) : null}
               </span>
@@ -72,7 +73,7 @@ export function ListEditor({
                     await removeListItemAction(kind, projectId, item.value);
                   })
                 }
-                className="transition-motion ml-auto text-fg-muted transition-colors hover:text-fg"
+                className="transition-motion ml-auto mt-1.5 text-fg-muted transition-colors hover:text-fg"
               >
                 <X className="size-3" />
               </button>
