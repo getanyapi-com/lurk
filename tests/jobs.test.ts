@@ -345,6 +345,32 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
     await db().delete(users).where(eq(users.id, user.id));
   });
 
+  it("claims a new project's setup before an older routine scan, and either sort alone when asked", async () => {
+    const { db, jobs, projects, users, user, project } = await fixture();
+    const { claimNextJob } = await import("@/jobs/runner");
+    const { eq } = await import("drizzle-orm");
+
+    const [signup] = await db()
+      .insert(projects)
+      .values({ userId: user.id, name: "Signed up a moment ago" })
+      .returning();
+    const [routine] = await db()
+      .insert(jobs)
+      .values({ kind: "noop", projectId: project.id, runAt: LONG_AGO })
+      .returning();
+    const [setup] = await db()
+      .insert(jobs)
+      .values({ kind: "discovery_initial", projectId: signup.id, runAt: new Date(LONG_AGO.getTime() + 5000) })
+      .returning();
+
+    expect((await claimNextJob(NOW, "routine"))?.id).toBe(routine.id);
+    await db().update(jobs).set({ startedAt: null }).where(eq(jobs.id, routine.id));
+    expect((await claimNextJob(NOW))?.id).toBe(setup.id);
+    expect(await claimNextJob(NOW, "watched")).toBeNull();
+
+    await db().delete(users).where(eq(users.id, user.id));
+  });
+
   it("never claims a second job of a project that is already running one", async () => {
     const { db, jobs, projects, users, user, project } = await fixture();
     const { claimNextJob } = await import("@/jobs/runner");

@@ -59,6 +59,8 @@ const schema = z.object({
     blankIsAbsent,
     z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
   ),
+  /** How many new-project setups and first sweeps run at once, on top of the routine workers. */
+  SCHEDULER_WATCHED_WORKERS: z.coerce.number().int().positive().default(8),
   SCHEDULER_WORKERS: z.coerce.number().int().positive().default(3),
 
   /**

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { enqueueOnce } from "./enqueue";
@@ -17,7 +17,16 @@ function noSiblingRunning(leaseCutoff: Date) {
 }
 
 /**
- * Takes one due job. The UPDATE ... RETURNING is the claim: a second worker
+ * The jobs somebody is watching: the setup of a project made a moment ago and
+ * the sweep it books. Whoever signed up is looking at a board that says
+ * "Starting", so these are claimed before anything routine and are not made to
+ * wait for one of the routine workers to come free.
+ */
+export const WATCHED_KINDS = ["discovery_initial", "backfill"];
+
+/**
+ * Takes one due job, a watched one first. The scheduler asks for only one sort
+ * when the other has no room left to run. The UPDATE ... RETURNING is the claim: a second worker
  * running the same statement sees a live lease and gets no row. A job whose
  * lease has expired is claimable again, which is how a crash recovers. The
  * sibling check is the per-project exclusion: two jobs of one project never run
@@ -25,7 +34,10 @@ function noSiblingRunning(leaseCutoff: Date) {
  * Claims are issued one at a time by the scheduler, so the check cannot be read
  * by two workers before either of them has written its own lease.
  */
-export async function claimNextJob(now = new Date()): Promise<Job | null> {
+export async function claimNextJob(
+  now = new Date(),
+  only?: "watched" | "routine",
+): Promise<Job | null> {
   const leaseCutoff = new Date(now.getTime() - LEASE_MS);
   const candidate = db()
     .select({ id: jobs.id })
@@ -36,9 +48,11 @@ export async function claimNextJob(now = new Date()): Promise<Job | null> {
         lte(jobs.runAt, now),
         or(isNull(jobs.startedAt), lt(jobs.startedAt, leaseCutoff)),
         noSiblingRunning(leaseCutoff),
+        only === "watched" ? inArray(jobs.kind, WATCHED_KINDS) : undefined,
+        only === "routine" ? notInArray(jobs.kind, WATCHED_KINDS) : undefined,
       ),
     )
-    .orderBy(asc(jobs.runAt))
+    .orderBy(sql`${inArray(jobs.kind, WATCHED_KINDS)} desc`, asc(jobs.runAt))
     .limit(1)
     .for("update", { skipLocked: true });
   const claimed = await db()
