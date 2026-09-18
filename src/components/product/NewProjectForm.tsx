@@ -32,7 +32,7 @@ export function NewProjectForm() {
       className="flex flex-col gap-4 rounded-card border bg-surface p-6"
     >
       <label className="flex flex-col gap-1 text-small text-fg-muted">
-        Product URL
+        Your site
         <span className="flex h-10 items-stretch overflow-hidden rounded-control border bg-surface text-body focus-within:ring-2 focus-within:ring-fg-muted/40">
           <span aria-hidden="true" className="flex select-none items-center border-r bg-surface-2 px-3 text-fg-muted">
             https://

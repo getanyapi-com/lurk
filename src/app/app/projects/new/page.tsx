@@ -1,23 +1,23 @@
+import { HowItWorks } from "@/components/product/HowItWorks";
 import { NewProjectForm } from "@/components/product/NewProjectForm";
 import { requireLocalUser } from "@/lib/auth";
-import { listProjects } from "@/lib/projects";
 
 export default async function NewProjectPage() {
-  const user = await requireLocalUser();
-  // The first project is the welcome: a new account is sent straight here.
-  const first = (await listProjects(user.id)).length === 0;
+  await requireLocalUser();
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h2" style={{ fontWeight: 500 }}>
-          {first ? "What do you sell?" : "New project"}
-        </h1>
-        <p className="text-body text-fg-muted">
-          Give us the product URL. We read the page, work out who buys it, and start reading the
-          past year of Reddit for them straight away.
-        </p>
+    <div className="grid max-w-5xl items-start gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-h2" style={{ fontWeight: 500 }}>
+            What&rsquo;s your site?
+          </h1>
+          <p className="text-body text-fg-muted">
+            That is all we need. The leads start arriving in about a minute.
+          </p>
+        </div>
+        <NewProjectForm />
       </div>
-      <NewProjectForm />
+      <HowItWorks />
     </div>
   );
 }
