@@ -1,0 +1,50 @@
+/* The AnyAPI tiles reuse the Reddit SEO cut: left heading, three pastel tiles, ledger. */
+.anyapi-tiles {
+  padding-bottom: 80px;
+  border-bottom: 1px solid var(--m-rule);
+}
+.anyapi-tiles .eyebrow-link img {
+  margin-right: 4px;
+}
+.anyapi-art-platforms {
+  --tile-first: var(--m-lilac);
+  --tile-second: var(--m-pink);
+}
+.anyapi-platform {
+  align-items: center;
+}
+.anyapi-platform span {
+  gap: 2px;
+}
+.anyapi-platform small {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.anyapi-tiles .seo-ledger td:nth-child(2) {
+  display: table-cell;
+  text-align: right;
+}
+.anyapi-tiles .seo-ledger th:nth-child(2) {
+  text-align: right;
+}
+.anyapi-tiles .seo-ledger td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.anyapi-art-trial {
+  --tile-first: var(--m-teal);
+  --tile-second: var(--m-lilac);
+}
+.anyapi-trial {
+  max-width: 300px;
+  align-items: flex-start;
+  padding: 22px;
+}
+.anyapi-trial strong {
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.anyapi-trial .marketing-button {
+  margin-top: 6px;
+}

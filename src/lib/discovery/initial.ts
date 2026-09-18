@@ -6,7 +6,6 @@ import { buildProfile } from "@/lib/profile";
 import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts } from "@/lib/product";
-import { smallSweep } from "@/lib/sweepScale";
 import { cadenceFor } from "@/lib/settings";
 import { tierForUser } from "@/lib/tier";
 
@@ -52,12 +51,6 @@ async function markDiscoveredAndQueue(
       return false;
     }
     const now = Date.now();
-    // A trial-size project gets its sweep and nothing that would go on spending
-    // after it: no SEO pass, no competitor scan, no recurring scan.
-    if (smallSweep()) {
-      await tx.insert(jobs).values({ kind: "backfill", projectId, runAt: new Date(now) });
-      return true;
-    }
     await tx.insert(jobs).values([
       { kind: "backfill", projectId, runAt: new Date(now) },
       { kind: "seo_refresh", projectId, runAt: new Date(now) },

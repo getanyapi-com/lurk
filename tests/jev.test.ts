@@ -9,8 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/config", () => ({
   config: () => ({
-    TYPESAFE_API_KEY: "test-key",
-    TYPESAFE_MODEL: "jev-test",
+    OPENROUTER_API_KEY: "test-key",
+    JEV_MODEL: "jev-test",
     HOUSE_LLM_CAP_USD_PER_DAY: 10,
   }),
 }));
@@ -70,6 +70,30 @@ describe("what the judgement boundary records", () => {
       schemaFailed: false,
     });
     expect(Number(recorded[0].costUsd)).toBeCloseTo(0.042, 6);
+  });
+
+  it("records what OpenRouter billed, and sends an option with no description as empty", async () => {
+    recorded.length = 0;
+    const fetch = answered({
+      model: "typesafe/jev-1",
+      provider: "TypeSafe",
+      answers: { p0__quote: { type: "choice", choice: "s1", probabilities: { s1: 1 }, confidence: 1 } },
+      usage: { input_tokens: 1_000, output_tokens: 20, cost: 0.5 },
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    await askJev({
+      ...call,
+      questions: {
+        p0__quote: { type: "choice" as const, instructions: "which sentence?", criteria: { s1: null } },
+      },
+    });
+
+    const sent = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(sent.model).toBe("jev-test");
+    expect(sent.questions.p0__quote.criteria).toEqual({ s1: "" });
+    expect(recorded[0]).toMatchObject({ provider: "TypeSafe", model: "typesafe/jev-1" });
+    expect(Number(recorded[0].costUsd)).toBeCloseTo(0.5, 6);
   });
 
   it("writes a row for a refused request too, and names the request too large", async () => {

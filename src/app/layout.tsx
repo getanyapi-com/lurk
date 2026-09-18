@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
+import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { ThemeScript } from "@/components/ThemeScript";
 import { PRODUCT_NAME_WITH_PROVIDER, PRODUCT_URL } from "@/lib/brand";
 
@@ -32,7 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <head>
           <ThemeScript />
         </head>
-        <body>{children}</body>
+        <body>
+          <PostHogIdentify />
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );

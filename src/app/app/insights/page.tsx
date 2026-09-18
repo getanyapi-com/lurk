@@ -1,3 +1,4 @@
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { refreshInsightsAction } from "@/app/app/insights/actions";
 import { EmptyState } from "@/components/EmptyState";
 import { CommunitiesTable } from "@/components/insights/CommunitiesTable";
@@ -54,8 +55,8 @@ export default async function InsightsPage({ searchParams }: InsightsPageProps) 
           </h1>
           <p className="text-small text-fg-muted">{lastRunSentence(job)}</p>
           <p className="text-small text-fg-muted">
-            Themes regroup after every scan that finds leads, and reading them costs nothing on
-            AnyAPI.
+            Themes regroup after every scan that finds leads, and reading them costs nothing on{" "}
+            <AnyapiLink />.
           </p>
         </div>
         <form action={refreshInsightsAction.bind(null, project.id)}>

@@ -27,9 +27,8 @@ const schema = z.object({
     z.string().default("meta/muse-spark-1.3-contributor"),
   ),
 
-  /** TypeSafe (https://typesafe.ai) judges every candidate the scan reads. */
-  TYPESAFE_API_KEY: optional(z.string()),
-  TYPESAFE_MODEL: z.preprocess(blankIsAbsent, z.string().default("jev-latest")),
+  /** TypeSafe's Jev, through OpenRouter, judges every candidate the scan reads. */
+  JEV_MODEL: z.preprocess(blankIsAbsent, z.string().default("~typesafe/jev-latest")),
 
   /**
    * The digest email goes out through Azure Communication Services when its

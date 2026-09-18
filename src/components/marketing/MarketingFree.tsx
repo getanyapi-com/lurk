@@ -3,6 +3,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { PRESETS } from "@/lib/settings/presets";
 import { limitsFor, type TierName } from "@/lib/tiers";
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { BrandImage } from "./BrandImage";
 import { MONTHLY_PLANS, PRICING_OBSERVED } from "./pricingContent";
 
@@ -55,7 +56,7 @@ export function MarketingFree() {
           <span>Free.</span> No card, no subscription.
         </h2>
         <p>
-          The hosted app runs on our own AnyAPI wallet within the limits below. Connect your
+          The hosted app runs on our own <AnyapiLink /> wallet within the limits below. Connect your
           own wallet for more, or self-host the MIT source with no app limits at all.
         </p>
       </header>

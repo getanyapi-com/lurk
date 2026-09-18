@@ -116,7 +116,7 @@
 @media (max-width: 760px) {
   .marketing { padding: 8px; }
   .marketing-nav { padding: 16px; gap: 10px; }
-  .marketing-nav > a { font-size: 12px; }
+  .marketing-nav > .wordmark { font-size: 12px; }
   .marketing-nav nav { display: none; }
   .marketing-nav .marketing-button { padding: 8px 12px; min-height: 40px; font-size: 12px; }
   .hero-layout { padding: 28px 16px; }
