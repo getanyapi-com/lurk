@@ -42,11 +42,11 @@
 .how-step[data-state="active"] figcaption em,
 .how-step[data-state="done"] figcaption em { background: var(--fg); border-color: var(--fg); color: var(--bg); }
 
-.how-step[data-state="active"] .how-in { animation: howIn 420ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 260ms + 250ms); }
-.how-step[data-state="active"] .how-pop { animation: howPop 380ms cubic-bezier(0.3, 1.5, 0.5, 1) backwards; animation-delay: calc(var(--i, 0) * 200ms + 250ms); }
+.how-step[data-state="active"] .how-in { animation: howIn 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 170ms + 120ms); }
+.how-step[data-state="active"] .how-pop { animation: howPop 300ms cubic-bezier(0.3, 1.5, 0.5, 1) backwards; animation-delay: calc(var(--i, 0) * 130ms + 120ms); }
 .how-type { display: inline-block; overflow: hidden; white-space: nowrap; width: 23ch; max-width: 100%; border-right: 1px solid transparent; }
-.how-step[data-state="active"] .how-type { animation: howType 1000ms steps(23) 200ms backwards, howCaret 500ms step-end 4; }
-.how-step[data-state="active"] .how-fade { animation: howFade 900ms ease backwards; animation-delay: 900ms; }
+.how-step[data-state="active"] .how-type { animation: howType 650ms steps(23) 100ms backwards, howCaret 400ms step-end 3; }
+.how-step[data-state="active"] .how-fade { animation: howFade 900ms ease backwards; animation-delay: 600ms; }
 
 @keyframes howIn { from { opacity: 0; transform: translateY(8px); } }
 @keyframes howPop { from { opacity: 0; transform: scale(0.5); } }

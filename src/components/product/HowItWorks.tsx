@@ -11,9 +11,9 @@ import "./how-steps.css";
  * account.
  */
 
-const STEP_MS = 2600;
+const STEP_MS = 1700;
 /** How long the finished picture is left up before it plays again. */
-const HOLD_MS = 5000;
+const HOLD_MS = 3500;
 
 const at = (i: number) => ({ "--i": i }) as CSSProperties;
 
