@@ -433,6 +433,24 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(covered.every((keyword) => keyword.lastCoveredAt !== null)).toBe(true);
   });
 
+  it("never asks a bare negation, and asks two keywords that differ only by one once", async () => {
+    const row = await project();
+    await db()
+      .insert(schema.projectKeywords)
+      .values([
+        { projectId: row.id, keyword: "(form OR forms) AND (no OR without)" },
+        { projectId: row.id, keyword: '(form OR forms) AND ("under 21")' },
+        { projectId: row.id, keyword: '(form OR forms) AND ("under 21" OR not)' },
+      ]);
+    pages([{ posts: [], nextCursor: null }]);
+    model();
+
+    await runBackfill(row.id);
+
+    const asked = [...new Set(callsOf().map((call) => call.query))].sort();
+    expect(asked).toEqual(['(form OR forms) AND "under 21"', "form builder"]);
+  });
+
   it("asks a compiled keyword one constraint at a time, so none hides behind the others", async () => {
     const row = await project();
     await db()

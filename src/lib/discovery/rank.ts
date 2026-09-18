@@ -426,6 +426,28 @@ export function constraintQueries(query: string): string[] {
     .map((term) => `${head} AND ${term}`);
 }
 
+/**
+ * A stored compiled search with the bare negations taken out of its
+ * constraints, or "" when nothing else was constraining it. The compiler
+ * stopped writing them on 2026-09-14, and the keywords saved before that still
+ * hold them. Measured 2026-09-18 on a first sweep: `(hotel OR hotels) AND not`
+ * and `AND cant` read 290 posts for no lead, where `AND "under 21"` read 150
+ * for 56. A search that is not the compiled form is returned as it is.
+ */
+export function withoutNegations(query: string): string {
+  const at = query.lastIndexOf(" AND ");
+  const tail = at === -1 ? "" : query.slice(at + " AND ".length);
+  if (!tail.startsWith("(") || !tail.endsWith(")")) {
+    return query;
+  }
+  const terms = tail.slice(1, -1).split(" OR ");
+  const kept = terms.filter((term) => !NEGATIONS.has(term));
+  if (kept.length === terms.length) {
+    return query;
+  }
+  return kept.length === 0 ? "" : `${query.slice(0, at)} AND ${orClause(kept)}`;
+}
+
 /** The same search asked inside one community. */
 export function scopedBooleanQuery(query: string, subreddit: string): string {
   return `subreddit:${subreddit} AND ${query}`;
