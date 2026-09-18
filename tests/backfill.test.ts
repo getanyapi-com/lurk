@@ -382,7 +382,9 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     const sweep = runBackfill(row.id);
     let midRun = 0;
-    for (let tries = 0; tries < 100 && midRun === 0; tries += 1) {
+    // Until both free batches have landed, not until the first has: the two
+    // commit a few milliseconds apart, and a slow runner read between them.
+    for (let tries = 0; tries < 100 && midRun < SCORE_BATCH_SIZE * 2; tries += 1) {
       await new Promise((resolve) => setTimeout(resolve, 20));
       midRun = (
         await db().select().from(schema.leads).where(eq(schema.leads.projectId, row.id))
