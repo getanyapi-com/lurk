@@ -9,7 +9,7 @@ import { retrieved, type PlanRow } from "./coverage";
 import { loadEvaluations, writeEvaluations } from "./evaluations";
 import { writeLeads, type LeadRow } from "./leads";
 import { loadScanProject, type ScanProject } from "./project";
-import { SMALL_SWEEP, smallSweep } from "@/lib/sweepScale";
+import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
 import { evaluationsFor, postItem, routed, toLead, unjudged } from "./run";
 import type { Judgement } from "./judgement";
 import { judgeItems, readOrder, triageTitles } from "./score";
@@ -355,7 +355,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
 
   // A trial-size sweep is the same sweep over less: see src/lib/sweepScale.ts.
   const small = smallSweep();
-  const queries = small ? queriesOf(project).slice(0, SMALL_SWEEP.queries) : queriesOf(project);
+  const queries = small ? spread(queriesOf(project), SMALL_SWEEP.queries) : queriesOf(project);
   const postBudget = small ? SMALL_SWEEP.posts : POST_BUDGET;
   const firstPassPages = small ? SMALL_SWEEP.pages : FIRST_PASS_PAGES;
   const depthPages = small ? SMALL_SWEEP.pages : DEPTH_PAGES;

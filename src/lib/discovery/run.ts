@@ -24,7 +24,7 @@ import {
   type CompetitorRank,
 } from "./rank";
 import { runDiscoveryQueries } from "./serp";
-import { SMALL_SWEEP, smallSweep } from "@/lib/sweepScale";
+import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
 import { applyRelevance, loadEvidence, UNLABELED, type EvidenceRow } from "./store";
 
 /**
@@ -163,7 +163,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
   // A trial-size project asks Google a few questions and none after them.
   const small = smallSweep();
   if (small) {
-    queries = queries.slice(0, SMALL_SWEEP.discoveryQueries);
+    queries = spread(queries, SMALL_SWEEP.discoveryQueries);
   }
   const opening = queries.length;
   const ceiling = small ? opening : opening + Math.max(budget.max - budget.queries, 0);

@@ -508,6 +508,47 @@ function passOf(snapshot: SweepSnapshot | null): string {
   return snapshot.progress?.split(" · ")[0] ?? "Reading the past year";
 }
 
+/** What happens before there is a thread to draw, in the order it happens. */
+const SETUP_STEPS = [
+  { opens: "Reading your site", label: "Reading your site", detail: "What you sell, and who buys it" },
+  { opens: "Asking Google", label: "Asking Google where your buyers ask", detail: "The communities and the words they use" },
+  { opens: "Booking", label: "Starting the sweep of the past year", detail: "Threads land here as they are read" },
+] as const;
+
+/**
+ * The wall before the sweep has a thread for it. A new project spends its first
+ * half minute reading the site and asking Google, and an empty wall with one
+ * small line over it read as nothing happening at all.
+ */
+function SetupSteps({ progress }: { progress: string | null }) {
+  const at = Math.max(0, SETUP_STEPS.findIndex((step) => progress?.startsWith(step.opens)));
+  return (
+    <ol className="flex min-h-[420px] flex-col items-start justify-center gap-5 px-10 py-12" aria-live="polite">
+      {SETUP_STEPS.map((step, index) => {
+        const state = index < at ? "done" : index === at ? "now" : "next";
+        return (
+          <li key={step.opens} className="flex items-start gap-3" style={{ opacity: state === "next" ? 0.4 : 1 }}>
+            <span
+              className="mt-1.5 size-2.5 shrink-0 rounded-full"
+              style={{
+                background: state === "done" ? "var(--score-hot)" : state === "now" ? "var(--score-warm)" : "var(--border)",
+                animation: state === "now" ? "sweepPulse 1.2s ease-in-out infinite" : undefined,
+              }}
+            />
+            <span className="flex flex-col">
+              <span className="text-h3 text-fg" style={{ fontWeight: 500 }}>
+                {step.label}
+                {state === "now" ? "…" : ""}
+              </span>
+              <span className="text-small text-fg-muted">{step.detail}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSnapshot | null; cols?: number; rows?: number }) {
   const view = useSweepView(snapshot, cols * rows);
   const running = snapshot?.state === "running" || snapshot?.state === "waiting" || snapshot === null;
@@ -555,7 +596,11 @@ export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSn
             <span className="font-mono text-[16px] tabular-nums text-fg">{(view.clockMs / 1000).toFixed(1)} s</span>
           </span>
         </div>
-        <ThreadWall wall={view.wall} cols={cols} />
+        {snapshot?.state === "waiting" ? (
+          <SetupSteps progress={snapshot.progress} />
+        ) : (
+          <ThreadWall wall={view.wall} cols={cols} />
+        )}
       </section>
     </div>
   );

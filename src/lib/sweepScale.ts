@@ -20,3 +20,16 @@ export const SMALL_SWEEP = {
   /** Google queries discovery may buy. */
   discoveryQueries: 3,
 } as const;
+
+/**
+ * A few of a list, taken evenly across it. The first few of a plan's searches
+ * are all one sort: on 2026-09-18 a trial sweep of getanyapi.com searched its
+ * first four phrasings, which were four things its customers do with it, and
+ * never reached "reddit api" or any of the sixty platform searches after them.
+ */
+export function spread<T>(items: T[], count: number): T[] {
+  if (items.length <= count) {
+    return items;
+  }
+  return Array.from({ length: count }, (_, index) => items[Math.floor((index * items.length) / count)]);
+}
