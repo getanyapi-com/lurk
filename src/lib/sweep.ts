@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { ProjectActivity } from "@/lib/projectActivity";
 import { candidateSources, jobs, leadEvaluations, llmUsage, redditPosts } from "@/db/schema";
@@ -65,7 +65,9 @@ const SWEEP_LINGER_MS = 90 * 1000;
 
 /** Whether the leads page draws the sweep: while it is queued or running, and just after. */
 export function sweepShown(activity: ProjectActivity, now = new Date()): boolean {
-  if (activity.active.some((job) => job.kind === "backfill")) {
+  // The setup that comes before the sweep counts too: a new project lands on
+  // this board, and it says what is being read until there are threads to draw.
+  if (activity.active.some((job) => job.kind === "backfill" || job.kind === "discovery_initial")) {
     return true;
   }
   const last = activity.last;
@@ -103,11 +105,28 @@ export async function sweepSnapshot(projectId: string): Promise<SweepSnapshot | 
     .where(and(eq(jobs.projectId, projectId), eq(jobs.kind, "backfill")))
     .orderBy(desc(jobs.runAt))
     .limit(1);
-  if (!job) {
-    return null;
-  }
-  if (!job.startedAt) {
-    return { state: "waiting", progress: null, elapsedMs: 0, counts: EMPTY, answers: 0, costUsd: 0, threads: [] };
+  if (!job?.startedAt) {
+    const [setup] = job
+      ? []
+      : await db()
+          .select({ progress: jobs.progress })
+          .from(jobs)
+          .where(
+            and(eq(jobs.projectId, projectId), eq(jobs.kind, "discovery_initial"), isNull(jobs.finishedAt)),
+          )
+          .limit(1);
+    if (!job && !setup) {
+      return null;
+    }
+    return {
+      state: "waiting",
+      progress: setup?.progress ?? null,
+      elapsedMs: 0,
+      counts: EMPTY,
+      answers: 0,
+      costUsd: 0,
+      threads: [],
+    };
   }
   const start = job.startedAt;
   const done = Boolean(job.finishedAt);

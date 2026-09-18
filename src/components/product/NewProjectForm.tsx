@@ -15,10 +15,9 @@ function bareAddress(value: string): string {
 }
 
 /**
- * The product URL, then one submit that reads the site and opens the project.
- * The site names the project, so nothing else is asked. Everything after the
- * page read happens in the background, so the wait here is one page read and
- * the copy says exactly that.
+ * The product URL and one submit. The site names the project, so nothing else
+ * is asked, and the submit only creates it: reading the site and everything
+ * after happens in a job the leads page draws.
  */
 export function NewProjectForm() {
   const [state, formAction, pending] = useActionState(
@@ -58,15 +57,8 @@ export function NewProjectForm() {
       </label>
       <div className="flex items-center gap-3">
         <Button type="submit" size="lg" disabled={pending}>
-          {pending ? "Reading your site" : "Create project"}
+          {pending ? "Creating" : "Create project"}
         </Button>
-        {pending ? (
-          <span aria-live="polite" className="text-small text-fg-muted">
-            Reading your site now. Your subreddits, your keywords and the
-            first year of leads are found in the background over the next few
-            minutes.
-          </span>
-        ) : null}
       </div>
       {state.error ? (
         <p aria-live="polite" className="text-body text-fg-muted">

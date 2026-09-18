@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
-import { resolveActiveSubreddits } from "@/lib/profile";
+import { buildProfile, resolveActiveSubreddits } from "@/lib/profile";
 import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts } from "@/lib/product";
@@ -74,10 +74,19 @@ export async function runInitialDiscovery(
   projectId: string,
   jobId?: string,
 ): Promise<InitialDiscoveryOutcome> {
-  const rows = await db().select().from(projects).where(eq(projects.id, projectId));
-  const project = rows[0];
+  const read = async () => (await db().select().from(projects).where(eq(projects.id, projectId)))[0];
+  let project = await read();
   if (!project) {
     throw new Error("This project no longer exists");
+  }
+  // A project made a moment ago is a URL and nothing else. Its page is read
+  // here and not in the request that made it: the read is one model call of
+  // about 25 seconds, and the person who asked is better off watching the
+  // work start than a button that says it is thinking.
+  if (!project.pain && project.url) {
+    await progress(jobId, "Reading your site");
+    await buildProfile(projectId, project.userId, project.url);
+    project = (await read()) ?? project;
   }
   const { limits, settings } = await tierForUser(project.userId);
 

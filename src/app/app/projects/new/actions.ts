@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { enqueueJob } from "@/jobs/enqueue";
 import { kickScheduler } from "@/jobs/scheduler";
 import { requireLocalUser } from "@/lib/auth";
-import { buildProfile } from "@/lib/profile";
 import { createProject } from "@/lib/projects";
 
 export type NewProjectState = { error: string | null };
@@ -27,11 +26,10 @@ function nameFromUrl(url: string): string {
 }
 
 /**
- * Creates the project, reads its page, and hands the rest to a job. The page
- * read names the project, so the form asks for the URL and nothing else. Reading
- * Google for where the buyers ask takes minutes, and a browser waiting on a
- * Server Action for minutes is a request an ingress cuts off, so the only work
- * inside this action is the page read the profile needs.
+ * Creates the project and hands everything else to a job, then opens the leads
+ * page, where the work is drawn as it happens. Nothing is read inside the
+ * request: the page read alone held the form for 28 seconds, and the profile it
+ * produced is not what a person who just pasted a URL came to look at.
  */
 export async function createProjectAndProfileAction(
   _previous: NewProjectState,
@@ -61,15 +59,12 @@ export async function createProjectAndProfileAction(
   }
 
   try {
-    await buildProfile(projectId, user.id, url);
     await enqueueJob("discovery_initial", projectId);
     kickScheduler();
   } catch (error) {
-    return {
-      error: `${name} was created but its profile could not be built: ${sentence(error)} Open the project and press Rebuild profile.`,
-    };
+    return { error: `${name} was created but its setup could not be queued: ${sentence(error)}` };
   }
 
   revalidatePath("/app", "layout");
-  redirect(`/app/product?project=${projectId}`);
+  redirect(`/app/leads?project=${projectId}`);
 }

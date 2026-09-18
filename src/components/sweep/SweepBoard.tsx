@@ -502,7 +502,7 @@ function ThreadWall({ wall, cols }: { wall: (SweepThread | null)[]; cols: number
 
 /** The pass the sweep is on, which is how its own progress line opens. */
 function passOf(snapshot: SweepSnapshot | null): string {
-  if (!snapshot || snapshot.state === "waiting") return "Starting";
+  if (!snapshot || snapshot.state === "waiting") return snapshot?.progress ?? "Starting";
   if (snapshot.state === "done") return "Done";
   if (snapshot.state === "stopped") return "Stopped";
   return snapshot.progress?.split(" · ")[0] ?? "Reading the past year";

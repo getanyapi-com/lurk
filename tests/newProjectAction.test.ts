@@ -86,13 +86,31 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
     form.set("url", "https://www.formcraft.test");
     await createProjectAndProfileAction({ error: null }, form);
 
+    // Nothing is read inside the request, not even the product's own page.
     expect(runDiscovery).not.toHaveBeenCalled();
+    expect(generateStructured).not.toHaveBeenCalled();
     expect(redirect).toHaveBeenCalledTimes(1);
+    expect(redirect.mock.calls[0][0]).toMatch(/^\/app\/leads\?project=/);
 
-    const [project] = await db()
+    const [made] = await db()
       .select()
       .from(schema.projects)
       .where(eq(schema.projects.userId, user.id));
+    expect(made.name).toBe("formcraft.test");
+    const queued = await db()
+      .select()
+      .from(schema.jobs)
+      .where(and(eq(schema.jobs.projectId, made.id), isNull(schema.jobs.startedAt)));
+    expect(queued.map((row) => row.kind)).toEqual(["discovery_initial"]);
+
+    // The job reads the page before it asks Google anything.
+    const { runInitialDiscovery } = await import("@/lib/discovery/initial");
+    await runInitialDiscovery(made.id);
+    expect(runDiscovery).toHaveBeenCalledTimes(1);
+    const [project] = await db()
+      .select()
+      .from(schema.projects)
+      .where(eq(schema.projects.id, made.id));
     // The page read names the project; the form never asked.
     expect(project.name).toBe("Formcraft");
     expect(project.pain).toBe(profile.pain);
@@ -102,12 +120,5 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
       "zapier api",
       "zapier scraper",
     ]);
-    expect(project.discoveredAt).toBeNull();
-
-    const queued = await db()
-      .select()
-      .from(schema.jobs)
-      .where(and(eq(schema.jobs.projectId, project.id), isNull(schema.jobs.startedAt)));
-    expect(queued.map((row) => row.kind)).toEqual(["discovery_initial"]);
   });
 });
