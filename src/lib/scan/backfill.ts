@@ -24,6 +24,19 @@ import { creditSources, markCovered, recordSources, type CandidateSource } from 
  * here: search now carries the body, and the reading costs more than judging
  * the same post twice would. It never writes `seo_opportunities` either, which
  * is what keeps the Reddit SEO tab a Google-only list.
+ *
+ * What it spends is bounded three ways, each measured 2026-09-18 on a sweep of
+ * 22 walks that read every page: 4,229 posts, 137 leads, $0.46. Read this way
+ * the same sweep keeps 130 of the 137 for $0.11:
+ *
+ *   depth    walks read FIRST_PASS_PAGES, and only one that found a lead reads
+ *            on, to DEPTH_PAGES. Pages one and two held 71% of the qualified
+ *            leads in 18% of the posts; pages nine and later held 3 in 1,074.
+ *   triage   a title under ASKING_FLOOR is not scored. Scoring a post costs
+ *            six times what triaging it does, and 95% of scored posts were
+ *            rejected.
+ *   budget   POST_BUDGET posts, whatever the plan's size, so one project's
+ *            first sweep costs about $0.20 at most.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -39,7 +52,24 @@ const STALE_PAGES = 3;
  * 59 pages and the sweep waited 53 seconds on it. The walks then pick up from
  * their cursors and read the rest of the year.
  */
-const FIRST_PASS_PAGES = 4;
+const FIRST_PASS_PAGES = 2;
+
+/** Pages a walk reads in all, when its first pass found a lead. */
+const DEPTH_PAGES = 6;
+
+/**
+ * Posts one sweep may find. A found post costs about $0.000076 all in: its
+ * share of a search page, its title's triage, and the scoring of the 41% that
+ * pass the floor. 2,500 of them is $0.19.
+ */
+const POST_BUDGET = 2500;
+
+/**
+ * The triage `asking` a title needs before its post is scored. Measured on the
+ * 3,914 posts the sweep above scored (.context/probe-triage.ts): 0.10 keeps
+ * 1,616 of them and every one of the 137 leads; 0.20 keeps 1,012 and loses 4.
+ */
+const ASKING_FLOOR = 0.1;
 
 /** Both orders one query can be read in; see fetchSearch on why both are bought. */
 const SORTS = ["relevance", "new"] as const;
@@ -67,8 +97,7 @@ type Query = { text: string; rows: PlanRow[] };
  * relevance sort returns sparse pages in the middle of a listing (2, 6, 6, 1,
  * 0, then six full pages), so treating the first of them as the end truncated
  * `(hotel OR hotels) AND "under 21"` to 16 posts where the listing holds 150.
- * There is no page cap: a year of one phrasing is what the sweep is for. It
- * does stop when the listing stops moving: three pages in a row that carry
+ * It also stops when the listing stops moving: three pages in a row that carry
  * nothing this walk has not already seen. Measured 2026-09-18 on the cheapest
  * source, a relevance walk ran 183 pages for 302 posts, every page after the
  * eleventh the same posts under a new cursor, and the walk before the stop
@@ -90,13 +119,13 @@ type Walk = {
   stale: number;
 };
 
-/** How a walk ended: at the end of its listing, at its page cap, or on a failed page. */
+/** How a walk ended: at the end of its listing, at its page cap or the sweep's post budget, or on a failed page. */
 type WalkEnd = "done" | "paused" | "cutShort";
 
 async function walk(
   ctx: FetchContext,
   state: Walk,
-  maxPages: number | null,
+  maxPages: number,
   found: Map<string, StoredPost>,
   sources: Map<string, CandidateSource[]>,
   landed: (posts: StoredPost[]) => void,
@@ -104,7 +133,7 @@ async function walk(
   const { query, sort, walked } = state;
   let { cursor, stale } = state;
   for (let pages = 0; ; pages += 1) {
-    if (maxPages !== null && pages >= maxPages) {
+    if (pages >= maxPages || found.size >= POST_BUDGET) {
       state.cursor = cursor;
       state.stale = stale;
       return "paused";
@@ -216,13 +245,14 @@ class Judge {
     this.pump();
   }
 
-  /** Judges whatever is left, and resolves once every chunk has landed. */
-  async finish(): Promise<void> {
+  /** Judges whatever is queued, and resolves once every chunk has landed. */
+  async settle(): Promise<void> {
     this.draining = true;
     this.pump();
     while (this.running) {
       await this.running;
     }
+    this.draining = false;
   }
 
   private pump(): void {
@@ -269,7 +299,10 @@ class Judge {
         { ageHours: (now - post.createdAt.getTime()) / HOUR_MS, upvotes: post.score },
       ]),
     );
-    const ordered = readOrder(triage, facts)
+    const ordered = readOrder(
+      triage.filter((item) => item.asking >= ASKING_FLOOR),
+      facts,
+    )
       .map((id) => byId.get(id))
       .filter((post): post is StoredPost => post !== undefined);
 
@@ -333,7 +366,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
       pass === "first"
         ? `First pass over a year of Reddit · ${plan.length} searches · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
         : pass === "rest"
-          ? `Reading the rest of the year · ${walks} of ${plan.length} searches done · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
+          ? `Reading further where the leads are · ${walks} of ${plan.length} searches done · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
           : `Scoring ${judge.candidates.length} posts · ${judge.judged.length} scored · ${judge.leads.length} leads`,
     );
   const judge: Judge = new Judge(project, await loadEvaluations(projectId), sourcesByPost, report);
@@ -342,15 +375,13 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   // so all of them start at once and the shared pace in src/lib/reddit/pace.ts
   // decides how many calls are actually in flight. Each page hands its new
   // posts to the judge as it lands. The first pass reads a few pages of every
-  // walk, so the feed has leads in seconds; the second reads the rest.
+  // walk, so the feed has leads in seconds; the second reads further into the
+  // walks that found one.
   await report();
-  const run = async (item: Walk, maxPages: number | null): Promise<WalkEnd> => {
+  const run = async (item: Walk, maxPages: number): Promise<WalkEnd> => {
     const end = await walk(ctx, item, maxPages, found, sourcesByPost, (posts) =>
       judge.offer(posts),
     );
-    if (end !== "paused") {
-      walks += 1;
-    }
     if (end === "cutShort") {
       cutShort += 1;
     }
@@ -358,14 +389,23 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
     return end;
   };
   const ends = await Promise.all(plan.map((item) => run(item, FIRST_PASS_PAGES)));
+  await judge.settle();
+  const leadPosts = new Set(judge.leads.map((lead) => lead.postId));
+  const deeper = plan.filter(
+    (item, index) => ends[index] === "paused" && [...item.walked].some((id) => leadPosts.has(id)),
+  );
+  walks = plan.length - deeper.length;
   pass = "rest";
   await report();
   await Promise.all(
-    plan.filter((_, index) => ends[index] === "paused").map((item) => run(item, null)),
+    deeper.map(async (item) => {
+      await run(item, DEPTH_PAGES - FIRST_PASS_PAGES);
+      walks += 1;
+    }),
   );
   pass = "scoring";
   await report();
-  await judge.finish();
+  await judge.settle();
 
   // A post several walks found gained sources after its chunk was judged, so
   // record every source once more; the ones already written are ignored.

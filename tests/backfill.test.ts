@@ -248,6 +248,79 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(callsOf()).toHaveLength(4);
   });
 
+  /** A listing that never ends: a fresh page of new posts under every cursor. */
+  function endless(perPage: number) {
+    let cursors = 0;
+    fetchSearch.mockImplementation(async () => {
+      cursors += 1;
+      return {
+        value: { posts: await posts(perPage), nextCursor: `page-${cursors}` },
+        reused: true,
+        costUsd: 0,
+      };
+    });
+  }
+
+  it("reads on past the first pass only where the first pass found a lead", async () => {
+    const row = await project();
+    endless(2);
+    // Every title is worth reading, and nobody in them is a buyer.
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) =>
+      call.purpose === "triage"
+        ? triageAnswers(Array.from({ length: call.itemsAsked }, () => ({})))
+        : judgeAnswers(
+            Array.from({ length: call.itemsAsked }, () => ({ relationship: "discussion", solvesProblem: 0.1, audience: 0.1 })),
+          ),
+    );
+
+    const outcome = await runBackfill(row.id);
+
+    // Two pages of each sort, and no walk earned a third.
+    expect(callsOf()).toHaveLength(4);
+    expect(outcome.leads).toBe(0);
+  });
+
+  it("stops a walk that keeps finding leads at its depth", async () => {
+    const row = await project();
+    endless(2);
+    model();
+
+    await runBackfill(row.id);
+
+    // Six pages of each sort.
+    expect(callsOf()).toHaveLength(12);
+  });
+
+  it("scores no post whose title triage says is asking for nothing", async () => {
+    const row = await project();
+    pages([{ posts: await posts(4), nextCursor: null }]);
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) =>
+      call.purpose === "triage"
+        ? triageAnswers(
+            Array.from({ length: call.itemsAsked }, (_, index) => ({ asking: index === 0 ? 0.4 : 0.03 })),
+          )
+        : judgeAnswers(Array.from({ length: call.itemsAsked }, () => ({ quote: "s0" }))),
+    );
+
+    const outcome = await runBackfill(row.id);
+
+    expect(outcome.found).toBe(4);
+    expect(outcome.judged).toBe(1);
+  });
+
+  it("stops finding posts once the sweep's budget is spent", async () => {
+    const row = await project();
+    endless(300);
+    model();
+
+    const outcome = await runBackfill(row.id);
+
+    // Twelve pages were on offer; the budget ran out before the last of them.
+    expect(callsOf().length).toBeLessThan(12);
+    expect(outcome.found).toBeGreaterThanOrEqual(2500);
+    expect(outcome.found).toBeLessThan(3600);
+  }, 60_000);
+
   it("reuses no cached search, because a retry must not inherit a truncated walk", async () => {
     const row = await project();
     pages([{ posts: await posts(1), nextCursor: null }]);
