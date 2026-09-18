@@ -34,8 +34,8 @@ export function NewProjectForm() {
     >
       <label className="flex flex-col gap-1 text-small text-fg-muted">
         Product URL
-        <span className="flex h-10 items-center rounded-control border bg-surface px-2 text-body focus-within:ring-2 focus-within:ring-fg-muted/40">
-          <span aria-hidden="true" className="select-none text-fg-muted opacity-60">
+        <span className="flex h-10 items-stretch overflow-hidden rounded-control border bg-surface text-body focus-within:ring-2 focus-within:ring-fg-muted/40">
+          <span aria-hidden="true" className="flex select-none items-center border-r bg-surface-2 px-3 text-fg-muted">
             https://
           </span>
           <input
@@ -51,7 +51,7 @@ export function NewProjectForm() {
             value={address}
             onChange={(event) => setAddress(bareAddress(event.target.value))}
             placeholder="yourproduct.com"
-            className="h-full min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-muted placeholder:opacity-60"
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-fg outline-none placeholder:text-fg-muted placeholder:opacity-60"
           />
         </span>
         <input type="hidden" name="url" value={address ? `https://${address}` : ""} />
