@@ -419,13 +419,18 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
       (await db().select().from(jobs).where(eq(jobs.projectId, projectId)))
         .map((row) => row.kind)
         .sort();
-    expect(await kinds(project.id)).toEqual([
-      "competitor_scan",
-      "discovery_refresh",
-      "scan",
-      "seo_refresh",
-    ]);
+    // No SEO pass and no competitor scan: those wait for their tab to be opened.
+    expect(await kinds(project.id)).toEqual(["discovery_refresh", "scan"]);
     expect(await kinds(fresh.id)).toEqual(["discovery_initial"]);
+
+    // A project whose tab was opened has had one, and is owed the next.
+    const ran = new Date();
+    await db()
+      .insert(jobs)
+      .values({ kind: "seo_refresh", projectId: project.id, runAt: ran, startedAt: ran, finishedAt: ran });
+    await seedProjectScans();
+    expect((await kinds(project.id)).filter((kind) => kind === "seo_refresh")).toHaveLength(2);
+    expect(await kinds(project.id)).not.toContain("competitor_scan");
 
     await db()
       .delete(jobs)

@@ -80,16 +80,12 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
     const first = await queued();
     expect(first.map((row) => row.kind).sort()).toEqual([
       "backfill",
-      "competitor_scan",
       "discovery_refresh",
       "scan",
-      "seo_refresh",
     ]);
     const due = (kind: string) =>
       (first.find((row) => row.kind === kind)!.runAt.getTime() - Date.now()) / HOUR_MS;
     expect(due("backfill")).toBeLessThan(0.1);
-    expect(due("seo_refresh")).toBeLessThan(0.1);
-    expect(due("competitor_scan")).toBeLessThan(0.1);
     expect(due("scan")).toBeGreaterThan(5);
     expect(due("discovery_refresh")).toBeGreaterThan(24);
 

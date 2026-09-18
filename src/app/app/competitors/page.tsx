@@ -1,4 +1,5 @@
-import { scanCompetitorsAction } from "@/app/app/competitors/actions";
+import { openCompetitorsAction, scanCompetitorsAction } from "@/app/app/competitors/actions";
+import { StartOnOpen } from "@/components/StartOnOpen";
 import { MentionCard } from "@/components/competitors/MentionCard";
 import { MentionsBar } from "@/components/competitors/MentionsBar";
 import { TopCompetitors } from "@/components/competitors/TopCompetitors";
@@ -74,6 +75,7 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
 
   return (
     <div className="flex flex-col gap-5">
+      {last ? null : <StartOnOpen start={openCompetitorsAction.bind(null, project.id)} />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-h2" style={{ fontWeight: 500 }}>

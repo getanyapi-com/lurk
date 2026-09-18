@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { config } from "@/lib/config";
 import { projectsWithStaleEvaluations } from "@/lib/scan/rescore";
-import { enqueueOnce } from "./enqueue";
+import { enqueueOnce, lastRunJob } from "./enqueue";
 import { WATCHED_KINDS, claimNextJob, runClaimedJob } from "./runner";
 
 let started: Cron | null = null;
@@ -112,8 +112,13 @@ async function seedProject(row: { id: string; discoveredAt: Date | null }, stale
   }
   await enqueueOnce("scan", new Date(), row.id);
   await enqueueOnce("discovery_refresh", new Date(), row.id);
-  await enqueueOnce("competitor_scan", new Date(), row.id);
-  await enqueueOnce("seo_refresh", new Date(), row.id);
+  // These two start the first time somebody opens their tab (see
+  // startOnOpen), so only a project that has had one is owed the next.
+  for (const kind of ["competitor_scan", "seo_refresh"]) {
+    if (await lastRunJob(kind, row.id)) {
+      await enqueueOnce(kind, new Date(), row.id);
+    }
+  }
   if (stale) {
     await enqueueOnce("rescore", new Date(), row.id);
   }

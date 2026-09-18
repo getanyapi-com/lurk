@@ -305,13 +305,39 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
   it("stops finding posts once the sweep's budget is spent", async () => {
     const row = await project();
     endless(600);
-    model();
+    // One buyer, so the walk reads on, and too few of them to stop the sweep.
+    let buyers = 0;
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) =>
+      call.purpose === "triage"
+        ? triageAnswers(Array.from({ length: call.itemsAsked }, () => ({})))
+        : judgeAnswers(
+            Array.from({ length: call.itemsAsked }, () =>
+              (buyers += 1) === 1
+                ? { quote: "s0" }
+                : { relationship: "discussion", solvesProblem: 0.1, audience: 0.1 },
+            ),
+          ),
+    );
 
     const outcome = await runBackfill(row.id);
 
     // Six pages were on offer; the budget ran out before the last of them.
     expect(callsOf().length).toBeLessThan(6);
     expect(outcome.found).toBe(2500);
+  }, 60_000);
+
+  it("stops searching and scoring once it holds as many buyers as one person answers", async () => {
+    const row = await project();
+    endless(100);
+    model();
+
+    const outcome = await runBackfill(row.id);
+
+    // Six pages of buyers were on offer. Two held the 150, and a chunk already
+    // being judged finishes, so the sweep ends a few over and reads no deeper.
+    expect(callsOf().length).toBeLessThan(6);
+    expect(outcome.leads).toBeGreaterThanOrEqual(150);
+    expect(outcome.leads).toBeLessThan(300);
   }, 60_000);
 
   it("reuses no cached search, because a retry must not inherit a truncated walk", async () => {

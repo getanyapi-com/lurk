@@ -1,5 +1,6 @@
-import { refreshSeoAction } from "@/app/app/seo/actions";
+import { openSeoAction, refreshSeoAction } from "@/app/app/seo/actions";
 import { EmptyState } from "@/components/EmptyState";
+import { StartOnOpen } from "@/components/StartOnOpen";
 import { Button } from "@/components/ui/button";
 import { NoPhrasings } from "@/components/seo/NoPhrasings";
 import { RefreshStatus } from "@/components/seo/RefreshStatus";
@@ -96,6 +97,7 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      {last ? null : <StartOnOpen start={openSeoAction.bind(null, project.id)} />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-h2" style={{ fontWeight: 500 }}>

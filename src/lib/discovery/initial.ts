@@ -28,10 +28,12 @@ async function progress(jobId: string | undefined, text: string): Promise<void> 
 /**
  * The first jobs of a project's life, written in the same transaction as the
  * marker that says the project is set up. The backfill fills the leads feed
- * from a year of Reddit's own search, the Google pass fills the Reddit SEO tab
- * and the competitor scan fills its own; the recurring scan starts at its own next
+ * from a year of Reddit's own search; the recurring scan starts at its own next
  * scheduled time, because the backfill has just read everything it would find; the
- * discovery delta is the first weekly top-up.
+ * discovery delta is the first weekly top-up. The Reddit SEO pass and the
+ * competitor scan are not here: measured 2026-09-18 they were 9 cents of a
+ * 30 cent signup, for two tabs most signups had not opened, so each is
+ * queued the first time its tab is (src/lib/startOnOpen.ts).
  *
  * The marker is claimed with a conditional update, so a second run of this
  * handler - a rebuild, or a retry after a crash that already wrote the row -
@@ -60,8 +62,6 @@ async function markDiscoveredAndQueue(
     }
     await tx.insert(jobs).values([
       { kind: "backfill", projectId, runAt: new Date(now) },
-      { kind: "seo_refresh", projectId, runAt: new Date(now) },
-      { kind: "competitor_scan", projectId, runAt: new Date(now) },
       { kind: "scan", projectId, runAt: scanAt },
       { kind: "discovery_refresh", projectId, runAt: new Date(now + refreshDays * DAY_MS) },
     ]);
