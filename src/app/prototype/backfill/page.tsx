@@ -2,13 +2,15 @@
 
 /**
  * PROTOTYPE: four boards for showing the year's backfill happening live,
- * switchable with ?variant=A|B|C|D and the arrow keys. Simulated data; see sim.ts.
- * Add ?speed=2 to run twice as fast, ?speed=0.5 for half. With ?project=<id>
- * the board reads that project's real backfill from the database instead.
+ * switchable with ?variant=A|B|C|D and the arrow keys. By default it replays
+ * the recorded real run (replay.ts) from page load at real speed; ?speed=2
+ * runs it twice as fast. ?project=<id> reads a live backfill from the database
+ * instead, and ?sim=1 uses the synthetic simulation in sim.ts.
  */
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 import { useLiveBackfill } from "./live";
+import { useReplay } from "./replay";
 import { useBackfillSim } from "./sim";
 import { VariantA, VariantB, VariantC, VariantD } from "./variants";
 
@@ -22,9 +24,11 @@ function Board() {
   const key = params.get("variant") ?? "A";
   const speed = Number(params.get("speed") ?? "1") || 1;
   const project = params.get("project");
-  const sim = useBackfillSim(project ? 0 : speed);
+  const simulated = params.get("sim") === "1";
+  const sim = useBackfillSim(!project && simulated ? speed : 0);
+  const replay = useReplay(speed, !project && !simulated);
   const live = useLiveBackfill(project);
-  const s = project ? live : sim;
+  const s = project ? live : simulated ? sim : replay;
   const index = Math.max(0, VARIANTS.findIndex(([k]) => k === key));
   const go = (delta: number) => {
     const next = VARIANTS[(index + delta + VARIANTS.length) % VARIANTS.length][0];

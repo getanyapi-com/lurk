@@ -84,7 +84,7 @@ export function VariantA({ s }: { s: SimState }) {
           <div className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(64, 1fr)" }}>
             {Array.from({ length: Math.max(TOTAL_POSTS, s.posts.length) }, (_, i) => {
               const p = s.posts[i];
-              const bg = !p ? "transparent" : p.status !== "judged" ? "var(--surface-2)" : REL_COLOR[p.relationship!];
+              const bg = !p ? "transparent" : p.status === "triaged" ? "var(--border)" : p.status === "found" ? "var(--surface-2)" : REL_COLOR[p.relationship!];
               const op = p?.status === "judged" && p.relationship === "buyer" ? 0.35 + (p.score ?? 0) / 130 : 1;
               return <div key={i} className="aspect-square rounded-[1px]" style={{ background: bg, opacity: op }} />;
             })}
@@ -93,7 +93,7 @@ export function VariantA({ s }: { s: SimState }) {
         <div className="flex flex-col gap-3">
           <div className="rounded-card border bg-surface p-3">
             <div className="mb-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-fg-muted">
-              <span>breakdown</span><span>{s.current?.ms ?? "—"} ms</span>
+              <span>breakdown</span><span>{s.current ? `#${s.current.id + 1}` : ""}</span>
             </div>
             <p className="mb-1 text-body" style={{ fontWeight: 500 }}>{s.current?.title ?? "…"}</p>
             <p className="mb-3 font-mono text-[11px] text-fg-muted">r/{s.current?.subreddit}</p>
@@ -149,19 +149,18 @@ export function VariantB({ s }: { s: SimState }) {
   return (
     <div className="grid h-screen grid-cols-[1fr_380px]" style={{ background: "var(--fg)", color: "var(--bg)" }}>
       <div ref={ref} className="overflow-hidden p-6 font-mono text-[12px] leading-[1.7]">
-        <div className="mb-4 opacity-50">$ lurk backfill --project bookline --window 1y</div>
+        <div className="mb-4 opacity-50">$ lurk backfill --window 1y</div>
         <div className="mb-1 opacity-70">
           {s.phase === "searching" || s.phase === "triage" ? `searching "${s.keyword}" …` : s.phase === "done" ? "done." : `scoring · batch of ${s.lastBatch.length}`}
         </div>
         {recent.map((p) => (
-          <div key={p.id} className="grid grid-cols-[52px_84px_1fr_120px_56px] gap-3 whitespace-nowrap">
+          <div key={p.id} className="grid grid-cols-[52px_84px_1fr_120px] gap-3 whitespace-nowrap">
             <span style={{ color: (p.score ?? 0) >= 70 ? "var(--score-hot)" : "inherit", opacity: (p.score ?? 0) >= 70 ? 1 : 0.5 }}>
               {String(p.score).padStart(3, " ")}
             </span>
             <span style={{ color: REL_COLOR[p.relationship!] }}>{p.relationship}</span>
             <span className="truncate opacity-90">{p.title}</span>
             <span className="opacity-50">{STAGE_LABEL[p.stage!]}</span>
-            <span className="text-right opacity-40">{p.ms}ms</span>
           </div>
         ))}
       </div>
