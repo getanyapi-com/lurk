@@ -24,13 +24,13 @@ import {
 /** One function per Reddit endpoint the scan uses, all sharing one run store. */
 
 /**
- * A listing only tells us a thread is closed if the source serving it reports
- * the flags, so both listings ask for them by name. That can route the call to
- * a dearer source, which is the price of knowing the thread can still be
- * replied in. `reddit.post` does not take the option and does not need it:
- * every source serving it already returns both flags.
+ * No listing asks for the closed-thread flags. Only the Reddit SEO pages read
+ * them, and those threads come from Google results opened with `reddit.post`,
+ * which every source serving it returns the flags for. Asking a listing for
+ * them by name pinned every page to the one source that reports them, at a
+ * third more per page and one vendor's rate limit for the whole sweep
+ * (measured 2026-09-17: 210 of 210 search pages).
  */
-const CLOSED_FLAGS: ["isArchived", "isLocked"] = ["isArchived", "isLocked"];
 
 type RawPage = { posts?: RawPost[]; nextCursor?: string | null } | null;
 
@@ -88,7 +88,6 @@ export async function fetchSearch(
         query,
         sort,
         timeframe,
-        requireFields: [...CLOSED_FLAGS],
         ...(cursor ? { cursor } : {}),
       });
       const data = res.output.found ? res.output.data : null;
@@ -121,7 +120,6 @@ export async function fetchSubredditPosts(
       const res = await ctx.funded.client.reddit.subredditPosts({
         subreddit,
         sort: "new",
-        requireFields: [...CLOSED_FLAGS],
         ...(cursor ? { cursor } : {}),
         ...(limit ? { limit } : {}),
       });

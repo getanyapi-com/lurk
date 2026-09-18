@@ -167,6 +167,25 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     }
   });
 
+  it("ends a walk whose listing stops moving, however many cursors it is handed", async () => {
+    const row = await project();
+    const same = await posts(2);
+    let cursors = 0;
+    // A source that repeats the same page under a fresh cursor forever.
+    fetchSearch.mockImplementation(async () => {
+      cursors += 1;
+      return { value: { posts: same, nextCursor: `page-${cursors}` }, reused: true, costUsd: 0 };
+    });
+    model();
+
+    const outcome = await runBackfill(row.id);
+
+    // Page one moved the walk; three more that did not end it. Two sorts.
+    expect(callsOf()).toHaveLength(8);
+    expect(outcome.cutShort).toBe(0);
+    expect(outcome.found).toBe(2);
+  });
+
   it("ends only the walk whose page failed, and keeps the pages before it", async () => {
     const row = await project();
     const first = await posts(2);
@@ -239,7 +258,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(maxAgesOf()).toEqual([0, 0]);
   });
 
-  it("walks queries at once, never more at once than the fetch concurrency", async () => {
+  it("starts every walk at once, and leaves the pace to the shared Reddit pace", async () => {
     const row = await project(["forms that branch", "a form that asks one question"]);
     let live = 0;
     let peak = 0;
@@ -254,11 +273,11 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    const { CALL_CONCURRENCY } = await import("@/lib/scan/constants");
-    // Six walks: three queries in both orders. Sequentially the peak is one.
+    // Six walks: three queries in both orders, all in flight together. How
+    // many calls that is allowed to be is decided in src/lib/reddit/pace.ts,
+    // underneath the fetch this test replaces.
     expect(callsOf()).toHaveLength(6);
-    expect(peak).toBeGreaterThan(1);
-    expect(peak).toBeLessThanOrEqual(CALL_CONCURRENCY);
+    expect(peak).toBe(6);
   });
 
   /**

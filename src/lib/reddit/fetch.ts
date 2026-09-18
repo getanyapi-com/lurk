@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { searchRuns, usageLedger } from "@/db/schema";
 import type { FundedClient, Funding } from "@/lib/anyapi";
 import { assertHouseDataUnderCap } from "@/lib/usage";
+import { paced } from "./pace";
 /** One search_runs row per kind of thing we fetch, on Reddit or on Google. */
 export type FetchKind =
   | "keyword"
@@ -108,6 +109,9 @@ export async function recordUsage(input: {
  *
  * Every paid call the house pays for passes the daily house cap first. A user
  * spending their own wallet is exempt: that money is not ours to ration.
+ *
+ * Every paid Reddit call runs inside the process's shared pace, whichever job
+ * makes it; Google has its own vendor and is not paced here.
  */
 export async function fetchShared<T>(input: SharedFetch<T>): Promise<SharedResult<T>> {
   const { ctx, kind, sku, normalizedQuery } = input;
@@ -137,7 +141,9 @@ export async function fetchShared<T>(input: SharedFetch<T>): Promise<SharedResul
   if (ctx.funded.funding === "house") {
     await assertHouseDataUnderCap();
   }
-  const { result, requestId } = await ctx.funded.call(input.run);
+  const { result, requestId } = sku.startsWith("reddit.")
+    ? await paced(() => ctx.funded.call(input.run))
+    : await ctx.funded.call(input.run);
   const runId = randomUUID();
   await db().insert(searchRuns).values({
     id: runId,

@@ -51,6 +51,15 @@ const schema = z.object({
    */
   SCHEDULER_WORKERS: z.coerce.number().int().positive().default(3),
 
+  /**
+   * The shared pace for paid Reddit calls; see src/lib/reddit/pace.ts. In
+   * flight is where a burst starts; per second is the token bucket every
+   * call draws from. Both are the summed vendor budgets behind reddit.*
+   * less headroom for a second job, measured 2026-09-17.
+   */
+  REDDIT_CALLS_IN_FLIGHT: z.coerce.number().int().positive().default(40),
+  REDDIT_CALLS_PER_SECOND: z.coerce.number().positive().default(12),
+
   HOUSE_DATA_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(25),
   HOUSE_LLM_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(10),
 });

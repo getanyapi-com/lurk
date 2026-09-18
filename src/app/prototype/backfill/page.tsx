@@ -55,7 +55,7 @@ function Board() {
       {process.env.NODE_ENV !== "production" ? (
         <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2 font-mono text-[12px] shadow-lg" style={{ background: "oklch(0.3 0.15 300)", color: "white" }}>
           <button onClick={() => go(-1)}>←</button>
-          <span>{VARIANTS[index][0]} — {VARIANTS[index][1]}</span>
+          <span>{VARIANTS[index][0]} · {VARIANTS[index][1]}</span>
           <button onClick={() => go(1)}>→</button>
         </div>
       ) : null}
