@@ -141,14 +141,12 @@ export async function resolveActiveSubreddits(projectId: string, userId: string)
         inArray(projectSubreddits.state, ["active", "pinned"]),
       ),
     );
-  const resolved: string[] = [];
-  for (const row of rows) {
-    const key = await resolveSubreddit(projectId, userId, row.name);
-    if (key) {
-      resolved.push(key);
-    }
-  }
-  return resolved;
+  // A community whose sidebar cannot be read keeps no rule and is still read
+  // for leads, so one failure here costs the others nothing.
+  const resolved = await Promise.all(
+    rows.map((row) => resolveSubreddit(projectId, userId, row.name).catch(() => null)),
+  );
+  return resolved.filter((key): key is string => key !== null);
 }
 
 export type ProfileOptions = {

@@ -100,6 +100,25 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
     );
   });
 
+  it("books the first sweep before it reads a single community's rules", async () => {
+    const { db, schema, project } = await fixture();
+    const { eq } = await import("drizzle-orm");
+    const { JOB_HANDLERS } = await import("@/jobs/registry");
+    let bookedWhenRulesWereRead: string[] = [];
+    resolveActiveSubreddits.mockImplementationOnce(async () => {
+      const rows = await db().select().from(schema.jobs).where(eq(schema.jobs.projectId, project.id));
+      bookedWhenRulesWereRead = rows.map((row) => row.kind);
+      return ["saas"];
+    });
+    const job = { id: undefined, projectId: project.id } as unknown as Parameters<
+      (typeof JOB_HANDLERS)["discovery_initial"]
+    >[0];
+
+    await JOB_HANDLERS.discovery_initial(job);
+
+    expect(bookedWhenRulesWereRead).toContain("backfill");
+  });
+
   it("comes back on the same cadence a failed first sweep does, not days later", async () => {
     const { db, schema, project } = await fixture();
     const { and, eq, isNull } = await import("drizzle-orm");
