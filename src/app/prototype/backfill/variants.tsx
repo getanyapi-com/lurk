@@ -1,326 +1,763 @@
 "use client";
 
-/* PROTOTYPE. Four boards over one simulation; see sim.ts. */
-import { useRef } from "react";
+/**
+ * PROTOTYPE. Three boards over one backfill (see sim.ts for the shape, and
+ * replay.ts for the recorded run they draw by default). They are three answers
+ * to the same question, which is what a person should understand after five
+ * seconds of watching a new project read a year of Reddit:
+ *
+ *   A  the feed filling up, because the leads are the product
+ *   B  the 62 seconds as one trace, because the shape of the minute is the point
+ *   C  the sieve, because 4,229 to 129 is the whole job in one picture
+ *
+ * Every number comes off the state, which comes off the run. The only constant
+ * is what a person costs: thirty seconds to read one post and decide.
+ */
+import { useEffect, useRef } from "react";
 import {
-  fmtSecs, fmtUsd, perSec, RELATIONSHIPS, STAGES, TOTAL_POSTS,
-  type Relationship, type SimPost, type SimState, type Stage,
+  fmtInt, fmtSecs, fmtUsd, itemsPerSec, PHASE_LABEL, RELATIONSHIPS,
+  type Relationship, type SimPost, type SimState,
 } from "./sim";
 
-const REL_COLOR: Record<Relationship, string> = {
-  buyer: "var(--score-hot)",
-  seller: "var(--reddit)",
-  helper: "var(--series-1)",
-  discussion: "var(--fg-muted)",
-  unknown: "var(--border)",
-};
-const STAGE_LABEL: Record<Stage, string> = {
-  none: "none", problem_aware: "problem aware", solution_seeking: "solution seeking",
-  comparing: "comparing", purchase_ready: "purchase ready",
-};
+/** What one post costs a person who reads it and decides: half a minute. */
+const HUMAN_SECONDS_PER_POST = 30;
 
-function Counter({ label, value, dark, unit }: { label: string; value: string; dark?: boolean; unit?: string }) {
+const REL_VAR: Record<Relationship, string> = {
+  buyer: "--score-hot",
+  seller: "--series-2",
+  helper: "--series-1",
+  discussion: "--fg-muted",
+  unknown: "--border",
+};
+const REL_LABEL: Record<Relationship, string> = {
+  buyer: "wants to buy",
+  seller: "selling",
+  helper: "answering",
+  discussion: "just talking",
+  unknown: "unclear",
+};
+const NEED_LABEL: Record<string, string> = {
+  open: "need open",
+  evaluating: "weighing options",
+  resolved: "already sorted",
+  no_active_need: "no need",
+  unknown: "need unclear",
+};
+const INTENT_WORD = ["no ask", "hinting", "asking around", "asking", "ready"];
+
+function relColor(rel: Relationship | undefined): string {
+  return `var(${REL_VAR[rel ?? "unknown"]})`;
+}
+function humanHours(judged: number): number {
+  return (judged * HUMAN_SECONDS_PER_POST) / 3600;
+}
+/** Posts through Jev per second, counting the triage pass and the scoring one. */
+function rateNote(s: SimState): string {
+  return `${Math.round(itemsPerSec(s))} a second through Jev`;
+}
+function isLead(post: SimPost): boolean {
+  return post.decision === "qualify";
+}
+/** The last `n` posts matching, newest first, without walking all of them twice. */
+function recentWhere(posts: SimPost[], ok: (p: SimPost) => boolean, n: number): SimPost[] {
+  const out: SimPost[] = [];
+  for (let i = posts.length - 1; i >= 0 && out.length < n; i -= 1) {
+    if (ok(posts[i])) out.push(posts[i]);
+  }
+  return out;
+}
+function best(posts: SimPost[], ok: (p: SimPost) => boolean): SimPost | null {
+  let top: SimPost | null = null;
+  for (const post of posts) {
+    if (ok(post) && (top === null || (post.score ?? 0) > (top.score ?? 0))) top = post;
+  }
+  return top;
+}
+
+/**
+ * The motion, in one place. Tokens hold one duration for a state change, and
+ * something arriving on screen wants a little longer than that, so these are
+ * the multiples of it rather than new numbers.
+ */
+function Motion() {
   return (
-    <div
-      className="flex flex-col gap-1 rounded-control border px-4 py-3"
-      style={dark ? { background: "var(--fg)", color: "var(--bg)" } : { background: "var(--surface)" }}
-    >
-      <span className="font-mono text-[10px] uppercase tracking-widest opacity-60">{label}</span>
-      <span className="font-mono text-[28px] leading-none tabular-nums">
+    <style>{`
+      @keyframes lurkRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @keyframes lurkPulse { 0% { opacity: 0.35; } 50% { opacity: 1; } 100% { opacity: 0.35; } }
+      @keyframes lurkFade { from { opacity: 0; } to { opacity: 1; } }
+      .lurk-rise { animation: lurkRise calc(var(--motion) * 2.5) ease-out both; }
+      .lurk-fade { animation: lurkFade calc(var(--motion) * 3) ease both; }
+      .lurk-live { animation: lurkPulse 1.6s ease-in-out infinite; }
+    `}</style>
+  );
+}
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-mono uppercase text-fg-muted" style={{ letterSpacing: "0.09em" }}>
+      {children}
+    </span>
+  );
+}
+
+function PhasePill({ s }: { s: SimState }) {
+  const running = s.phase !== "done" && s.phase !== "idle";
+  return (
+    <span className="inline-flex items-center gap-2 rounded-control border bg-surface px-2.5 py-1 text-mono text-fg-muted">
+      <span
+        className={running ? "size-1.5 rounded-full lurk-live" : "size-1.5 rounded-full"}
+        style={{ background: running ? "var(--score-warm)" : "var(--score-hot)" }}
+      />
+      {PHASE_LABEL[s.phase]}
+    </span>
+  );
+}
+
+function Stat({ label, value, unit, note, accent }: {
+  label: string; value: string; unit?: string; note?: string; accent?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-1 rounded-card border bg-surface px-4 py-3">
+      <Eyebrow>{label}</Eyebrow>
+      <span
+        className="font-mono text-[26px] leading-none tabular-nums"
+        style={accent ? { color: "var(--score-hot)" } : undefined}
+      >
         {value}
-        {unit ? <span className="text-[14px] opacity-60">{unit}</span> : null}
+        {unit ? <span className="ml-1 text-[13px] text-fg-muted">{unit}</span> : null}
+      </span>
+      {note ? <span className="text-mono text-fg-muted">{note}</span> : null}
+    </div>
+  );
+}
+
+function SubChip({ name }: { name: string }) {
+  return (
+    <span className="inline-flex max-w-[180px] items-center gap-1 truncate rounded-control bg-surface-2 px-2 py-0.5 text-mono text-fg-muted">
+      <span className="size-1.5 shrink-0 rounded-full" style={{ background: "var(--reddit)" }} />
+      r/{name}
+    </span>
+  );
+}
+
+function RelChip({ post }: { post: SimPost }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-control border px-2 py-0.5 text-mono"
+      style={{ color: relColor(post.relationship), borderColor: relColor(post.relationship) }}
+    >
+      {REL_LABEL[post.relationship ?? "unknown"]}
+    </span>
+  );
+}
+
+function FitDots({ fit }: { fit: number | null | undefined }) {
+  if (fit == null) return null;
+  return (
+    <span className="flex items-center gap-[3px]" aria-label={`Fit ${fit} of 4`}>
+      {[1, 2, 3, 4].map((step) => (
+        <span
+          key={step}
+          className="size-[5px] rounded-full"
+          style={{ background: "var(--score-hot)", opacity: step <= fit ? 1 : 0.25 }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/** The judgement, as the feed writes it: what they are, then how far along. */
+function Verdict({ post }: { post: SimPost }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <SubChip name={post.subreddit} />
+      <RelChip post={post} />
+      <span className="text-mono text-fg-muted">{NEED_LABEL[post.needState ?? "unknown"] ?? post.needState}</span>
+      <span className="flex items-center gap-1.5 text-mono" style={{ color: "var(--score-hot)" }}>
+        {INTENT_WORD[post.intent ?? 0]}
+        <FitDots fit={post.fit} />
       </span>
     </div>
   );
 }
 
-function Bars({ post }: { post: SimPost | null }) {
-  if (!post?.answers) return <div className="text-small text-fg-muted">Waiting for the first batch…</div>;
+/** The sentence the person wrote, which is the only unarguable part. */
+function Quote({ text }: { text: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      {post.answers.map((a) => (
-        <div key={a.question} className="grid grid-cols-[120px_1fr_36px] items-center gap-2 font-mono text-[11px]">
-          <span className="text-fg-muted">{a.question}</span>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-fg">{a.answer}</span>
-            <div className="h-1 w-full rounded-full" style={{ background: "var(--surface-2)" }}>
-              <div className="h-1 rounded-full transition-all" style={{ width: `${a.p * 100}%`, background: "var(--fg)" }} />
-            </div>
+    <blockquote
+      className="border-l-2 pl-3 text-body text-fg-muted"
+      style={{ borderColor: "var(--score-warm)" }}
+    >
+      <mark
+        className="rounded-sm px-0.5 text-fg"
+        style={{ background: "color-mix(in oklch, var(--score-warm) 22%, transparent)" }}
+      >
+        {text}
+      </mark>
+    </blockquote>
+  );
+}
+
+function LeadCard({ post }: { post: SimPost }) {
+  const quote = post.quote?.trim();
+  // Plenty of asks are the whole title, and printing the same sentence twice
+  // reads as a bug. When they are the same sentence, the title is the quote.
+  const echo = quote !== undefined && quote === post.title.trim();
+  return (
+    <article className="lurk-rise flex flex-col gap-2.5 rounded-card border bg-surface p-4">
+      <div className="flex items-start justify-between gap-3">
+        {echo ? (
+          <div className="min-w-0 flex-1">
+            <Quote text={quote} />
           </div>
-          <span className="text-right text-fg-muted">{Math.round(a.p * 100)}%</span>
-        </div>
-      ))}
+        ) : (
+          <h3 className="min-w-0 truncate text-small text-fg" style={{ fontWeight: 500 }}>
+            {post.title}
+          </h3>
+        )}
+        <span className="shrink-0 text-mono tabular-nums text-fg-muted">
+          {fmtSecs(post.atMs ?? 0)}
+        </span>
+      </div>
+      {!echo && quote ? <Quote text={quote} /> : null}
+      <Verdict post={post} />
+    </article>
+  );
+}
+
+/** Where the minute is, with the moment the feed became useful marked on it. */
+function Rail({ s }: { s: SimState }) {
+  const total = s.marks.totalMs || Math.max(1, s.elapsedMs);
+  const pct = Math.min(100, (s.elapsedMs / total) * 100);
+  const firstPass = Math.min(100, (s.marks.firstPassMs / total) * 100);
+  const reached = s.elapsedMs >= s.marks.firstPassMs;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+        <div
+          className="h-full rounded-full transition-motion"
+          style={{ width: `${pct}%`, background: "var(--fg)" }}
+        />
+      </div>
+      <div className="relative h-4">
+        <span
+          className="absolute top-0 -translate-x-1/2 whitespace-nowrap text-mono"
+          style={{ left: `${firstPass}%`, color: reached ? "var(--score-hot)" : "var(--fg-muted)" }}
+        >
+          {fmtSecs(s.marks.firstPassMs)} every search swept once
+        </span>
+      </div>
     </div>
   );
 }
 
+/** Who the year turned out to be, as one bar. */
+function RelationshipSplit({ s }: { s: SimState }) {
+  const by = s.counts.byRelationship;
+  const total = Math.max(1, s.counts.judged);
+  return (
+    <div className="flex flex-col gap-2.5 rounded-card border bg-surface p-4">
+      <Eyebrow>Who the year turned out to be</Eyebrow>
+      <div className="flex h-2 w-full gap-[2px] overflow-hidden rounded-full">
+        {RELATIONSHIPS.map((rel) => (
+          <span
+            key={rel}
+            className="h-full transition-motion"
+            style={{ width: `${(by[rel] / total) * 100}%`, background: relColor(rel) }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {RELATIONSHIPS.filter((rel) => by[rel] > 0).map((rel) => (
+          <span key={rel} className="flex items-center gap-1.5 text-mono text-fg-muted">
+            <span className="size-1.5 rounded-full" style={{ background: relColor(rel) }} />
+            {REL_LABEL[rel]}
+            <span className="tabular-nums text-fg">{fmtInt(by[rel])}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-/* ---------------- A: the board ---------------- */
+/**
+ * The comparison, kept to what the run can prove: the posts it actually read,
+ * at half a minute each, against the seconds and the cents it took instead.
+ */
+function WhatItReplaces({ s }: { s: SimState }) {
+  const hours = humanHours(s.counts.judged);
+  const perDollar = s.costUsd > 0 ? s.counts.leads / s.costUsd : 0;
+  return (
+    <div className="flex flex-col gap-3 rounded-card border bg-surface p-4">
+      <Eyebrow>What it would have taken a person</Eyebrow>
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[30px] leading-none tabular-nums">{hours.toFixed(1)}</span>
+        <span className="text-small text-fg-muted">
+          hours of reading · {fmtInt(s.counts.judged)} posts at 30s each
+        </span>
+      </div>
+      <div className="h-px w-full" style={{ background: "var(--border)" }} />
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[30px] leading-none tabular-nums" style={{ color: "var(--score-hot)" }}>
+          {fmtUsd(s.costUsd)}
+        </span>
+        <span className="text-small text-fg-muted">
+          of Jev, in {fmtSecs(s.elapsedMs)}
+        </span>
+      </div>
+      <span className="text-mono text-fg-muted">
+        {fmtInt(s.items)} posts asked about · {fmtInt(s.judgments)} typed answers
+        {perDollar > 0 ? ` · ${fmtInt(perDollar)} leads per dollar` : ""}
+      </span>
+    </div>
+  );
+}
+
+/* ---------------- A: reading a year ---------------- */
+
+/**
+ * The calm one. It is the real feed, filling. The leads arrive as the cards
+ * they will be tomorrow morning, quote and all, and the strip beside them says
+ * how much of the year they came out of. The story it tells is that you get
+ * something to read three seconds in and a usable feed at fourteen.
+ */
 export function VariantA({ s }: { s: SimState }) {
-  const judged = s.posts.filter((p) => p.status === "judged");
-  const byStage = STAGES.map((st) => [st, judged.filter((p) => p.relationship === "buyer" && p.stage === st).length] as const);
-  const byRel = RELATIONSHIPS.map((r) => [r, judged.filter((p) => p.relationship === r).length] as const);
-  const hot = judged.filter((p) => (p.score ?? 0) >= 80).slice(-8).reverse();
-  const max = Math.max(1, ...byStage.map(([, n]) => n), ...byRel.map(([, n]) => n));
+  const c = s.counts;
+  const leads = recentWhere(s.posts, isLead, 4);
+  const done = s.phase === "done";
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <div>
-        <h1 className="text-display" style={{ fontWeight: 600 }}>read the whole year</h1>
-        <p className="font-mono text-mono text-fg-muted">a year of Reddit · every post, who is asking, and how close they are to buying</p>
-      </div>
-      <div className="grid grid-cols-6 gap-3">
-        <Counter dark label="posts read" value={String(s.posts.length)} />
-        <Counter dark label="typed judgments" value={s.judgments.toLocaleString()} />
-        <Counter label="subreddits" value={String(new Set(s.posts.map((p) => p.subreddit)).size)} />
-        <Counter label="judgments / sec" value={Math.round(perSec(s)).toString()} />
-        <Counter label="elapsed" value={fmtSecs(s.elapsedMs)} />
-        <Counter label="cost so far" value={fmtUsd(s.costUsd)} />
-      </div>
-      <div className="grid grid-cols-[1fr_420px] gap-3">
-        <div className="rounded-card border bg-surface p-3">
-          <div className="mb-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-fg-muted">
-            <span>posts</span><span>{judged.length} / {s.posts.length}</span>
+    <main className="min-h-screen bg-bg px-8 py-8 text-fg">
+      <Motion />
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>New project · first backfill</Eyebrow>
+            <h1 className="text-h2" style={{ fontWeight: 500 }}>
+              Reading a year of Reddit
+            </h1>
+            <p className="text-small text-fg-muted">
+              Jev answers seven typed questions about every post it finds, and keeps the sentence
+              that made it say yes.
+            </p>
           </div>
-          <div className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(64, 1fr)" }}>
-            {Array.from({ length: Math.max(TOTAL_POSTS, s.posts.length) }, (_, i) => {
-              const p = s.posts[i];
-              const bg = !p ? "transparent" : p.status === "triaged" ? "var(--border)" : p.status === "found" ? "var(--surface-2)" : REL_COLOR[p.relationship!];
-              const op = p?.status === "judged" && p.relationship === "buyer" ? 0.35 + (p.score ?? 0) / 130 : 1;
-              return <div key={i} className="aspect-square rounded-[1px]" style={{ background: bg, opacity: op }} />;
-            })}
+          <div className="flex items-center gap-4">
+            <PhasePill s={s} />
+            <span className="font-mono text-[40px] leading-none tabular-nums">{fmtSecs(s.elapsedMs)}</span>
           </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <div className="rounded-card border bg-surface p-3">
-            <div className="mb-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-fg-muted">
-              <span>breakdown</span><span>{s.current ? `#${s.current.id + 1}` : ""}</span>
+        </header>
+
+        <Rail s={s} />
+
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)]">
+          <section className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-h3" style={{ fontWeight: 500 }}>
+                {done ? "Leads from the year" : "Leads, as they qualify"}
+              </h2>
+              <span className="text-mono text-fg-muted">
+                {fmtInt(c.leads)} qualified · {fmtInt(c.review)} held for review
+              </span>
             </div>
-            <p className="mb-1 text-body" style={{ fontWeight: 500 }}>{s.current?.title ?? "…"}</p>
-            <p className="mb-3 font-mono text-[11px] text-fg-muted">r/{s.current?.subreddit}</p>
-            <Bars post={s.current} />
-          </div>
-          <div className="rounded-card border bg-surface p-3">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-fg-muted">the year</div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                {byRel.map(([r, n]) => (
-                  <div key={r} className="font-mono text-[11px]">
-                    <div className="flex justify-between"><span>{r}</span><span className="text-fg-muted">{n}</span></div>
-                    <div className="h-1" style={{ width: `${(n / max) * 100}%`, background: REL_COLOR[r] }} />
-                  </div>
-                ))}
+            {leads.length === 0 ? (
+              <div className="rounded-card border bg-surface p-6 text-small text-fg-muted">
+                Searching. The first verdicts land about three seconds in.
               </div>
-              <div className="flex flex-col gap-1">
-                {byStage.map(([st, n]) => (
-                  <div key={st} className="font-mono text-[11px]">
-                    <div className="flex justify-between"><span>{STAGE_LABEL[st]}</span><span className="text-fg-muted">{n}</span></div>
-                    <div className="h-1" style={{ width: `${(n / max) * 100}%`, background: "var(--fg)" }} />
-                  </div>
-                ))}
-              </div>
+            ) : (
+              leads.map((post) => <LeadCard key={post.id} post={post} />)
+            )}
+            {c.leads === 0 ? null : (
+              <p className="text-mono text-fg-muted">
+                {c.leads > leads.length
+                  ? `Showing the ${leads.length} newest of ${fmtInt(c.leads)}.`
+                  : `All ${fmtInt(c.leads)} so far.`}
+                {" "}Everything else was read and set aside: {fmtInt(c.rejected)} posts Jev could say
+                were not your buyer.
+              </p>
+            )}
+          </section>
+
+          <aside className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Stat label="Posts found" value={fmtInt(c.found)} note={`${fmtInt(c.subreddits)} communities`} />
+              <Stat label="Judged" value={fmtInt(c.judged)} note={rateNote(s)} />
+              <Stat label="Leads" value={fmtInt(c.leads)} accent note="asking for what you sell" />
+              <Stat label="Jev spend" value={fmtUsd(s.costUsd)} note={`${fmtInt(s.judgments)} answers`} />
             </div>
-          </div>
+            <WhatItReplaces s={s} />
+            <RelationshipSplit s={s} />
+          </aside>
         </div>
       </div>
-      <div className="rounded-card border bg-surface p-3">
-        <div className="mb-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-fg-muted">
-          <span>needs a human</span><span>{judged.filter((p) => (p.score ?? 0) >= 80).length}</span>
-        </div>
-        <div className="flex gap-2 overflow-hidden">
-          {hot.map((p) => (
-            <div key={p.id} className="w-56 shrink-0 rounded-control border p-2" style={{ borderColor: "var(--score-hot)" }}>
-              <div className="font-mono text-[18px]" style={{ color: "var(--score-hot)" }}>{p.score}</div>
-              <div className="truncate text-small">{p.title}</div>
-              <div className="font-mono text-[10px] text-fg-muted">r/{p.subreddit} · {STAGE_LABEL[p.stage!]}</div>
-            </div>
-          ))}
-        </div>
+    </main>
+  );
+}
+
+/* ---------------- B: the 62 seconds ---------------- */
+
+/**
+ * Every verdict of the run as one mark on one trace: the time it landed across,
+ * what Jev decided by direction, who the person was by colour, how sure it was
+ * by length. The hum below the line is the year being cleared; the spikes above
+ * it are the leads. It is the only board where you can see that the work never
+ * stopped and that the leads were arriving from the third second on.
+ */
+function Trace({ s }: { s: SimState }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const drawn = useRef(0);
+  const box = useRef({ w: 0, h: 0 });
+  const total = s.marks.totalMs || Math.max(1, s.elapsedMs);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = parent.clientWidth;
+    const h = parent.clientHeight;
+    if (box.current.w !== w || box.current.h !== h) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      box.current = { w, h };
+      drawn.current = 0;
+    }
+    const css = getComputedStyle(document.documentElement);
+    const ink = (name: string) => css.getPropertyValue(name).trim() || "#888888";
+    const base = Math.round(h * 0.68);
+    const up = base - 10;
+    const down = h - base - 6;
+    for (let i = drawn.current; i < s.posts.length; i += 1) {
+      const post = s.posts[i];
+      const x = 10 + ((post.atMs ?? 0) / total) * (w - 20);
+      const lead = post.decision === "qualify" || post.decision === "review";
+      const mag = Math.min(1, (post.score ?? 0) / 100);
+      ctx.strokeStyle = ink(REL_VAR[post.relationship ?? "unknown"]);
+      ctx.globalAlpha = lead ? 0.9 : 0.24;
+      ctx.lineWidth = lead ? 1.6 : 1;
+      const length = lead ? 12 + mag * (up - 26) : 8 + mag * (down - 8);
+      ctx.beginPath();
+      ctx.moveTo(x, base);
+      ctx.lineTo(x, lead ? base - length : base + length);
+      ctx.stroke();
+      if (post.decision === "qualify") {
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = ink("--score-hot");
+        ctx.beginPath();
+        ctx.arc(x, base - length, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = ink("--border");
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(10, base + 0.5);
+    ctx.lineTo(w - 10, base + 0.5);
+    ctx.stroke();
+    drawn.current = s.posts.length;
+  });
+
+  const pct = Math.min(100, (s.elapsedMs / total) * 100);
+  const marks: [number, string][] = [
+    [s.marks.firstVerdictMs, `${fmtSecs(s.marks.firstVerdictMs)} first verdict`],
+    [s.marks.firstPassMs, `${fmtSecs(s.marks.firstPassMs)} every search swept once`],
+    [total, `${fmtSecs(total)} the whole year`],
+  ];
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="relative h-[300px] w-full rounded-card border bg-surface">
+        <canvas ref={ref} className="absolute inset-0 rounded-card" />
+        <div
+          className="absolute top-0 bottom-0 w-px transition-motion"
+          style={{ left: `${pct}%`, background: "var(--fg)", opacity: s.phase === "done" ? 0 : 0.5 }}
+        />
+        <span className="absolute top-3 left-4 text-mono text-fg-muted">leads above the line</span>
+        <span className="absolute bottom-3 left-4 text-mono text-fg-muted">read and set aside below it</span>
+      </div>
+      <div className="relative h-4">
+        {marks.map(([ms, label], index) => (
+          <span
+            key={label}
+            className="absolute top-0 whitespace-nowrap text-mono"
+            style={{
+              left: `${Math.min(100, (ms / total) * 100)}%`,
+              transform: index === marks.length - 1 ? "translateX(-100%)" : "translateX(-50%)",
+              color: s.elapsedMs >= ms ? "var(--fg)" : "var(--fg-muted)",
+            }}
+          >
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   );
 }
 
-/* ---------------- B: the stream ---------------- */
 export function VariantB({ s }: { s: SimState }) {
-  const judged = s.posts.filter((p) => p.status === "judged");
-  const recent = judged.slice(-40).reverse();
-  const leads = judged.filter((p) => (p.score ?? 0) >= 70).length;
-  const ref = useRef<HTMLDivElement>(null);
+  const c = s.counts;
+  const done = s.phase === "done";
+  const shown = done ? best(s.posts, isLead) : (recentWhere(s.posts, isLead, 1)[0] ?? null);
+  const hours = humanHours(c.judged);
+  const perDollar = s.costUsd > 0 ? c.leads / s.costUsd : 0;
   return (
-    <div className="grid h-screen grid-cols-[1fr_380px]" style={{ background: "var(--fg)", color: "var(--bg)" }}>
-      <div ref={ref} className="overflow-hidden p-6 font-mono text-[12px] leading-[1.7]">
-        <div className="mb-4 opacity-50">$ lurk backfill --window 1y</div>
-        <div className="mb-1 opacity-70">
-          {s.phase === "searching" || s.phase === "triage" ? `searching "${s.keyword}" …` : s.phase === "done" ? "done." : `scoring · batch of ${s.lastBatch.length}`}
-        </div>
-        {recent.map((p) => (
-          <div key={p.id} className="grid grid-cols-[52px_84px_1fr_120px] gap-3 whitespace-nowrap">
-            <span style={{ color: (p.score ?? 0) >= 70 ? "var(--score-hot)" : "inherit", opacity: (p.score ?? 0) >= 70 ? 1 : 0.5 }}>
-              {String(p.score).padStart(3, " ")}
-            </span>
-            <span style={{ color: REL_COLOR[p.relationship!] }}>{p.relationship}</span>
-            <span className="truncate opacity-90">{p.title}</span>
-            <span className="opacity-50">{STAGE_LABEL[p.stage!]}</span>
+    <main className="min-h-screen bg-bg px-8 py-8 text-fg">
+      <Motion />
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>One backfill · every verdict on one trace</Eyebrow>
+            <h1 className="text-h2" style={{ fontWeight: 500 }}>
+              A year of Reddit, verdict by verdict
+            </h1>
+            <p className="text-small text-fg-muted">
+              One mark per post: above the line if Jev qualified it, below if it read it and set it
+              aside, coloured by who the person turned out to be.
+            </p>
           </div>
-        ))}
-      </div>
-      <div className="flex flex-col justify-between border-l p-6" style={{ borderColor: "oklch(0.35 0 0)" }}>
-        <div className="flex flex-col gap-6">
-          <Big label="posts read" value={s.posts.length.toLocaleString()} />
-          <Big label="judgments" value={s.judgments.toLocaleString()} />
-          <Big label="per second" value={Math.round(perSec(s)).toLocaleString()} />
-          <Big label="leads" value={String(leads)} accent />
+          <div className="flex items-center gap-4">
+            <PhasePill s={s} />
+            <span className="font-mono text-[40px] leading-none tabular-nums">{fmtSecs(s.elapsedMs)}</span>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-4 gap-3">
+          <Stat
+            label="Posts judged"
+            value={fmtInt(c.judged)}
+            note={`of ${fmtInt(c.found)} found · ${rateNote(s)}`}
+          />
+          <Stat label="Typed answers" value={fmtInt(s.judgments)} note="seven questions a post" />
+          <Stat label="Hours of reading replaced" value={hours.toFixed(1)} unit="h" note="30s a post, by hand" />
+          <Stat
+            label="Jev spend"
+            value={fmtUsd(s.costUsd)}
+            accent
+            note={perDollar > 0 ? `${fmtInt(perDollar)} leads per dollar` : "counting"}
+          />
         </div>
-        <div className="flex flex-col gap-1 font-mono text-[12px] opacity-60">
-          <div>{fmtSecs(s.elapsedMs)} elapsed</div>
-          <div>{fmtUsd(s.costUsd)} in Jev</div>
-          <div>{new Set(s.posts.map((p) => p.subreddit)).size} subreddits</div>
+
+        <Trace s={s} />
+
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          <section className="flex flex-col gap-3">
+            <Eyebrow>{done ? "The strongest lead of the year" : "The lead that just qualified"}</Eyebrow>
+            {shown ? (
+              <LeadCard key={shown.id} post={shown} />
+            ) : (
+              <div className="rounded-card border bg-surface p-6 text-small text-fg-muted">
+                Nothing has qualified yet.
+              </div>
+            )}
+          </section>
+          <aside className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 rounded-card border bg-surface p-4">
+              <Eyebrow>Read across the line</Eyebrow>
+              <p className="text-small text-fg-muted">
+                {s.elapsedMs >= s.marks.firstPassMs ? (
+                  <>
+                    By {fmtSecs(s.marks.firstPassMs)} every search had been swept once:
+                    {" "}{fmtInt(s.marks.foundAtFirstPass)} posts found, {fmtInt(s.marks.judgedAtFirstPass)} judged,
+                    {" "}{fmtInt(s.marks.leadsAtFirstPass)} leads already in the feed. The rest of the year kept
+                    loading behind a feed you could already work.
+                  </>
+                ) : (
+                  <>
+                    The first sweep takes every search once, so the feed is worth opening long before the
+                    year is finished.
+                  </>
+                )}
+              </p>
+            </div>
+            <RelationshipSplit s={s} />
+          </aside>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
-function Big({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+
+/* ---------------- C: the sieve ---------------- */
+
+/** The funnel, drawn at the real proportions of the run so far. */
+function Sieve({ s }: { s: SimState }) {
+  const c = s.counts;
+  const top = Math.max(1, c.found);
+  const buyers = c.byRelationship.buyer;
+  const rows: [string, number, string][] = [
+    ["turned up by the searches", c.found, "var(--surface-2)"],
+    ["judged by Jev", c.judged, "color-mix(in oklch, var(--series-1) 22%, var(--surface))"],
+    ["people who want to buy", buyers, "color-mix(in oklch, var(--score-hot) 28%, var(--surface))"],
+    ["asking for what you sell", c.leads, "var(--score-hot)"],
+  ];
+  const width = (n: number) => (n === 0 ? 0 : Math.max(1.2, (n / top) * 100));
   return (
-    <div>
-      <div className="font-mono text-[10px] uppercase tracking-widest opacity-50">{label}</div>
-      <div className="font-mono text-[56px] leading-none tabular-nums" style={accent ? { color: "var(--score-hot)" } : undefined}>{value}</div>
+    <div className="flex flex-col gap-2.5">
+      {rows.map(([label, n, fill], index) => {
+        const wide = width(n);
+        const nextWide = index + 1 < rows.length ? width(rows[index + 1][1]) : wide;
+        const taper = wide === 0 ? 0 : (nextWide / wide) * 50;
+        return (
+          <div key={label} className="grid grid-cols-[1fr_minmax(0,56%)_1fr] items-center gap-3">
+            <span className="text-right text-small text-fg-muted">{label}</span>
+            <div className="relative h-[84px]">
+              {wide === 0 ? null : <div
+                className="absolute inset-y-0 left-1/2 -translate-x-1/2 transition-motion"
+                style={{
+                  width: `${wide}%`,
+                  minWidth: 4,
+                  background: fill,
+                  borderRadius: "var(--radius-control)",
+                  clipPath: `polygon(0 0, 100% 0, ${50 + taper}% 100%, ${50 - taper}% 100%)`,
+                  border: `var(--hairline) solid var(--border)`,
+                }}
+              />}
+            </div>
+            <div className="flex flex-col">
+              <span
+                className="font-mono text-[22px] leading-none tabular-nums"
+                style={index === rows.length - 1 ? { color: "var(--score-hot)" } : undefined}
+              >
+                {fmtInt(n)}
+              </span>
+              {index === 0 ? (
+                <span className="text-mono text-fg-muted">every post the searches turned up</span>
+              ) : (
+                <span className="text-mono tabular-nums text-fg-muted">
+                  {((n / top) * 100).toFixed(1)}% of everything found
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/* ---------------- C: the sorter ---------------- */
+/** The seven questions, on whichever post Jev is holding this frame. */
+function QuestionSheet({ post, settled }: { post: SimPost | null; settled: boolean }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-card border bg-surface p-4">
+      <Eyebrow>
+        {settled ? "What Jev asked of the strongest lead" : "The same seven questions, every post"}
+      </Eyebrow>
+      <p className="min-h-[38px] truncate text-small text-fg" style={{ fontWeight: 500 }}>
+        {post?.title ?? "Waiting for the first post"}
+      </p>
+      <div className="flex flex-col">
+        {(post?.answers ?? []).map((answer) => (
+          <div
+            key={answer.question}
+            className="grid grid-cols-[110px_1fr] items-center gap-3 border-b py-1.5 last:border-b-0"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <span className="text-mono text-fg-muted">{answer.question.replace(/_/g, " ")}</span>
+            <span className="truncate text-mono text-fg">{answer.answer}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function VariantC({ s }: { s: SimState }) {
-  const judged = s.posts.filter((p) => p.status === "judged");
-  const buckets = RELATIONSHIPS.map((r) => ({ r, items: judged.filter((p) => p.relationship === r) }));
-  const hot = judged.filter((p) => (p.score ?? 0) >= 80);
-  const unjudged = s.posts.length - judged.length;
+  const c = s.counts;
+  const hours = humanHours(c.judged);
+  const done = s.phase === "done";
+  const pool = recentWhere(s.posts, (p) => isLead(p) && Boolean(p.quote), 18);
+  // Three at a time out of the newest leads, turning over every couple of
+  // seconds, so a screenshot of any moment has three real sentences on it.
+  const turn = Math.floor(s.elapsedMs / 2400);
+  const cycling = pool.length <= 3 ? pool : [0, 1, 2].map((i) => pool[(turn * 3 + i) % pool.length]);
+  const sheet = done ? best(s.posts, isLead) : s.current;
+  const perDollar = s.costUsd > 0 ? c.leads / s.costUsd : 0;
   return (
-    <div className="flex h-screen flex-col gap-4 p-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-h2" style={{ fontWeight: 500 }}>{s.posts.length.toLocaleString()} posts found. {judged.length.toLocaleString()} sorted.</h1>
-          <p className="text-small text-fg-muted">{fmtSecs(s.elapsedMs)} · {fmtUsd(s.costUsd)} · {Math.round(perSec(s))} judgments a second</p>
-        </div>
-        <div className="text-right">
-          <div className="font-mono text-[48px] leading-none" style={{ color: "var(--score-hot)" }}>{hot.length}</div>
-          <div className="font-mono text-[10px] uppercase tracking-widest text-fg-muted">worth a reply</div>
-        </div>
-      </div>
-      <div className="rounded-card border bg-surface p-3">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-fg-muted">inbox · {unjudged} waiting</div>
-        <div className="flex h-8 flex-wrap gap-[2px] overflow-hidden">
-          {Array.from({ length: Math.min(unjudged, 400) }).map((_, i) => (
-            <div key={i} className="h-[6px] w-[6px] rounded-full" style={{ background: "var(--fg-muted)", opacity: 0.4 }} />
-          ))}
-        </div>
-      </div>
-      <div className="grid flex-1 grid-cols-5 gap-3">
-        {buckets.map(({ r, items }) => (
-          <div key={r} className="flex flex-col rounded-card border bg-surface p-3">
-            <div className="mb-2 flex items-baseline justify-between">
-              <span className="text-body" style={{ fontWeight: 500, color: REL_COLOR[r] }}>{r}</span>
-              <span className="font-mono text-[20px] tabular-nums">{items.length}</span>
-            </div>
-            <div className="flex flex-wrap content-start gap-[3px] overflow-hidden">
-              {items.slice(-600).map((p) => (
-                <div
-                  key={p.id}
-                  className="h-[9px] w-[9px] rounded-[2px]"
-                  style={{
-                    background: REL_COLOR[r],
-                    opacity: r === "buyer" ? 0.25 + (p.score ?? 0) / 120 : 0.5,
-                    outline: (p.score ?? 0) >= 80 ? "1px solid var(--fg)" : undefined,
-                  }}
-                />
-              ))}
-            </div>
-            {r === "buyer" ? (
-              <div className="mt-auto flex flex-col gap-1 pt-2">
-                {STAGES.slice(1).map((st) => {
-                  const n = items.filter((p) => p.stage === st).length;
-                  return (
-                    <div key={st} className="flex justify-between font-mono text-[11px]">
-                      <span className="text-fg-muted">{STAGE_LABEL[st]}</span><span>{n}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+    <main className="min-h-screen bg-bg px-8 py-8 text-fg">
+      <Motion />
+      <div className="mx-auto flex max-w-[1280px] flex-col gap-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Eyebrow>A year of Reddit, sieved</Eyebrow>
+            <h1 className="text-h2" style={{ fontWeight: 500 }}>
+              {fmtInt(c.found)} posts in, {fmtInt(c.leads)} people asking
+            </h1>
           </div>
-        ))}
-      </div>
-      <div className="flex gap-2 overflow-hidden">
-        {hot.slice(-6).reverse().map((p) => (
-          <div key={p.id} className="w-64 shrink-0 rounded-control border bg-surface p-2">
-            <div className="flex justify-between font-mono text-[11px]">
-              <span style={{ color: "var(--score-hot)" }}>{p.score}</span><span className="text-fg-muted">r/{p.subreddit}</span>
-            </div>
-            <div className="truncate text-small">{p.title}</div>
-            <div className="truncate font-mono text-[10px] text-fg-muted">“{p.quote}”</div>
+          <div className="flex items-center gap-4">
+            <PhasePill s={s} />
+            <span className="font-mono text-[40px] leading-none tabular-nums">{fmtSecs(s.elapsedMs)}</span>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+        </header>
 
-/* ---------------- D: the year ---------------- */
-export function VariantD({ s }: { s: SimState }) {
-  const judged = s.posts.filter((p) => p.status === "judged");
-  const months = Array.from({ length: 13 }, (_, i) => 12 - i);
-  const label = (m: number) => {
-    const d = new Date(2026, 8 - m, 1);
-    return d.toLocaleString("en", { month: "short" }) + (d.getMonth() === 0 || m === 12 ? ` ${d.getFullYear().toString().slice(2)}` : "");
-  };
-  const leads = judged.filter((p) => (p.score ?? 0) >= 70);
-  const maxCol = Math.max(1, ...months.map((m) => s.posts.filter((p) => p.monthsAgo === m).length));
-  return (
-    <div className="flex h-screen flex-col justify-between p-8">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-display" style={{ fontWeight: 600 }}>
-          {s.phase === "done" ? "A year of Reddit, read." : "Reading a year of Reddit…"}
-        </h1>
-        <div className="font-mono text-[14px] text-fg-muted">
-          {s.posts.length.toLocaleString()} posts · {s.judgments.toLocaleString()} judgments · {fmtSecs(s.elapsedMs)} · {fmtUsd(s.costUsd)}
-        </div>
-      </div>
-      <div className="flex flex-1 items-end gap-2 py-8">
-        {months.map((m) => {
-          const col = s.posts.filter((p) => p.monthsAgo === m);
-          const colJudged = col.filter((p) => p.status === "judged");
-          const colLeads = colJudged.filter((p) => (p.score ?? 0) >= 70);
-          return (
-            <div key={m} className="flex flex-1 flex-col items-stretch gap-1">
-              <div className="flex flex-col-reverse gap-[2px]" style={{ height: 420 }}>
-                <div className="rounded-t-sm transition-all" style={{ height: `${(col.length / maxCol) * 100}%`, background: "var(--surface-2)", position: "relative" }}>
-                  <div className="absolute bottom-0 left-0 right-0 rounded-t-sm transition-all" style={{ height: `${col.length ? (colJudged.length / col.length) * 100 : 0}%`, background: "var(--fg-muted)", opacity: 0.35 }} />
-                  <div className="absolute bottom-0 left-0 right-0 rounded-t-sm transition-all" style={{ height: `${col.length ? (colLeads.length / col.length) * 100 : 0}%`, background: "var(--score-hot)" }} />
-                </div>
-              </div>
-              <div className="flex justify-between font-mono text-[10px] text-fg-muted">
-                <span>{label(m)}</span><span>{colLeads.length ? colLeads.length : ""}</span>
-              </div>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,8fr)_minmax(0,5fr)]">
+          <section className="flex flex-col gap-5 rounded-frame border bg-surface p-6">
+            <Sieve s={s} />
+            <div className="h-px w-full" style={{ background: "var(--border)" }} />
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              <span className="text-small text-fg-muted">
+                Reading {fmtInt(c.judged)} posts by hand, half a minute each, is
+                {" "}
+                <span className="font-mono text-fg tabular-nums">{hours.toFixed(1)} hours</span>.
+              </span>
+              <span className="text-small text-fg-muted">
+                Jev did it in
+                {" "}
+                <span className="font-mono text-fg tabular-nums">{fmtSecs(s.elapsedMs)}</span>
+                {" for "}
+                <span className="font-mono tabular-nums" style={{ color: "var(--score-hot)" }}>
+                  {fmtUsd(s.costUsd)}
+                </span>
+                {perDollar > 0 ? ` · ${fmtInt(perDollar)} leads per dollar` : ""}.
+              </span>
             </div>
-          );
-        })}
+          </section>
+
+          <aside className="flex flex-col gap-3">
+            <QuestionSheet post={sheet} settled={done} />
+            <div className="grid grid-cols-2 gap-3">
+              <Stat label="Communities read" value={fmtInt(c.subreddits)} />
+              <Stat label="Typed answers" value={fmtInt(s.judgments)} note="two at triage, five at scoring" />
+            </div>
+          </aside>
+        </div>
+
+        <section className="flex flex-col gap-3">
+          <Eyebrow>In their own words · what the qualified ones actually wrote</Eyebrow>
+          <div className="grid gap-3 md:grid-cols-3">
+            {cycling.length === 0 ? (
+              [0, 1, 2].map((slot) => (
+                <div
+                  key={slot}
+                  className="flex min-h-[112px] items-center rounded-card border bg-surface p-4 text-small text-fg-muted"
+                >
+                  Waiting for the first verdict.
+                </div>
+              ))
+            ) : (
+              cycling.map((post) => (
+                <div key={post.id} className="lurk-fade flex flex-col gap-2.5 rounded-card border bg-surface p-4">
+                  <Quote text={post.quote ?? ""} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SubChip name={post.subreddit} />
+                    <span className="text-mono text-fg-muted">
+                      {post.monthsAgo === 0
+                        ? "this month"
+                        : `${post.monthsAgo} month${post.monthsAgo === 1 ? "" : "s"} back`}
+                    </span>
+                    <span className="text-mono" style={{ color: "var(--score-hot)" }}>
+                      {INTENT_WORD[post.intent ?? 0]}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
-      <div className="grid grid-cols-[1fr_1fr_1fr] gap-6">
-        <Stat n={leads.length} label="people asking for what you sell" accent />
-        <Stat n={judged.filter((p) => p.stage === "purchase_ready" && p.relationship === "buyer").length} label="about to buy" />
-        <Stat n={judged.filter((p) => p.relationship === "seller").length} label="competitors pitching, skipped" />
-      </div>
-      <div className="mt-6 h-6 truncate font-mono text-[12px] text-fg-muted">
-        {s.current ? `${s.current.score} · r/${s.current.subreddit} · ${s.current.title}` : ""}
-      </div>
-    </div>
-  );
-}
-function Stat({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
-  return (
-    <div className="rounded-card border bg-surface p-4">
-      <div className="font-mono text-[44px] leading-none tabular-nums" style={accent ? { color: "var(--score-hot)" } : undefined}>{n.toLocaleString()}</div>
-      <div className="mt-1 text-small text-fg-muted">{label}</div>
-    </div>
+    </main>
   );
 }

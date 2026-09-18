@@ -2,14 +2,12 @@
 
 /**
  * PROTOTYPE. The real backfill of one project, read every half second and
- * shaped like the simulation so the four boards draw it unchanged. Typed
+ * shaped like the recording so the boards draw it unchanged. Typed
  * judgments are items asked times the questions each step asks: two at
  * triage, five at scoring, three per reading.
  */
 import { useEffect, useRef, useState } from "react";
-import type { Relationship, SimPost, SimState, Stage } from "./sim";
-
-const QUESTIONS_PER_ITEM: Record<string, number> = { triage: 2, score: 5, reading: 3 };
+import { EMPTY_COUNTS, QUESTIONS_PER_ITEM, tally, type Decision, type Phase, type Relationship, type SimPost, type SimState, type Stage } from "./sim";
 
 type Live = {
   job: { progress: string | null; startedAt: string | null; finishedAt: string | null; error: string | null } | null;
@@ -39,8 +37,12 @@ function asPost(e: Live["evaluations"][number], index: number): SimPost {
     monthsAgo: Math.min(12, Math.max(0, Math.floor((Date.now() - new Date(e.createdAt).getTime()) / MONTH_MS))),
     status: "judged",
     relationship,
+    needState: e.needState,
     stage,
+    decision: (["qualify", "review", "reject"].includes(e.decision) ? e.decision : "reject") as Decision,
     score: e.score,
+    fit: e.fit,
+    intent: e.intent,
     quote: e.quote ?? undefined,
     ms: undefined,
     answers: [
@@ -57,7 +59,17 @@ function asPost(e: Live["evaluations"][number], index: number): SimPost {
 
 export function useLiveBackfill(projectId: string | null): SimState {
   const [state, setState] = useState<SimState>({
-    phase: "idle", keyword: "", posts: [], judgments: 0, elapsedMs: 0, costUsd: 0, current: null, lastBatch: [],
+    phase: "idle",
+    keyword: "",
+    posts: [],
+    counts: EMPTY_COUNTS,
+    marks: { firstVerdictMs: 0, firstPassMs: 0, searchEndMs: 0, totalMs: 0, foundAtFirstPass: 0, judgedAtFirstPass: 0, leadsAtFirstPass: 0 },
+    items: 0,
+    judgments: 0,
+    elapsedMs: 0,
+    costUsd: 0,
+    current: null,
+    lastBatch: [],
   });
   const seen = useRef(0);
   useEffect(() => {
@@ -67,29 +79,31 @@ export function useLiveBackfill(projectId: string | null): SimState {
       try {
         const res = await fetch(`/prototype/backfill/live?project=${projectId}`, { cache: "no-store" });
         const live: Live = await res.json();
+        const items = live.usage.reduce((n, u) => n + u.items, 0);
         const judgments = live.usage.reduce((n, u) => n + u.items * (QUESTIONS_PER_ITEM[u.purpose] ?? 1), 0);
         const cost = live.usage.reduce((n, u) => n + u.usd, 0);
         const progress = live.job?.progress ?? "";
         const searching = /^Searching/.test(progress);
         const foundInProgress = Number(/(\d+) posts found/.exec(progress)?.[1] ?? 0);
         const keyword = /Searching a year of "([^"]+)"/.exec(progress)?.[1] ?? "";
-        const judged = live.evaluations.map(asPost);
-        const total = Math.max(live.found, foundInProgress, judged.length);
-        const posts: SimPost[] = [
-          ...judged,
-          ...Array.from({ length: total - judged.length }, (_, i) => ({
-            id: judged.length + i, title: "", subreddit: "", monthsAgo: 0, status: "found" as const,
-          })),
-        ];
-        const batch = judged.slice(seen.current);
-        seen.current = judged.length;
+        const posts: SimPost[] = live.evaluations.map(asPost);
+        const total = Math.max(live.found, foundInProgress, posts.length);
+        const batch = posts.slice(seen.current);
+        seen.current = posts.length;
         const started = live.job?.startedAt ? new Date(live.job.startedAt).getTime() : Date.now();
         const ended = live.job?.finishedAt ? new Date(live.job.finishedAt).getTime() : new Date(live.now).getTime();
         const done = Boolean(live.job?.finishedAt);
+        // The live reader has one progress line rather than the recording's
+        // phase samples, so its two searching states both land on the first
+        // pass and everything after it is judging.
+        const phase: Phase = done ? "done" : searching ? "first" : posts.length > 0 ? "scoring" : total > 0 ? "rest" : "idle";
         setState((prev) => ({
-          phase: done ? "done" : searching ? "searching" : judged.length > 0 ? "scoring" : total > 0 ? "triage" : "idle",
+          ...prev,
+          phase,
           keyword,
           posts,
+          counts: tally(posts, total),
+          items,
           judgments,
           elapsedMs: ended - started,
           costUsd: cost,

@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * PROTOTYPE: four boards for showing the year's backfill happening live,
- * switchable with ?variant=A|B|C|D and the arrow keys. By default it replays
+ * PROTOTYPE: three boards for showing the year's backfill happening live,
+ * switchable with ?variant=A|B|C and the arrow keys. By default it replays
  * the recorded real run (replay.ts) from page load at real speed; ?speed=2
  * runs it twice as fast. ?project=<id> reads a live backfill from the database
  * instead, and ?sim=1 uses the synthetic simulation in sim.ts.
@@ -12,10 +12,10 @@ import { Suspense, useEffect } from "react";
 import { useLiveBackfill } from "./live";
 import { useReplay } from "./replay";
 import { useBackfillSim } from "./sim";
-import { VariantA, VariantB, VariantC, VariantD } from "./variants";
+import { VariantA, VariantB, VariantC } from "./variants";
 
 const VARIANTS = [
-  ["A", "The board"], ["B", "The stream"], ["C", "The sorter"], ["D", "The year"],
+  ["A", "Reading a year"], ["B", "The 62 seconds"], ["C", "The sieve"],
 ] as const;
 
 function Board() {
@@ -51,7 +51,6 @@ function Board() {
       {key === "A" && <VariantA s={s} />}
       {key === "B" && <VariantB s={s} />}
       {key === "C" && <VariantC s={s} />}
-      {key === "D" && <VariantD s={s} />}
       {process.env.NODE_ENV !== "production" ? (
         <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full px-4 py-2 font-mono text-[12px] shadow-lg" style={{ background: "oklch(0.3 0.15 300)", color: "white" }}>
           <button onClick={() => go(-1)}>←</button>
