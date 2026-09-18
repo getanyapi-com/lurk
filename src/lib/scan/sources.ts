@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { candidateSources, projectKeywords, projectSubreddits, searchRuns } from "@/db/schema";
 import { normalizeQuery } from "@/lib/reddit/fetch";
@@ -120,6 +120,7 @@ export async function lastWideSweeps(queries: string[]): Promise<Map<string, Dat
         eq(searchRuns.kind, "keyword"),
         inArray(searchRuns.normalizedQuery, queries.map(normalizeQuery)),
         inArray(searchRuns.timeframe, ["week", "month"]),
+        isNotNull(searchRuns.completedAt),
       ),
     )
     .orderBy(desc(searchRuns.fetchedAt));

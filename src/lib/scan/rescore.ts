@@ -199,9 +199,6 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
     return row ? [{ judgement, stale: row }] : [];
   });
 
-  await writeEvaluations(
-    judged.map(({ judgement, stale: row }) => rewrite(projectId, row, judgement)),
-  );
   const outcome = reconcile(judged, await leadStatuses(projectId));
   await writeLeads(
     outcome.write.map((entry) =>
@@ -209,6 +206,11 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
     ),
   );
   const demoted = await demoteLeads(projectId, outcome.demote);
+  // Verdicts last: once rewritten a row is no longer stale, so a rescore that
+  // died before the feed was settled would never come back for it.
+  await writeEvaluations(
+    judged.map(({ judgement, stale: row }) => rewrite(projectId, row, judgement)),
+  );
   await writeProgress(jobId, "Finished");
   return {
     judged: judged.length,

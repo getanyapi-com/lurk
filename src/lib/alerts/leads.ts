@@ -18,7 +18,7 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
       status: leads.status,
       scoredAt: leads.scoredAt,
       title: redditPosts.title,
-      url: redditPosts.url,
+      url: sql<string>`coalesce(${redditComments.permalink}, ${redditPosts.url})`,
       subreddit: redditPosts.subreddit,
       author: sql<string | null>`coalesce(${redditComments.author}, ${redditPosts.author})`,
       avatarUrl: redditAuthors.avatarUrl,

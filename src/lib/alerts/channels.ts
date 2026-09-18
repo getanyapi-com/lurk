@@ -16,6 +16,15 @@ export type ProjectChannel = AlertRow & {
 const emailTarget = z.email();
 const urlTarget = z.url();
 
+/** The hosts each service issues webhooks on, matched whole so a lookalike fails. */
+const SLACK_HOSTS = new Set(["hooks.slack.com", "hooks.slack-gov.com"]);
+const DISCORD_HOSTS = new Set([
+  "discord.com",
+  "discordapp.com",
+  "canary.discord.com",
+  "ptb.discord.com",
+]);
+
 function typed(row: AlertRow): ProjectChannel {
   return {
     ...row,
@@ -49,11 +58,14 @@ export function normalizeTarget(channel: AlertChannel, raw: string): string {
   if (!urlTarget.safeParse(target).success) {
     throw new Error(`${CHANNEL_LABELS[channel]} needs a webhook URL`);
   }
-  const host = new URL(target).hostname;
-  if (channel === "slack" && !host.endsWith("slack.com")) {
+  const url = new URL(target);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(`${CHANNEL_LABELS[channel]} needs an http or https URL`);
+  }
+  if (channel === "slack" && !(url.protocol === "https:" && SLACK_HOSTS.has(url.hostname))) {
     throw new Error("A Slack webhook URL is on hooks.slack.com");
   }
-  if (channel === "discord" && !/discord(app)?\.com$/.test(host)) {
+  if (channel === "discord" && !(url.protocol === "https:" && DISCORD_HOSTS.has(url.hostname))) {
     throw new Error("A Discord webhook URL is on discord.com");
   }
   return target;

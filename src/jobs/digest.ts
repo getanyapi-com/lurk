@@ -11,9 +11,13 @@ import {
 } from "@/lib/alerts/select";
 import { sendToChannel } from "@/lib/alerts/send";
 import type { Digest } from "@/lib/alerts/types";
+import { inFlight } from "@/lib/scan/constants";
 import { tierForUser } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
 import { enqueueOnce } from "./enqueue";
+
+/** How many channels are delivered to at once. */
+const SEND_CONCURRENCY = 5;
 
 async function limitsCache(): Promise<(userId: string) => Promise<TierLimits | null>> {
   const seen = new Map<string, TierLimits | null>();
@@ -58,19 +62,24 @@ export async function sendDueDigests(now = new Date()): Promise<number> {
   const limitsFor = await limitsCache();
   const failures: string[] = [];
   let sent = 0;
-  for (const channel of await allChannels()) {
-    const digest = await digestFor(channel, await limitsFor(channel.userId), now);
-    if (!digest) {
-      continue;
-    }
-    try {
-      await sendToChannel(channel.channel, channel.target, digest);
-      await markSent(channel.id, now);
-      sent += 1;
-    } catch (error) {
-      failures.push(`${channel.channel} for ${channel.projectName}: ${String(error)}`);
-    }
-  }
+  // A few at a time, so one slow receiver holds up its own lane and not the hour.
+  await inFlight(
+    await allChannels(),
+    async (channel) => {
+      try {
+        const digest = await digestFor(channel, await limitsFor(channel.userId), now);
+        if (!digest) {
+          return;
+        }
+        await sendToChannel(channel.channel, channel.target, digest);
+        await markSent(channel.id, now);
+        sent += 1;
+      } catch (error) {
+        failures.push(`${channel.channel} for ${channel.projectName}: ${String(error)}`);
+      }
+    },
+    SEND_CONCURRENCY,
+  );
   if (failures.length > 0) {
     throw new Error(failures.join("; "));
   }

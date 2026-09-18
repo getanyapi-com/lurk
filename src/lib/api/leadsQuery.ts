@@ -59,13 +59,17 @@ export function parseLeadQuery(params: URLSearchParams): LeadQuery {
   return { status, minScore, since, limit, offset, includeBody: params.get("include") === "body" };
 }
 
+/** When the need was written. A comment lead is as old as its comment. */
+const NEED_AT = sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`;
+
 function windowStart(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
 /**
  * The conditions behind a leads call: the project, the feed window on when the
- * post was written, and the caller's own filters. `since` is a different
+ * need was written (the comment's date for a comment lead, as the app's feed
+ * reads it), and the caller's own filters. `since` is a different
  * question from the window - it asks when the lead appeared, which is what an
  * agent syncing incrementally wants.
  */
@@ -77,11 +81,14 @@ export function leadConditions(
   return and(
     eq(leads.projectId, projectId),
     query.status === "all" ? undefined : eq(leads.status, query.status),
-    gte(redditPosts.createdAt, windowStart(feedWindowDays)),
+    sql`${NEED_AT} >= ${windowStart(feedWindowDays).toISOString()}::timestamptz`,
     query.minScore === null ? undefined : gte(leads.score, query.minScore),
     query.since ? gte(leads.scoredAt, query.since) : undefined,
   );
 }
+
+/** Where the lead's own words are: the comment when it is one, else the post. */
+export const LEAD_URL = sql<string>`coalesce(${redditComments.permalink}, ${redditPosts.url})`;
 
 const columns = {
   id: leads.id,
@@ -91,14 +98,14 @@ const columns = {
   subreddit: redditPosts.subreddit,
   postAuthor: redditPosts.author,
   commentAuthor: redditComments.author,
-  url: redditPosts.url,
+  url: LEAD_URL,
   score: leads.score,
   stage: leads.stage,
   reason: leads.reason,
   matchedPhrase: leads.matchedPhrase,
   sellerSide: leads.sellerSide,
   status: leads.status,
-  postedAt: sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`,
+  postedAt: NEED_AT,
   scoredAt: leads.scoredAt,
   body: sql<string | null>`coalesce(${redditComments.body}, ${redditPosts.body})`,
 };
@@ -111,7 +118,7 @@ export function leadsSelect(projectId: string, query: LeadQuery, feedWindowDays:
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
     .where(leadConditions(projectId, query, feedWindowDays))
-    .orderBy(desc(leads.score), desc(redditPosts.createdAt))
+    .orderBy(desc(leads.score), desc(NEED_AT))
     .limit(query.limit + 1)
     .offset(query.offset);
 }

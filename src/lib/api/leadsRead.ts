@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, projects, redditComments, redditPosts } from "@/db/schema";
 import { leadCosts } from "@/lib/leads";
-import { leadsSelect, type LeadQuery } from "./leadsQuery";
+import { LEAD_URL, leadsSelect, type LeadQuery } from "./leadsQuery";
 
 export type ApiLead = {
   id: string;
@@ -104,7 +104,7 @@ export async function getApiLead(userId: string, leadId: string): Promise<ApiLea
       subreddit: redditPosts.subreddit,
       postAuthor: redditPosts.author,
       commentAuthor: redditComments.author,
-      url: redditPosts.url,
+      url: LEAD_URL,
       score: leads.score,
       stage: leads.stage,
       reason: leads.reason,

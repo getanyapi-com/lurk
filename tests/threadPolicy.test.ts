@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
 import { threadPolicyFor } from "@/lib/settings";
 import type { ThreadPolicy, ThreadPolicySettings } from "@/lib/settings/types";
@@ -74,12 +74,33 @@ describe.skipIf(!hasDatabase)("threadsToRead against a database", () => {
     return post.id;
   }
 
-  /** What reading a thread records: when it was read and at what reply count. */
-  async function markRead(postId: string, replies: number): Promise<void> {
+  /** What buying a thread records on the shared post, for every project. */
+  async function markBought(postId: string, replies: number): Promise<void> {
     await db()
       .update(schema.redditPosts)
       .set({ commentsObservedAt: new Date(), commentsReadCount: replies })
       .where(eq(schema.redditPosts.id, postId));
+  }
+
+  /** What a scan records once this project has judged a thread it read. */
+  async function markRead(postId: string, replies: number, projectId?: string): Promise<void> {
+    await markBought(postId, replies);
+    const { markThreadsRead } = await import("@/lib/scan/leads");
+    const [post] = await db()
+      .select()
+      .from(schema.redditPosts)
+      .where(eq(schema.redditPosts.id, postId));
+    const owners = projectId
+      ? [projectId]
+      : (
+          await db()
+            .select({ id: schema.leads.projectId })
+            .from(schema.leads)
+            .where(eq(schema.leads.postId, postId))
+        ).map((row) => row.id);
+    for (const owner of owners) {
+      await markThreadsRead(owner, [{ ...post, numComments: replies }]);
+    }
   }
 
   async function setReplies(postId: string, replies: number): Promise<void> {
@@ -101,6 +122,30 @@ describe.skipIf(!hasDatabase)("threadsToRead against a database", () => {
     expect(await ids(projectId, policy())).toEqual([]);
     await setReplies(postId, 9);
     expect(await ids(projectId, policy())).toEqual([postId]);
+  });
+
+  it("still reads a thread another project bought, and reads it from the store", async () => {
+    const first = await project();
+    const second = await project();
+    const postId = await lead(first, { replies: 5 });
+    await db()
+      .insert(schema.leads)
+      .values({ projectId: second, postId, score: 60, kind: "buyer" });
+    await db()
+      .insert(schema.redditComments)
+      .values({ id: `c${randomUUID().slice(0, 8)}`, postId, body: "I need this too", author: "buyer", createdAt: new Date() });
+
+    await markRead(postId, 5, first);
+    expect(await ids(first, policy())).toEqual([]);
+    const owed = await threadsToRead(second, policy());
+    expect(owed.map((post) => post.id)).toEqual([postId]);
+
+    const { readLeadThreads } = await import("@/lib/scan/comments");
+    const paid = vi.fn();
+    const ctx = { projectId: second, maxAgeMs: 0, funded: { call: paid } } as never;
+    const { threads } = await readLeadThreads(ctx, owed);
+    expect(paid).not.toHaveBeenCalled();
+    expect(threads[0].comments.map((comment) => comment.body)).toEqual(["I need this too"]);
   });
 
   it("never buys a thread older than the window when old threads are not read", async () => {

@@ -83,18 +83,23 @@ export async function writeLeads(input: LeadRow[]): Promise<number> {
 }
 
 /**
- * The threads worth buying this scan, best score first: every post lead still
+ * The threads worth reading this scan, best score first: every post lead still
  * in the feed whose post carries at least the policy's minimum replies and
- * whose thread has never been read, or whose reply count has moved since it
- * was. An unchanged thread has nothing new to name a competitor in, and a
- * thread under the minimum has too little to be worth its price.
+ * whose thread this project has never read, or whose reply count has moved
+ * since it did. An unchanged thread has nothing new to name a competitor in,
+ * and a thread under the minimum has too little to be worth its price.
+ *
+ * The question is asked of the lead, not of the shared post. Another project,
+ * or the SEO refresh, buying the thread leaves its comments stored for everyone
+ * but judges them for nobody else, so that purchase never takes a thread off
+ * this project's list; `readLeadThreads` reads it from the store for nothing.
  *
  * Age decides which of those two the policy still pays for. A post inside the
- * reply window is bought whenever its count moves, because that is where the
- * replies still arrive. A post older than the window is bought only once, and
+ * reply window is read whenever its count moves, because that is where the
+ * replies still arrive. A post older than the window is read only once, and
  * only when the policy reads old threads at all: for the competitors already
  * named in it, never again for a count that moved. `threadsPerScan` caps how
- * many are bought; null buys every one that qualifies.
+ * many are read; null reads every one that qualifies.
  */
 export async function threadsToRead(
   projectId: string,
@@ -112,10 +117,10 @@ export async function threadsToRead(
         eq(leads.status, "new"),
         isNull(leads.commentId),
         sql`coalesce(${redditPosts.numComments}, 0) >= ${policy.minReplies}`,
-        policy.readOldThreadsOnce ? or(fresh, isNull(redditPosts.commentsObservedAt)) : fresh,
+        policy.readOldThreadsOnce ? or(fresh, isNull(leads.threadReadCount)) : fresh,
         or(
-          isNull(redditPosts.commentsObservedAt),
-          sql`${redditPosts.numComments} is distinct from ${redditPosts.commentsReadCount}`,
+          isNull(leads.threadReadCount),
+          sql`coalesce(${redditPosts.numComments}, 0) <> ${leads.threadReadCount}`,
         ),
       ),
     )
@@ -123,6 +128,22 @@ export async function threadsToRead(
   const rows =
     policy.threadsPerScan === null ? await query : await query.limit(policy.threadsPerScan);
   return rows.map((row) => row.post);
+}
+
+/**
+ * Records that this project has judged these threads at the reply counts they
+ * were read at. Written after the comment leads are, so a scan that dies in
+ * between reads the thread again instead of losing the people in it.
+ */
+export async function markThreadsRead(projectId: string, posts: StoredPost[]): Promise<void> {
+  for (const post of posts) {
+    await db()
+      .update(leads)
+      .set({ threadReadCount: post.numComments ?? 0 })
+      .where(
+        and(eq(leads.projectId, projectId), eq(leads.postId, post.id), isNull(leads.commentId)),
+      );
+  }
 }
 
 /** One candidate a re-judgement no longer puts in the feed. */

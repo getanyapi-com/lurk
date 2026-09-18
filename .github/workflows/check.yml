@@ -8,6 +8,21 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # The suites that read and write real rows skip without a database, so CI
+    # gives them one. The tests make their own `_test` database beside it.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lurk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,6 +31,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/lurk
+          # What a local .env gives the same suites. The key is 32 zero bytes.
+          APP_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          SELF_HOSTED: "true"
       - run: npx next build
         env:
           NEXT_TELEMETRY_DISABLED: "1"

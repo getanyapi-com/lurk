@@ -36,6 +36,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the stored run key", () => {
       sort: "relevance",
       timeframe: "week",
       fundedBy: "house",
+      completedAt: new Date(),
     };
     const first = randomUUID();
     const other = randomUUID();
@@ -63,6 +64,10 @@ describe.skipIf(!process.env.DATABASE_URL)("the stored run key", () => {
     expect(second?.id).toBe(page2);
     expect(second?.nextCursor).toBe("p3");
     expect(await findRun({ ...key, variant: "cursor=p9" }, hour)).toBeNull();
+
+    // A run still storing its results is not an answer yet.
+    await db().update(searchRuns).set({ completedAt: null }).where(eq(searchRuns.id, first));
+    expect(await findRun(key, hour)).toBeNull();
 
     for (const id of [first, other, page2]) {
       await db().delete(searchRuns).where(eq(searchRuns.id, id));

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { enqueueOnce } from "@/jobs/enqueue";
-import { JOB_HANDLERS } from "@/jobs/registry";
+import { JOB_HANDLERS, nextRunAt, type Job } from "@/jobs/registry";
 import { runBackfill } from "@/lib/scan/backfill";
 import { runScan } from "@/lib/scan/run";
 import { captureRequestId, withRequestId } from "@/lib/anyapi";
@@ -478,5 +478,38 @@ describe("what a finished scan queues", () => {
     await JOB_HANDLERS.backfill(job);
 
     expect(booked).toHaveBeenCalledWith("insights", expect.any(Date), "project-1");
+  });
+});
+
+/**
+ * A recurring kind books its successor only when it succeeds, so the retry time
+ * is the only thing standing between one upstream error and a schedule that
+ * never runs again. Every kind that recurs must have one.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("when a failed recurring job is due again", () => {
+  const job = (kind: string, projectId: string | null): Job =>
+    ({ id: randomUUID(), kind, projectId }) as Job;
+
+  it("gives every recurring kind a retry time, and a one-off kind none", async () => {
+    const projectId = randomUUID();
+    const recurring = [
+      "scan",
+      "backfill",
+      "discovery_initial",
+      "discovery_refresh",
+      "competitor_scan",
+      "seo_refresh",
+    ];
+    for (const kind of recurring) {
+      const due = await nextRunAt(job(kind, projectId));
+      expect(due, kind).toBeInstanceOf(Date);
+      expect((due as Date).getTime(), kind).toBeGreaterThan(Date.now());
+    }
+    for (const kind of ["retention", "digest"]) {
+      expect(await nextRunAt(job(kind, null)), kind).toBeInstanceOf(Date);
+    }
+    for (const kind of ["rescore", "insights", "noop"]) {
+      expect(await nextRunAt(job(kind, projectId)), kind).toBeNull();
+    }
   });
 });
