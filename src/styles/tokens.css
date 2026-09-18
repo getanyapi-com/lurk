@@ -65,8 +65,10 @@
   --series-8: oklch(0.669 0.159 22.3);
 }
 
-/* Scoped marketing palette: no changes to the authenticated application. */
-.marketing {
+/* Scoped marketing palette: no changes to the authenticated application,
+   except the new-project steps (.how-steps), which are drawn in it. */
+.marketing,
+.how-steps {
   --m-brand-paper: oklch(1 0 0);
   --m-sky-top: oklch(0.87 0.095 218);
   --m-sky-bottom: oklch(0.97 0.025 215);
@@ -84,7 +86,8 @@
   --m-shadow: 0 2px 5px var(--m-shadow-ink), 0 24px 64px -20px var(--m-shadow-ink);
   --m-shadow-small: 0 2px 4px var(--m-shadow-ink), 0 12px 28px -14px var(--m-shadow-ink);
 }
-[data-theme="dark"] .marketing {
+[data-theme="dark"] .marketing,
+[data-theme="dark"] .how-steps {
   --m-sky-top: oklch(0.3 0.075 236);
   --m-sky-bottom: oklch(0.22 0.025 240);
   --m-cloud: oklch(0.5 0.045 227 / 0.7);
@@ -99,7 +102,8 @@
 }
 
 /* Editorial below-the-fold vocabulary, scoped away from the app. */
-.marketing {
+.marketing,
+.how-steps {
   --m-page: oklch(1 0 0);
   --m-wash: oklch(0.983 0.002 230);
   --m-rule: oklch(0.92 0.002 230);
@@ -121,7 +125,8 @@
   --m-radius-bar: 2px;
   --m-fragment-shadow: 0 1px 2px var(--m-shadow-ink), 0 12px 28px -12px var(--m-shadow-ink);
 }
-[data-theme="dark"] .marketing {
+[data-theme="dark"] .marketing,
+[data-theme="dark"] .how-steps {
   --m-page: var(--bg);
   --m-wash: oklch(0.19 0.007 230);
   --m-rule: oklch(0.28 0.005 230);

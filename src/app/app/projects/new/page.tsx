@@ -5,7 +5,7 @@ import { requireLocalUser } from "@/lib/auth";
 export default async function NewProjectPage() {
   await requireLocalUser();
   return (
-    <div className="grid max-w-5xl items-start gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid max-w-6xl items-start gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-h2" style={{ fontWeight: 500 }}>
