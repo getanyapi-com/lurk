@@ -14,6 +14,8 @@ type LeadPagesProps = {
   search: string;
   /** How many rows the server drew, which is where the next page starts. */
   drawn: number;
+  /** The thread the server's last row sits in, which the next page may carry on. */
+  lastPostId: string | null;
   /** Every lead these filters hold, so the list knows when it is whole. */
   total: number;
   selectedId: string | null;
@@ -34,6 +36,7 @@ export function LeadPages({
   projectId,
   search,
   drawn,
+  lastPostId,
   total,
   selectedId,
   children,
@@ -123,13 +126,15 @@ export function LeadPages({
   return (
     <>
       {children}
-      {rows.map((row) => (
+      {rows.map((row, index) => (
         <LeadRow
           key={row.id}
           id={row.id}
           href={entryHref(params, row.id)}
           selected={row.id === selectedId}
           title={row.title}
+          excerpt={row.excerpt}
+          nested={(index > 0 ? rows[index - 1].postId : lastPostId) === row.postId}
           author={row.author}
           avatarUrl={row.avatarUrl}
           subreddit={row.subreddit}

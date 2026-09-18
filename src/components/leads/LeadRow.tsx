@@ -9,6 +9,10 @@ type LeadRowProps = {
   href: string;
   selected: boolean;
   title: string;
+  /** A comment lead's own words. The row is headed by them, not by the thread. */
+  excerpt?: string | null;
+  /** Whether the row above is the same thread, which this one then sits under. */
+  nested?: boolean;
   author: string | null;
   avatarUrl: string | null;
   subreddit: string;
@@ -25,12 +29,18 @@ type LeadRowProps = {
  *
  * Everything on this row is also everything the pane needs to open, so the row
  * hands it over on the click rather than making the pane wait to be told.
+ *
+ * A comment lead is headed by what the comment says. Its thread is named under
+ * it, unless the row above already is that thread, and then it is indented
+ * beneath it instead.
  */
 export function LeadRow({
   id,
   href,
   selected,
   title,
+  excerpt,
+  nested,
   author,
   avatarUrl,
   subreddit,
@@ -42,16 +52,30 @@ export function LeadRow({
     <RowLink
       href={href}
       selectedOnServer={selected}
+      nested={nested}
       summary={{ id, title, author, avatarUrl, subreddit, subredditIconUrl, createdAt, trailing }}
     >
       <AuthorAvatar name={author} src={avatarUrl} size={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate text-small text-fg" style={{ fontWeight: 500 }}>
-          {title}
+          {excerpt ?? title}
         </span>
         <span className="flex min-w-0 items-center gap-2">
-          <SubredditChip name={subreddit} iconUrl={subredditIconUrl} className="min-w-0 truncate" />
+          {nested ? (
+            <span className="text-small min-w-0 truncate text-fg-muted">
+              u/{author ?? "unknown"} replied
+            </span>
+          ) : (
+            <SubredditChip
+              name={subreddit}
+              iconUrl={subredditIconUrl}
+              className={excerpt ? "shrink-0" : "min-w-0 truncate"}
+            />
+          )}
           <span className="text-mono shrink-0 text-fg-muted">{shortAge(createdAt)}</span>
+          {excerpt && !nested ? (
+            <span className="text-small min-w-0 flex-1 truncate text-fg-muted">in: {title}</span>
+          ) : null}
         </span>
       </span>
       <span className="shrink-0 pt-0.5">{trailing}</span>

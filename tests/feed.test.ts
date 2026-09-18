@@ -206,6 +206,50 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     expect((await findLead(project.id, best[2].id))?.id).toBe(best[2].id);
   });
 
+  /**
+   * A post and its comments can each be a lead. Ordered by their own scores,
+   * they were rows under one title scattered through the feed, with the post
+   * that explains them last.
+   */
+  it("keeps a thread's leads together, the post before its comments", async () => {
+    const { db, schema, project, post } = await fixture(null);
+    const { listLeads } = await import("@/lib/leads");
+    const [between] = (await threeLeads(db, schema, project.id, post.id)).filter(
+      (lead) => lead.score === 60,
+    );
+    const threadId = between.postId as string;
+    const comments = await db()
+      .insert(schema.redditComments)
+      .values(
+        [1, 2].map((n) => ({
+          id: `c${randomUUID().slice(0, 8)}`,
+          postId: threadId,
+          author: `buyer${n}`,
+          body: "I need the same thing.",
+          permalink: `https://www.reddit.com/r/SaaS/comments/60/form/c${n}/`,
+          createdAt: new Date(Date.now() - n * DAY_MS),
+        })),
+      )
+      .returning();
+    await db()
+      .insert(schema.leads)
+      .values([
+        { projectId: project.id, postId: threadId, commentId: comments[0].id, score: 90 },
+        { projectId: project.id, postId: threadId, commentId: comments[1].id, score: 55 },
+      ]);
+
+    const feed = await listLeads(project.id, { status: "new", days: "all" });
+
+    // The thread rises on its best comment, and is read from the post down.
+    expect(feed.map((lead) => [lead.postId === threadId, lead.score])).toEqual([
+      [true, 60],
+      [true, 90],
+      [true, 55],
+      [false, 70],
+      [false, 50],
+    ]);
+  });
+
   /** Every face the window holds, however few of its leads have been read. */
   it("strips the faces of the whole window, not of the page", async () => {
     const { db, schema, project, post } = await fixture(null);

@@ -164,13 +164,32 @@ function feedWhere(projectId: string, filter: FeedFilter) {
   );
 }
 
+/** The best score any lead in the same thread holds, under the same pills. */
+const THREAD_BEST = sql`max(${leads.score}) over (partition by ${leads.postId})`;
+
+/** The newest need in that thread, which settles two threads on one score. */
+const THREAD_NEWEST = sql`max(${NEED_AT}) over (partition by ${leads.postId})`;
+
 /**
- * The feed's order: best first, then the newer need, then the row's own id.
+ * The feed's order: the best thread first, and a thread's leads together. A
+ * post and three of its comments can each be a lead, and ordered by their own
+ * scores they were four rows under one title with the post itself last. So a
+ * thread sits where its best lead earns it, the post leads it, and its
+ * comments follow best first.
+ *
  * The id decides nothing a person can see; it is there because two leads can
  * hold the same score and the same minute, and a page boundary that falls
  * between them would otherwise show one of them twice and the other never.
  */
-const FEED_ORDER = [desc(leads.score), desc(NEED_AT), asc(leads.id)];
+const FEED_ORDER = [
+  desc(THREAD_BEST),
+  desc(THREAD_NEWEST),
+  asc(leads.postId),
+  asc(sql`${leads.commentId} is not null`),
+  desc(leads.score),
+  desc(NEED_AT),
+  asc(leads.id),
+];
 
 /**
  * The feed, best first, for one set of filter pills. A page is a slice of that
