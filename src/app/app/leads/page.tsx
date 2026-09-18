@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { EmptyState } from "@/components/EmptyState";
+import { redirect } from "next/navigation";
 import { Feed } from "@/components/leads/Feed";
 import { ListSkeleton, PillsSkeleton, Skeleton } from "@/components/Skeleton";
 import { Button } from "@/components/ui/button";
@@ -37,13 +37,11 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const user = await requireLocalUser();
   const params = await searchParams;
   const project = await activeProject(user.id, params.project);
+  // An account with no project has one thing to do, so it is taken there. This
+  // is where a new signup lands, and an empty leads page telling them to go and
+  // find the button was the whole of their welcome.
   if (!project) {
-    return (
-      <EmptyState
-        title="Leads"
-        sentence="Create a project first, then scans can look for people asking about what you sell."
-      />
-    );
+    redirect("/app/projects/new");
   }
 
   return (

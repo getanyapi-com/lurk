@@ -42,7 +42,15 @@ export function ProjectSwitcher({ projects, defaultId }: ProjectSwitcherProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      {projects.length > 0 ? (
+      {creating && projects.length === 0 ? (
+        // A first project has nothing to switch to, so the same pill, with no list behind it.
+        <div className="flex h-[42px] items-center gap-2 rounded-control border bg-surface px-2 text-body text-fg">
+          <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed text-fg-muted">
+            <Plus className="size-3" aria-hidden="true" />
+          </span>
+          <span className="pl-0.5">New project</span>
+        </div>
+      ) : projects.length > 0 ? (
         <div
           className={`flex items-center gap-2 rounded-control border bg-surface px-2 transition-opacity${pending ? " opacity-60" : ""}`}
           aria-busy={pending}
@@ -68,7 +76,7 @@ export function ProjectSwitcher({ projects, defaultId }: ProjectSwitcherProps) {
           />
         </div>
       ) : null}
-      {creating && projects.length > 0 ? null : (
+      {creating ? null : (
         <Button
           variant="outline"
           size="lg"
