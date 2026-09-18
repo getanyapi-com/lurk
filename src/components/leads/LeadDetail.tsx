@@ -12,6 +12,7 @@ import { relativeAge } from "@/lib/format";
 import { intentWord } from "@/lib/scan/words";
 
 import type { Selection } from "@/components/leads/workspace";
+import { redditAvatar } from "@/lib/redditAvatar";
 
 type LeadDetailProps = {
   selection: Selection;
@@ -52,7 +53,7 @@ function Called({ label, sentence }: { label: string; sentence: string | null })
 function ReplyingIn({ title, author, avatarUrl }: { title: string; author: string | null; avatarUrl: string | null }) {
   return (
     <div className="text-mono flex items-center gap-2 rounded-control bg-surface-2 px-2 py-1 text-fg-muted">
-      <Avatar name={author} src={avatarUrl} size={16} />
+      <Avatar name={author} src={redditAvatar(author, avatarUrl)} size={16} />
       <span className="truncate">Replying in: {title}</span>
     </div>
   );

@@ -1,3 +1,5 @@
+import { redditAvatar } from "@/lib/redditAvatar";
+
 /**
  * The light theme of `src/styles/tokens.css` converted to sRGB hex, because an
  * email client cannot read a CSS variable and most cannot parse `oklch()`.
@@ -74,6 +76,8 @@ export function initials(name: string | null): string {
  */
 export function avatarHtml(name: string | null, src: string | null, size: number): string {
   const radius = `${size / 2}px`;
+  // Every face in an email is a Reddit author's.
+  src = redditAvatar(name, src);
   if (src) {
     return `<img src="${escapeHtml(src)}" width="${size}" height="${size}" alt="" style="display:block;width:${size}px;height:${size}px;border-radius:${radius};border:1px solid ${EMAIL_COLORS.border};object-fit:cover" />`;
   }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { SubredditChip } from "@/components/SubredditChip";
 import { themeHref, type ThemeView } from "@/lib/insights/read";
+import { redditAvatar } from "@/lib/redditAvatar";
 
 type ThemeCardProps = { theme: ThemeView; projectId: string };
 
@@ -42,7 +43,7 @@ export function ThemeCard({ theme, projectId }: ThemeCardProps) {
               className={index === 0 ? "" : "-ml-2"}
               title={face.name ? `u/${face.name}` : undefined}
             >
-              <Avatar name={face.name} src={face.avatarUrl} size={28} />
+              <Avatar name={face.name} src={redditAvatar(face.name, face.avatarUrl)} size={28} />
             </span>
           ))}
         </span>

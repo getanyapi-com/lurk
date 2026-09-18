@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { FeedParams, FeedWindow, Grain, LeadFace } from "@/lib/feed";
 
 import type { StreamColumn } from "@/components/leads/stream";
+import { redditAvatar } from "@/lib/redditAvatar";
 
 type PeopleStripProps = {
   faces: LeadFace[];
@@ -141,7 +142,7 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
                     )}
                     title={`u/${face.author ?? "unknown"} in r/${face.subreddit}`}
                   >
-                    <Avatar name={face.author} src={face.avatarUrl} size="fluid" />
+                    <Avatar name={face.author} src={redditAvatar(face.author, face.avatarUrl)} size="fluid" />
                   </span>
                 ))}
               {column.faces.length === 0 ? (

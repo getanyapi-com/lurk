@@ -256,7 +256,7 @@ describe("the digest email", () => {
   });
 
   it("keeps the same table structure", () => {
-    expect(structure(html)).toMatchInlineSnapshot(`"!doctype html head meta meta title /title /head body table tr td table tr td table tr td img /td td /td /tr /table /td /tr tr td /td /tr tr td table tr td /td /tr tr td table tr td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div div /div /div div /div div /div /td td div /div div /div /td td div /div div /div /td /tr /table /td /tr /table /td /tr tr td table tr td div /div img /td td div /div div /div div /div div /div /td td div /div a /a /td /tr /table /td /tr tr td a /a a /a /td /tr /table /td /tr /table /body /html"`);
+    expect(structure(html)).toMatchInlineSnapshot(`"!doctype html head meta meta title /title /head body table tr td table tr td table tr td img /td td /td /tr /table /td /tr tr td /td /tr tr td table tr td /td /tr tr td table tr td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div img /div div /div div /div /td td div /div div /div /td td div /div div /div /td /tr /table /td /tr /table /td /tr tr td table tr td img img /td td div /div div /div div /div div /div /td td div /div a /a /td /tr /table /td /tr tr td a /a a /a /td /tr /table /td /tr /table /body /html"`);
   });
 
   it("says plainly when nothing came in", () => {
