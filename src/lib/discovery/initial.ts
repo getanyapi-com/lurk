@@ -92,14 +92,18 @@ export async function runInitialDiscovery(
     limits,
   });
 
-  await progress(jobId, "Reading the communities it found");
-  const subreddits = await resolveActiveSubreddits(projectId, project.userId);
-
+  // The sweep needs the plan and nothing else, so it is booked the moment the
+  // plan exists. The sidebars only feed the self-promotion rule a lead's detail
+  // shows, and reading them first kept a new project waiting 27 seconds on
+  // 2026-09-17 for something no first screen needs.
   await progress(jobId, "Booking the first sweep of the past year");
   const queuedChildren = await markDiscoveredAndQueue(
     projectId,
     cadenceFor(settings.settings.cadence).nextRunAt(new Date()),
     discoveryBudget(limits).refreshDays,
   );
+
+  await progress(jobId, "Reading the rules of the communities it found");
+  const subreddits = await resolveActiveSubreddits(projectId, project.userId);
   return { queuedChildren, subreddits };
 }

@@ -51,13 +51,14 @@ export async function runDiscoveryQueries(
   queries: DiscoveryQuery[],
   maxAgeMs: number,
 ): Promise<SerpOutcome> {
-  const observations: Observation[] = [];
-  let costUsd = 0;
-  for (const query of queries) {
-    const found = await fetchGoogleThreads(ctx, query.query, maxAgeMs);
-    costUsd += found.costUsd;
-    observations.push(...observationsOf(query, found.value));
-  }
+  // No query of a round reads another's answer, so the round takes as long as
+  // its slowest search. One at a time, five of them took 42 of the 73 seconds
+  // a new project waited on 2026-09-17.
+  const found = await Promise.all(
+    queries.map((query) => fetchGoogleThreads(ctx, query.query, maxAgeMs)),
+  );
+  const observations = queries.flatMap((query, index) => observationsOf(query, found[index].value));
+  const costUsd = found.reduce((sum, result) => sum + result.costUsd, 0);
   await writeObservations(ctx.projectId, observations);
   return { observations, costUsd };
 }

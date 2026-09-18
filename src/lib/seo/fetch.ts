@@ -19,6 +19,15 @@ const GOOGLE_KIND: FetchKind = "serp";
 /** Every Google search this app makes asks for United States results. */
 export const SEO_GEO = "us";
 
+/**
+ * The response time Google is asked for. AnyAPI serves the cheapest source
+ * whose median is under this and the best it has when none is, so this buys
+ * speed where there is some to buy and never refuses a search. A new project
+ * waits on these searches before it has a plan: measured 2026-09-17, the
+ * cheapest source took 7 to 9 seconds a search.
+ */
+const GOOGLE_LATENCY_MS = 1000;
+
 /** And asks for them in English, which is also Google's own default. */
 export const SEO_LANGUAGE = "en";
 
@@ -92,6 +101,7 @@ export async function fetchGoogleThreads(
         query,
         gl: SEO_GEO,
         hl: SEO_LANGUAGE,
+        preferLatencyUnderMs: GOOGLE_LATENCY_MS,
       });
       return { data: res.output.found ? res.output.data : null, costUsd: res.costUsd };
     },
