@@ -9,6 +9,7 @@ import { retrieved, type PlanRow } from "./coverage";
 import { loadEvaluations, writeEvaluations } from "./evaluations";
 import { writeLeads, type LeadRow } from "./leads";
 import { loadScanProject, type ScanProject } from "./project";
+import { SMALL_SWEEP, smallSweep } from "@/lib/sweepScale";
 import { evaluationsFor, postItem, routed, toLead, unjudged } from "./run";
 import type { Judgement } from "./judgement";
 import { judgeItems, readOrder, triageTitles } from "./score";
@@ -126,6 +127,7 @@ async function walk(
   ctx: FetchContext,
   state: Walk,
   maxPages: number,
+  postBudget: number,
   found: Map<string, StoredPost>,
   sources: Map<string, CandidateSource[]>,
   landed: (posts: StoredPost[]) => void,
@@ -133,7 +135,7 @@ async function walk(
   const { query, sort, walked } = state;
   let { cursor, stale } = state;
   for (let pages = 0; ; pages += 1) {
-    if (pages >= maxPages || found.size >= POST_BUDGET) {
+    if (pages >= maxPages || found.size >= postBudget) {
       state.cursor = cursor;
       state.stale = stale;
       return "paused";
@@ -351,7 +353,12 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   // searches from the cache of earlier failures and so never reached Reddit.
   const ctx: FetchContext = { projectId, funded, maxAgeMs: 0 };
 
-  const queries = queriesOf(project);
+  // A trial-size sweep is the same sweep over less: see src/lib/sweepScale.ts.
+  const small = smallSweep();
+  const queries = small ? queriesOf(project).slice(0, SMALL_SWEEP.queries) : queriesOf(project);
+  const postBudget = small ? SMALL_SWEEP.posts : POST_BUDGET;
+  const firstPassPages = small ? SMALL_SWEEP.pages : FIRST_PASS_PAGES;
+  const depthPages = small ? SMALL_SWEEP.pages : DEPTH_PAGES;
   const found = new Map<string, StoredPost>();
   const sourcesByPost = new Map<string, CandidateSource[]>();
   const plan: Walk[] = queries.flatMap((query) =>
@@ -379,7 +386,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   // walks that found one.
   await report();
   const run = async (item: Walk, maxPages: number): Promise<WalkEnd> => {
-    const end = await walk(ctx, item, maxPages, found, sourcesByPost, (posts) =>
+    const end = await walk(ctx, item, maxPages, postBudget, found, sourcesByPost, (posts) =>
       judge.offer(posts),
     );
     if (end === "cutShort") {
@@ -388,18 +395,18 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
     await report();
     return end;
   };
-  const ends = await Promise.all(plan.map((item) => run(item, FIRST_PASS_PAGES)));
+  const ends = await Promise.all(plan.map((item) => run(item, firstPassPages)));
   await judge.settle();
   const leadPosts = new Set(judge.leads.map((lead) => lead.postId));
   const deeper = plan.filter(
-    (item, index) => ends[index] === "paused" && [...item.walked].some((id) => leadPosts.has(id)),
+    (item, index) => depthPages > firstPassPages && ends[index] === "paused" && [...item.walked].some((id) => leadPosts.has(id)),
   );
   walks = plan.length - deeper.length;
   pass = "rest";
   await report();
   await Promise.all(
     deeper.map(async (item) => {
-      await run(item, DEPTH_PAGES - FIRST_PASS_PAGES);
+      await run(item, depthPages - firstPassPages);
       walks += 1;
     }),
   );

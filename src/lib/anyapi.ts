@@ -48,11 +48,33 @@ export function captureRequestId(response: Response): void {
   }
 }
 
+/** Raised before the request is sent, so nothing is bought. */
+export class SeoEndpointRefusedError extends Error {
+  constructor(slug: string) {
+    super(`lurk never buys AnyAPI's seo endpoints, and something asked for ${slug}.`);
+    this.name = "SeoEndpointRefusedError";
+  }
+}
+
+/**
+ * lurk does not buy AnyAPI's `seo.*` endpoints, under any circumstance. One
+ * `seo.search_volume` call was $0.108, more than half of what a whole first
+ * sweep costs. Nothing calls them today; this is what keeps it that way, at the
+ * one seam every request to the gateway goes through.
+ */
+export function refuseSeoEndpoint(url: string): void {
+  const slug = /\/v1\/run\/([^/?#]+)/.exec(url)?.[1];
+  if (slug && decodeURIComponent(slug).toLowerCase().startsWith("seo.")) {
+    throw new SeoEndpointRefusedError(decodeURIComponent(slug));
+  }
+}
+
 function clientCapturingRequestId(apiKey: string, baseUrl: string) {
   const client = new AnyAPI({
     apiKey,
     baseUrl,
     fetch: async (input, init) => {
+      refuseSeoEndpoint(input instanceof Request ? input.url : String(input));
       const response = await fetch(input, init);
       captureRequestId(response);
       return response;

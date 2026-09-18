@@ -59,6 +59,13 @@ const schema = z.object({
     blankIsAbsent,
     z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
   ),
+  /**
+   * "small" makes a new project cost a cent or two: a few Google queries, four
+   * Reddit searches a page deep, 300 posts, and no SEO or competitor pass. It
+   * is the real pipeline at a size for trying the signup flow over and over,
+   * and it is ignored in production whatever it is set to.
+   */
+  SWEEP_SCALE: z.preprocess(blankIsAbsent, z.enum(["full", "small"]).default("full")),
   /** How many new-project setups and first sweeps run at once, on top of the routine workers. */
   SCHEDULER_WATCHED_WORKERS: z.coerce.number().int().positive().default(8),
   SCHEDULER_WORKERS: z.coerce.number().int().positive().default(3),

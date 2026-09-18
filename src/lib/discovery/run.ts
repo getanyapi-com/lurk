@@ -24,6 +24,7 @@ import {
   type CompetitorRank,
 } from "./rank";
 import { runDiscoveryQueries } from "./serp";
+import { SMALL_SWEEP, smallSweep } from "@/lib/sweepScale";
 import { applyRelevance, loadEvidence, UNLABELED, type EvidenceRow } from "./store";
 
 /**
@@ -159,8 +160,13 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
   // The opening set is the page's own size: one query per phrasing, plus the
   // places. What the tier bounds is how far past it expansion may go, which is
   // the distance between its two numbers.
+  // A trial-size project asks Google a few questions and none after them.
+  const small = smallSweep();
+  if (small) {
+    queries = queries.slice(0, SMALL_SWEEP.discoveryQueries);
+  }
   const opening = queries.length;
-  const ceiling = opening + Math.max(budget.max - budget.queries, 0);
+  const ceiling = small ? opening : opening + Math.max(budget.max - budget.queries, 0);
 
   while (queries.length > 0) {
     const round = await runRound(ctx, input.facts, input.destinations, queries, maxAgeMs, labelled);

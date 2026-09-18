@@ -24,6 +24,13 @@ available_in = [ "local" ]
 command = "RUN_SCHEDULER=true ./scripts/workspace-dev.sh"
 icon = "timer"
 
+# The scheduler on and every new project at trial size: the real pipeline for a
+# cent or two a signup, for trying the onboarding flow over and over.
+[scripts.run."dev with small sweeps"]
+available_in = [ "local" ]
+command = "RUN_SCHEDULER=true SWEEP_SCALE=small ./scripts/workspace-dev.sh"
+icon = "timer"
+
 [scripts.run.test]
 command = "npm run test -- --watch"
 icon = "test-tube"

@@ -9,11 +9,22 @@ set -e
 
 # Next reads .env by itself; tsx and docker compose do not, and the migration
 # runner is a tsx script. Loading it here is what makes all three agree.
+#
+# What the caller set wins over the file. .env says RUN_SCHEDULER=false, and
+# sourcing it after the caller's RUN_SCHEDULER=true quietly turned the
+# scheduler back off, so "dev with scheduler" never ran a job.
+ASKED_RUN_SCHEDULER="${RUN_SCHEDULER:-}"
+ASKED_SCHEDULER_SEED="${SCHEDULER_SEED:-}"
+ASKED_SWEEP_SCALE="${SWEEP_SCALE:-}"
 if [ -f .env ]; then
   set -a
   . ./.env
   set +a
 fi
+[ -n "$ASKED_RUN_SCHEDULER" ] && RUN_SCHEDULER="$ASKED_RUN_SCHEDULER"
+[ -n "$ASKED_SWEEP_SCALE" ] && export SWEEP_SCALE="$ASKED_SWEEP_SCALE"
+# Seeding is never taken from .env here: see below.
+SCHEDULER_SEED="$ASKED_SCHEDULER_SEED"
 
 export RUN_SCHEDULER="${RUN_SCHEDULER:-false}"
 # With the scheduler on, run what somebody queued and nothing else. Seeding at
