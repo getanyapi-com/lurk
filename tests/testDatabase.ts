@@ -26,7 +26,6 @@ export function testDatabaseUrl(env: NodeJS.ProcessEnv): string | undefined {
 
 /** The keys a test must never be able to spend. Every model call is mocked. */
 export const PAID_KEYS = [
-  "TYPESAFE_API_KEY",
   "OPENROUTER_API_KEY",
   "ANYAPI_HOUSE_API_KEY",
 ] as const;

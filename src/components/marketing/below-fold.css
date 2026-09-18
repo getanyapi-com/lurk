@@ -47,6 +47,7 @@
 .code-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .code-header span { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .code-header svg { width: 18px; height: 18px; }
+.marketing .anyapi-link svg { width: 14px; height: 14px; }
 .code-window small { font: 10px var(--font-mono); color: var(--m-night-muted); }
 .code-window code { font: 12px/1.8 var(--font-mono); }
 .code-window pre { overflow-x: auto; }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { Wordmark } from "@/components/Wordmark";
 import { BrandWord } from "./BrandWord";
 
@@ -55,12 +56,12 @@ export function MarketingFooter() {
           <span>Get started</span>
           <a href="https://github.com/getanyapi-com/lurk">GitHub / at launch</a>
           <Link href="/sign-up">Hosted free</Link>
-          <a href="https://getanyapi.com">AnyAPI</a>
+          <AnyapiLink />
           <a href="mailto:support@getanyapi.com">Contact</a>
         </div>
       </nav>
       <div className="footer-bottom">
-        <Wordmark />
+        <Wordmark homeHref="/" />
         <span>MIT licensed. Built on public conversations.</span>
       </div>
     </footer>

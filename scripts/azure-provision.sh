@@ -222,6 +222,7 @@ add_plain NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 add_plain ANYAPI_BASE_URL https://api.getanyapi.com
 add_plain ANYAPI_OAUTH_CLIENT_ID
 add_plain OPENROUTER_MODEL
+add_plain JEV_MODEL
 add_plain ALERTS_FROM_EMAIL
 add_plain SLACK_CLIENT_ID
 add_plain HOUSE_DATA_CAP_USD_PER_DAY

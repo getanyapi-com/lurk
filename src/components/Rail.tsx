@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords } from "lucide-react";
 import { NEW_PROJECT_PATH } from "@/components/ProjectSwitcher";
 import { cn } from "@/lib/utils";
+import { AnyapiRailCard } from "./AnyapiRailCard";
 
 /** One icon per destination, so the rail reads at a glance. */
 const ICONS = {
@@ -90,6 +91,7 @@ export function Rail({ groups, children }: RailProps) {
           })}
         </div>
       ))}
+      <AnyapiRailCard />
     </nav>
   );
 }

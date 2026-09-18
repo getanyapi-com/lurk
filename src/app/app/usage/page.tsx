@@ -1,3 +1,4 @@
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { StatCard } from "@/components/StatCard";
 import { lastRunJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
@@ -31,7 +32,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           Data usage
         </h1>
         <p className="text-body text-fg-muted">
-          What this project spent on AnyAPI today, and how much of it was answered from data we had
+          What this project spent on <AnyapiLink /> today, and how much of it was answered from data we had
           already fetched.
         </p>
       </div>

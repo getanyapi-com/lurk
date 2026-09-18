@@ -1,5 +1,5 @@
 import { Braces, Code2 } from "lucide-react";
-import { BrandImage } from "./BrandImage";
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { REPO_URL } from "./researchContent";
 
 const LINES = [
@@ -47,7 +47,7 @@ export function OpenSourcePanel() {
               <Braces />
               Terminal
             </span>
-            <BrandImage name="AnyAPI" src="/anyapi-mark.svg" size={22} />
+            <AnyapiLink>Data by AnyAPI</AnyapiLink>
           </div>
           <pre>
             <code>{LINES.join("\n")}</code>
