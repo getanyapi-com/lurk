@@ -1,8 +1,12 @@
 /* The new-project steps, in the home page's tile language: a pastel field with
    a piece of the product floating on it, and a caption that opens in bold. */
-.how-steps { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+/* Beside the form it is one narrow column. Where the page is too narrow for
+   that it goes under the form, and there it is a row of small tiles, never
+   four bands the width of the page. */
+.how-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+@media (min-width: 900px) { .how-steps { grid-template-columns: minmax(0, 1fr); } }
 .how-step { min-width: 0; margin: 0; }
-.how-art { min-height: 104px; border-radius: var(--m-radius-tile); overflow: hidden; position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; padding: 14px 16px; background: linear-gradient(135deg, var(--tile-first), var(--m-pastel-light) 53%, var(--tile-second)); }
+.how-art { min-height: 104px; border-radius: var(--m-radius-tile); overflow: hidden; clip-path: inset(0 round var(--m-radius-tile)); position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; padding: 14px 16px; background: linear-gradient(135deg, var(--tile-first), var(--m-pastel-light) 53%, var(--tile-second)); }
 .how-art::before { content: ""; position: absolute; inset: -25%; z-index: -1; background: radial-gradient(ellipse 95% 28% at 35% 22%, transparent 45%, var(--m-pastel-light) 57%, transparent 72%), radial-gradient(ellipse 90% 30% at 80% 90%, var(--tile-second), transparent 70%); transform: rotate(-25deg); filter: blur(12px); }
 .how-pink { --tile-first: var(--m-pink); --tile-second: var(--m-lilac); }
 .how-teal { --tile-first: var(--m-teal); --tile-second: var(--m-lilac); }
