@@ -82,11 +82,12 @@ jobs:
         run: |
           set -euo pipefail
           REVISION="$CONTAINER_APP--s$(echo "$SHA" | cut -c1-8)"
-          until [ "$(az containerapp revision show \
+          # Azure says Running, or RunningAtMaxScale once every replica is up.
+          until az containerapp revision show \
             --name "$CONTAINER_APP" \
             --resource-group "$RESOURCE_GROUP" \
             --revision "$REVISION" \
-            --query "properties.runningState" --output tsv)" = "Running" ]; do
+            --query "properties.runningState" --output tsv | grep -q '^Running'; do
             echo "waiting for $REVISION to run"
             sleep 5
           done
