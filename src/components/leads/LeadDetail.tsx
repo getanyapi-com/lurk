@@ -6,10 +6,10 @@ import { DetailRail } from "@/components/leads/DetailRail";
 import { HighlightedBody } from "@/components/leads/HighlightedBody";
 import { LeadActions } from "@/components/leads/LeadActions";
 import { PromoPolicyBadge } from "@/components/leads/PromoPolicyBadge";
-import { StageChip } from "@/components/leads/StageChip";
 import { WorthACommentChip } from "@/components/leads/WorthACommentChip";
 import { verdictFor } from "@/components/leads/verdict";
 import { relativeAge } from "@/lib/format";
+import { intentWord } from "@/lib/scan/words";
 
 import type { Selection } from "@/components/leads/workspace";
 
@@ -126,7 +126,11 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
           <span className="text-small text-fg-muted">u/{lead.author ?? "unknown"}</span>
           <SubredditChip name={lead.subreddit} iconUrl={lead.subredditIconUrl} />
           <span className="text-mono text-fg-muted">{relativeAge(lead.createdAt)}</span>
-          <StageChip stage={lead.stage} />
+          {intentWord(lead.intent) ? (
+            <span className="rounded-control bg-surface-2 px-2 py-0.5 text-mono text-fg-muted">
+              {intentWord(lead.intent)}
+            </span>
+          ) : null}
           <WorthACommentChip kind={lead.kind} />
           <PromoPolicyBadge
             projectId={projectId}

@@ -34,6 +34,37 @@ const INTENT_SHORT: Record<number, string> = {
   4: "Ready to buy",
 };
 
+/** How good the lead is, from both answers together. */
+export type LeadRank = "strong" | "good" | "look";
+
+const RANK_SHORT: Record<LeadRank, string> = {
+  strong: "Strong lead",
+  good: "Good lead",
+  look: "Worth a look",
+};
+
+/**
+ * Both answers folded into one rank, or null when either is missing. Intent 4
+ * needs a purchase already in motion, which a Reddit post almost never shows,
+ * so an explicit ask your product fits exactly is as good as a lead gets and
+ * has to read that way.
+ */
+export function leadRank(fit: number | null, intent: number | null): LeadRank | null {
+  if (fit === null || intent === null) {
+    return null;
+  }
+  if (Math.min(fit, intent) >= 3) {
+    return Math.max(fit, intent) === 4 ? "strong" : "good";
+  }
+  return "look";
+}
+
+/** The rank in words, or null when either answer is missing. */
+export function rankWord(fit: number | null, intent: number | null): string | null {
+  const rank = leadRank(fit, intent);
+  return rank === null ? null : RANK_SHORT[rank];
+}
+
 /** The shorthand for one fit level, or null when nothing judged it. */
 export function fitWord(fit: number | null): string | null {
   return fit === null ? null : FIT_SHORT[fit] ?? null;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FIT, INTENT_LEVELS } from "@/lib/scan/questions";
-import { fitWord, intentWord, judgementSentence } from "@/lib/scan/words";
+import { fitWord, intentWord, judgementSentence, rankWord } from "@/lib/scan/words";
 
 /**
  * The feed used to print the folded score as a percent. A fifth of that fold is
@@ -17,6 +17,14 @@ describe("the words a card says instead of a percent", () => {
     for (let level = 0; level < INTENT_LEVELS.length; level += 1) {
       expect(intentWord(level)).toBeTruthy();
     }
+  });
+
+  it("calls an explicit ask the product fits exactly a strong lead", () => {
+    expect(rankWord(4, 3)).toBe("Strong lead");
+    expect(rankWord(3, 4)).toBe("Strong lead");
+    expect(rankWord(3, 3)).toBe("Good lead");
+    expect(rankWord(4, 2)).toBe("Worth a look");
+    expect(rankWord(null, 3)).toBeNull();
   });
 
   it("says nothing at all about a level nothing judged", () => {

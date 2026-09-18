@@ -1,4 +1,4 @@
-import { fitWord, intentWord, judgementSentence } from "@/lib/scan/words";
+import { fitWord, intentWord, judgementSentence, leadRank, rankWord } from "@/lib/scan/words";
 import { cn } from "@/lib/utils";
 
 type VerdictBadgeProps = { fit: number | null; intent: number | null; className?: string };
@@ -39,11 +39,13 @@ function FitDots({ fit }: { fit: number }) {
  * comparison between rows rather than a thing you read. One line, one chip.
  */
 export function VerdictBadge({ fit, intent, className }: VerdictBadgeProps) {
+  const rank = leadRank(fit, intent);
   const tone =
-    intent === 4 ? "text-score-hot" : intent === 3 ? "text-score-warm" : "text-score-cool";
-  // With no intent there is no sentence and no colour to earn, so the fit word
-  // stands in rather than leaving four unexplained dots on their own.
-  const word = intentWord(intent) ?? fitWord(fit);
+    rank === "strong" ? "text-score-hot" : rank === "good" ? "text-score-warm" : "text-score-cool";
+  // The chip says how good the lead is, from both answers; the intent phrase
+  // alone read as faint praise on a thread the product fits exactly. With only
+  // one answer there is no rank, so that answer's own word stands in.
+  const word = rankWord(fit, intent) ?? intentWord(intent) ?? fitWord(fit);
   if (word === null) {
     return null;
   }
@@ -51,7 +53,7 @@ export function VerdictBadge({ fit, intent, className }: VerdictBadgeProps) {
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-mono whitespace-nowrap",
-        intent === null ? "text-fg-muted" : tone,
+        rank === null ? "text-fg-muted" : tone,
         className,
       )}
       // The rubric's own sentences, so the chip can always be checked.
