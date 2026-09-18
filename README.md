@@ -41,7 +41,8 @@ Deliberately absent, and not planned:
 - **No conversation inbox.** Once you reply, the conversation belongs to Reddit.
 - **No feedback loop that rewrites your filters.** Marking a lead as not a fit records the
   reason and shows it in Insights; it does not silently change what you see next.
-- **No archive of Reddit.** Search is the index. We keep 30 days and no more.
+- **No archive of Reddit.** Search is the index. A post nobody is being shown is gone 30
+  days after it was written.
 - **No subscription.** There is no plan to buy here, in any tier.
 
 ## Five-minute self-host
@@ -96,7 +97,8 @@ npm run anyapi:register
 | `SLACK_CLIENT_ID` | no | - | With the secret, turns the Slack channel into an Add to Slack button. |
 | `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
 | `HOUSE_DATA_CAP_USD_PER_DAY` | no | `25` | Daily ceiling on data spend from the house key. |
-| `HOUSE_LLM_CAP_USD_PER_DAY` | no | `10` | Daily ceiling on language model spend. |
+| `HOUSE_LLM_CAP_USD_PER_DAY` | no | `100` (`10` under the Compose file) | Daily ceiling on language model spend. |
+| `ALERTS_ALLOW_PRIVATE_WEBHOOKS` | no | `false` | Webhooks may only reach public addresses. Set `true` on a self-hosted instance to deliver to your own network. |
 
 A variable set to nothing counts as unset, so an empty line in `.env` never half-configures a
 feature.
@@ -184,9 +186,11 @@ titles that survived triage.
 
 Reddit posts and comments are public facts, so they are stored once and shared across
 projects: two people tracking the same keyword pay for one fetch between them. Scores are
-never shared; the same post can be a 92 for one product and a 12 for another. Shared Reddit
-rows are deleted 30 days after they were posted, along with the leads pointing at them, which
-is also the feed window.
+never shared; the same post can be a 92 for one product and a 12 for another. A shared
+Reddit post is deleted 30 days after it was posted, which is also the feed window, unless
+someone is still being shown it: a post behind a lead or a Reddit SEO thread is kept, with its
+comments, for as long as that lead or thread exists. Deleting the project, or the account,
+removes its leads, and the posts behind them go at the next daily cleanup.
 
 ## Built on AnyAPI
 

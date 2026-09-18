@@ -1,10 +1,14 @@
 name: Deploy
 
-# Every push to main builds the image, pushes it to the registry, rolls the
-# container app, and waits for the public health path to answer. The repository
-# variables and secrets it reads are listed in the deploy section of README.md.
+# Every push to main that passes Check builds the image, pushes it to the
+# registry, rolls the container app, and waits for the new revision to serve.
+# The commit deployed is the one Check passed, not whatever main has become
+# since. The repository variables and secrets it reads are listed in the deploy
+# section of README.md.
 on:
-  push:
+  workflow_run:
+    workflows: [Check]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -14,6 +18,10 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -24,8 +32,11 @@ jobs:
       REGISTRY: ${{ vars.AZURE_CONTAINER_REGISTRY }}
       HEALTH_URL: ${{ vars.APP_HEALTH_URL }}
       IMAGE: reddit-leads
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Sign in to Azure
         uses: azure/login@v2
@@ -38,7 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           az acr login --name "$REGISTRY"
-          TAG="$REGISTRY.azurecr.io/$IMAGE:${{ github.sha }}"
+          TAG="$REGISTRY.azurecr.io/$IMAGE:$SHA"
           docker build -t "$TAG" .
           docker push "$TAG"
 
@@ -50,8 +61,8 @@ jobs:
           az containerapp update \
             --name "$CONTAINER_APP" \
             --resource-group "$RESOURCE_GROUP" \
-            --image "$REGISTRY.azurecr.io/$IMAGE:${{ github.sha }}" \
-            --revision-suffix "s$(echo '${{ github.sha }}' | cut -c1-8)" \
+            --image "$REGISTRY.azurecr.io/$IMAGE:$SHA" \
+            --revision-suffix "s$(echo "$SHA" | cut -c1-8)" \
             --output none
 
       - name: Show the active revisions
@@ -63,13 +74,24 @@ jobs:
             --output table
 
       # The step's own timeout is the whole budget for the new revision to start
-      # serving; raise it here if a cold start ever needs longer.
+      # serving; raise it here if a cold start ever needs longer. The old
+      # revision answers the health path too, so the new one has to be running
+      # first or a failed rollout would pass.
       - name: Wait for the deployed instance to answer
         timeout-minutes: 10
         run: |
           set -euo pipefail
+          REVISION="$CONTAINER_APP--s$(echo "$SHA" | cut -c1-8)"
+          until [ "$(az containerapp revision show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --revision "$REVISION" \
+            --query "properties.runningState" --output tsv)" = "Running" ]; do
+            echo "waiting for $REVISION to run"
+            sleep 5
+          done
           until [ "$(curl -s -o /dev/null -w '%{http_code}' "$HEALTH_URL")" = "200" ]; do
             echo "waiting for $HEALTH_URL"
             sleep 5
           done
-          echo "$HEALTH_URL answered 200"
+          echo "$REVISION is running and $HEALTH_URL answered 200"

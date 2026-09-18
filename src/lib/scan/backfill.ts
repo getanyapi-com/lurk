@@ -312,11 +312,13 @@ class Judge {
     // judgeItems returns.
     const committed = new Set<string>();
     const commit = async (batch: Judgement[]): Promise<void> => {
-      await writeEvaluations(evaluationsFor(this.project, chunk, batch));
       const written = routed(batch.map((judgement) => ({ judgement }))).map((item) =>
         toLead(this.project, item.judgement, item.judgement.id, null, item.kind),
       );
+      // Leads first: a stored verdict stops a post being judged again, so it
+      // must never exist without the lead it stands for.
       await writeLeads(written);
+      await writeEvaluations(evaluationsFor(this.project, chunk, batch));
       this.leads.push(...written);
       for (const judgement of batch) {
         committed.add(judgement.id);

@@ -78,7 +78,9 @@ describe("leads filter query builder", () => {
     const { sql, params } = compile("");
     expect(sql).toContain('"leads"."project_id" = $1');
     expect(sql).toContain('"leads"."status" = $2');
-    expect(sql).toContain('"reddit_posts"."created_at" >=');
+    expect(sql).toContain(
+      'coalesce("reddit_comments"."created_at", "reddit_posts"."created_at") >=',
+    );
     expect(params[0]).toBe("project-1");
     expect(params[1]).toBe("new");
   });

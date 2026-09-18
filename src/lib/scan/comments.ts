@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { redditPosts } from "@/db/schema";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPostComments } from "@/lib/reddit/skus";
-import type { StoredComment, StoredPost } from "@/lib/reddit/store";
+import { commentsOfPost, type StoredComment, type StoredPost } from "@/lib/reddit/store";
 import {
   alreadyJudged,
   contentHash,
@@ -50,6 +50,32 @@ export async function readThreads(
   });
   const threads = reads.filter((read): read is ThreadRead => read !== null);
   return { threads, failures: reads.length - threads.length };
+}
+
+/** Whether the stored comments are the thread as Reddit last reported it. */
+function storedIsCurrent(post: StoredPost): boolean {
+  return post.commentsObservedAt !== null && (post.numComments ?? 0) === post.commentsReadCount;
+}
+
+/**
+ * A project's own read of its leads' threads. A thread somebody else already
+ * bought at this reply count is read from the store for nothing; the rest are
+ * bought. Either way this project still has every comment to judge.
+ */
+export async function readLeadThreads(
+  ctx: FetchContext,
+  posts: StoredPost[],
+): Promise<{ threads: ThreadRead[]; failures: number }> {
+  const held = await Promise.all(
+    posts
+      .filter(storedIsCurrent)
+      .map(async (post): Promise<ThreadRead> => ({ post, comments: await commentsOfPost(post.id) })),
+  );
+  const bought = await readThreads(
+    ctx,
+    posts.filter((post) => !storedIsCurrent(post)),
+  );
+  return { threads: [...held, ...bought.threads], failures: bought.failures };
 }
 
 /**

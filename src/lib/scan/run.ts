@@ -7,7 +7,7 @@ import { cadenceFor, threadPolicyFor } from "@/lib/settings";
 import { tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { writeThreadMentions } from "@/lib/competitors/threads";
-import { judgeThreads, readThreads } from "./comments";
+import { judgeThreads, readLeadThreads } from "./comments";
 import { hydrationCap, inFlight } from "./constants";
 import { isSentinel } from "./evidence";
 import { routeLead, type LeadKind } from "./gates";
@@ -19,7 +19,14 @@ import {
   type EvaluationRecord,
   type StoredJudgement,
 } from "./evaluations";
-import { demoteLeads, leadKey, threadsToRead, writeLeads, type LeadRow } from "./leads";
+import {
+  demoteLeads,
+  leadKey,
+  markThreadsRead,
+  threadsToRead,
+  writeLeads,
+  type LeadRow,
+} from "./leads";
 import { loadScanProject, type ScanProject } from "./project";
 import { retrieve } from "./retrieve";
 import { creditSources, markCovered, type CandidateSource } from "./sources";
@@ -157,7 +164,7 @@ export function evaluationsFor(
 /**
  * One scan: run the retrieval plan, triage the titles, read the shortlist in
  * full, take the shared reading of each one, judge whatever that reading left,
- * and write what qualified. Only then are comment threads bought, once per
+ * and write what qualified. Only then are comment threads read, once per
  * lead and again only when the reply count moves, for two purposes: naming
  * the competitors being recommended in the thread, and finding the other
  * people in it who have a need of their own. Leads are already committed by
@@ -257,10 +264,6 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
 
   await writeProgress(jobId, `Scoring ${toJudge.length} of ${sources.length} posts`);
   const judgements = [...cut, ...(await judgeItems(projectId, project.product, toJudge, readings))];
-  await writeEvaluations(evaluationsFor(project, unjudgedPosts, judgements));
-  for (const entry of retrieval.covered) {
-    await markCovered(entry.row, entry.at);
-  }
   const scored = judgements.map((judgement) => ({ judgement }));
   const fullById = new Map(unjudgedPosts.map((post) => [post.id, post]));
   const postLeads = routed(scored).map((item) =>
@@ -280,17 +283,31 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
       .filter((judgement) => !kept.has(judgement.id))
       .map((judgement) => ({ postId: judgement.id, commentId: null })),
   );
+  /**
+   * The verdicts are recorded only once the feed agrees with them. A stored
+   * verdict is what stops a post being judged again, so a scan that died with
+   * the verdict written and the lead not would never offer that lead again;
+   * this way round it costs one repeated judgement instead.
+   */
+  await writeEvaluations(evaluationsFor(project, unjudgedPosts, judgements));
+  for (const entry of retrieval.covered) {
+    await markCovered(entry.row, entry.at);
+  }
 
   await writeProgress(jobId, "Reading comment threads");
   const threadPosts = await threadsToRead(projectId, threadPolicyFor(settings.settings.threads));
-  const { threads } = await readThreads(ctx, threadPosts);
+  const { threads } = await readLeadThreads(ctx, threadPosts);
   await writeThreadMentions(projectId, project.competitors, threads);
   const judged = await judgeThreads(project, threads, stored);
-  await writeEvaluations(judged.records);
   const commentLeads = qualified(judged.discovery).map((item) =>
     toLead(project, item.judgement, item.postId, item.comment.id, "buyer"),
   );
   await writeLeads(commentLeads);
+  await writeEvaluations(judged.records);
+  await markThreadsRead(
+    projectId,
+    threads.map((thread) => thread.post),
+  );
   const committed = new Set(
     [...postLeads, ...commentLeads].map((lead) => leadKey(lead.postId, lead.commentId)),
   );

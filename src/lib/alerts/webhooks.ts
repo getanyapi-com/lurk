@@ -1,3 +1,4 @@
+import { postJson } from "./outbound";
 import type { Digest, DigestLead } from "./types";
 
 function headline(digest: Digest): string {
@@ -66,14 +67,13 @@ export type WebhookBody = ReturnType<
   typeof slackPayload | typeof discordPayload | typeof genericPayload
 >;
 
-/** Posts one message. A non-2xx is an error the job records against the run. */
+/**
+ * Posts one message. A non-2xx is an error the job records against the run, and
+ * that includes a redirect: the address checked is the only one ever contacted.
+ */
 export async function postWebhook(url: string, body: WebhookBody): Promise<void> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`Webhook returned ${response.status}`);
+  const status = await postJson(url, body);
+  if (status < 200 || status >= 300) {
+    throw new Error(`Webhook returned ${status}`);
   }
 }

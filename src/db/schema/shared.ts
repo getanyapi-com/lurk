@@ -134,6 +134,13 @@ export const searchRuns = pgTable(
     /** The cursor this run's upstream handed back, or null at the end of a walk. */
     nextCursor: text("next_cursor"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * When everything this run returned had been stored. The run row has to
+     * exist before its results can point at it, so until this is set the run
+     * is half written and nobody may reuse it. A run whose store failed keeps
+     * its cost and stays null for good.
+     */
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     costUsd: numeric("cost_usd", { precision: 12, scale: 6 }),
     requestId: text("request_id"),
     fundedBy: text("funded_by").notNull(),

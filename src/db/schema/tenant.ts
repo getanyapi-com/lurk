@@ -244,6 +244,13 @@ export const leads = pgTable(
     sellerSide: boolean("seller_side").notNull().default(false),
     status: text("status").notNull().default("new"),
     notFitReason: text("not_fit_reason"),
+    /**
+     * The reply count this project last read the post's thread at. The shared
+     * `reddit_posts.comments_read_count` says when the thread was last bought;
+     * this says when this project last judged it, which one project's purchase
+     * must never settle for another.
+     */
+    threadReadCount: integer("thread_read_count"),
     scoredAt: timestamp("scored_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

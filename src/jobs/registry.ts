@@ -129,20 +129,26 @@ async function discoveryRefreshDaysFor(projectId: string): Promise<number> {
 /**
  * When a recurring kind is due again, or null when the kind runs once on
  * request. This repo has no retry policy, so a failed job simply waits its own
- * cadence: a scan retries one scan interval later, retention a day later,
- * digest an hour later. That bounds retries at one attempt per cadence and
+ * cadence: a scan or a competitor scan retries one scan interval later,
+ * retention and an SEO refresh a day later, digest an hour later. That bounds retries at one attempt per cadence and
  * never runs a recurring job sooner than it would have run anyway.
  */
 export async function nextRunAt(job: Job): Promise<Date | null> {
   const now = Date.now();
-  const scanCadence = job.kind === "scan" || job.kind === "backfill" || job.kind === "discovery_initial";
+  const scanCadence =
+    job.kind === "scan" ||
+    job.kind === "backfill" ||
+    job.kind === "discovery_initial" ||
+    job.kind === "competitor_scan";
   if (scanCadence && job.projectId) {
     return (await scanCadenceFor(job.projectId)).nextRunAt(new Date(now));
   }
   if (job.kind === "discovery_refresh" && job.projectId) {
     return new Date(now + (await discoveryRefreshDaysFor(job.projectId)) * DAY_MS);
   }
-  if (job.kind === "retention") {
+  // An SEO refresh books its successor days out and only when it succeeds, so
+  // a failed one looks again tomorrow rather than never.
+  if (job.kind === "retention" || (job.kind === "seo_refresh" && job.projectId)) {
     return new Date(now + DAY_MS);
   }
   if (job.kind === "digest") {

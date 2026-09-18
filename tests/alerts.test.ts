@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const azureSend = vi.fn();
@@ -37,6 +39,7 @@ import {
   type SelectableLead,
 } from "@/lib/alerts/select";
 import { describeTarget, normalizeTarget } from "@/lib/alerts/channels";
+import { isPublicAddress } from "@/lib/alerts/outbound";
 import type { Digest, DigestLead } from "@/lib/alerts/types";
 import { TIERS } from "@/lib/tiers";
 
@@ -155,6 +158,10 @@ describe("targets", () => {
   it("refuses an address that cannot be that channel", () => {
     expect(() => normalizeTarget("slack", "https://example.com/x")).toThrow(/hooks.slack.com/);
     expect(() => normalizeTarget("discord", "https://example.com/x")).toThrow(/discord.com/);
+    expect(() => normalizeTarget("slack", "https://notslack.com/x")).toThrow(/hooks.slack.com/);
+    expect(() => normalizeTarget("slack", "http://hooks.slack.com/x")).toThrow(/hooks.slack.com/);
+    expect(() => normalizeTarget("discord", "https://notdiscord.com/x")).toThrow(/discord.com/);
+    expect(() => normalizeTarget("webhook", "ftp://example.com/x")).toThrow(/http or https/);
     expect(() => normalizeTarget("email", "not-an-address")).toThrow(/email address/);
   });
 
@@ -278,28 +285,95 @@ describe("delivery", () => {
     vi.unstubAllEnvs();
   });
 
-  /** Stands in for the network so the request itself can be read. */
-  function captureRequest() {
-    const seen: { url: string; body: string }[] = [];
-    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
-      seen.push({ url: String(input), body: String(init?.body ?? "") });
-      return new Response(JSON.stringify({ id: "sent" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+  /** A receiver on loopback, which only a self-hosted instance may deliver to. */
+  async function receiver(status = 200, headers: Record<string, string> = {}) {
+    const seen: { path: string; body: string }[] = [];
+    const server = createServer((request, response) => {
+      let body = "";
+      request.on("data", (chunk) => (body += chunk));
+      request.on("end", () => {
+        seen.push({ path: request.url ?? "", body });
+        response.writeHead(status, headers).end();
       });
     });
-    return seen;
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    return { seen, url: `http://127.0.0.1:${port}/hooks`, close: () => server.close() };
   }
 
   it("posts the digest as JSON to a generic webhook", async () => {
-    const seen = captureRequest();
-    await sendToChannel(
-      "webhook",
-      "https://example.com/hooks",
-      digestOf(selectLeads([lead({ id: "a" })], SINCE, null)),
-    );
-    expect(seen[0].url).toBe("https://example.com/hooks");
-    expect(JSON.parse(seen[0].body)).toMatchObject({ project: "Acme" });
+    vi.stubEnv("ALERTS_ALLOW_PRIVATE_WEBHOOKS", "true");
+    const hook = await receiver();
+    try {
+      await sendToChannel(
+        "webhook",
+        hook.url,
+        digestOf(selectLeads([lead({ id: "a" })], SINCE, null)),
+      );
+      expect(hook.seen[0].path).toBe("/hooks");
+      expect(JSON.parse(hook.seen[0].body)).toMatchObject({ project: "Acme" });
+    } finally {
+      hook.close();
+    }
+  });
+
+  it("never sends to an address that is not on the public internet", async () => {
+    const hook = await receiver();
+    try {
+      for (const target of [
+        hook.url,
+        hook.url.replace("127.0.0.1", "localhost"),
+        hook.url.replace("127.0.0.1", "[::1]"),
+        hook.url.replace("127.0.0.1", "[::ffff:127.0.0.1]"),
+        "http://169.254.169.254/latest/meta-data/",
+        "http://10.0.0.5/",
+      ]) {
+        await expect(sendToChannel("webhook", target, digestOf([]))).rejects.toThrow(
+          /not on the public internet/,
+        );
+      }
+      expect(hook.seen).toEqual([]);
+    } finally {
+      hook.close();
+    }
+  });
+
+  it("treats a redirect as a failure instead of following it", async () => {
+    vi.stubEnv("ALERTS_ALLOW_PRIVATE_WEBHOOKS", "true");
+    const inner = await receiver();
+    const hook = await receiver(307, { location: inner.url });
+    try {
+      await expect(sendToChannel("webhook", hook.url, digestOf([]))).rejects.toThrow(
+        "Webhook returned 307",
+      );
+      expect(inner.seen).toEqual([]);
+    } finally {
+      hook.close();
+      inner.close();
+    }
+  });
+
+  it("knows a public address from a private one", () => {
+    for (const address of ["8.8.8.8", "140.82.112.3", "2606:4700:4700::1111"]) {
+      expect(isPublicAddress(address)).toBe(true);
+    }
+    for (const address of [
+      "127.0.0.1",
+      "10.1.2.3",
+      "172.16.0.1",
+      "192.168.1.1",
+      "169.254.169.254",
+      "100.64.0.1",
+      "0.0.0.0",
+      "::1",
+      "::",
+      "fe80::1",
+      "fd00::1",
+      "::ffff:10.0.0.1",
+      "not-an-address",
+    ]) {
+      expect(isPublicAddress(address)).toBe(false);
+    }
   });
 
   it("reads a blank variable as an unset one and says what is missing", async () => {

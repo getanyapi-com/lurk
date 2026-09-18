@@ -169,6 +169,20 @@
       "when": 1789675371027,
       "tag": "0023_drop_reply_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789765856022,
+      "tag": "0024_lead_thread_read_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789765945222,
+      "tag": "0025_search_run_completed_at",
+      "breakpoints": true
     }
   ]
 }

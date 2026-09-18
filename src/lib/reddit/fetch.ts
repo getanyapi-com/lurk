@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { searchRuns, usageLedger } from "@/db/schema";
 import type { FundedClient, Funding } from "@/lib/anyapi";
@@ -53,7 +53,8 @@ type RunKey = {
 /**
  * The stored run that answers exactly this call. The SKU and the variant are
  * part of the key because two endpoints, or two pages of one walk, give
- * different answers to the same query and must never serve each other.
+ * different answers to the same query and must never serve each other. A run
+ * still storing its results is not an answer yet and is never returned.
  */
 export async function findRun(key: RunKey, maxAgeMs: number): Promise<StoredRun | null> {
   const rows = await db()
@@ -69,6 +70,7 @@ export async function findRun(key: RunKey, maxAgeMs: number): Promise<StoredRun 
           ? isNull(searchRuns.timeframe)
           : eq(searchRuns.timeframe, key.timeframe),
         eq(searchRuns.variant, key.variant),
+        isNotNull(searchRuns.completedAt),
         gte(searchRuns.fetchedAt, new Date(Date.now() - maxAgeMs)),
       ),
     )
@@ -119,56 +121,86 @@ export async function fetchShared<T>(input: SharedFetch<T>): Promise<SharedResul
   const timeframe = input.timeframe ?? null;
   const variant = input.variant ?? "";
   const maxAgeMs = input.maxAgeMs ?? ctx.maxAgeMs;
+  const key = { kind, sku, normalizedQuery, sort, timeframe, variant };
 
-  const existing = await findRun(
-    { kind, sku, normalizedQuery, sort, timeframe, variant },
-    maxAgeMs,
-  );
-  if (existing) {
-    const value = await input.load(existing.id);
+  const reuse = async (run: { id: string; requestId: string | null }, value: T) => {
     await recordUsage({
       projectId: ctx.projectId,
       sku,
       costUsd: 0,
-      requestId: existing.requestId,
-      searchRunId: existing.id,
+      requestId: run.requestId,
+      searchRunId: run.id,
       fundedBy: ctx.funded.funding,
       reused: true,
     });
     return { value, reused: true, costUsd: 0 };
+  };
+
+  const existing = await findRun(key, maxAgeMs);
+  if (existing) {
+    return reuse(existing, await input.load(existing.id));
+  }
+  // Two callers that both missed wait on one purchase instead of making two.
+  const flightKey = JSON.stringify(key);
+  const flying = inFlightRuns.get(flightKey) as Promise<Bought<T>> | undefined;
+  if (flying) {
+    const bought = await flying;
+    return reuse(bought, bought.value);
   }
 
+  const buying = buy(input, key);
+  inFlightRuns.set(flightKey, buying);
+  try {
+    const bought = await buying;
+    return { value: bought.value, reused: false, costUsd: bought.costUsd };
+  } finally {
+    inFlightRuns.delete(flightKey);
+  }
+}
+
+type Bought<T> = { id: string; requestId: string | null; value: T; costUsd: number };
+
+/** The purchases under way in this process, by the key a reuse would match. */
+const inFlightRuns = new Map<string, Promise<Bought<unknown>>>();
+
+/**
+ * One paid call, stored. The run row is written first because its results point
+ * at it, and only stamped complete once they are all in, which is the moment
+ * `findRun` starts handing it out. The money is spent whether or not the store
+ * works, so the ledger line is written either way.
+ */
+async function buy<T>(input: SharedFetch<T>, key: RunKey): Promise<Bought<T>> {
+  const { ctx } = input;
   if (ctx.funded.funding === "house") {
     await assertHouseDataUnderCap();
   }
-  const { result, requestId } = sku.startsWith("reddit.")
+  const { result, requestId } = key.sku.startsWith("reddit.")
     ? await paced(() => ctx.funded.call(input.run))
     : await ctx.funded.call(input.run);
   const runId = randomUUID();
   await db().insert(searchRuns).values({
     id: runId,
-    kind,
-    sku,
-    normalizedQuery,
-    sort,
-    timeframe,
-    variant,
+    ...key,
     nextCursor: result.nextCursor ?? null,
     costUsd: result.costUsd.toFixed(6),
     requestId,
     fundedBy: ctx.funded.funding,
   });
-  const value = await input.store(result.data, runId);
-  await recordUsage({
-    projectId: ctx.projectId,
-    sku,
-    costUsd: result.costUsd,
-    requestId,
-    searchRunId: runId,
-    fundedBy: ctx.funded.funding,
-    reused: false,
-  });
-  return { value, reused: false, costUsd: result.costUsd };
+  try {
+    const value = await input.store(result.data, runId);
+    await db().update(searchRuns).set({ completedAt: new Date() }).where(eq(searchRuns.id, runId));
+    return { id: runId, requestId, value, costUsd: result.costUsd };
+  } finally {
+    await recordUsage({
+      projectId: ctx.projectId,
+      sku: key.sku,
+      costUsd: result.costUsd,
+      requestId,
+      searchRunId: runId,
+      fundedBy: ctx.funded.funding,
+      reused: false,
+    });
+  }
 }
 
 /**
