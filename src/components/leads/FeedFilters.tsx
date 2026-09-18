@@ -48,7 +48,9 @@ export function FeedFilters({ facets, at, params }: FeedFiltersProps) {
       name: "days",
       ariaLabel: "days",
       icon: <CalendarDays className={ICON} aria-hidden="true" />,
-      fallback: "30",
+      // The window the feed opened on, which is the year when nobody chose one
+      // and the last 30 days were empty.
+      fallback: params.days ?? "30",
       options: FEED_WINDOWS.map((days) => ({
         value: String(days),
         label: WINDOW_LABELS[days],

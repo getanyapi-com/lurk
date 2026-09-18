@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { ProjectActivity } from "@/lib/projectActivity";
 import { candidateSources, jobs, leadEvaluations, llmUsage, redditPosts } from "@/db/schema";
+import { newLeadCount } from "@/lib/leads";
 
 /**
  * A project's first sweep as it is happening, for the board that draws it on
@@ -58,6 +59,12 @@ export type SweepSnapshot = {
   costUsd: number;
   /** The newest threads the sweep is finished with, newest first. */
   threads: SweepThread[];
+  /**
+   * Leads waiting in the feed. Not the funnel's last band: a post held for
+   * review can still be routed into the feed, so this is the number the feed
+   * under the board will show, and the one a summary of the sweep has to match.
+   */
+  feedLeads: number;
 };
 
 /** How long a sweep that has ended still has its board drawn, so its last state can be read. */
@@ -126,6 +133,7 @@ export async function sweepSnapshot(projectId: string): Promise<SweepSnapshot | 
       answers: 0,
       costUsd: 0,
       threads: [],
+      feedLeads: 0,
     };
   }
   const start = job.startedAt;
@@ -255,5 +263,6 @@ export async function sweepSnapshot(projectId: string): Promise<SweepSnapshot | 
     answers: usage.reduce((sum, row) => sum + row.items * (ANSWERS_PER_ITEM[row.purpose] ?? 0), 0),
     costUsd: usage.reduce((sum, row) => sum + row.usd, 0),
     threads,
+    feedLeads: await newLeadCount(projectId),
   };
 }

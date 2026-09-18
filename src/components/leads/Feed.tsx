@@ -107,12 +107,23 @@ async function openOn(
  * and ActivityPoll re-renders this to show it, and the thread the pane opens
  * on.
  */
-export async function Feed({ projectId, params }: FeedProps) {
-  const filter = feedFilter(params);
-  const [page, activity] = await Promise.all([
+export async function Feed({ projectId, params: asked }: FeedProps) {
+  let params = asked;
+  let filter = feedFilter(params);
+  const [opened, activity] = await Promise.all([
     feedPage(projectId, filter),
     projectActivity(projectId),
   ]);
+  let page = opened;
+  // Nobody picked the 30 days the feed opens on. A first sweep reads a year, and
+  // its leads are mostly older than a month, so a new project opened on an
+  // empty window with its leads one pill away. When the window nobody chose is
+  // empty and the year is not, the feed opens on the year.
+  if (!asked.days && !asked.at && page.total === 0 && page.elsewhere > 0) {
+    params = { ...asked, days: "all" };
+    filter = feedFilter(params);
+    page = await feedPage(projectId, filter);
+  }
   const { total, faces, facets, elsewhere } = page;
   // The first sweep is drawn while it runs and for a moment after, so the
   // page a new project lands on shows the year being read rather than an

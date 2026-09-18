@@ -39,7 +39,16 @@ export const FEED_HOLD_MS = 60_000;
 
 type Held = { key: string; value: Promise<unknown>; at: number };
 
-const lastRead = new Map<string, Held>();
+/**
+ * Held on the process, not the module. Next bundles instrumentation, where the
+ * scheduler lives, apart from the routes, so a module-level map came in two
+ * copies: the sweep dropped the entry in its own and the leads page went on
+ * answering from the other. On 2026-09-18 a finished sweep with 39 leads sat
+ * over a feed that said "Leads 0" for that reason.
+ */
+const HOLDER = Symbol.for("lurk.projectFeedCache");
+const holder = globalThis as { [HOLDER]?: Map<string, Held> };
+const lastRead = (holder[HOLDER] ??= new Map<string, Held>());
 
 /**
  * The value this project last answered `key` with, or a fresh read. The promise

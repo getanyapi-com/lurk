@@ -91,14 +91,24 @@ export async function runInitialDiscovery(
   // about 25 seconds, and the person who asked is better off watching the
   // work start than a button that says it is thinking.
   if (!project.pain && project.url) {
-    await progress(jobId, "Reading your site");
-    await buildProfile(projectId, project.userId, project.url);
+    const host = URL.canParse(project.url) ? new URL(project.url).hostname.replace(/^www\./, "") : project.url;
+    const built = await buildProfile(projectId, project.userId, project.url, {}, (step) =>
+      step === "scrape"
+        ? progress(jobId, `Opening ${host}`)
+        : step === "profile"
+          ? progress(jobId, "Reading the page: what you sell, and who buys it")
+          : undefined,
+    );
     project = (await read()) ?? project;
+    await progress(
+      jobId,
+      `${project.name} · ${built.problemPhrasings.length} ways your buyers describe the problem`,
+    );
   }
   const { limits, settings } = await tierForUser(project.userId);
 
-  await progress(jobId, "Asking Google where your buyers ask");
   await runDiscovery({
+    onProgress: (text) => progress(jobId, text),
     projectId,
     userId: project.userId,
     // No competitor is known before discovery has looked for one.
@@ -110,7 +120,7 @@ export async function runInitialDiscovery(
 
   // The sweep needs the plan and nothing else, so it is booked the moment the
   // plan exists.
-  await progress(jobId, "Booking the first sweep of the past year");
+  await progress(jobId, "Starting the sweep of the past year");
   const queuedChildren = await markDiscoveredAndQueue(
     projectId,
     cadenceFor(settings.settings.cadence).nextRunAt(new Date()),

@@ -54,6 +54,7 @@ function snapshotAt(ms: number): SweepSnapshot {
     },
     answers: usage.reduce((n, row) => n + row.items * (ANSWERS[row.purpose] ?? 0), 0),
     costUsd: usage.reduce((n, row) => n + row.usd, 0),
+    feedLeads: scored.filter((thread) => thread.verdict?.decision === "qualify").length,
     threads: [
       ...shown([...scored].sort((a, b) => (a.verdict?.t ?? 0) - (b.verdict?.t ?? 0)), 160),
       ...shown(aside, 120),
