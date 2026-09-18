@@ -1,18 +1,17 @@
 import Link from "next/link";
-import { PRODUCT_NAME } from "@/lib/brand";
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { Wordmark } from "@/components/Wordmark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function MarketingNav() {
   return (
     <header className="marketing-nav">
-      <Link href="/" aria-label={`${PRODUCT_NAME} home`}>
-        <Wordmark />
-      </Link>
+      <Wordmark homeHref="/" />
       <nav aria-label="Main navigation">
         <a href="#features">Features</a>
         <a href="#costs">Data costs</a>
         <a href="#self-host">Self-host</a>
+        <AnyapiLink mark={false} />
       </nav>
       <div className="nav-actions">
         <ThemeToggle />

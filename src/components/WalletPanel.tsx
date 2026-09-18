@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { AnyapiLink } from "@/components/AnyapiLink";
 import { AnyapiMark } from "@/components/AnyapiMark";
 import { Button } from "@/components/ui/button";
 import { disconnectWalletAction } from "@/app/app/settings/actions";
@@ -87,6 +88,9 @@ export function WalletPanel({ connectedAt, selfHosted }: WalletPanelProps) {
                 ? `AnyAPI wallet connected on ${connectedAt.toISOString().slice(0, 10)}. Scans bill your wallet per request, up to the spend cap you set when you authorized lurk.`
                 : "Free runs on a shared wallet with daily scans. Connect your own AnyAPI wallet and every scan is billed per request to your account, with the limits below lifted."}
           </p>
+          <AnyapiLink mark={false} className="self-start text-small text-fg-muted hover:text-fg">
+            Open your AnyAPI dashboard
+          </AnyapiLink>
         </div>
       </div>
 

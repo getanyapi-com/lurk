@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AnyapiLink } from "./AnyapiLink";
 
 /** One icon per destination, so the rail reads at a glance. */
 const ICONS = {
@@ -74,6 +75,9 @@ export function Rail({ groups, children }: RailProps) {
           })}
         </div>
       ))}
+      <AnyapiLink className="mt-auto px-2 text-small text-fg-muted hover:text-fg">
+        Data by AnyAPI
+      </AnyapiLink>
     </nav>
   );
 }

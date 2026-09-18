@@ -13,7 +13,7 @@ export function Header() {
       className="sticky top-0 z-20 flex items-center justify-between border-b bg-bg px-6"
       style={{ height: "var(--header-height)" }}
     >
-      <Wordmark />
+      <Wordmark homeHref="/app" />
       <div className="flex items-center gap-2">
         <ThemeToggle />
         <UserButton />
