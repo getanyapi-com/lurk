@@ -11,7 +11,7 @@ import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
 import { LiveSweep } from "@/components/sweep/LiveSweep";
 import { VerdictBadge } from "@/components/VerdictBadge";
-import { buildStream, toCard } from "@/components/leads/stream";
+import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
 import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
 import { competitorsNamedIn } from "@/lib/competitors/read";
@@ -177,16 +177,19 @@ export async function Feed({ projectId, params }: FeedProps) {
                   projectId={projectId}
                   search={feedSearch(params)}
                   drawn={entries.length}
+                  lastPostId={entries.at(-1)?.lead.postId ?? null}
                   total={total}
                   selectedId={selectedId}
                 >
-                  {entries.map((entry) => (
+                  {entries.map((entry, index) => (
                     <LeadRow
                       key={entry.id}
                       id={entry.id}
                       href={entryHref(params, entry.id)}
                       selected={entry.id === selectedId}
                       title={entry.lead.title}
+                      excerpt={rowExcerpt(entry.lead)}
+                      nested={index > 0 && entries[index - 1].lead.postId === entry.lead.postId}
                       author={entry.lead.author}
                       avatarUrl={entry.lead.avatarUrl}
                       subreddit={entry.lead.subreddit}

@@ -77,6 +77,22 @@ export function toCard(lead: FeedLead): CardLead {
   };
 }
 
+/** As much of a comment as a row could ever show before it is cut off. */
+const EXCERPT_LENGTH = 160;
+
+/**
+ * What a comment lead's row is headed by: the comment's own words on one line.
+ * Headed by the thread's title, three comments in one thread were three rows
+ * nobody could tell apart from each other or from the post.
+ */
+export function rowExcerpt(lead: Pick<CardLead, "isComment" | "body">): string | null {
+  if (!lead.isComment) {
+    return null;
+  }
+  const line = lead.body.replace(/\s+/g, " ").trim();
+  return line ? line.slice(0, EXCERPT_LENGTH) : null;
+}
+
 /**
  * The same lead as one line in the list column. It is what crosses the wire
  * when the next page is fetched, so it carries what a row draws and not the
@@ -86,7 +102,9 @@ export function toRow(lead: FeedLead): FeedRow {
   const card = toCard(lead);
   return {
     id: `lead-${card.id}`,
+    postId: card.postId,
     title: card.title,
+    excerpt: rowExcerpt(card),
     author: card.author,
     avatarUrl: card.avatarUrl,
     subreddit: card.subreddit,

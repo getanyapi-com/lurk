@@ -8,6 +8,8 @@ type RowLinkProps = {
   summary: OpeningSummary;
   /** Whether the server thinks this is the row on screen. */
   selectedOnServer: boolean;
+  /** Whether the row sits under the row above it, as part of the same thread. */
+  nested?: boolean;
   children: React.ReactNode;
 };
 
@@ -19,7 +21,7 @@ type RowLinkProps = {
  * It does not prefetch: a prefetch here is the whole feed read again for every
  * row the pointer crosses, and it is the same read the click itself makes.
  */
-export function RowLink({ href, summary, selectedOnServer, children }: RowLinkProps) {
+export function RowLink({ href, summary, selectedOnServer, nested, children }: RowLinkProps) {
   const { summary: opening, open } = useOpening();
   const selected = opening ? opening.id === summary.id : selectedOnServer;
   return (
@@ -29,7 +31,9 @@ export function RowLink({ href, summary, selectedOnServer, children }: RowLinkPr
       prefetch={false}
       onClick={() => open(summary)}
       aria-current={selected ? "true" : undefined}
-      className={`transition-motion flex items-start gap-2.5 border-b px-3 py-2.5 last:border-b-0 ${
+      className={`transition-motion flex items-start gap-2.5 border-b py-2.5 pr-3 last:border-b-0 ${
+        nested ? "pl-10" : "pl-3"
+      } ${
         selected ? "bg-surface-2" : "hover:bg-surface-2"
       }`}
     >

@@ -170,7 +170,11 @@ export type FeedPage = { limit: number; offset: number };
 export type FeedRow = {
   /** The entry id the URL carries, not the lead's own id. */
   id: string;
+  /** The thread the row sits in, so a thread's rows can be drawn as one. */
+  postId: string | null;
   title: string;
+  /** A comment lead's own words, cut to a line. Null when the lead is the post. */
+  excerpt: string | null;
   author: string | null;
   avatarUrl: string | null;
   subreddit: string;
