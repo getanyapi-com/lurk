@@ -362,6 +362,22 @@ export async function leadCosts(
   return byPost;
 }
 
+/** Whether this project holds a lead in the named community. */
+export async function leadInSubreddit(projectId: string, subreddit: string): Promise<boolean> {
+  const rows = await db()
+    .select({ id: leads.id })
+    .from(leads)
+    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
+    .where(
+      and(
+        eq(leads.projectId, projectId),
+        eq(sql`lower(${redditPosts.subreddit})`, subreddit.trim().toLowerCase()),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** Moves a lead out of the feed, recording why when the user says it is a miss. */
 export async function setLeadStatus(
   projectId: string,

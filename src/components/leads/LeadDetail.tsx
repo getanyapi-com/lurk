@@ -93,6 +93,7 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
             </ul>
           </div>
           <DetailRail
+            projectId={null}
             author={item.author}
             avatarUrl={item.avatarUrl}
             authorKarma={item.authorKarma}
@@ -127,7 +128,12 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
           <span className="text-mono text-fg-muted">{relativeAge(lead.createdAt)}</span>
           <StageChip stage={lead.stage} />
           <WorthACommentChip kind={lead.kind} />
-          <PromoPolicyBadge policy={lead.promoPolicy} rulesText={lead.rulesText} />
+          <PromoPolicyBadge
+            projectId={projectId}
+            subreddit={lead.subreddit}
+            policy={lead.promoPolicy}
+            rulesText={lead.rulesText}
+          />
         </div>
       </header>
       <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto p-4">
@@ -147,6 +153,7 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
           )}
         </div>
         <DetailRail
+          projectId={projectId}
           author={lead.author}
           avatarUrl={lead.avatarUrl}
           authorKarma={lead.authorKarma}

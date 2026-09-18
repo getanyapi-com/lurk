@@ -51,7 +51,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
     resolveActiveSubreddits.mockClear();
   });
 
-  it("publishes a plan, reads the communities, and books every first job once", async () => {
+  it("publishes a plan and books every first job once", async () => {
     const { db, schema, user, project } = await fixture();
     const { eq } = await import("drizzle-orm");
     const { JOB_HANDLERS } = await import("@/jobs/registry");
@@ -68,7 +68,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
       facts: { name: "Formcraft", pain: "Forms cannot branch.", capabilities: ["branching"] },
       problemPhrasings: ["forms that branch"],
     });
-    expect(resolveActiveSubreddits).toHaveBeenCalledWith(project.id, user.id);
 
     const [marked] = await db()
       .select()
@@ -100,23 +99,16 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
     );
   });
 
-  it("books the first sweep before it reads a single community's rules", async () => {
-    const { db, schema, project } = await fixture();
-    const { eq } = await import("drizzle-orm");
+  it("reads no community's rules, so the sweep is not kept waiting on them", async () => {
+    const { project } = await fixture();
     const { JOB_HANDLERS } = await import("@/jobs/registry");
-    let bookedWhenRulesWereRead: string[] = [];
-    resolveActiveSubreddits.mockImplementationOnce(async () => {
-      const rows = await db().select().from(schema.jobs).where(eq(schema.jobs.projectId, project.id));
-      bookedWhenRulesWereRead = rows.map((row) => row.kind);
-      return ["saas"];
-    });
     const job = { id: undefined, projectId: project.id } as unknown as Parameters<
       (typeof JOB_HANDLERS)["discovery_initial"]
     >[0];
 
     await JOB_HANDLERS.discovery_initial(job);
 
-    expect(bookedWhenRulesWereRead).toContain("backfill");
+    expect(resolveActiveSubreddits).not.toHaveBeenCalled();
   });
 
   it("comes back on the same cadence a failed first sweep does, not days later", async () => {

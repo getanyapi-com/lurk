@@ -1,7 +1,7 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { projectSubreddits, projects, subreddits } from "@/db/schema";
+import { projects, subreddits } from "@/db/schema";
 import { clientForUser } from "./anyapi";
 import { generateStructured } from "./llm";
 import { PROFILE_SYSTEM, PROMO_POLICY_SYSTEM } from "./prompts";
@@ -93,12 +93,22 @@ async function scrapeProduct(projectId: string, userId: string, url: string) {
   return res.output.data;
 }
 
-/** Fills the shared subreddit row and its one-sentence self-promotion rule. */
-async function resolveSubreddit(
+/**
+ * A community's self-promotion rule in one sentence, read the first time
+ * anybody needs it and kept on the shared row for everyone after. It is one
+ * person's call on one reply, so it is bought when a lead in that community is
+ * opened and never while a new project waits on its first sweep.
+ */
+export async function promoPolicyFor(
   projectId: string,
   userId: string,
   name: string,
 ): Promise<string | null> {
+  const key = normalizeQuery(name);
+  const known = await db().select().from(subreddits).where(eq(subreddits.name, key));
+  if (known[0]?.promoPolicy) {
+    return known[0].promoPolicy;
+  }
   const funded = await clientForUser(userId);
   const result = await fetchSubredditDetails(
     { projectId, funded, maxAgeMs: SUBREDDIT_MAX_AGE_MS },
@@ -108,45 +118,18 @@ async function resolveSubreddit(
   if (!result.value) {
     return null;
   }
-  const key = normalizeQuery(name);
-  const existing = await db().select().from(subreddits).where(eq(subreddits.name, key));
-  if (!existing[0]?.promoPolicy) {
-    const summary = await generateStructured({
-      purpose: "promo_policy",
-      projectId,
-      schema: z.object({ policy: z.string() }),
-      system: PROMO_POLICY_SYSTEM,
-      prompt: `Subreddit r/${name} sidebar:\n\n${result.value.description}`,
-    });
-    await db()
-      .update(subreddits)
-      .set({ promoPolicy: summary.policy })
-      .where(eq(subreddits.name, key));
-  }
-  return key;
-}
-
-/**
- * Buys the sidebar and the self-promotion rule for every community the plan
- * will actually read. Discovery has already proved each one carries relevant
- * threads, so this spends only on communities that earned a slot.
- */
-export async function resolveActiveSubreddits(projectId: string, userId: string): Promise<string[]> {
-  const rows = await db()
-    .select()
-    .from(projectSubreddits)
-    .where(
-      and(
-        eq(projectSubreddits.projectId, projectId),
-        inArray(projectSubreddits.state, ["active", "pinned"]),
-      ),
-    );
-  // A community whose sidebar cannot be read keeps no rule and is still read
-  // for leads, so one failure here costs the others nothing.
-  const resolved = await Promise.all(
-    rows.map((row) => resolveSubreddit(projectId, userId, row.name).catch(() => null)),
-  );
-  return resolved.filter((key): key is string => key !== null);
+  const summary = await generateStructured({
+    purpose: "promo_policy",
+    projectId,
+    schema: z.object({ policy: z.string() }),
+    system: PROMO_POLICY_SYSTEM,
+    prompt: `Subreddit r/${name} sidebar:\n\n${result.value.description}`,
+  });
+  await db()
+    .update(subreddits)
+    .set({ promoPolicy: summary.policy })
+    .where(eq(subreddits.name, key));
+  return summary.policy;
 }
 
 export type ProfileOptions = {

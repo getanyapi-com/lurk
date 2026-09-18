@@ -1,11 +1,14 @@
 import { ArrowUp, ExternalLink, MessageCircle } from "lucide-react";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { SubredditChip } from "@/components/SubredditChip";
+import { PromoPolicyLine } from "@/components/leads/PromoPolicyBadge";
 import { Meter } from "@/components/leads/Meter";
 import { accountAge } from "@/components/leads/workspace";
 import { judgementSentence } from "@/lib/scan/words";
 
 export type DetailRailProps = {
+  /** The project to read a missing self-promotion rule for, or null to leave it unread. */
+  projectId: string | null;
   author: string | null;
   avatarUrl: string | null;
   authorKarma: number | null;
@@ -67,9 +70,12 @@ export function DetailRail(props: DetailRailProps) {
         <span className="text-mono tabular-nums text-fg-muted">
           {tally(props.weeklyActive)} weekly active
         </span>
-        <span className="text-mono text-fg-muted" title={props.rulesText ?? undefined}>
-          {props.promoPolicy ?? MISSING}
-        </span>
+        <PromoPolicyLine
+          projectId={props.projectId}
+          subreddit={props.subreddit}
+          policy={props.promoPolicy}
+          rulesText={props.rulesText}
+        />
       </Block>
 
       <Block label="Thread">

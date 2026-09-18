@@ -2,10 +2,11 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
-import { buildProfile, resolveActiveSubreddits } from "@/lib/profile";
+import { buildProfile } from "@/lib/profile";
 import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts } from "@/lib/product";
+import { smallSweep } from "@/lib/sweepScale";
 import { cadenceFor } from "@/lib/settings";
 import { tierForUser } from "@/lib/tier";
 
@@ -16,7 +17,6 @@ const DAY_MS = 24 * HOUR_MS;
 export type InitialDiscoveryOutcome = {
   /** False when the project was already set up, so nothing was queued again. */
   queuedChildren: boolean;
-  subreddits: string[];
 };
 
 async function progress(jobId: string | undefined, text: string): Promise<void> {
@@ -52,6 +52,12 @@ async function markDiscoveredAndQueue(
       return false;
     }
     const now = Date.now();
+    // A trial-size project gets its sweep and nothing that would go on spending
+    // after it: no SEO pass, no competitor scan, no recurring scan.
+    if (smallSweep()) {
+      await tx.insert(jobs).values({ kind: "backfill", projectId, runAt: new Date(now) });
+      return true;
+    }
     await tx.insert(jobs).values([
       { kind: "backfill", projectId, runAt: new Date(now) },
       { kind: "seo_refresh", projectId, runAt: new Date(now) },
@@ -65,9 +71,10 @@ async function markDiscoveredAndQueue(
 
 /**
  * Everything a new project needs after its own page has been read: ask Google
- * where and how its buyers ask, publish the plan that answer produces, buy the
- * sidebar and self-promotion rule of every community that plan will read, then
- * queue the jobs that fill its first screens. This is the whole of what used to
+ * where and how its buyers ask, publish the plan that answer produces, then
+ * queue the jobs that fill its first screens. No community's self-promotion
+ * rule is read here: it is one person's call on one reply, no first screen
+ * needs it, and while this job ran the sweep could not start. This is the whole of what used to
  * happen inside the request that created the project, which took minutes.
  */
 export async function runInitialDiscovery(
@@ -102,17 +109,12 @@ export async function runInitialDiscovery(
   });
 
   // The sweep needs the plan and nothing else, so it is booked the moment the
-  // plan exists. The sidebars only feed the self-promotion rule a lead's detail
-  // shows, and reading them first kept a new project waiting 27 seconds on
-  // 2026-09-17 for something no first screen needs.
+  // plan exists.
   await progress(jobId, "Booking the first sweep of the past year");
   const queuedChildren = await markDiscoveredAndQueue(
     projectId,
     cadenceFor(settings.settings.cadence).nextRunAt(new Date()),
     discoveryBudget(limits).refreshDays,
   );
-
-  await progress(jobId, "Reading the rules of the communities it found");
-  const subreddits = await resolveActiveSubreddits(projectId, project.userId);
-  return { queuedChildren, subreddits };
+  return { queuedChildren };
 }
