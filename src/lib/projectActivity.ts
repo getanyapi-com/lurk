@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import type { JobRow } from "@/jobs/enqueue";
@@ -67,6 +67,21 @@ export async function projectActivity(projectId: string): Promise<ProjectActivit
     .from(jobs)
     .where(and(eq(jobs.projectId, projectId), inArray(jobs.kind, [...ACTIVITY_KINDS])));
   return activityFrom(rows);
+}
+
+/**
+ * Whether any job of this project is running or due, whatever its kind. The
+ * pages a person waits on name three kinds; the rail's counts and the Reddit
+ * SEO and Competitors tabs are filled by the others, which a new project books
+ * the moment its plan exists and which finish minutes after the sweep.
+ */
+export async function hasWorkInFlight(projectId: string, now = new Date()): Promise<boolean> {
+  const [row] = await db()
+    .select({ id: jobs.id })
+    .from(jobs)
+    .where(and(eq(jobs.projectId, projectId), isNull(jobs.finishedAt), lte(jobs.runAt, now)))
+    .limit(1);
+  return row !== undefined;
 }
 
 export function isBusy(activity: ProjectActivity): boolean {

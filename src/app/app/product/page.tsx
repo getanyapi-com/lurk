@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ActivityPoll } from "@/components/ActivityPoll";
 import { EmptyState } from "@/components/EmptyState";
 import { ListEditor } from "@/components/product/ListEditor";
 import { PlanSections } from "@/components/product/PlanSections";
@@ -14,7 +13,7 @@ import {
 import { requireLocalUser } from "@/lib/auth";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { activeProject } from "@/lib/projects";
-import { activitySentence, isBusy, projectActivity } from "@/lib/projectActivity";
+import { activitySentence, projectActivity } from "@/lib/projectActivity";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
 
 type ProductPageProps = { searchParams: Promise<{ project?: string }> };
@@ -58,8 +57,6 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
         </p>
         <p className="text-small text-fg-muted">{activitySentence(activity)}</p>
       </div>
-
-      <ActivityPoll busy={isBusy(activity)} />
 
       <ProfileForm
         project={{

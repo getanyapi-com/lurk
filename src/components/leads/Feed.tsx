@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ActivityPoll } from "@/components/ActivityPoll";
 import { FeedFilters } from "@/components/leads/FeedFilters";
 import { HeldSection } from "@/components/leads/HeldSection";
 import { LeadDetail } from "@/components/leads/LeadDetail";
@@ -17,7 +16,7 @@ import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@
 import { competitorsNamedIn } from "@/lib/competitors/read";
 import { feedPage } from "@/lib/feedPage";
 import { findLead } from "@/lib/leads";
-import { isBusy, projectActivity } from "@/lib/projectActivity";
+import { projectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
 import { sweepShown, sweepSnapshot } from "@/lib/sweep";
 
@@ -150,8 +149,6 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
         {total > 0 ? <p className="text-small text-fg-muted">{sentence}</p> : null}
         <ScanStatus activity={activity} />
       </div>
-
-      <ActivityPoll busy={isBusy(activity)} />
       {sweep ? <LiveSweep projectId={projectId} first={sweep} /> : null}
       <PeopleStrip faces={faces} days={filter.days} at={filter.at} params={params} />
       <FeedFilters facets={facets} at={filter.at} params={params} />

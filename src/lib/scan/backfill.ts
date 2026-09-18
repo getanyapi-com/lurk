@@ -42,6 +42,9 @@ import { creditSources, markCovered, recordSources, type CandidateSource } from 
 
 const HOUR_MS = 60 * 60 * 1000;
 
+/** Lead authors whose profile a sweep looks up, best leads first. About $0.002 each. */
+const FACES = 25;
+
 /** Pages in a row carrying nothing new to their walk before the walk ends. */
 const STALE_PAGES = 3;
 
@@ -158,6 +161,12 @@ async function walk(
         moved = true;
       }
       if (!found.has(post.id)) {
+        // Every walk checks the budget before its page and all of them are in
+        // flight at once, so without this the pages already asked for land on
+        // top of it: the 2026-09-18 sweep found 4,164 posts on a budget of 2,500.
+        if (found.size >= postBudget) {
+          continue;
+        }
         fresh.push(post);
       }
       found.set(post.id, post);
@@ -234,7 +243,6 @@ class Judge {
     private readonly stored: Map<string, StoredJudgement>,
     private readonly sources: Map<string, CandidateSource[]>,
     private readonly report: () => Promise<void>,
-    private readonly faces: (usernames: string[]) => void,
   ) {}
 
   /** Posts a page just carried; only the ones with no verdict are queued. */
@@ -321,7 +329,6 @@ class Judge {
       );
       await writeLeads(written);
       this.leads.push(...written);
-      this.faces(written.map((lead) => byId.get(lead.postId)?.author ?? ""));
       for (const judgement of batch) {
         committed.add(judgement.id);
       }
@@ -378,12 +385,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
           ? `Reading further where the leads are · ${walks} of ${plan.length} searches done · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
           : `Scoring ${judge.candidates.length} posts · ${judge.judged.length} scored · ${judge.leads.length} leads`,
     );
-  // A lead's face is looked up as the lead is written, beside the sweep and
-  // not after it, so the feed the board folds over already has them.
-  const faces: Promise<void>[] = [];
-  const judge: Judge = new Judge(project, await loadEvaluations(projectId), sourcesByPost, report, (usernames) => {
-    faces.push(fetchAvatars(ctx, usernames));
-  });
+  const judge: Judge = new Judge(project, await loadEvaluations(projectId), sourcesByPost, report);
 
   // Every walk is independent of every other and nearly all waiting on Reddit,
   // so all of them start at once and the shared pace in src/lib/reddit/pace.ts
@@ -420,7 +422,17 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   pass = "scoring";
   await report();
   await judge.settle();
-  await Promise.all(faces);
+
+  // Faces for the top of the feed only. A full sweep writes hundreds of leads
+  // and a profile costs twenty times a scored post: looked up for all 448 of
+  // them on 2026-09-18 they were $0.88 of a $1.27 sweep, and they shared
+  // Reddit's pace with the searches, which tripled how long the sweep took.
+  // The rest keep their initials until a scan or a refresh reaches them.
+  const faces = [...judge.leads]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, FACES)
+    .map((lead) => found.get(lead.postId)?.author ?? "");
+  await fetchAvatars(ctx, faces);
 
   // A post several walks found gained sources after its chunk was judged, so
   // record every source once more; the ones already written are ignored.

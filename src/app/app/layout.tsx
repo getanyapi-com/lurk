@@ -1,4 +1,6 @@
 import { headers } from "next/headers";
+import { ActivityPoll } from "@/components/ActivityPoll";
+import { hasWorkInFlight } from "@/lib/projectActivity";
 import { Header } from "@/components/Header";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { Rail, type RailGroup } from "@/components/Rail";
@@ -64,10 +66,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     listProjects(user.id),
     requestedProject().then((requested) => activeProject(user.id, requested)),
   ]);
-  const counts = project ? await countsFor(project.id) : EMPTY_COUNTS;
+  const [counts, busy] = project
+    ? await Promise.all([countsFor(project.id), hasWorkInFlight(project.id)])
+    : [EMPTY_COUNTS, false];
   return (
     <div className="flex min-h-dvh flex-col">
       <Header />
+      {/* Here and not on each page: the rail's counts and every tab are filled
+          by jobs that finish after the page was drawn. */}
+      <ActivityPoll busy={busy} />
       <div className="flex flex-1">
         <Rail groups={groupsFor(counts)}>
           <ProjectSwitcher
