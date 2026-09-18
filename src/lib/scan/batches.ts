@@ -1,4 +1,5 @@
 import { JevRequestTooLargeError } from "@/lib/jev";
+import { LlmCapReachedError } from "@/lib/llm";
 import { MODEL_CONCURRENCY, inFlight } from "./constants";
 
 /**
@@ -30,6 +31,13 @@ export async function askInBatches<T, R>(
           askSplitting(batch.slice(half)),
         ]);
         return [...left, ...right];
+      }
+      // The day's model budget being spent is not a dropped call: every batch
+      // after it would go unanswered too, and the job would end "Finished"
+      // having judged nothing (a 2026-09-18 run did). The job fails with the
+      // reason instead, and is queued again at its cadence.
+      if (error instanceof LlmCapReachedError) {
+        throw error;
       }
       // A batch the model never answered is unanswered, never rejected: one
       // dropped connection lost a whole sweep's triage on 2026-09-10.

@@ -167,6 +167,25 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     }
   });
 
+  it("ends a walk whose listing stops moving, however many cursors it is handed", async () => {
+    const row = await project();
+    const same = await posts(2);
+    let cursors = 0;
+    // A source that repeats the same page under a fresh cursor forever.
+    fetchSearch.mockImplementation(async () => {
+      cursors += 1;
+      return { value: { posts: same, nextCursor: `page-${cursors}` }, reused: true, costUsd: 0 };
+    });
+    model();
+
+    const outcome = await runBackfill(row.id);
+
+    // Page one moved the walk; three more that did not end it. Two sorts.
+    expect(callsOf()).toHaveLength(8);
+    expect(outcome.cutShort).toBe(0);
+    expect(outcome.found).toBe(2);
+  });
+
   it("ends only the walk whose page failed, and keeps the pages before it", async () => {
     const row = await project();
     const first = await posts(2);
@@ -229,6 +248,79 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(callsOf()).toHaveLength(4);
   });
 
+  /** A listing that never ends: a fresh page of new posts under every cursor. */
+  function endless(perPage: number) {
+    let cursors = 0;
+    fetchSearch.mockImplementation(async () => {
+      cursors += 1;
+      return {
+        value: { posts: await posts(perPage), nextCursor: `page-${cursors}` },
+        reused: true,
+        costUsd: 0,
+      };
+    });
+  }
+
+  it("reads on past the first pass only where the first pass found a lead", async () => {
+    const row = await project();
+    endless(2);
+    // Every title is worth reading, and nobody in them is a buyer.
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) =>
+      call.purpose === "triage"
+        ? triageAnswers(Array.from({ length: call.itemsAsked }, () => ({})))
+        : judgeAnswers(
+            Array.from({ length: call.itemsAsked }, () => ({ relationship: "discussion", solvesProblem: 0.1, audience: 0.1 })),
+          ),
+    );
+
+    const outcome = await runBackfill(row.id);
+
+    // Two pages of each sort, and no walk earned a third.
+    expect(callsOf()).toHaveLength(4);
+    expect(outcome.leads).toBe(0);
+  });
+
+  it("stops a walk that keeps finding leads at its depth", async () => {
+    const row = await project();
+    endless(2);
+    model();
+
+    await runBackfill(row.id);
+
+    // Six pages of each sort.
+    expect(callsOf()).toHaveLength(12);
+  });
+
+  it("scores no post whose title triage says is asking for nothing", async () => {
+    const row = await project();
+    pages([{ posts: await posts(4), nextCursor: null }]);
+    askJev.mockImplementation(async (call: { purpose: string; itemsAsked: number }) =>
+      call.purpose === "triage"
+        ? triageAnswers(
+            Array.from({ length: call.itemsAsked }, (_, index) => ({ asking: index === 0 ? 0.4 : 0.03 })),
+          )
+        : judgeAnswers(Array.from({ length: call.itemsAsked }, () => ({ quote: "s0" }))),
+    );
+
+    const outcome = await runBackfill(row.id);
+
+    expect(outcome.found).toBe(4);
+    expect(outcome.judged).toBe(1);
+  });
+
+  it("stops finding posts once the sweep's budget is spent", async () => {
+    const row = await project();
+    endless(300);
+    model();
+
+    const outcome = await runBackfill(row.id);
+
+    // Twelve pages were on offer; the budget ran out before the last of them.
+    expect(callsOf().length).toBeLessThan(12);
+    expect(outcome.found).toBeGreaterThanOrEqual(2500);
+    expect(outcome.found).toBeLessThan(3600);
+  }, 60_000);
+
   it("reuses no cached search, because a retry must not inherit a truncated walk", async () => {
     const row = await project();
     pages([{ posts: await posts(1), nextCursor: null }]);
@@ -239,7 +331,7 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     expect(maxAgesOf()).toEqual([0, 0]);
   });
 
-  it("walks queries at once, never more at once than the fetch concurrency", async () => {
+  it("starts every walk at once, and leaves the pace to the shared Reddit pace", async () => {
     const row = await project(["forms that branch", "a form that asks one question"]);
     let live = 0;
     let peak = 0;
@@ -254,11 +346,11 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     await runBackfill(row.id);
 
-    const { CALL_CONCURRENCY } = await import("@/lib/scan/constants");
-    // Six walks: three queries in both orders. Sequentially the peak is one.
+    // Six walks: three queries in both orders, all in flight together. How
+    // many calls that is allowed to be is decided in src/lib/reddit/pace.ts,
+    // underneath the fetch this test replaces.
     expect(callsOf()).toHaveLength(6);
-    expect(peak).toBeGreaterThan(1);
-    expect(peak).toBeLessThanOrEqual(CALL_CONCURRENCY);
+    expect(peak).toBe(6);
   });
 
   /**
@@ -339,6 +431,24 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
       .from(schema.projectKeywords)
       .where(eq(schema.projectKeywords.projectId, row.id));
     expect(covered.every((keyword) => keyword.lastCoveredAt !== null)).toBe(true);
+  });
+
+  it("never asks a bare negation, and asks two keywords that differ only by one once", async () => {
+    const row = await project();
+    await db()
+      .insert(schema.projectKeywords)
+      .values([
+        { projectId: row.id, keyword: "(form OR forms) AND (no OR without)" },
+        { projectId: row.id, keyword: '(form OR forms) AND ("under 21")' },
+        { projectId: row.id, keyword: '(form OR forms) AND ("under 21" OR not)' },
+      ]);
+    pages([{ posts: [], nextCursor: null }]);
+    model();
+
+    await runBackfill(row.id);
+
+    const asked = [...new Set(callsOf().map((call) => call.query))].sort();
+    expect(asked).toEqual(['(form OR forms) AND "under 21"', "form builder"]);
   });
 
   it("asks a compiled keyword one constraint at a time, so none hides behind the others", async () => {

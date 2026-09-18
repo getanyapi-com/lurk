@@ -24,6 +24,22 @@ function candidates(n: number) {
 
 describe("triage over many batches", () => {
   /**
+   * The day's model budget being spent is not one dropped call. Treated as
+   * one, every batch after it goes unanswered and the sweep ends "Finished"
+   * with nothing judged, which is what a 2026-09-18 run reported. The sweep
+   * fails with the reason instead.
+   */
+  it("fails the whole sweep when the model budget is spent, rather than judging nothing", async () => {
+    const { LlmCapReachedError } = await import("@/lib/llm");
+    askJev.mockReset();
+    askJev.mockRejectedValue(new LlmCapReachedError(10));
+
+    await expect(
+      triageTitles("project", product, candidates(TRIAGE_BATCH_SIZE * 2)),
+    ).rejects.toBeInstanceOf(LlmCapReachedError);
+  });
+
+  /**
    * One dropped connection on batch 48 of 51 threw away a whole sweep's triage
    * on 2026-09-10. A batch the model never answered has to mean the same as a
    * batch it answered with nothing: unread, never rejected.

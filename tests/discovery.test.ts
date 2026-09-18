@@ -18,6 +18,7 @@ import {
 import {
   compileBooleanQuery,
   constraintQueries,
+  withoutNegations,
   competitorsFrom,
   coverageFrom,
   dedupeThreads,
@@ -637,6 +638,21 @@ describe("what the evidence says to search for", () => {
     ]);
     expect(constraintQueries('(hotel OR hotels) AND "under 21"')).toEqual(['(hotel OR hotels) AND "under 21"']);
     expect(constraintQueries("hotels that allow 18 year olds")).toEqual(["hotels that allow 18 year olds"]);
+  });
+
+  it("takes the bare negations out of a search saved before the compiler dropped them", () => {
+    expect(withoutNegations('(hotel OR hotels) AND (18 OR "under 21" OR cant OR not)')).toBe(
+      '(hotel OR hotels) AND (18 OR "under 21")',
+    );
+    expect(withoutNegations("subreddit:vegas AND (hotel OR hotels) AND (21 OR not)")).toBe(
+      "subreddit:vegas AND (hotel OR hotels) AND (21)",
+    );
+    // Nothing else was constraining it, so there is no search left to ask.
+    expect(withoutNegations("(form OR forms) AND (no OR without)")).toBe("");
+    expect(withoutNegations("(quiz) AND (without)")).toBe("");
+    // A search with none, and one that was never compiled, are left alone.
+    expect(withoutNegations('(hotel OR hotels) AND (18 OR "under 21")')).toBe('(hotel OR hotels) AND (18 OR "under 21")');
+    expect(withoutNegations("form builder without coding")).toBe("form builder without coding");
   });
 
   it("keeps only the numbers the product itself talks about", () => {

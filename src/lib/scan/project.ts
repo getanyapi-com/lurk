@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projectCompetitors, projectKeywords, projectSubreddits, projects } from "@/db/schema";
+import { withoutNegations } from "@/lib/discovery/rank";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts, productText, type ProductFacts } from "@/lib/product";
 import { DEFAULT_SCORE_THRESHOLD } from "./constants";
@@ -69,15 +70,28 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
    * plan's own state vocabulary, so `retrieved` decides this too.
    */
   const competitorNames = retrievedNames(competitors);
-  const queries: PlanRow[] = keywords.map((item) => ({
+  // A keyword saved before the compiler dropped bare negations is searched
+  // without them. One that was nothing else is not searched at all, and of
+  // several that are now the same search, the row being retrieved with the
+  // most evidence is the one that is.
+  const cleaned: PlanRow[] = keywords.map((item) => ({
     id: item.id,
     table: "keyword",
-    key: item.keyword,
+    key: withoutNegations(item.keyword),
     source: item.source,
     state: item.state,
     lastCoveredAt: item.lastCoveredAt,
     evidence: item.evidence ?? 0,
   }));
+  const live = (row: PlanRow) => (retrieved([row]).length > 0 ? 1 : 0);
+  const kept = new Map<string, PlanRow>();
+  for (const row of cleaned) {
+    const held = kept.get(row.key);
+    if (!held || live(row) > live(held) || (live(row) === live(held) && row.evidence > held.evidence)) {
+      kept.set(row.key, row);
+    }
+  }
+  const queries = cleaned.filter((row) => row.key !== "" && kept.get(row.key) === row);
   const communities: PlanRow[] = subs.map((item) => ({
     id: item.id,
     table: "community",
