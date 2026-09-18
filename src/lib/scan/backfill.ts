@@ -10,7 +10,7 @@ import { loadEvaluations, writeEvaluations } from "./evaluations";
 import { writeLeads, type LeadRow } from "./leads";
 import { loadScanProject, type ScanProject } from "./project";
 import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
-import { evaluationsFor, postItem, routed, toLead, unjudged } from "./run";
+import { evaluationsFor, fetchAvatars, postItem, routed, toLead, unjudged } from "./run";
 import type { Judgement } from "./judgement";
 import { judgeItems, readOrder, triageTitles } from "./score";
 import type { StoredJudgement } from "./evaluations";
@@ -234,6 +234,7 @@ class Judge {
     private readonly stored: Map<string, StoredJudgement>,
     private readonly sources: Map<string, CandidateSource[]>,
     private readonly report: () => Promise<void>,
+    private readonly faces: (usernames: string[]) => void,
   ) {}
 
   /** Posts a page just carried; only the ones with no verdict are queued. */
@@ -320,6 +321,7 @@ class Judge {
       );
       await writeLeads(written);
       this.leads.push(...written);
+      this.faces(written.map((lead) => byId.get(lead.postId)?.author ?? ""));
       for (const judgement of batch) {
         committed.add(judgement.id);
       }
@@ -376,7 +378,12 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
           ? `Reading further where the leads are · ${walks} of ${plan.length} searches done · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
           : `Scoring ${judge.candidates.length} posts · ${judge.judged.length} scored · ${judge.leads.length} leads`,
     );
-  const judge: Judge = new Judge(project, await loadEvaluations(projectId), sourcesByPost, report);
+  // A lead's face is looked up as the lead is written, beside the sweep and
+  // not after it, so the feed the board folds over already has them.
+  const faces: Promise<void>[] = [];
+  const judge: Judge = new Judge(project, await loadEvaluations(projectId), sourcesByPost, report, (usernames) => {
+    faces.push(fetchAvatars(ctx, usernames));
+  });
 
   // Every walk is independent of every other and nearly all waiting on Reddit,
   // so all of them start at once and the shared pace in src/lib/reddit/pace.ts
@@ -413,6 +420,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   pass = "scoring";
   await report();
   await judge.settle();
+  await Promise.all(faces);
 
   // A post several walks found gained sources after its chunk was judged, so
   // record every source once more; the ones already written are ignored.

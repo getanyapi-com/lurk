@@ -500,14 +500,6 @@ function ThreadWall({ wall, cols }: { wall: (SweepThread | null)[]; cols: number
 
 /* ---------------- the board ---------------- */
 
-/** The pass the sweep is on, which is how its own progress line opens. */
-function passOf(snapshot: SweepSnapshot | null): string {
-  if (!snapshot || snapshot.state === "waiting") return snapshot?.progress ?? "Starting";
-  if (snapshot.state === "done") return "Done";
-  if (snapshot.state === "stopped") return "Stopped";
-  return snapshot.progress?.split(" · ")[0] ?? "Reading the past year";
-}
-
 export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSnapshot | null; cols?: number; rows?: number }) {
   const view = useSweepView(snapshot, cols * rows);
   const running = snapshot?.state === "running" || snapshot?.state === "waiting" || snapshot === null;
@@ -516,6 +508,22 @@ export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSn
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,11fr)]">
       <RedditTheme />
       <div className="flex flex-col gap-4">
+        <div className="flex items-baseline gap-3 px-1">
+          <span className="font-mono text-[44px] leading-none tabular-nums text-fg">
+            {(view.clockMs / 1000).toFixed(1)}
+            <span className="text-[20px] text-fg-muted"> s</span>
+          </span>
+          <span className="inline-flex items-center gap-2 text-mono text-fg-muted">
+            <span
+              className="size-1.5 rounded-full"
+              style={{
+                background: running ? "var(--score-warm)" : "var(--score-hot)",
+                animation: running ? "sweepPulse 1.6s ease-in-out infinite" : undefined,
+              }}
+            />
+            {running ? "reading" : snapshot?.state === "stopped" ? "stopped" : "done"}
+          </span>
+        </div>
         <section className="flex flex-col gap-4 rounded-card border bg-surface p-4">
           <div className="flex items-baseline justify-between gap-2">
             <Eyebrow>The past year</Eyebrow>
@@ -531,30 +539,6 @@ export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSn
       </div>
 
       <section className="flex flex-col overflow-hidden rounded-card border bg-surface">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5">
-          <span className="inline-flex items-center gap-2 text-mono text-fg-muted">
-            <span
-              className="size-1.5 rounded-full"
-              style={{
-                background: running ? "var(--score-warm)" : "var(--score-hot)",
-                animation: running ? "sweepPulse 1.6s ease-in-out infinite" : undefined,
-              }}
-            />
-            {passOf(snapshot)}
-          </span>
-          <span className="flex items-baseline gap-4 text-mono text-fg-muted">
-            {running ? (
-              <span>
-                <span className="font-mono text-[16px] tabular-nums text-fg">{fmt(view.perSec)}</span> threads in the last second
-              </span>
-            ) : (
-              <span>
-                <span className="font-mono text-[16px] tabular-nums text-fg">{fmt(view.counts.found)}</span> threads
-              </span>
-            )}
-            <span className="font-mono text-[16px] tabular-nums text-fg">{(view.clockMs / 1000).toFixed(1)} s</span>
-          </span>
-        </div>
         <ThreadWall wall={view.wall} cols={cols} />
       </section>
     </div>

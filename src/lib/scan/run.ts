@@ -103,7 +103,7 @@ export function postItem(post: StoredPost): ScorableItem {
  * Faces for the feed, bought once a month per author. A failure here is not a
  * failed scan: the card falls back to the author's initials.
  */
-async function fetchAvatars(ctx: FetchContext, usernames: string[]): Promise<void> {
+export async function fetchAvatars(ctx: FetchContext, usernames: string[]): Promise<void> {
   await inFlight([...new Set(usernames.filter(Boolean))], async (username) => {
     try {
       await fetchAuthorProfile(ctx, username, AUTHOR_MAX_AGE_MS);
