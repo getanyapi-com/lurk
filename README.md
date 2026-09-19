@@ -98,7 +98,7 @@ npm run anyapi:register
 | `SMTP_URL` | no | - | Sends the digest through any SMTP server, as `smtps://user:pass@host:465`. |
 | `SLACK_CLIENT_ID` | no | - | With the secret, turns the Slack channel into an Add to Slack button. |
 | `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
-| `HOUSE_DATA_CAP_USD_PER_DAY` | no | `25` | Daily ceiling on data spend from the house key. |
+| `HOUSE_DATA_CAP_USD_PER_DAY` | no | `50` | Daily ceiling on data spend from the house key. |
 | `HOUSE_LLM_CAP_USD_PER_DAY` | no | `100` (`10` under the Compose file) | Daily ceiling on language model spend. |
 | `ALERTS_ALLOW_PRIVATE_WEBHOOKS` | no | `false` | Webhooks may only reach public addresses. Set `true` on a self-hosted instance to deliver to your own network. |
 

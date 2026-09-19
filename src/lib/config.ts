@@ -84,7 +84,7 @@ const schema = z.object({
   REDDIT_CALLS_IN_FLIGHT: z.coerce.number().int().positive().default(40),
   REDDIT_CALLS_PER_SECOND: z.coerce.number().positive().default(12),
 
-  HOUSE_DATA_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(25),
+  HOUSE_DATA_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(50),
   HOUSE_LLM_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(100),
 });
 
