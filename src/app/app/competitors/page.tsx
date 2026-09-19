@@ -75,8 +75,9 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
   const domains = domainsByName(competitors);
   const ranked = topCompetitors(mentions);
 
+  // Keyed so switching projects mounts StartOnOpen again for the new one.
   return (
-    <div className="flex flex-col gap-5">
+    <div key={project.id} className="flex flex-col gap-5">
       {last ? null : <StartOnOpen start={openCompetitorsAction.bind(null, project.id)} />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">

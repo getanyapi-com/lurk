@@ -49,8 +49,9 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     lastSentAt: one.lastSentAt ? one.lastSentAt.toISOString().slice(0, 16).replace("T", " ") : null,
   }));
 
+  // Keyed so a half-filled channel form does not carry over to another project.
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div key={project.id} className="flex max-w-3xl flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-h2" style={{ fontWeight: 500 }}>
           Alerts

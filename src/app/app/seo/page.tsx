@@ -97,8 +97,9 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
   const href = linker(params);
   const selected = threads.find((thread) => thread.id === params.thread) ?? threads[0] ?? null;
 
+  // Keyed so switching projects mounts StartOnOpen again for the new one.
   return (
-    <div className="flex flex-col gap-5">
+    <div key={project.id} className="flex flex-col gap-5">
       {last ? null : <StartOnOpen start={openSeoAction.bind(null, project.id)} />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
