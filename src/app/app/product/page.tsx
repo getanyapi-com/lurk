@@ -1,10 +1,7 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { ListEditor } from "@/components/product/ListEditor";
-import { PlanSections } from "@/components/product/PlanSections";
 import { ProfileForm } from "@/components/product/ProfileForm";
-import { ListSkeleton } from "@/components/Skeleton";
 import { PaidButton } from "@/components/PaidButton";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,8 +57,12 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
           Product
         </h1>
         <p className="text-body text-fg-muted">
-          What we tell the scorer about your product, and where it looks. Edit
-          anything that reads wrong; the next scan uses what is here.
+          What we tell the scorer about your product. Edit anything that reads
+          wrong; the next scan uses what is here. Where it looks is under{" "}
+          <Link href={`/app/sources?project=${project.id}`} className="underline">
+            Sources
+          </Link>
+          .
         </p>
         <p className="text-small text-fg-muted">{activitySentence(activity)}</p>
       </div>
@@ -137,15 +138,6 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
         ]}
       />
 
-      {/*
-        Everything discovery wrote, read behind its own boundary: it is every
-        evidence row this project holds, and the profile form above it was
-        never waiting on any of that.
-      */}
-      <Suspense fallback={<ListSkeleton rows={5} />}>
-        <PlanSections projectId={project.id} userId={user.id} />
-      </Suspense>
-
       <div className="flex flex-wrap items-center gap-3">
         {isOnboarding(activity) ? null : (
           <form action={scanAndOpenLeadsAction}>
@@ -166,7 +158,7 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
               />
             </form>
             <span className="text-small text-fg-muted">
-              Rebuilding reads your site again and replaces everything above.
+              Rebuilding reads your site again and replaces everything above, and your sources.
             </span>
           </>
         ) : null}

@@ -1,6 +1,6 @@
-import { HeadingSkeleton, ListSkeleton, Skeleton } from "@/components/Skeleton";
+import { HeadingSkeleton, Skeleton } from "@/components/Skeleton";
 
-/** The profile form, then the lists discovery wrote under it. */
+/** The profile form. */
 export default function ProductLoading() {
   return (
     <div className="flex flex-col gap-5">
@@ -10,7 +10,6 @@ export default function ProductLoading() {
           <Skeleton key={index} className="h-10 w-full" />
         ))}
       </div>
-      <ListSkeleton rows={5} />
     </div>
   );
 }

@@ -122,28 +122,6 @@ function clean(kind: ChipKind, value: string): string {
     : trimmed;
 }
 
-async function chipCount(kind: ChipKind, projectId: string): Promise<number> {
-  if (kind === "keyword") {
-    const rows = await db()
-      .select()
-      .from(projectKeywords)
-      .where(eq(projectKeywords.projectId, projectId));
-    return rows.length;
-  }
-  if (kind === "subreddit") {
-    const rows = await db()
-      .select()
-      .from(projectSubreddits)
-      .where(eq(projectSubreddits.projectId, projectId));
-    return rows.length;
-  }
-  const rows = await db()
-    .select()
-    .from(projectCompetitors)
-    .where(eq(projectCompetitors.projectId, projectId));
-  return rows.length;
-}
-
 async function chipLimit(
   kind: ChipKind,
   userId: string,
@@ -207,7 +185,7 @@ export async function addChipAction(
       return { error: "Type something first." };
     }
     const limit = await chipLimit(kind, user.id);
-    if (limit != null && (await chipCount(kind, project.id)) >= limit) {
+    if (limit != null && (await chipsOn(kind, project.id)) >= limit) {
       return {
         error: `This tier allows ${limit} ${NOUNS[kind]} per project. Connect an AnyAPI wallet for more.`,
       };
@@ -217,6 +195,7 @@ export async function addChipAction(
       await bumpProfileVersion(project.id);
     }
     revalidatePath("/app/product");
+    revalidatePath("/app/sources");
     return { error: null };
   } catch (error) {
     return {
@@ -263,6 +242,22 @@ export async function removeChipAction(
     await bumpProfileVersion(project.id);
   }
   revalidatePath("/app/product");
+  revalidatePath("/app/sources");
+}
+
+/** The rows of one kind a scan may use: everything switched on. */
+async function chipsOn(kind: ChipKind, projectId: string): Promise<number> {
+  const table =
+    kind === "keyword"
+      ? projectKeywords
+      : kind === "subreddit"
+        ? projectSubreddits
+        : projectCompetitors;
+  const rows = await db()
+    .select({ state: table.state })
+    .from(table)
+    .where(eq(table.projectId, projectId));
+  return rows.filter((row) => row.state === "active" || row.state === "pinned").length;
 }
 
 /**
@@ -277,7 +272,16 @@ export async function setChipStateAction(
   state: ChipState,
 ): Promise<ChipResult> {
   try {
-    const { project } = await ownedProject(projectId);
+    const { user, project } = await ownedProject(projectId);
+    // Switching a row on spends a place under the tier cap, the same as adding one.
+    if (state !== "excluded") {
+      const limit = await chipLimit(kind, user.id);
+      if (limit != null && (await chipsOn(kind, project.id)) >= limit) {
+        return {
+          error: `This tier allows ${limit} ${NOUNS[kind]} per project. Switch one off first, or connect an AnyAPI wallet for more.`,
+        };
+      }
+    }
     if (kind === "keyword") {
       await db()
         .update(projectKeywords)
@@ -311,6 +315,7 @@ export async function setChipStateAction(
       await bumpProfileVersion(project.id);
     }
     revalidatePath("/app/product");
+    revalidatePath("/app/sources");
     return { error: null };
   } catch (error) {
     return {
@@ -347,6 +352,7 @@ export async function setCompetitorDomainAction(
         ),
       );
     revalidatePath("/app/product");
+    revalidatePath("/app/sources");
     return { error: null };
   } catch (error) {
     return {
@@ -408,6 +414,7 @@ async function saveLists(projectId: string, kind: ListKind, lists: ProductLists)
     await bumpProfileVersion(projectId);
   }
   revalidatePath("/app/product");
+  revalidatePath("/app/sources");
 }
 
 /**

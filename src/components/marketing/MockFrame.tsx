@@ -1,4 +1,4 @@
-import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords } from "lucide-react";
+import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords, Telescope } from "lucide-react";
 import type { RailIcon } from "@/components/Rail";
 import { BrandImage } from "./BrandImage";
 import { MOCK_RAIL } from "./mockContent";
@@ -9,6 +9,7 @@ const ICONS: Record<RailIcon, React.ComponentType<{ className?: string }>> = {
   lightbulb: Lightbulb,
   swords: Swords,
   box: Box,
+  telescope: Telescope,
   bell: Bell,
   receipt: Receipt,
   settings: Settings,
