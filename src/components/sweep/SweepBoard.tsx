@@ -115,8 +115,10 @@ function useSweepView(snapshot: SweepSnapshot | null, slots: number): View {
       const waiting = queue.current.length;
       const pace = waiting === 0 ? 0 : Math.min(WALL_MAX_PER_S, Math.max(WALL_MIN_PER_S, waiting / QUEUE_S));
       owed.current = Math.min(waiting, owed.current + pace * dt);
-      const taken = queue.current.splice(0, Math.floor(owed.current));
-      owed.current -= taken.length;
+      // An ended sweep lands the rest at once: its list is final, and a phone's
+      // said "more land when the sweep is done" for seconds after it was.
+      const taken = queue.current.splice(0, running ? Math.floor(owed.current) : queue.current.length);
+      owed.current = running ? owed.current - taken.length : 0;
 
       setView((before) => {
         const counts = { ...before.counts };
@@ -572,7 +574,12 @@ export function SweepBoard({
         <ThreadWall wall={view.wall} cols={cols} />
       </section>
       <div className="min-w-0 lg:hidden">
-        <SweepLeads leads={view.kept} total={view.counts.leads + view.counts.review} projectId={projectId} />
+        <SweepLeads
+          leads={view.kept}
+          total={view.counts.leads + view.counts.review}
+          projectId={projectId}
+          done={!running}
+        />
       </div>
     </div>
   );

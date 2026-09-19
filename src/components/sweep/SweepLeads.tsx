@@ -192,11 +192,14 @@ export function SweepLeads({
   leads,
   total,
   projectId,
+  done = false,
 }: {
   leads: SweepThread[];
   total: number;
   /** Absent in the recorded replay, which has no project to read the rest from. */
   projectId?: string;
+  /** Whether the sweep has ended, after which the rest are in the feed already. */
+  done?: boolean;
 }) {
   const [open, setOpen] = useState<SweepThread | null>(null);
   // Stable, or the shelf's effect runs again on every tick of the board.
@@ -204,7 +207,7 @@ export function SweepLeads({
   return (
     <section className="flex min-w-0 flex-col overflow-hidden rounded-card border bg-surface">
       <div className="flex items-center gap-2 border-b px-3 py-2">
-        <span className="text-mono tracking-wide text-fg-muted uppercase">Best leads so far</span>
+        <span className="text-mono tracking-wide text-fg-muted uppercase">{done ? "Best leads" : "Best leads so far"}</span>
         <span className="text-mono tabular-nums text-fg-muted">{Math.round(total)}</span>
       </div>
       {leads.length === 0 ? (
@@ -238,7 +241,8 @@ export function SweepLeads({
       )}
       {total > leads.length && leads.length > 0 ? (
         <p className="text-small border-t px-3 py-2.5 text-fg-muted">
-          {Math.round(total - leads.length).toLocaleString()} more land in your feed when the sweep is done.
+          {Math.round(total - leads.length).toLocaleString()}{" "}
+          {done ? "more are in your feed below." : "more land in your feed when the sweep is done."}
         </p>
       ) : null}
       {open ? <Shelf key={open.id} thread={open} projectId={projectId} onClose={close} /> : null}

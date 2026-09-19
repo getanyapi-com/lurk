@@ -134,7 +134,13 @@ export function LiveSweep({ projectId, first }: { projectId: string; first: Swee
     }
     wasEnded.current = true;
     router.refresh();
-    const timer = setTimeout(() => setFolded(true), FOLD_AFTER_MS);
+    const timer = setTimeout(() => {
+      setFolded(true);
+      // On a phone the board is several screens tall and the leads were under
+      // it, so folding it left the reader mid-page with nothing saying it was
+      // over. Take them to the top, where the summary sits over the feed.
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, FOLD_AFTER_MS);
     return () => clearTimeout(timer);
   }, [ended, router]);
 
