@@ -216,6 +216,67 @@ export type ProfileOptions = {
   rejudge?: boolean;
 };
 
+export type PageReseed = {
+  sellsPlatformData: boolean;
+  droppedPhrasings: string[];
+  competitors: string[];
+};
+
+/** What `platformPhrasings` builds, recognised by its shape: nothing else may end this way. */
+const PLATFORM_PHRASING = / (?:api|scraper)$/;
+
+/**
+ * Brings a project made before 2026-09-19 up to what a new one gets, and
+ * touches nothing else. The page is read again for the two things it was never
+ * asked: the platform searches are dropped when the product does not sell its
+ * platforms' data, and the competitors the reading names are written. The facts
+ * a person may since have edited stay as they are, and the profile version does
+ * not move, so no verdict is judged again. The caller queues the discovery that
+ * turns the corrected searches into a plan.
+ */
+export async function reseedFromPage(
+  project: { id: string; userId: string; url: string; problemPhrasings: string[] },
+  options: { dryRun?: boolean } = {},
+): Promise<PageReseed> {
+  const page = await scrapeProduct(project.id, project.userId, project.url);
+  const profile = await generateStructured({
+    purpose: "profile",
+    projectId: project.id,
+    schema: profileSchema,
+    system: PROFILE_SYSTEM,
+    prompt: [
+      `Website: ${page.url}`,
+      `Title: ${page.title}`,
+      `Description: ${page.description}`,
+      "",
+      (page.markdown ?? "").slice(0, 12000),
+    ].join("\n"),
+  });
+  const droppedPhrasings = profile.sellsPlatformData
+    ? []
+    : project.problemPhrasings.filter((item) => PLATFORM_PHRASING.test(item));
+  const { limits } = await tierForUser(project.userId);
+  const competitors = capped(
+    pageCompetitors(profile.name, profile.competitors),
+    limits?.competitors,
+  );
+  if (!options.dryRun) {
+    if (droppedPhrasings.length > 0) {
+      const dropped = new Set(droppedPhrasings);
+      await db()
+        .update(projects)
+        .set({ problemPhrasings: project.problemPhrasings.filter((item) => !dropped.has(item)) })
+        .where(eq(projects.id, project.id));
+    }
+    await writePageCompetitors(project.id, competitors);
+  }
+  return {
+    sellsPlatformData: profile.sellsPlatformData,
+    droppedPhrasings,
+    competitors: competitors.map((item) => item.name),
+  };
+}
+
 /**
  * Reads the product's own page and writes what the page says the product is.
  * That is all it does: where and how the buyers ask is learned by the initial
