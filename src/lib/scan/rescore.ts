@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, lt, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { leadEvaluations, leads, redditComments, redditPosts } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
@@ -61,11 +61,12 @@ export async function projectsWithStaleEvaluations(): Promise<Set<string>> {
 }
 
 /**
- * Every stale verdict this project holds, as the judge reads it. A comment is
+ * Every stale verdict this project holds, as the judge reads it: one an older
+ * scorer made, or one made against an older profile than the project has now. A comment is
  * judged as its author's own words with the post it replies to for context,
  * exactly as the scan judges one; a post is judged as itself.
  */
-async function staleItems(projectId: string): Promise<Stale[]> {
+async function staleItems(projectId: string, profileVersion: number): Promise<Stale[]> {
   const rows = await db()
     .select({
       postId: leadEvaluations.postId,
@@ -81,7 +82,10 @@ async function staleItems(projectId: string): Promise<Stale[]> {
     .where(
       and(
         eq(leadEvaluations.projectId, projectId),
-        ne(leadEvaluations.scorerVersion, SCORER_VERSION),
+        or(
+          ne(leadEvaluations.scorerVersion, SCORER_VERSION),
+          lt(leadEvaluations.profileVersion, profileVersion),
+        ),
       ),
     );
   return rows.map((row) => ({
@@ -179,7 +183,7 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const stale = await staleItems(projectId);
+  const stale = await staleItems(projectId, project.profileVersion);
   if (stale.length === 0) {
     return NOTHING;
   }
@@ -209,7 +213,7 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
   // Verdicts last: once rewritten a row is no longer stale, so a rescore that
   // died before the feed was settled would never come back for it.
   await writeEvaluations(
-    judged.map(({ judgement, stale: row }) => rewrite(projectId, row, judgement)),
+    judged.map(({ judgement, stale: row }) => rewrite(projectId, project.profileVersion, row, judgement)),
   );
   await writeProgress(jobId, "Finished");
   return {
@@ -222,16 +226,21 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
 
 /**
  * The stored verdict replaced by the new one. The text has not changed, so the
- * hash and the profile version the old verdict was made under are kept: a
- * rescore must not make the next scan judge everything a third time.
+ * hash is kept, and the verdict is stored under the profile it was just made
+ * against: a rescore must not make the next scan judge everything a third time.
  */
-function rewrite(projectId: string, row: Stale, judgement: Judgement): EvaluationRecord {
+function rewrite(
+  projectId: string,
+  profileVersion: number,
+  row: Stale,
+  judgement: Judgement,
+): EvaluationRecord {
   return {
     projectId,
     postId: row.postId,
     commentId: row.commentId,
     judgement,
-    profileVersion: row.profileVersion,
+    profileVersion,
     contentHash: row.contentHash,
   };
 }

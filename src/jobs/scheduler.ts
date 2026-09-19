@@ -1,6 +1,7 @@
 import { Cron } from "croner";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { jobs, projects } from "@/db/schema";
 import { config } from "@/lib/config";
 import { projectsWithStaleEvaluations } from "@/lib/scan/rescore";
 import { enqueueOnce, lastRunJob } from "./enqueue";
@@ -78,12 +79,25 @@ async function pump(workers: number, watchedWorkers: number): Promise<void> {
  */
 export async function seedProjectScans(): Promise<void> {
   const rows = await db()
-    .select({ id: projects.id, discoveredAt: projects.discoveredAt })
+    .select({
+      id: projects.id,
+      discoveredAt: projects.discoveredAt,
+      createdAt: projects.createdAt,
+      url: projects.url,
+    })
     .from(projects);
   const stale = await projectsWithStaleEvaluations();
+  const reseeded = new Set(
+    (
+      await db()
+        .selectDistinct({ projectId: jobs.projectId })
+        .from(jobs)
+        .where(eq(jobs.kind, "profile_reseed"))
+    ).map((row) => row.projectId),
+  );
   for (const row of rows) {
     try {
-      await seedProject(row, stale.has(row.id));
+      await seedProject(row, stale.has(row.id), reseeded.has(row.id));
     } catch (error) {
       /** The project was deleted between the read above and its insert. Nothing to seed. */
       if (!isMissingProject(error)) {
@@ -99,7 +113,19 @@ function isMissingProject(error: unknown): boolean {
   return (cause as { code?: string } | null)?.code === "23503";
 }
 
-async function seedProject(row: { id: string; discoveredAt: Date | null }, stale: boolean): Promise<void> {
+/**
+ * Profiles made before this were read from the homepage alone, by a prompt that
+ * asked for a product's limits only where the page spelled them out. Each gets
+ * one new reading, spread over a few hours so the scrapes and the rescores
+ * behind them never crowd a signup's first sweep.
+ */
+const PROFILES_READ_WHOLE_SINCE = new Date("2026-09-20T00:00:00Z");
+const RESEED_GAP_MS = 2 * 60 * 1000;
+let reseedsQueued = 0;
+
+type SeedRow = { id: string; discoveredAt: Date | null; createdAt: Date; url: string | null };
+
+async function seedProject(row: SeedRow, stale: boolean, reseeded: boolean): Promise<void> {
   if (!row.discoveredAt) {
     /**
      * A project whose first discovery never finished has no plan at all, so
@@ -121,6 +147,10 @@ async function seedProject(row: { id: string; discoveredAt: Date | null }, stale
   }
   if (stale) {
     await enqueueOnce("rescore", new Date(), row.id);
+  }
+  if (row.url && row.createdAt < PROFILES_READ_WHOLE_SINCE && !reseeded) {
+    await enqueueOnce("profile_reseed", new Date(Date.now() + reseedsQueued * RESEED_GAP_MS), row.id);
+    reseedsQueued += 1;
   }
 }
 

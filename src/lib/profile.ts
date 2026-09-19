@@ -55,7 +55,9 @@ const readingSchema = profileSchema.extend({
 function flat(text: string): string {
   return text
     .toLowerCase()
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    // The address may not hold a space: a page cut mid-link leaves "[text](https://a.com"
+    // open, and an address that ran on to the next ")" took a whole page of text with it.
+    .replace(/\[([^\]]*)\]\([^)\s]*\)/g, "$1")
     .replace(/[*_#`>|~\\]/g, "")
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
@@ -148,6 +150,12 @@ async function scrapeProduct(projectId: string, userId: string, url: string) {
 
 /** The pages that say what a homepage leaves out, in the order they are worth reading. */
 const SITE_PAGES = [/pric|plans/i, /feature|product|solution|how-it-works|services/i, /faq|help/i, /about/i];
+/**
+ * Where a site keeps writing about things rather than the thing it sells. A
+ * post titled "2024 popular javascript products" is not the product page its
+ * address looks like (ihatereading.in, 2026-09-19).
+ */
+const NOT_A_SITE_PAGE = /^(blogs?|posts?|news|articles?|stories|docs?|guides?|changelog|legal|privacy|terms|tag|category)$/i;
 const MAX_SITE_PAGES = 3;
 const HOME_CHARS = 12000;
 const PAGE_CHARS = 8000;
@@ -172,9 +180,11 @@ export function sitePageLinks(pageUrl: string, markdown: string): string[] {
     if (link.host !== home.host || path === home.pathname.replace(/\/$/, "") || !/^https?:$/.test(link.protocol)) {
       continue;
     }
+    const segments = path.split("/").filter(Boolean);
     const rank = SITE_PAGES.findIndex((pattern) => pattern.test(path));
     const key = `${link.origin}${path}`;
-    if (rank !== -1 && path.split("/").length <= 3 && !found.has(key)) {
+    const written = segments.some((segment) => NOT_A_SITE_PAGE.test(segment));
+    if (rank !== -1 && segments.length <= 2 && !written && !found.has(key)) {
       found.set(key, rank);
     }
   }
@@ -316,6 +326,8 @@ export type PageReseed = {
   sellsPlatformData: boolean;
   droppedPhrasings: string[];
   competitors: string[];
+  /** True when nobody had touched the profile, so the new reading replaced all of it. */
+  refreshed: boolean;
   /** The exclusions and not-buyers written, which is none when the project already had its own. */
   exclusions: string[];
   notBuyers: string[];
@@ -325,16 +337,16 @@ export type PageReseed = {
 const PLATFORM_PHRASING = / (?:api|scraper)$/;
 
 /**
- * Brings an older project up to what a new one gets, and touches nothing else.
- * The page is read again for what it was never asked: the platform searches are
- * dropped when the product does not sell its platforms' data, the competitors
- * the reading names are written, and a project with no exclusions or no
- * not-buyers gets the ones the page implies (before 2026-09-19 they were asked
- * for only where the page stated them, and 54 of 79 projects had none). A list
- * that holds anything is a person's or an earlier reading's and stays as it is.
- * Filling either one bumps the profile version, because a verdict made without
- * them is a verdict about a different product. The caller queues the discovery
- * that turns the corrected searches into a plan.
+ * Brings an older project up to what a new one gets. The site is read again:
+ * the platform searches are dropped when the product does not sell its
+ * platforms' data, and the competitors the reading names are written. A profile
+ * nobody has touched (still on its first version) is replaced whole by the new
+ * reading, because the old one was made from the homepage alone and asked for
+ * limits only where the page stated them (54 of 79 projects had none). A profile
+ * somebody edited or rebuilt keeps every fact it has, and only an empty list of
+ * exclusions or not-buyers is filled. Either way the profile version is bumped
+ * when a fact changed, because a verdict made without it is a verdict about a
+ * different product. Where and how buyers ask is left to the weekly refresh.
  */
 export async function reseedFromPage(
   project: {
@@ -344,6 +356,7 @@ export async function reseedFromPage(
     problemPhrasings: string[];
     exclusions: string[];
     notBuyers: string[];
+    profileVersion: number;
   },
   options: { dryRun?: boolean } = {},
 ): Promise<PageReseed> {
@@ -352,8 +365,9 @@ export async function reseedFromPage(
   const droppedPhrasings = profile.sellsPlatformData
     ? []
     : project.problemPhrasings.filter((item) => PLATFORM_PHRASING.test(item));
-  const exclusions = project.exclusions.length === 0 ? profile.exclusions : [];
-  const notBuyers = project.notBuyers.length === 0 ? profile.notBuyers : [];
+  const refreshed = project.profileVersion === 1 && profile.pain.trim() !== "";
+  const exclusions = refreshed || project.exclusions.length === 0 ? profile.exclusions : [];
+  const notBuyers = refreshed || project.notBuyers.length === 0 ? profile.notBuyers : [];
   const { limits } = await tierForUser(project.userId);
   const competitors = capped(
     pageCompetitors(profile.name, profile.competitors),
@@ -367,7 +381,22 @@ export async function reseedFromPage(
         .set({ problemPhrasings: project.problemPhrasings.filter((item) => !dropped.has(item)) })
         .where(eq(projects.id, project.id));
     }
-    if (exclusions.length > 0 || notBuyers.length > 0) {
+    if (refreshed) {
+      await db()
+        .update(projects)
+        .set({
+          pain: profile.pain,
+          solution: profile.solution,
+          targetUsers: profile.targetUsers,
+          geography: profile.serviceGeography || null,
+          budgetFit: profile.budgetFit,
+          capabilities: profile.capabilities,
+          exclusions,
+          notBuyers,
+          profileVersion: sql`${projects.profileVersion} + 1`,
+        })
+        .where(eq(projects.id, project.id));
+    } else if (exclusions.length > 0 || notBuyers.length > 0) {
       await db()
         .update(projects)
         .set({
@@ -383,6 +412,7 @@ export async function reseedFromPage(
     sellsPlatformData: profile.sellsPlatformData,
     droppedPhrasings,
     competitors: competitors.map((item) => item.name),
+    refreshed,
     exclusions,
     notBuyers,
   };

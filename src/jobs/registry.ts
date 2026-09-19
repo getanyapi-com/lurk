@@ -4,6 +4,8 @@ import { jobs, projects } from "@/db/schema";
 import { CADENCE_MS } from "@/lib/alerts/select";
 import { runDiscoveryRefresh } from "@/lib/discovery/refresh";
 import { runInitialDiscovery } from "@/lib/discovery/initial";
+import { parseTextList } from "@/lib/discovery/store";
+import { reseedFromPage } from "@/lib/profile";
 import { deleteExpiredPosts } from "@/lib/retention";
 import { discoveryBudget } from "@/lib/discovery/run";
 import { runBackfill } from "@/lib/scan/backfill";
@@ -82,6 +84,38 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
       throw new Error("A rescore needs a project");
     }
     await runRescore(job.projectId, job.id);
+  },
+  /**
+   * One new reading of the site for a project whose profile an older prompt
+   * made, queued at boot and never again. When a fact changed, every verdict
+   * the project holds was made about a different product, so they are judged
+   * again; the text is already here, so that buys no Reddit data.
+   */
+  profile_reseed: async (job) => {
+    if (!job.projectId) {
+      throw new Error("A profile reseed needs a project");
+    }
+    const [project] = await db().select().from(projects).where(eq(projects.id, job.projectId));
+    if (!project?.url) {
+      return;
+    }
+    const result = await reseedFromPage({
+      id: project.id,
+      userId: project.userId,
+      url: project.url,
+      problemPhrasings: parseTextList(project.problemPhrasings),
+      exclusions: parseTextList(project.exclusions),
+      notBuyers: parseTextList(project.notBuyers),
+      profileVersion: project.profileVersion,
+    });
+    if (result.refreshed || result.exclusions.length > 0 || result.notBuyers.length > 0) {
+      await enqueueOnce("rescore", new Date(), project.id);
+    }
+    // Searches for a platform's API that the product never sold are in the plan
+    // itself, and only a new plan takes them out.
+    if (result.droppedPhrasings.length > 0) {
+      await enqueueOnce("discovery_initial", new Date(), project.id);
+    }
   },
   discovery_refresh: async (job) => {
     if (!job.projectId) {

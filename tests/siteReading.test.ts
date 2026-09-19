@@ -14,6 +14,13 @@ describe("the limits a profile keeps", () => {
     ).toEqual(["iPhone only"]);
   });
 
+  it("still finds a source after a link the page cut left open", () => {
+    const cut = "[Read the case study](https://acme.com\n\n--- Page: https://acme.com/pricing ---\n\nPlans start at $30/month (billed yearly).";
+    expect(groundedLimits([{ text: "from $30 a month", sourceText: "Plans start at $30/month" }], cut)).toEqual([
+      "from $30 a month",
+    ]);
+  });
+
   it("drops a limit the site never says, and one with no source at all", () => {
     expect(
       groundedLimits(
@@ -39,6 +46,11 @@ describe("the pages read beside the homepage", () => {
       "https://acme.com/features",
       "https://acme.com/faq",
     ]);
+  });
+
+  it("leaves out a blog post whose address only sounds like a product page", () => {
+    const blog = "[Post](/blogs/2024-popular-javascript-products) [Guide](/docs/features) [Plans](/plans)";
+    expect(sitePageLinks("https://acme.com", blog)).toEqual(["https://acme.com/plans"]);
   });
 
   it("finds nothing on a page with no address to resolve links against", () => {

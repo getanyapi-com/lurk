@@ -62,8 +62,9 @@ describe("profile not-buyers and exclusions", () => {
     expect(bullet("exclusions")).toMatch(/copied character for character/);
   });
 
-  it("asks what a buyer must already have, and never takes silence for a limit", () => {
-    expect(bullet("exclusions")).toMatch(/what a buyer must already have or be/i);
+  it("asks for each kind of limit by name, and never takes silence for a limit", () => {
+    expect(bullet("exclusions")).toMatch(/Look for each of these five/);
+    expect(bullet("exclusions")).toMatch(/Not a limit: what a cheaper plan leaves out/);
     expect(bullet("exclusions")).toMatch(/a thing no page mentions is not a limit/);
     expect(bullet("notBuyers")).toMatch(/Never someone a page of the site sells to or invites/);
   });

@@ -2,9 +2,11 @@
  * One-off for projects made before 2026-09-19 (PR #73): reads each product page
  * again, drops the "<platform> api" and "<platform> scraper" searches from a
  * product that does not sell platform data, writes the competitors the reading
- * names, fills the exclusions and not-buyers of a project that has none, and
- * queues the discovery that rebuilds the plan from them. No facts a person
- * edited are touched; a project whose lists were filled is judged again.
+ * names, replaces a profile nobody has touched with the new reading, fills the
+ * exclusions and not-buyers of an edited one that has none, and queues the
+ * discovery that rebuilds the plan. No facts a person edited are touched. The
+ * deployed app does the same from its own `profile_reseed` job at boot; this
+ * is for a database you can reach, and for --dry-run.
  *
  * The discovery jobs are spaced out, because they run on the same workers as a
  * new signup's first sweep. Run it only once the deployed app has PR #73: an
@@ -55,6 +57,7 @@ for (const row of chosen) {
         problemPhrasings: parseTextList(row.problemPhrasings),
         exclusions: parseTextList(row.exclusions),
         notBuyers: parseTextList(row.notBuyers),
+        profileVersion: row.profileVersion,
       },
       { dryRun },
     );
@@ -66,7 +69,7 @@ for (const row of chosen) {
       `${row.name}: sells platform data ${result.sellsPlatformData}, ` +
         `dropped ${result.droppedPhrasings.length} searches, ` +
         `competitors ${result.competitors.join(", ") || "none"}, ` +
-        `filled ${result.exclusions.length} exclusions and ${result.notBuyers.length} not-buyers`,
+        `${result.refreshed ? "profile replaced, " : ""}wrote ${result.exclusions.length} exclusions and ${result.notBuyers.length} not-buyers`,
     );
   } catch (error) {
     // One page that will not load is not a reason to leave the rest as they are.
