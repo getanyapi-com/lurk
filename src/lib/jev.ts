@@ -24,11 +24,12 @@ export const JEV_PRICE_USD_PER_MILLION_INPUT = 0.042;
 export const GATEWAY_FREE_UNTIL = new Date("2026-09-26T07:00:00Z");
 
 /**
- * How long the Gateway gets before the call moves to OpenRouter. A Jev answer
- * takes seconds, so a Gateway that is quiet for a minute is down, and the
- * OpenRouter attempt still fits inside the job's heartbeat.
+ * How long the Gateway gets before the call moves to OpenRouter. Jev answered
+ * 400 calls fired 100 at a time in under 1.2s each (2026-09-19), and in one
+ * burst a few calls hung until this cut them off, so a call quiet for 15s is
+ * stuck, and the OpenRouter attempt still fits inside the job's heartbeat.
  */
-const GATEWAY_TIMEOUT_MS = 60_000;
+const GATEWAY_TIMEOUT_MS = 15_000;
 
 /**
  * How long the Gateway is left alone after it rate-limits us. Its free tier
