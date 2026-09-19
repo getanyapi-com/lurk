@@ -131,7 +131,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
 
   it("takes back a lead whose verdict dropped to review", async () => {
     const { project } = await fixture({ lead: { status: "new" } });
-    answers({ hardRequirement: "unknown" });
+    answers({ hardRequirement: "unknown", intent: 2 });
 
     const outcome = await runRescore(project.id, randomUUID());
 
@@ -166,7 +166,7 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
   it("never touches a lead the person already acted on", async () => {
     for (const status of ["hidden", "not_fit", "resolved"]) {
       const { project } = await fixture({ lead: { status } });
-      answers({ hardRequirement: "unknown" });
+      answers({ hardRequirement: "unknown", intent: 2 });
 
       const outcome = await runRescore(project.id, randomUUID());
 

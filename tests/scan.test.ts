@@ -8,7 +8,7 @@ import {
   retrievalBudgets,
 } from "@/lib/scan/constants";
 import { BODY_CHAR_BUDGET, truncateBody } from "@/lib/scan/evidence";
-import { judge, routeLead } from "@/lib/scan/gates";
+import { decide, judge, routeLead } from "@/lib/scan/gates";
 import type { Assessment, ScorableItem, TriageItem } from "@/lib/scan/judgement";
 import { itemState, spans } from "@/lib/scan/spans";
 import { retentionCutoff } from "@/lib/retention";
@@ -159,6 +159,14 @@ describe("the qualification gates", () => {
       );
       expect(judged.decision).toBe("reject");
     }
+  });
+
+  it("qualifies an unsettled requirement only for someone asking outright", () => {
+    expect(decide(assessment({ fit: 2, intent: 3 })).decision).toBe("qualify");
+    expect(decide(assessment({ fit: 2, intent: 2 }))).toEqual({
+      decision: "review",
+      reasonCode: "insufficient_evidence",
+    });
   });
 
   it("still holds a plausible buyer with one material unknown for review", () => {

@@ -188,7 +188,7 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
   const wrongJob: JevSpec = { solvesProblem: 0.1, audience: 0.1 };
 
   /** A judgement the gates hold for review: a requirement the facts cannot settle. */
-  const oneUnknown: JevSpec = { hardRequirement: "unknown" };
+  const oneUnknown: JevSpec = { hardRequirement: "unknown", intent: 2 };
 
   async function evaluations(projectId: string) {
     return db()

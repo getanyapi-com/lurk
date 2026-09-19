@@ -37,7 +37,13 @@ export function gateFailure(item: Assessment): ReasonCode | null {
   if (item.relationship !== "buyer" || item.needState === "unknown") {
     return "insufficient_evidence";
   }
-  if (item.fit === null || item.fit === 2) {
+  // A requirement the product facts cannot settle (fit 2) holds a lead, except
+  // for someone asking outright for a thing to use. The facts are a few pages of
+  // a website and are silent on most of what people ask for: "under $100",
+  // "works on a Mac". Holding those cost 8 of the 156 strongest labelled leads
+  // on 2026-09-19 and kept out almost nothing wrong.
+  const askingOutright = item.intent !== null && item.intent >= 3;
+  if (item.fit === null || (item.fit === 2 && !askingOutright)) {
     return "insufficient_evidence";
   }
   if (item.intent === null) {
