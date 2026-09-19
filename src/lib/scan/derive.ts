@@ -18,6 +18,15 @@ import type { Spans } from "./spans";
  */
 const YES = 0.5;
 
+/**
+ * How sure a no on `audience` has to be before it outweighs a product that does
+ * the job. Until 2026-09-19 the answer was read only when the product did not
+ * do the job, so a hotel guest asking about a booking was a buyer of hotel
+ * software. On 1,463 labelled posts a plain no (under 0.5) cost 48 of 210 real
+ * leads; a confident one costs 14 and takes the wrong ones shown from 20% to 14%.
+ */
+const NOT_THE_AUDIENCE = 0.25;
+
 function oneOf<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
   return (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
 }
@@ -41,7 +50,8 @@ export function readingFrom(answers: Answers, prefix: string, sentences: Spans):
 /**
  * lurk's 0-4 fit from three answers. A requirement the product explicitly
  * cannot meet is a wrong job whatever else is true. A job the product does not
- * do is audience overlap at best. Otherwise the requirement decides: met is 4,
+ * do is audience overlap at best, and so is one it does for somebody who is
+ * confidently not its buyer. Otherwise the requirement decides: met is 4,
  * none stated is 3, and one the facts cannot settle is 2, which the gates hold
  * for review rather than qualify.
  */
@@ -52,6 +62,9 @@ export function fitFrom(answers: Answers, prefix: string): number {
   }
   if (noul(answers, `${prefix}__solves_problem`) < YES) {
     return noul(answers, `${prefix}__audience`) >= YES ? 1 : 0;
+  }
+  if (noul(answers, `${prefix}__audience`) < NOT_THE_AUDIENCE) {
+    return 1;
   }
   return { met: 4, none_stated: 3, unknown: 2 }[requirement];
 }

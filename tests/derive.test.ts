@@ -21,6 +21,11 @@ describe("the fit a judgement is derived from", () => {
     expect(fit({ solvesProblem: 0.1, audience: 0.1 })).toBe(0);
   });
 
+  it("counts a job done for someone confidently not the buyer as audience overlap", () => {
+    expect(fit({ solvesProblem: 0.9, audience: 0.1 })).toBe(1);
+    expect(fit({ solvesProblem: 0.9, audience: 0.4, hardRequirement: "none_stated" })).toBe(3);
+  });
+
   it("lets the requirement decide once the product does the job", () => {
     expect(fit({ hardRequirement: "unknown" })).toBe(2);
     expect(fit({ hardRequirement: "none_stated" })).toBe(3);
