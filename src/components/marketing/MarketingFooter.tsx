@@ -62,7 +62,10 @@ export function MarketingFooter() {
       </nav>
       <div className="footer-bottom">
         <Wordmark homeHref="/" />
-        <span>MIT licensed. Built on public conversations.</span>
+        <span>
+          MIT licensed. Built on public conversations. <Link href="/privacy">Privacy</Link> ·{" "}
+          <Link href="/terms">Terms</Link>
+        </span>
       </div>
     </footer>
   );
