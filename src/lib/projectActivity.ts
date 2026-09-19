@@ -121,7 +121,15 @@ const STOPPED: Record<ActivityKind, string> = {
   scan: "Last scan stopped",
 };
 
+/**
+ * The first sentence of a stored failure, which is written for whoever debugs
+ * it. A failed statement leads with its SQL, which means nothing to the person
+ * reading the board, so that one is said in words instead.
+ */
 function firstSentence(error: string): string {
+  if (error.startsWith("Failed query:")) {
+    return "the database could not finish it. It is safe to try again.";
+  }
   const line = error.split("\n")[0].trim();
   return line.endsWith(".") ? line : `${line}.`;
 }

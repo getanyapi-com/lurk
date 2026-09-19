@@ -17,5 +17,8 @@ if (window.location.hostname === "lurk.so") {
     ui_host: "https://us.posthog.com",
     defaults: "2026-01-30",
     disable_surveys: true,
+    // Uncaught errors land in PostHog's error tracking. The ones an error
+    // boundary catches are sent from src/app/app/error.tsx.
+    capture_exceptions: true,
   });
 }

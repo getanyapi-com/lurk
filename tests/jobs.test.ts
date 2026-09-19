@@ -6,7 +6,7 @@ import { runBackfill } from "@/lib/scan/backfill";
 import { runScan } from "@/lib/scan/run";
 import { captureRequestId, withRequestId } from "@/lib/anyapi";
 import { HEARTBEAT_MS, LEASE_MS } from "@/jobs/lease";
-import { reasonFor } from "@/jobs/runner";
+import { isTransient, reasonFor, TRANSIENT_RETRY_MS } from "@/jobs/runner";
 import { LlmTimeoutError, LLM_CALL_TIMEOUT_MS, withCallTimeout } from "@/lib/llm";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { PRESETS } from "@/lib/settings/presets";
@@ -101,6 +101,26 @@ describe("what a failed job records", () => {
   });
 });
 
+describe("which failures are worth running again", () => {
+  it("counts a full database, however deep in the chain, as passing", () => {
+    const full = Object.assign(
+      new Error("remaining connection slots are reserved for roles with the SUPERUSER attribute"),
+      { code: "53300" },
+    );
+    expect(isTransient(new Error("Failed query: select", { cause: full }))).toBe(true);
+    expect(isTransient(Object.assign(new Error("closed"), { code: "CONNECTION_CLOSED" }))).toBe(
+      true,
+    );
+  });
+
+  it("does not count a statement Postgres rejected on its merits", () => {
+    const conflict = Object.assign(new Error("duplicate key"), { code: "23505" });
+    expect(isTransient(new Error("Failed query: insert", { cause: conflict }))).toBe(false);
+    expect(isTransient(new Error("Reddit returned 502"))).toBe(false);
+    expect(isTransient("not an error")).toBe(false);
+  });
+});
+
 describe("the model call deadline", () => {
   it("cuts a call off well inside the lease it must not outlive", () => {
     expect(LLM_CALL_TIMEOUT_MS).toBe(HEARTBEAT_MS);
@@ -192,6 +212,44 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
       .where(and(eq(jobs.kind, "scan"), eq(jobs.projectId, project.id), isNull(jobs.startedAt)));
     expect(pending).toHaveLength(1);
     expect(pending[0].runAt.getTime()).toBeCloseTo(nextFreeScan().getTime(), -4);
+
+    await db().delete(users).where(eq(users.id, user.id));
+  });
+
+  it("hands a setup that lost its database connection back to run again, unfinished", async () => {
+    const { db, jobs, users, user, project } = await fixture();
+    const { JOB_HANDLERS } = await import("@/jobs/registry");
+    const { runClaimedJob } = await import("@/jobs/runner");
+    const { eq } = await import("drizzle-orm");
+
+    const [claimed] = await db()
+      .insert(jobs)
+      .values({
+        kind: "discovery_initial",
+        projectId: project.id,
+        runAt: LONG_AGO,
+        startedAt: new Date(),
+      })
+      .returning();
+    const original = JOB_HANDLERS.discovery_initial;
+    JOB_HANDLERS.discovery_initial = async () => {
+      const full = Object.assign(new Error("remaining connection slots are reserved"), {
+        code: "53300",
+      });
+      throw new Error("Failed query: select 1", { cause: full });
+    };
+    const before = Date.now();
+    try {
+      await runClaimedJob(claimed);
+    } finally {
+      JOB_HANDLERS.discovery_initial = original;
+    }
+
+    const [row] = await db().select().from(jobs).where(eq(jobs.id, claimed.id));
+    expect(row.finishedAt).toBeNull();
+    expect(row.startedAt).toBeNull();
+    expect(row.error).toContain("code 53300");
+    expect(row.runAt.getTime()).toBeGreaterThanOrEqual(before + TRANSIENT_RETRY_MS);
 
     await db().delete(users).where(eq(users.id, user.id));
   });

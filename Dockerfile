@@ -10,7 +10,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# A Server Action's id is a hash salted with the actions encryption key, and
+# Next draws a fresh key for every build that is not given one. A tab left open
+# across a deploy then calls ids the new server never heard of, and the click
+# fails. One key kept across builds keeps every unchanged action's id; the
+# deployment id lets a stale tab notice it is stale and load the page again.
+ARG NEXT_DEPLOYMENT_ID
+ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
+RUN --mount=type=secret,id=actions_key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY \
+    npm run build
 # The runner has no node_modules of its own, so the migrator ships as one
 # self-contained file rather than as a script plus a TypeScript runtime.
 RUN ./node_modules/.bin/esbuild src/db/migrate.ts \

@@ -109,4 +109,23 @@ describe("what a project is doing", () => {
       "Setting your project up stopped: Google returned 502.",
     );
   });
+
+  it("never shows a person the SQL a failed statement leads with", () => {
+    const activity = activityFrom(
+      [
+        job({
+          kind: "discovery_initial",
+          runAt: new Date(NOW.getTime() - 7200_000),
+          startedAt: new Date(NOW.getTime() - 7200_000),
+          finishedAt: new Date(NOW.getTime() - 7000_000),
+          error: 'Failed query: select "id" from "search_runs" where "kind" = $1; code 23505',
+        }),
+      ],
+      NOW,
+    );
+
+    expect(activitySentence(activity)).toBe(
+      "Setting your project up stopped: the database could not finish it. It is safe to try again.",
+    );
+  });
 });

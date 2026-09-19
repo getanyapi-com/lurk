@@ -300,6 +300,11 @@ repository settings:
 | `AZURE_CLIENT_ID` | printed by `scripts/azure-github-oidc.sh` |
 | `AZURE_TENANT_ID` | printed by `scripts/azure-github-oidc.sh` |
 | `AZURE_SUBSCRIPTION_ID` | printed by `scripts/azure-github-oidc.sh` |
+| `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | `openssl rand -base64 32`, once; never rotate it casually |
+
+The encryption key salts every Server Action id. Built without it, each deploy gets a new
+random key, every id changes, and any tab open across the deploy fails on its next click.
+The deploy refuses to build without it.
 
 A deploy builds the image, pushes it, rolls the container app to a revision named after the
 commit, and then polls `APP_HEALTH_URL` until it answers 200. Migrations are not a separate

@@ -112,6 +112,47 @@ export function reasonFor(error: unknown): string {
 }
 
 /**
+ * Codes that say the database could not be reached or had no room, not that
+ * the work was wrong: Postgres's connection classes and the driver's own. The
+ * same job run a minute later would likely succeed.
+ */
+const TRANSIENT_CODES = new Set([
+  "53300", // too many connections
+  "57P01", // admin shutdown, as a failover or restart does
+  "57P02",
+  "57P03", // cannot connect now
+  "08000",
+  "08001",
+  "08003",
+  "08004",
+  "08006",
+  "CONNECTION_CLOSED",
+  "CONNECTION_ENDED",
+  "CONNECTION_DESTROYED",
+  "CONNECT_TIMEOUT",
+  "ECONNREFUSED",
+  "ECONNRESET",
+]);
+
+/** Whether anything in the error's chain is a connection failure rather than a real one. */
+export function isTransient(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (typeof current === "object" && current !== null && !seen.has(current)) {
+    seen.add(current);
+    const { code } = current as Cause;
+    if (typeof code === "string" && TRANSIENT_CODES.has(code)) {
+      return true;
+    }
+    current = (current as Cause).cause;
+  }
+  return false;
+}
+
+/** How long a job that hit a connection failure waits before it is claimable again. */
+export const TRANSIENT_RETRY_MS = 60_000;
+
+/**
  * The lease this worker holds, which is the started_at stamp it last wrote.
  * Every write conditions on that stamp, so a worker whose lease was taken back
  * writes nothing: the reclaiming worker's own stamp no longer matches.
@@ -168,6 +209,19 @@ async function finish(job: Job, lease: Lease, error: string | null): Promise<boo
 }
 
 /**
+ * Hands a job back to the queue unfinished, to run again shortly. The reason
+ * stays on the row for whoever reads it, and the claim clears it. If this
+ * write fails too, the lease simply runs out and the job is claimed again.
+ */
+async function release(job: Job, lease: Lease, error: string): Promise<void> {
+  await db()
+    .update(jobs)
+    .set({ startedAt: null, runAt: new Date(Date.now() + TRANSIENT_RETRY_MS), error })
+    .where(heldBy(job, lease))
+    .catch(() => undefined);
+}
+
+/**
  * Puts a recurring kind back on the queue after it failed, so one transient
  * error cannot end a project's schedule. It only queues when nothing of that
  * kind is already waiting, so a scan the user asked for keeps its own time.
@@ -195,6 +249,12 @@ export async function runClaimedJob(job: Job): Promise<void> {
     await handler(job);
     await finish(job, lease, null);
   } catch (error) {
+    // A setup that died because the database was full would otherwise stop for
+    // good and show the person a query; it runs again once there is room.
+    if (isTransient(error)) {
+      await release(job, lease, reasonFor(error));
+      return;
+    }
     if (await finish(job, lease, reasonFor(error))) {
       await requeueRecurring(job);
     }

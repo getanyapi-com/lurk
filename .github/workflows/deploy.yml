@@ -46,11 +46,19 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Build and push the image
+        env:
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" ]; then
+            echo "::error::NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is not set; every open tab would break on this deploy"
+            exit 1
+          fi
           az acr login --name "$REGISTRY"
           TAG="$REGISTRY.azurecr.io/$IMAGE:$SHA"
-          docker build -t "$TAG" .
+          docker build -t "$TAG" \
+            --secret id=actions_key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY \
+            --build-arg NEXT_DEPLOYMENT_ID="$SHA" .
           docker push "$TAG"
 
       # The image applies its own migrations from docker-entrypoint.sh before it

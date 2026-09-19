@@ -151,18 +151,23 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
             <PaidButton label="Scan now" allowance={scanNow} align="start" />
           </form>
         )}
-        <form action={rebuildProfileAction}>
-          <input type="hidden" name="projectId" value={project.id} />
-          <PaidButton
-            label="Rebuild profile"
-            allowance={rebuild}
-            variant="secondary"
-            align="start"
-          />
-        </form>
-        <span className="text-small text-fg-muted">
-          Rebuilding reads your site again and replaces everything above.
-        </span>
+        {/* Rebuilding reads the product page again, so a project with no page has nothing to rebuild from. */}
+        {project.url ? (
+          <>
+            <form action={rebuildProfileAction}>
+              <input type="hidden" name="projectId" value={project.id} />
+              <PaidButton
+                label="Rebuild profile"
+                allowance={rebuild}
+                variant="secondary"
+                align="start"
+              />
+            </form>
+            <span className="text-small text-fg-muted">
+              Rebuilding reads your site again and replaces everything above.
+            </span>
+          </>
+        ) : null}
       </div>
     </div>
   );
