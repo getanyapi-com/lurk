@@ -4,7 +4,8 @@
  * PROTOTYPE: the recorded first sweep in recorded-run.json, replayed from page
  * load through the same board the leads page draws over a live one. It is what
  * the launch video is filmed from. ?speed=2 runs it twice as fast, ?theme=dark
- * or light forces the theme, ?cols= and ?rows= size the wall.
+ * or light forces the theme, ?cols= and ?rows= size the wall, and ?project= lets
+ * a phone's shelf read threads in full from a project that holds them.
  */
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -68,6 +69,7 @@ function Replay() {
   const theme = params.get("theme");
   const cols = Number(params.get("cols")) || undefined;
   const rows = Number(params.get("rows")) || undefined;
+  const projectId = params.get("project") ?? undefined;
   const [snapshot, setSnapshot] = useState<SweepSnapshot>(() => snapshotAt(0));
   useEffect(() => {
     if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
@@ -83,7 +85,7 @@ function Replay() {
   }, [speed]);
   return (
     <main className="min-h-screen bg-bg p-6 text-fg">
-      <SweepBoard snapshot={snapshot} cols={cols} rows={rows} />
+      <SweepBoard snapshot={snapshot} projectId={projectId} cols={cols} rows={rows} />
     </main>
   );
 }

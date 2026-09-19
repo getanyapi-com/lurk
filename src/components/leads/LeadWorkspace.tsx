@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { OpeningPane } from "@/components/leads/OpeningPane";
+import { ScrollLock } from "@/components/ScrollLock";
 import { useOpening } from "@/components/leads/opening";
 
 /**
@@ -13,6 +14,9 @@ import { useOpening } from "@/components/leads/opening";
 const PANE = "lg:h-full lg:min-h-0";
 
 const COLUMN = "flex min-w-0 flex-col rounded-card border bg-surface";
+
+/** Tailwind's lg, below which the thread covers the list. */
+const LG = 1024;
 
 /**
  * The list and the thread, side by side. It is a client component only so that
@@ -48,6 +52,7 @@ export function LeadWorkspace({
             covering ? "" : "max-lg:hidden"
           }`}
         >
+          {covering ? <ScrollLock maxWidth={LG} /> : null}
           <Link
             href={backHref}
             scroll={false}

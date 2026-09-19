@@ -53,8 +53,8 @@ function SweepSetup({ lines }: { lines: SetupLine[] }) {
   }, []);
   const shown = lines.length > 0 ? lines : [{ text: "Starting", at: now }];
   return (
-    <section className="flex flex-col gap-3 rounded-card border bg-surface px-6 py-5" aria-live="polite">
-      <span className="flex items-baseline justify-between gap-3 text-[11px] uppercase tracking-wide text-fg-muted">
+    <section className="flex flex-col gap-3 rounded-card border bg-surface px-4 py-5 sm:px-6" aria-live="polite">
+      <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[11px] uppercase tracking-wide text-fg-muted">
         Setting up your project
         <span className="font-mono normal-case tabular-nums">
           {seconds(now - shown[0].at)} · about {ABOUT_S.reduce((sum, [, s]) => sum + s, 0)} s in all
@@ -178,7 +178,7 @@ export function LiveSweep({ projectId, first }: { projectId: string; first: Swee
   }
   return (
     <div className="flex flex-col gap-2">
-      <SweepBoard snapshot={snapshot} />
+      <SweepBoard snapshot={snapshot} projectId={projectId} />
       {ended ? (
         <button type="button" className="self-end text-small text-fg-muted underline" onClick={() => setFolded(true)}>
           Hide the sweep

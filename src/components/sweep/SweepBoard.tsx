@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { fitWord, intentWord } from "@/lib/scan/words";
+import { jevAnswers, SweepLeads } from "@/components/sweep/SweepLeads";
 import type { SweepCounts, SweepSnapshot, SweepThread } from "@/lib/sweep";
 
 /**
@@ -26,6 +26,11 @@ const WALL_MIN_PER_S = 12;
 const WALL_MAX_PER_S = 160;
 /** Threads Jev's answers are shown for, newest kept. */
 const RING = 40;
+/**
+ * Leads the phone's list holds: the strongest so far. Newest first moved the
+ * list under a finger several times a second; the strongest few settle.
+ */
+const KEPT = 10;
 /** How long Jev's panel stays on one thread. */
 const RING_STEP_MS = 90;
 
@@ -52,6 +57,8 @@ type View = {
   ring: SweepThread[];
   /** The highest-scoring lead the wall has carried, which the panel settles on. */
   best: SweepThread | null;
+  /** The strongest leads and held threads the wall has carried, for the phone's list. */
+  kept: SweepThread[];
   /** Threads finished with, a second ago and now, for the rate. */
   perSec: number;
 };
@@ -65,7 +72,7 @@ function settled(counts: SweepCounts): number {
 /** The board's own state, advanced twenty times a second toward the newest snapshot. */
 function useSweepView(snapshot: SweepSnapshot | null, slots: number): View {
   const [view, setView] = useState<View>(() => ({
-    clockMs: 0, counts: ZERO, wall: Array.from({ length: slots }, () => null), placed: 0, ring: [], best: null, perSec: 0,
+    clockMs: 0, counts: ZERO, wall: Array.from({ length: slots }, () => null), placed: 0, ring: [], best: null, kept: [], perSec: 0,
   }));
   const latest = useRef<{ snapshot: SweepSnapshot | null; at: number }>({ snapshot: null, at: 0 });
   const seen = useRef(new Set<string>());
@@ -130,6 +137,7 @@ function useSweepView(snapshot: SweepSnapshot | null, slots: number): View {
         let wall = before.wall;
         let ring = before.ring;
         let best = before.best;
+        let kept = before.kept;
         if (taken.length > 0) {
           wall = [...before.wall];
           taken.forEach((thread, index) => {
@@ -138,6 +146,14 @@ function useSweepView(snapshot: SweepSnapshot | null, slots: number): View {
             wall[((before.placed + index) * 37) % slots] = thread;
           });
           ring = [...before.ring, ...taken.filter((thread) => thread.verdict)].slice(-RING);
+          const keep = taken.filter((thread) => thread.verdict && thread.verdict.decision !== "reject");
+          if (keep.length > 0) {
+            const ids = new Set(keep.map((thread) => thread.id));
+            // A stable sort, so equal scores stay in the order they arrived.
+            kept = [...before.kept.filter((thread) => !ids.has(thread.id)), ...keep]
+              .sort((a, b) => (b.verdict?.score ?? 0) - (a.verdict?.score ?? 0))
+              .slice(0, KEPT);
+          }
           for (const thread of taken) {
             if (thread.verdict?.decision === "qualify" && thread.verdict.score > (best?.verdict?.score ?? -1)) {
               best = thread;
@@ -158,6 +174,7 @@ function useSweepView(snapshot: SweepSnapshot | null, slots: number): View {
           placed: before.placed + taken.length,
           ring,
           best,
+          kept,
           perSec: running ? Math.round(settled(counts) - history.current[0].n) : 0,
         };
       });
@@ -299,7 +316,6 @@ function Sieve({ counts }: { counts: SweepCounts }) {
 
 /* ---------------- Jev's answers ---------------- */
 
-const VERDICT_WORD = { qualify: "yes, a lead", review: "maybe, held for review", reject: "no" } as const;
 
 /**
  * What Jev answered about one thread. Verdicts land far faster than anyone can
@@ -311,16 +327,7 @@ function JevAtWork({ view, over, answers }: { view: View; over: boolean; answers
   const thread =
     ring.length === 0 ? null : over ? view.best ?? ring[ring.length - 1] : ring[Math.floor(view.clockMs / RING_STEP_MS) % ring.length];
   const verdict = thread?.verdict ?? null;
-  const rows: [string, string][] = verdict
-    ? [
-        ["Who is this person to you?", verdict.relationship.replace(/_/g, " ")],
-        ["Is the need still open?", verdict.needState.replace(/_/g, " ")],
-        ["Which sentence says so?", verdict.quote ? `"${verdict.quote}"` : "none"],
-        ["Does what you sell solve it?", fitWord(verdict.fit) ?? "-"],
-        ["How hard are they asking?", intentWord(verdict.intent) ?? "-"],
-        ["Worth a reply?", `${VERDICT_WORD[verdict.decision]} · ${verdict.score}`],
-      ]
-    : [];
+  const rows = thread ? jevAnswers(thread) : [];
   return (
     <section className="flex flex-col gap-3 rounded-card border bg-surface p-4">
       <div className="flex items-baseline justify-between gap-2">
@@ -507,15 +514,30 @@ function ThreadWall({ wall, cols }: { wall: (SweepThread | null)[]; cols: number
 
 /* ---------------- the board ---------------- */
 
-export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSnapshot | null; cols?: number; rows?: number }) {
+export function SweepBoard({
+  snapshot,
+  projectId,
+  cols = 6,
+  rows = 8,
+}: {
+  snapshot: SweepSnapshot | null;
+  /** The project the sweep is for, which lets a phone's shelf read a thread in full. */
+  projectId?: string;
+  cols?: number;
+  rows?: number;
+}) {
   const view = useSweepView(snapshot, cols * rows);
   const running = snapshot?.state === "running" || snapshot?.state === "waiting" || snapshot === null;
   const over = !running && view.counts.scored === snapshot?.counts.scored;
   const perSheet = postsPerSheet(view.counts.found);
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,11fr)]">
+    // One column below lg is still a declared one: an implicit track is as wide
+    // as its longest unbroken line, and Jev's title and quote change several
+    // times a second, so on a phone the board ran off the screen and resized
+    // with every thread.
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,11fr)]">
       <RedditTheme />
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <div className="flex items-baseline gap-3 px-1">
           <span className="font-mono text-[44px] leading-none tabular-nums text-fg">
             {(view.clockMs / 1000).toFixed(1)}
@@ -546,9 +568,12 @@ export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSn
         <JevAtWork view={view} over={over} answers={snapshot?.answers ?? 0} />
       </div>
 
-      <section className="flex flex-col overflow-hidden rounded-card border bg-surface">
+      <section className="flex flex-col overflow-hidden rounded-card border bg-surface max-lg:hidden">
         <ThreadWall wall={view.wall} cols={cols} />
       </section>
+      <div className="min-w-0 lg:hidden">
+        <SweepLeads leads={view.kept} total={view.counts.leads + view.counts.review} projectId={projectId} />
+      </div>
     </div>
   );
 }

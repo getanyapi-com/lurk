@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { ScrollLock } from "@/components/ScrollLock";
 import { SubredditChip } from "@/components/SubredditChip";
 import { InlineScore } from "@/components/seo/OpportunityScore";
 import { RankPill } from "@/components/seo/RankPill";
@@ -87,10 +88,12 @@ export function SplitView({
           className={cn(
             COLUMN,
             PANE,
-            "overflow-y-auto max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:top-[var(--header-height)] max-lg:z-10 max-lg:rounded-none max-lg:border-0",
+            "overflow-y-auto overscroll-contain max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:top-[var(--header-height)] max-lg:z-10 max-lg:rounded-none max-lg:border-0",
             asked ? "" : "max-lg:hidden",
           )}
         >
+          {/* Tailwind's lg, below which the thread covers the list. */}
+          {asked ? <ScrollLock maxWidth={1024} /> : null}
           <Link
             href={backHref}
             scroll={false}

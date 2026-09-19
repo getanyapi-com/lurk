@@ -82,7 +82,7 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
             <span className="text-mono text-fg-muted">{relativeAge(item.createdAt)}</span>
           </div>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 xl:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
             <Called label={`Held: ${verdict.label}`} sentence={item.reason} />
             <ul className="flex flex-col gap-1">
@@ -141,7 +141,7 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
           />
         </div>
       </header>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 xl:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
           <Called label="Why this is a lead" sentence={lead.reason} />
           {lead.isComment ? (

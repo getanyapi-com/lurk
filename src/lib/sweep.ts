@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import type { ProjectActivity } from "@/lib/projectActivity";
-import { candidateSources, jobs, leadEvaluations, llmUsage, redditPosts } from "@/db/schema";
+import { candidateSources, jobs, leadEvaluations, leads, llmUsage, redditPosts } from "@/db/schema";
 import { newLeadCount } from "@/lib/leads";
 
 /**
@@ -27,6 +27,9 @@ export type SweepThread = {
   id: string;
   title: string;
   subreddit: string;
+  /** Absent from the recorded replay, which was taken before they were read. */
+  author?: string | null;
+  url?: string;
   body: string | null;
   ups: number | null;
   comments: number | null;
@@ -143,6 +146,8 @@ export async function sweepSnapshot(projectId: string): Promise<SweepSnapshot | 
     id: redditPosts.id,
     title: redditPosts.title,
     subreddit: redditPosts.subreddit,
+    author: redditPosts.author,
+    url: redditPosts.url,
     body: sql<string | null>`left(${redditPosts.body}, ${BODY_CHARS})`,
     ups: redditPosts.score,
     comments: redditPosts.numComments,
@@ -231,6 +236,8 @@ export async function sweepSnapshot(projectId: string): Promise<SweepSnapshot | 
       id: row.id,
       title: row.title,
       subreddit: row.subreddit,
+      author: row.author,
+      url: row.url,
       body: row.body,
       ups: row.ups,
       comments: row.comments,
@@ -265,4 +272,52 @@ export async function sweepSnapshot(projectId: string): Promise<SweepSnapshot | 
     threads,
     feedLeads: await newLeadCount(projectId),
   };
+}
+
+/**
+ * One thread the sweep drew, in full: the snapshot carries only the opening of
+ * each body, since it is read every second for hundreds of threads. Only a
+ * post this project's searches found can be read. `entry` is how the feed
+ * names it, once it is there: `lead-` for a lead, `held-` for a thread held for
+ * review, which is never a lead but opens in the same pane.
+ */
+export async function sweepThreadDetail(
+  projectId: string,
+  postId: string,
+): Promise<{ body: string | null; entry: string | null } | null> {
+  const [row] = await db()
+    .select({ body: redditPosts.body })
+    .from(redditPosts)
+    .where(
+      and(
+        eq(redditPosts.id, postId),
+        sql`exists (select 1 from ${candidateSources} where ${candidateSources.projectId} = ${projectId} and ${candidateSources.postId} = ${postId})`,
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    return null;
+  }
+  const [[lead], [held]] = await Promise.all([
+    db()
+      .select({ id: leads.id })
+      .from(leads)
+      .where(and(eq(leads.projectId, projectId), eq(leads.postId, postId), isNull(leads.commentId)))
+      .limit(1),
+    db()
+      .select({ id: leadEvaluations.id })
+      .from(leadEvaluations)
+      .where(
+        and(
+          eq(leadEvaluations.projectId, projectId),
+          eq(leadEvaluations.postId, postId),
+          isNull(leadEvaluations.commentId),
+          eq(leadEvaluations.decision, "review"),
+        ),
+      )
+      .orderBy(desc(leadEvaluations.judgedAt))
+      .limit(1),
+  ]);
+  const entry = lead ? `lead-${lead.id}` : held ? `held-${held.id}` : null;
+  return { body: row.body, entry };
 }
