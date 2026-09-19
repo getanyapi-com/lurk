@@ -61,10 +61,11 @@
 .closing-cta h2 { margin: 20px 0 28px; }
 .closing-cta .cta-row { justify-content: center; }
 .marketing-footer { padding-bottom: 36px; }
-.footer-columns { display: grid; grid-template-columns: repeat(5,1fr); gap: 28px; padding: 0 0 80px; }
+.footer-columns { display: grid; grid-template-columns: repeat(5,1fr); gap: 28px; padding: 0 32px 80px; }
 .footer-columns > div { display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 18px; }
 .footer-columns > div > span { color: var(--fg-muted); margin-bottom: 8px; }
-.footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid var(--m-rule); padding-top: 28px; font-size: 12px; color: var(--fg-muted); }
+/* Padding, not margin, keeps the rule running frame to frame while the words sit off it. */
+.footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid var(--m-rule); padding: 28px 32px 0; font-size: 12px; color: var(--fg-muted); }
 /* Keep the caption visible before the intentionally cropped hero window. */
 .preview-caption { margin: 0 0 8px; }
 .hero-layout { padding-top: 20px; }
@@ -79,7 +80,7 @@
   .pastel-art { padding: 16px; }
   .api-panel-copy { padding: 36px; }
   .api-art { padding: 20px; }
-  .footer-columns, .footer-bottom { margin-inline: 24px; }
+  .footer-columns, .footer-bottom { padding-inline: 24px; }
 }
 @media (max-width: 760px) {
   .marketing-body { border: none; }
