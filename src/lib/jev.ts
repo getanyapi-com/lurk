@@ -31,6 +31,15 @@ export const GATEWAY_FREE_UNTIL = new Date("2026-09-26T07:00:00Z");
  */
 const GATEWAY_TIMEOUT_MS = 15_000;
 
+/**
+ * The waits before the Gateway is asked again after a 503. Measured 2026-09-19
+ * on 2,047 judge calls, 507 came back 503 in about a second and were paid for
+ * on OpenRouter; they arrive in short spells, whatever the request's size, and
+ * of 9 met in a probe of 80 calls 8 cleared on the first wait and the last on
+ * the second. Nothing else is retried here: a 429 or a timeout moves on.
+ */
+const GATEWAY_503_WAITS_MS = [400, 1200];
+
 const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
 export type NoulQuestion = {
@@ -193,6 +202,20 @@ export async function askJev(call: JevCall): Promise<Answers> {
 }
 
 async function askGateway(key: string, call: JevCall): Promise<Answers> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await askGatewayOnce(key, call);
+    } catch (error) {
+      const wait = GATEWAY_503_WAITS_MS[attempt];
+      if (wait === undefined || !GatewayError.isInstance(error) || error.statusCode !== 503) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+}
+
+async function askGatewayOnce(key: string, call: JevCall): Promise<Answers> {
   const { JEV_GATEWAY_MODEL } = config();
   const gateway = createGateway({ apiKey: key });
   const startedAt = Date.now();

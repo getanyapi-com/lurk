@@ -179,6 +179,29 @@ describe("the Gateway first, OpenRouter behind it", () => {
     expect(recorded[1]).toMatchObject({ provider: "typesafe", finishReason: "answered" });
   });
 
+  it("asks the Gateway again after a 503 before paying OpenRouter", async () => {
+    recorded.length = 0;
+    settings.AI_GATEWAY_API_KEY = "vck_test";
+    let asked = 0;
+    const fetch = twoRoutes(() => {
+      asked += 1;
+      return asked === 1
+        ? new Response(JSON.stringify({ error: { message: "unavailable", type: "service_unavailable" } }), { status: 503 })
+        : new Response(
+            JSON.stringify({
+              answers: { p0__audience: { type: "boolean", probability: 0.9 } },
+              usage: { inputTokens: 500, outputTokens: 0 },
+            }),
+          );
+    }, openrouterAnswer);
+    vi.stubGlobal("fetch", fetch);
+
+    const answers = await askJev(call);
+
+    expect(answers.p0__audience).toEqual({ type: "noul", noul: 0.9 });
+    expect(recorded.map((row) => `${row.provider}:${row.finishReason}`)).toEqual(["vercel:http_503", "vercel:answered"]);
+  });
+
   it("asks the Gateway first every time, even after it rate-limits", async () => {
     recorded.length = 0;
     settings.AI_GATEWAY_API_KEY = "vck_test";
