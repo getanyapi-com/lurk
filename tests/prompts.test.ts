@@ -47,22 +47,24 @@ describe("profile phrasings", () => {
 /**
  * The profile only ever described who the buyer is, so a person who shares the
  * product's vocabulary and will never buy had no way into the facts the judge
- * reads. Asked only for what the page states, 70 of 79 production profiles
- * came back with no not-buyer and 54 with no exclusion (2026-09-19), because a
- * marketing page never says who it is not for. Both are now read from what the
- * page does say: who it sells to, what it runs on, where it works.
+ * reads. Asked only for what the page states, 70 of 79 production profiles had
+ * no not-buyer and 54 no exclusion (2026-09-19); asked to infer them, 24 of 78
+ * profiles came back with a limit the site contradicts. So each one is asked
+ * for with the site's own words behind it, and profile.ts checks the words.
  */
 describe("profile not-buyers and exclusions", () => {
-  it("reads who is not a buyer from who the page sells to", () => {
-    const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- notBuyers:"));
-    expect(bullet).toBeDefined();
-    expect(bullet).toMatch(/would not buy it/);
-    expect(bullet).toMatch(/Read them from who the page sells to/);
+  const bullet = (name: string) =>
+    PROFILE_SYSTEM.split("\n").find((line) => line.startsWith(`- ${name}:`));
+
+  it("asks for every limit with the exact words it rests on", () => {
+    expect(bullet("exclusions")).toMatch(/\{ text, sourceText \}/);
+    expect(bullet("notBuyers")).toMatch(/\{ text, sourceText \}/);
+    expect(bullet("exclusions")).toMatch(/copied character for character/);
   });
 
-  it("asks what a buyer must already have, and forbids guessing a missing feature", () => {
-    const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- exclusions:"));
-    expect(bullet).toMatch(/what a buyer must already have or be/);
-    expect(bullet).toMatch(/never a guess about a feature the page is silent on/);
+  it("asks what a buyer must already have, and never takes silence for a limit", () => {
+    expect(bullet("exclusions")).toMatch(/what a buyer must already have or be/i);
+    expect(bullet("exclusions")).toMatch(/a thing no page mentions is not a limit/);
+    expect(bullet("notBuyers")).toMatch(/Never someone a page of the site sells to or invites/);
   });
 });

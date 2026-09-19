@@ -42,6 +42,45 @@ export const profileSchema = z.object({
 
 export type ProductProfile = z.infer<typeof profileSchema>;
 
+/** One limit as the model returns it: the claim, and the page's own words it rests on. */
+const groundedSchema = z.object({ text: z.string(), sourceText: z.string() });
+
+/** What the model is asked for: the profile, with every limit carrying its source. */
+const readingSchema = profileSchema.extend({
+  exclusions: z.array(groundedSchema),
+  notBuyers: z.array(groundedSchema),
+});
+
+/** Text as a quote is compared against it: no markdown, no case, no spacing. */
+function flat(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_#`>|~\\]/g, "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * The limits whose source really is on the site. A limit is the one kind of
+ * fact that loses leads silently when it is wrong, and asked to infer them the
+ * model wrote "does not host applications" for a host whose own menu sells
+ * application hosting (2026-09-19: 19 false exclusions in 58 profiles, nearly
+ * all a thing the homepage did not mention and another page sold). So a limit
+ * stands only on words the site says, and the code checks that it says them.
+ */
+export function groundedLimits(items: z.infer<typeof groundedSchema>[], siteText: string): string[] {
+  const site = flat(siteText);
+  return items
+    .filter((item) => {
+      const source = flat(item.sourceText);
+      return item.text.trim().length > 0 && source.length >= 4 && site.includes(source);
+    })
+    .map((item) => item.text.trim());
+}
+
 export type ProfileStep = "scrape" | "profile" | "done";
 
 /**
@@ -86,7 +125,7 @@ export function platformPhrasings(platforms: string[], sellsPlatformData: boolea
  * Reads the product page. It buys no shared run, so it counts against the house
  * cap through the same seam every Reddit fetch uses, and is refused by it.
  */
-export async function scrapeProduct(projectId: string, userId: string, url: string) {
+async function scrapeProduct(projectId: string, userId: string, url: string) {
   const funded = await clientForUser(userId);
   if (funded.funding === "house") {
     await assertHouseDataUnderCap();
@@ -105,6 +144,63 @@ export async function scrapeProduct(projectId: string, userId: string, url: stri
     throw new Error(`AnyAPI could not read ${url}`);
   }
   return res.output.data;
+}
+
+/** The pages that say what a homepage leaves out, in the order they are worth reading. */
+const SITE_PAGES = [/pric|plans/i, /feature|product|solution|how-it-works|services/i, /faq|help/i, /about/i];
+const MAX_SITE_PAGES = 3;
+const HOME_CHARS = 12000;
+const PAGE_CHARS = 8000;
+
+/** The same-site links on this page that lead to one of SITE_PAGES, best first. */
+export function sitePageLinks(pageUrl: string, markdown: string): string[] {
+  let home: URL;
+  try {
+    home = new URL(pageUrl);
+  } catch {
+    return [];
+  }
+  const found = new Map<string, number>();
+  for (const match of markdown.matchAll(/\]\(([^)\s]+)/g)) {
+    let link: URL;
+    try {
+      link = new URL(match[1], home);
+    } catch {
+      continue;
+    }
+    const path = link.pathname.replace(/\/$/, "");
+    if (link.host !== home.host || path === home.pathname.replace(/\/$/, "") || !/^https?:$/.test(link.protocol)) {
+      continue;
+    }
+    const rank = SITE_PAGES.findIndex((pattern) => pattern.test(path));
+    const key = `${link.origin}${path}`;
+    if (rank !== -1 && path.split("/").length <= 3 && !found.has(key)) {
+      found.set(key, rank);
+    }
+  }
+  return [...found].sort((a, b) => a[1] - b[1]).slice(0, MAX_SITE_PAGES).map(([url]) => url);
+}
+
+/**
+ * The product's page and the few pages beside it that say what a homepage does
+ * not: the price, the plans, the platforms, who it is for. Read from the
+ * homepage alone, a profile was right for 5 of 19 products on 2026-09-19; the
+ * pricing page was the richest thing missed. A page that will not load is left
+ * out, because the homepage is still a profile and its neighbours are a bonus.
+ */
+export async function readSite(projectId: string, userId: string, url: string) {
+  const home = await scrapeProduct(projectId, userId, url);
+  const links = sitePageLinks(home.url ?? url, home.markdown ?? "");
+  const others = await Promise.all(
+    links.map((link) => scrapeProduct(projectId, userId, link).catch(() => null)),
+  );
+  const markdown = [
+    (home.markdown ?? "").slice(0, HOME_CHARS),
+    ...others.flatMap((page, index) =>
+      page?.markdown ? [`\n\n--- Page: ${links[index]} ---\n\n${page.markdown.slice(0, PAGE_CHARS)}`] : [],
+    ),
+  ].join("");
+  return { ...home, markdown };
 }
 
 /**
@@ -251,7 +347,7 @@ export async function reseedFromPage(
   },
   options: { dryRun?: boolean } = {},
 ): Promise<PageReseed> {
-  const page = await scrapeProduct(project.id, project.userId, project.url);
+  const page = await readSite(project.id, project.userId, project.url);
   const profile = await profileFromPage(project.id, page);
   const droppedPhrasings = profile.sellsPlatformData
     ? []
@@ -292,24 +388,25 @@ export async function reseedFromPage(
   };
 }
 
-/** What one scraped page says the product is. Reads the page and writes nothing. */
+/** What the site's pages say the product is. Reads them and writes nothing. */
 export async function profileFromPage(
   projectId: string,
   page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
 ): Promise<ProductProfile> {
-  return generateStructured({
+  const markdown = page.markdown ?? "";
+  const reading = await generateStructured({
     purpose: "profile",
     projectId,
-    schema: profileSchema,
+    schema: readingSchema,
     system: PROFILE_SYSTEM,
-    prompt: [
-      `Website: ${page.url}`,
-      `Title: ${page.title}`,
-      `Description: ${page.description}`,
-      "",
-      (page.markdown ?? "").slice(0, 12000),
-    ].join("\n"),
+    prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", markdown].join("\n"),
   });
+  const siteText = `${page.title ?? ""}\n${page.description ?? ""}\n${markdown}`;
+  return {
+    ...reading,
+    exclusions: groundedLimits(reading.exclusions, siteText),
+    notBuyers: groundedLimits(reading.notBuyers, siteText),
+  };
 }
 
 /**
@@ -326,7 +423,7 @@ export async function buildProfile(
   onStep?: (step: ProfileStep) => Promise<void> | void,
 ): Promise<ProductProfile> {
   await onStep?.("scrape");
-  const page = await scrapeProduct(projectId, userId, url);
+  const page = await readSite(projectId, userId, url);
 
   await onStep?.("profile");
   const profile = await profileFromPage(projectId, page);
