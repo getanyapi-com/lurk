@@ -43,35 +43,37 @@ export function ApiKeysPanel({ keys, requestsPerDay, selfHosted }: ApiKeysPanelP
           No keys yet. Create one to read your leads from a script or an agent.
         </p>
       ) : (
-        <table className="w-full text-body">
-          <thead>
-            <tr className="text-small text-fg-muted">
-              <th className="py-2 text-left font-normal">Name</th>
-              <th className="py-2 text-left font-normal">Key</th>
-              <th className="py-2 text-left font-normal">Created</th>
-              <th className="py-2 text-left font-normal">Last used</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((key) => (
-              <tr key={key.id} className="border-t">
-                <td className="py-2 pr-3">{key.name}</td>
-                <td className="py-2 pr-3 font-mono text-mono text-fg-muted">{key.prefix}...</td>
-                <td className="py-2 pr-3 text-fg-muted tabular-nums">{day(key.createdAt)}</td>
-                <td className="py-2 pr-3 text-fg-muted tabular-nums">{day(key.lastUsedAt)}</td>
-                <td className="py-2 text-right">
-                  <form action={revokeApiKeyAction}>
-                    <input type="hidden" name="keyId" value={key.id} />
-                    <Button type="submit" variant="ghost" size="sm">
-                      Revoke
-                    </Button>
-                  </form>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-body">
+            <thead>
+              <tr className="text-small text-fg-muted">
+                <th className="py-2 text-left font-normal">Name</th>
+                <th className="py-2 text-left font-normal">Key</th>
+                <th className="py-2 text-left font-normal">Created</th>
+                <th className="py-2 text-left font-normal">Last used</th>
+                <th className="py-2" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {keys.map((key) => (
+                <tr key={key.id} className="border-t">
+                  <td className="py-2 pr-3">{key.name}</td>
+                  <td className="py-2 pr-3 font-mono text-mono text-fg-muted">{key.prefix}...</td>
+                  <td className="py-2 pr-3 text-fg-muted tabular-nums">{day(key.createdAt)}</td>
+                  <td className="py-2 pr-3 text-fg-muted tabular-nums">{day(key.lastUsedAt)}</td>
+                  <td className="py-2 text-right">
+                    <form action={revokeApiKeyAction}>
+                      <input type="hidden" name="keyId" value={key.id} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Revoke
+                      </Button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

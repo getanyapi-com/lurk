@@ -10,7 +10,7 @@ function activeUsers(value: number | null): string {
 /** Where the leads come from, and what each community allows you to say. */
 export function CommunitiesTable({ rows }: CommunitiesTableProps) {
   return (
-    <div className="rounded-card border bg-surface">
+    <div className="overflow-x-auto rounded-card border bg-surface">
       <table className="w-full text-body">
         <thead>
           <tr className="border-b text-left text-small text-fg-muted">
