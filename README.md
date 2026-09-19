@@ -1,5 +1,9 @@
 # lurk
 
+<p align="center">
+  <img src=".github/banner.png" alt="lurk on a MacBook and an iPhone, showing a scored feed of Reddit leads. Powered by AnyAPI." width="900">
+</p>
+
 lurk is a Reddit buyer-intent finder you can self-host for free, hosted at
 <https://lurk.so>. It watches the subreddits and keywords your buyers use, scores every post
 and comment against your product, tells you in one sentence why each one scored what it did,
