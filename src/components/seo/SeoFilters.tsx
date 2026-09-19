@@ -19,6 +19,8 @@ export function SeoFilters({ facets }: SeoFiltersProps) {
   const filters: FilterSpec[] = [
     {
       name: "view",
+      // A phone has one shape to offer, the list, so there is nothing to pick.
+      className: "max-lg:hidden",
       ariaLabel: "view",
       icon: <LayoutGrid className={ICON} aria-hidden="true" />,
       fallback: DEFAULT_VIEW,

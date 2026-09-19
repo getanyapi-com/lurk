@@ -280,14 +280,18 @@ function series(last: number, every: number): number[] {
  */
 function ticksOn(columns: StreamColumn[]): StreamTick[] {
   const last = columns.length - 1;
-  const at = series(last, Math.max(Math.round(last / 8), 1));
+  const step = Math.max(Math.round(last / 8), 1);
+  const at = series(last, step);
   // The narrow set is taken out of the wide one, so nothing is labelled on a
   // small card that a big one does not also label.
   const keep = Math.max(Math.round(at.length / 5), 1);
+  // The last column is always labelled, so a kept label that lands just short
+  // of it gives way: on a phone the two are drawn on top of each other.
+  const clearOfLast = (index: number) => last - index >= step * keep * 0.75;
   return at.map((index, n) => ({
     index,
     label: columns[index].label,
-    sparse: n % keep === 0 || n === at.length - 1,
+    sparse: n === at.length - 1 || (n % keep === 0 && clearOfLast(index)),
   }));
 }
 

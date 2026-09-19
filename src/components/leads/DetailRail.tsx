@@ -52,9 +52,9 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 export function DetailRail(props: DetailRailProps) {
   return (
     <aside
-      className="shrink-0 self-start rounded-card border bg-surface"
-      // The app's own rail token, so the two rails frame the page at one width.
-      style={{ width: "var(--rail-width)" }}
+      // The app's own rail token, so the two rails frame the page at one width,
+      // once the pane is wide enough to hold the post beside it.
+      className="shrink-0 rounded-card border bg-surface xl:w-[var(--rail-width)] xl:self-start"
     >
       <Block label="Author">
         <span className="flex items-center gap-2">

@@ -24,6 +24,8 @@ export type FilterSpec = {
   searchable?: boolean;
   /** What that search box says before anything is typed. */
   searchPlaceholder?: string;
+  /** Extra classes for the pill, e.g. to hide one where its choice is moot. */
+  className?: string;
 };
 
 /**
@@ -60,7 +62,10 @@ export function FilterPills({ filters }: { filters: FilterSpec[] }) {
       {filters.map((filter) => (
         <span
           key={filter.name}
-          className="text-small inline-flex items-center gap-1.5 rounded-control border bg-surface py-1 pr-1 pl-2.5 text-fg-muted"
+          className={cn(
+            "text-small inline-flex items-center gap-1.5 rounded-control border bg-surface py-1 pr-1 pl-2.5 text-fg-muted",
+            filter.className,
+          )}
         >
           {pending ? (
             <Loader2 className="size-3.5 shrink-0 animate-spin text-fg-muted" aria-hidden="true" />

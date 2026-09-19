@@ -42,6 +42,14 @@
   --motion: 150ms;
 }
 
+/* A phone has no width to spend on margins. 767px is one under Tailwind's md,
+   which is where the rail stops being a column and becomes a drawer. */
+@media (max-width: 767px) {
+  :root {
+    --page-gutter: 16px;
+  }
+}
+
 [data-theme="dark"] {
   --bg: oklch(0.17 0 0);
   --surface: oklch(0.21 0 0);

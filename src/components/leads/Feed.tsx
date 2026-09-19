@@ -155,6 +155,8 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
 
       <OpeningProvider serverSelectedId={selectedId}>
         <LeadWorkspace
+          asked={Boolean(params.lead)}
+          backHref={`?${feedSearch(params)}`}
           list={
             <>
               <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-surface px-3 py-2">

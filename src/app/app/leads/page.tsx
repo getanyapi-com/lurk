@@ -16,7 +16,7 @@ function FeedSkeleton() {
     <div className="flex flex-col gap-5">
       <Skeleton className="h-4 w-80 max-w-full" />
       <PillsSkeleton count={4} />
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(0,7fr)_minmax(0,9fr)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,9fr)]">
         <ListSkeleton rows={8} />
         <div className="flex flex-col gap-3 rounded-card border bg-surface p-4">
           <Skeleton className="h-5 w-3/4" />

@@ -171,7 +171,7 @@ export function PlanEditor({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-card border bg-surface p-6">
+    <section className="flex flex-col gap-3 rounded-card border bg-surface p-4 md:p-6">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="text-h3" style={{ fontWeight: 500 }}>
           {title}
@@ -194,7 +194,7 @@ export function PlanEditor({
               >
                 {row.value}
               </span>
-              <span className="ml-auto flex items-center gap-2">
+              <span className="ml-auto flex flex-wrap items-center gap-2">
                 <Yield row={row} />
                 {kind === "competitor" ? (
                   <DomainField

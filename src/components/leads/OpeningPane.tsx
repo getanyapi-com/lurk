@@ -32,8 +32,8 @@ export function OpeningPane({ summary }: { summary: OpeningSummary }) {
           <span className="text-mono text-fg-muted">{relativeAge(summary.createdAt)}</span>
         </div>
       </header>
-      <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 xl:flex-row">
+        <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
           <div className="flex flex-col gap-2 rounded-card bg-surface-2 p-3">
             <Skeleton className="h-3 w-32" />
             <Skeleton className="h-4 w-full" />
@@ -44,7 +44,7 @@ export function OpeningPane({ summary }: { summary: OpeningSummary }) {
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-4 w-5/6" />
         </div>
-        <div className="flex w-52 shrink-0 flex-col gap-3">
+        <div className="flex shrink-0 flex-col gap-3 xl:w-52">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-20 w-full" />

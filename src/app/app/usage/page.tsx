@@ -36,7 +36,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           already fetched.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="Calls today" value={String(usage.calls)} caption="AnyAPI requests" />
         <StatCard
           label="USD today"
@@ -51,7 +51,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           Last scan
         </h2>
         {scan ? (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <StatCard label="Calls" value={String(scan.calls)} caption="AnyAPI requests" />
             <StatCard
               label="USD"
@@ -83,7 +83,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           Every query and community in the plan, with the candidates it found, the leads those
           became, and what its own calls cost.
         </p>
-        <div className="rounded-card border bg-surface">
+        <div className="overflow-x-auto rounded-card border bg-surface">
           <table className="w-full text-body">
             <thead>
               <tr className="border-b text-left text-small text-fg-muted">
@@ -126,7 +126,7 @@ export default async function UsagePage({ searchParams }: UsagePageProps) {
           </table>
         </div>
       </div>
-      <div className="rounded-card border bg-surface">
+      <div className="overflow-x-auto rounded-card border bg-surface">
         <table className="w-full text-body">
           <thead>
             <tr className="border-b text-left text-small text-fg-muted">

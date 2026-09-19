@@ -19,9 +19,20 @@ type Opening = {
   /** The row being opened, until the server agrees it is the one on screen. */
   summary: OpeningSummary | null;
   open: (summary: OpeningSummary) => void;
+  /**
+   * Whether the reader has gone back to the list. Only a phone asks: there the
+   * thread covers the list, and leaving it cannot wait a second for the server.
+   */
+  closed: boolean;
+  close: () => void;
 };
 
-const OpeningContext = createContext<Opening>({ summary: null, open: () => {} });
+const OpeningContext = createContext<Opening>({
+  summary: null,
+  open: () => {},
+  closed: false,
+  close: () => {},
+});
 
 export function useOpening(): Opening {
   return useContext(OpeningContext);
@@ -43,6 +54,7 @@ export function OpeningProvider({
   children: React.ReactNode;
 }) {
   const [clicked, setClicked] = useState<OpeningSummary | null>(null);
+  const [closed, setClosed] = useState(false);
   /**
    * Derived rather than cleared, so there is no moment where the pane has both
    * the server's answer and something standing in for it: the row we are
@@ -50,7 +62,18 @@ export function OpeningProvider({
    */
   const summary = clicked && clicked.id !== serverSelectedId ? clicked : null;
 
-  const value = useMemo<Opening>(() => ({ summary, open: setClicked }), [summary]);
+  const value = useMemo<Opening>(
+    () => ({
+      summary,
+      open: (row) => {
+        setClicked(row);
+        setClosed(false);
+      },
+      closed,
+      close: () => setClosed(true),
+    }),
+    [summary, closed],
+  );
 
   return <OpeningContext value={value}>{children}</OpeningContext>;
 }

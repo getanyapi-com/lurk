@@ -156,7 +156,18 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
               {/* The axis, and the hint, on the same line under the column. The
                   hint is a chip so it can be wider than the column it belongs
                   to and still be read over its neighbours. */}
-              <span className="relative mt-1 flex h-4 w-full items-center justify-center">
+              <span
+                className={cn(
+                  "relative mt-1 flex h-4 w-full items-center",
+                  // A narrow card's end columns are thinner than their labels,
+                  // which then hang over the card's edge unless they turn in.
+                  index === 0
+                    ? "justify-start @2xl:justify-center"
+                    : index === last
+                      ? "justify-end @2xl:justify-center"
+                      : "justify-center",
+                )}
+              >
                 {tick ? (
                   <span
                     className={cn(

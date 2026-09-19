@@ -57,7 +57,7 @@ export function LeadRow({
     >
       <AuthorAvatar name={author} src={avatarUrl} size={24} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate text-small text-fg" style={{ fontWeight: 500 }}>
+        <span className="text-small text-fg max-sm:line-clamp-2 sm:truncate" style={{ fontWeight: 500 }}>
           {excerpt ?? title}
         </span>
         <span className="flex min-w-0 items-center gap-2">

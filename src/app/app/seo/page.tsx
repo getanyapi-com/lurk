@@ -125,20 +125,31 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
         ) : (
           <EmptyState title="Nothing ranked yet" sentence={EMPTY_SENTENCE} />
         )
-      ) : view === "split" ? (
-        <SplitView
-          threads={threads}
-          selected={selected}
-          hrefFor={(id) => href({ thread: id })}
-          competitors={competitors}
-        />
       ) : (
-        <ThreadTable
-          threads={threads}
-          order={order}
-          hrefFor={(asked: SeoOrder) => href({ order: asked })}
-          competitors={competitors}
-        />
+        <>
+          {/* The table is sixty rems of columns, which a phone can only scroll
+              sideways through. Below lg both views are the list. */}
+          <div className={view === "split" ? undefined : "lg:hidden"}>
+            <SplitView
+              threads={threads}
+              selected={selected}
+              asked={selected !== null && selected.id === params.thread}
+              backHref={href({ thread: undefined })}
+              hrefFor={(id) => href({ thread: id })}
+              competitors={competitors}
+            />
+          </div>
+          {view === "split" ? null : (
+            <div className="max-lg:hidden">
+              <ThreadTable
+                threads={threads}
+                order={order}
+                hrefFor={(asked: SeoOrder) => href({ order: asked })}
+                competitors={competitors}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
