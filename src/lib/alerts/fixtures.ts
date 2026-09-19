@@ -14,6 +14,10 @@ const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
     score: 91,
     reason: "Names the current tool, the price and the failure. Ready to switch.",
     matchedPhrase: "breaks every other week",
+    excerpt:
+      "We have been on the same scraping vendor for a year, paying $99/mo, and it breaks every other week when the site changes its markup. I am done babysitting it. What are people switching to?",
+    isComment: false,
+    numComments: 14,
     hoursAgo: 2,
   },
   {
@@ -26,6 +30,10 @@ const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
     score: 74,
     reason: "Solution seeking, no vendor named yet.",
     matchedPhrase: "without getting rate limited",
+    excerpt:
+      "Building a small monitoring tool and I keep hitting 429s after a few hundred requests. How are you all pulling Reddit data without getting rate limited? Happy to pay for something if it just works.",
+    isComment: false,
+    numComments: 23,
     hoursAgo: 5,
   },
   {
@@ -38,6 +46,10 @@ const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
     score: 58,
     reason: "Comparing options, no budget stated.",
     matchedPhrase: "lead finders that watch subreddits",
+    excerpt:
+      "There seem to be a dozen lead finders that watch subreddits now. Has anyone actually compared them side by side? Mostly care about how many of the alerts are real buyers.",
+    isComment: false,
+    numComments: 6,
     hoursAgo: 9,
   },
 ];

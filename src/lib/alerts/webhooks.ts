@@ -1,5 +1,7 @@
+import { shortAge } from "@/lib/format";
 import { postJson } from "./outbound";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
+import { scoreColor } from "./tokens";
 import type { Digest, DigestLead } from "./types";
 
 function headline(digest: Digest): string {
@@ -8,27 +10,88 @@ function headline(digest: Digest): string {
   return `${count} new ${count === 1 ? "lead" : "leads"} for ${digest.projectName} ${window}.`;
 }
 
-function line(lead: DigestLead): string {
-  const reason = lead.reason ? `\n_${lead.reason}_` : "";
-  return `*${lead.score}* r/${lead.subreddit} - ${lead.title}${reason}`;
+/** Slack reads these three as markup wherever they appear, a Reddit title included. */
+function slackEscape(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/** Slack Block Kit: a headline and one section per lead with its link. */
-export function slackPayload(digest: Digest) {
+/**
+ * What the author wrote, or the matched phrase when there is no body to quote.
+ * The rubric sentence in `reason` reads the same on every lead, so an alert
+ * leaves it to the feed and spends the room on the thread.
+ */
+function quoted(lead: DigestLead): string | null {
+  if (lead.excerpt) {
+    return lead.excerpt;
+  }
+  return lead.matchedPhrase && lead.matchedPhrase !== lead.title ? lead.matchedPhrase : null;
+}
+
+/** Where the lead sits: the subreddit, who wrote it, how old, how busy the thread is. */
+function where(lead: DigestLead, now: Date): string[] {
+  const comments =
+    lead.numComments == null
+      ? []
+      : [`${lead.numComments} ${lead.numComments === 1 ? "comment" : "comments"}`];
+  return [
+    `r/${lead.subreddit}`,
+    `${lead.isComment ? "comment by " : ""}u/${lead.author ?? "unknown"}`,
+    `${shortAge(lead.createdAt, now)} ago`,
+    ...comments,
+  ];
+}
+
+/**
+ * One lead as a Slack attachment, the only Slack shape with a coloured stripe:
+ * the stripe is the score badge's colour, the byline carries the author's face.
+ * No button, because a link button makes Slack call an interactivity endpoint
+ * the incoming-webhook app does not have, and shows the reader a warning.
+ */
+function slackLead(lead: DigestLead, now: Date) {
+  const quote = quoted(lead);
+  const title = `*<${lead.url}|${slackEscape(lead.title)}>*`;
+  const face = lead.avatarUrl
+    ? [{ type: "image", image_url: lead.avatarUrl, alt_text: `u/${lead.author ?? "unknown"}` }]
+    : [];
   return {
-    text: headline(digest),
+    color: scoreColor(lead.score),
+    fallback: `${lead.score} r/${lead.subreddit} - ${lead.title}`,
     blocks: [
-      { type: "section", text: { type: "mrkdwn", text: headline(digest) } },
-      ...digest.leads.map((lead) => ({
+      {
         type: "section",
-        text: { type: "mrkdwn", text: `${line(lead)}\n<${lead.url}|Source>` },
-      })),
+        text: { type: "mrkdwn", text: quote ? `${title}\n${slackEscape(quote)}` : title },
+      },
       {
         type: "context",
         elements: [
+          ...face,
+          { type: "mrkdwn", text: [`*Score ${lead.score}*`, ...where(lead, now)].join("  ·  ") },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Slack: a headline, then one attachment per lead with the linked title over
+ * the author's own words and a quiet byline saying where it is.
+ */
+export function slackPayload(digest: Digest) {
+  return {
+    text: headline(digest),
+    blocks: [{ type: "header", text: { type: "plain_text", text: headline(digest) } }],
+    attachments: [
+      ...digest.leads.map((lead) => slackLead(lead, digest.generatedAt)),
+      {
+        blocks: [
           {
-            type: "mrkdwn",
-            text: `${ANYAPI_PLUG} <${anyapiAlertUrl("slack")}|${ANYAPI_PLUG_CTA}>`,
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `${ANYAPI_PLUG} <${anyapiAlertUrl("slack")}|${ANYAPI_PLUG_CTA}>`,
+              },
+            ],
           },
         ],
       },
@@ -46,13 +109,25 @@ export function discordPayload(digest: Digest) {
     content: headline(digest),
     embeds: [
       ...digest.leads.map((lead) => ({
+        author: {
+          name: `${lead.isComment ? "comment by " : ""}u/${lead.author ?? "unknown"}`,
+          icon_url: lead.avatarUrl ?? undefined,
+        },
         title: lead.title.slice(0, 256),
         url: lead.url,
-        description: lead.reason ?? undefined,
+        description: quoted(lead) ?? undefined,
+        color: parseInt(scoreColor(lead.score).slice(1), 16),
+        timestamp: lead.createdAt.toISOString(),
         fields: [
           { name: "Score", value: String(lead.score), inline: true },
           { name: "Subreddit", value: `r/${lead.subreddit}`, inline: true },
         ],
+        footer: {
+          text:
+            lead.numComments == null
+              ? "Reddit"
+              : `${lead.numComments} ${lead.numComments === 1 ? "comment" : "comments"}`,
+        },
       })),
       {
         description: `${ANYAPI_PLUG} [${ANYAPI_PLUG_CTA}](${anyapiAlertUrl("discord")})`,
@@ -77,6 +152,9 @@ export function genericPayload(digest: Digest) {
       score: lead.score,
       reason: lead.reason,
       matchedPhrase: lead.matchedPhrase,
+      excerpt: lead.excerpt,
+      isComment: lead.isComment,
+      numComments: lead.numComments,
       createdAt: lead.createdAt.toISOString(),
     })),
   };

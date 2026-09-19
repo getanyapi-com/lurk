@@ -1,4 +1,5 @@
 import type { TierLimits } from "@/lib/tiers";
+import { excerptOf } from "./excerpt";
 import {
   CUSTOM_WEBHOOK_CHANNEL,
   type AlertCadence,
@@ -45,7 +46,11 @@ export function windowStart(lastSentAt: Date | null, cadence: AlertCadence, now:
   return lastSentAt ?? new Date(now.getTime() - CADENCE_MS[cadence]);
 }
 
-export type SelectableLead = DigestLead & { status: string; scoredAt: Date };
+export type SelectableLead = Omit<DigestLead, "excerpt"> & {
+  body: string | null;
+  status: string;
+  scoredAt: Date;
+};
 
 /**
  * The leads one message carries: still new, scored inside the window, best
@@ -70,6 +75,9 @@ export function selectLeads(
     score: row.score,
     reason: row.reason,
     matchedPhrase: row.matchedPhrase,
+    excerpt: excerptOf(row.body, row.matchedPhrase),
+    isComment: row.isComment,
+    numComments: row.numComments,
     createdAt: row.createdAt,
   }));
 }

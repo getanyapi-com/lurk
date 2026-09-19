@@ -96,11 +96,14 @@ function leadRow(lead: DigestLead, digest: Digest): string {
     `u/${lead.author ?? "unknown"}`,
     `r/${lead.subreddit}`,
     shortAge(lead.createdAt, digest.generatedAt),
+    ...(lead.numComments == null
+      ? []
+      : [`${lead.numComments} ${lead.numComments === 1 ? "comment" : "comments"}`]),
   ]
     .map(escapeHtml)
     .join(" &middot; ");
-  const reason = lead.reason
-    ? `<div style="margin-top:6px;font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted}">${escapeHtml(lead.reason)}</div>`
+  const excerpt = lead.excerpt
+    ? `<div style="margin-top:6px;font-family:${EMAIL_FONT};font-size:13px;line-height:1.5;color:${C.fgMuted}">${escapeHtml(lead.excerpt)}</div>`
     : "";
   const phrase = lead.matchedPhrase
     ? `<div style="margin-top:6px;padding:6px 10px;border-radius:${EMAIL_RADIUS.control};background:${C.surface2};font-family:${EMAIL_FONT};font-size:13px;color:${C.fg}">&ldquo;${escapeHtml(lead.matchedPhrase)}&rdquo;</div>`
@@ -111,7 +114,7 @@ ${authorCell(lead, digest.appUrl)}
 <td valign="top" style="padding:16px 12px">
 <div style="font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">${meta}</div>
 <div style="margin-top:4px;font-family:${EMAIL_FONT};font-size:15px;line-height:1.4;color:${C.fg}">${escapeHtml(lead.title)}</div>
-${reason}${phrase}</td>
+${excerpt}${phrase}</td>
 <td valign="top" align="right" width="72" style="padding:16px 16px 16px 0">
 <div style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${scoreColor(lead.score)}">${lead.score}</div>
 <a href="${escapeHtml(lead.url)}" style="display:inline-block;margin-top:8px;font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted};text-decoration:underline">Source</a></td>
@@ -156,7 +159,7 @@ ${headerRow(digest)}${headlineRow(digest)}${body}${anyapiRow()}${footerRow(diges
 export function renderDigestText(digest: Digest): string {
   const lines = digest.leads.map(
     (lead) =>
-      `${lead.score} - ${lead.title} (r/${lead.subreddit}, u/${lead.author ?? "unknown"}, ${shortAge(lead.createdAt, digest.generatedAt)})\n${lead.reason ?? ""}\n${lead.url}`,
+      `${lead.score} - ${lead.title} (r/${lead.subreddit}, u/${lead.author ?? "unknown"}, ${shortAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}`,
   );
   return [
     `${digest.leads.length} new leads for ${digest.projectName} ${windowPhrase(digest)}.`,

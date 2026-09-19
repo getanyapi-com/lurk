@@ -30,6 +30,11 @@ export type DigestLead = {
   score: number;
   reason: string | null;
   matchedPhrase: string | null;
+  /** The author's own words, trimmed by `excerptOf`. Null for a link post. */
+  excerpt: string | null;
+  /** True when the lead is a comment inside the thread rather than the post. */
+  isComment: boolean;
+  numComments: number | null;
   createdAt: Date;
 };
 

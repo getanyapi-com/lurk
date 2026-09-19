@@ -41,6 +41,7 @@ import {
 import { describeTarget, normalizeTarget } from "@/lib/alerts/channels";
 import { isPublicAddress } from "@/lib/alerts/outbound";
 import type { Digest, DigestLead } from "@/lib/alerts/types";
+import { excerptOf } from "@/lib/alerts/excerpt";
 import { TIERS } from "@/lib/tiers";
 
 /** Local time on purpose: the timeline axis is drawn in the reader's hours. */
@@ -57,6 +58,9 @@ function lead(overrides: Partial<SelectableLead> & { id: string }): SelectableLe
     score: 70,
     reason: "Names the tool and the price.",
     matchedPhrase: "paying too much",
+    body: "We are paying too much for a scraper that breaks. What are people switching to?",
+    isComment: false,
+    numComments: 12,
     createdAt: new Date(2026, 8, 5, 7, 0, 0),
     status: "new",
     scoredAt: new Date(2026, 8, 5, 8, 0, 0),
@@ -180,6 +184,29 @@ describe("targets", () => {
   });
 });
 
+describe("the excerpt", () => {
+  it("is the whole body on one line when it fits", () => {
+    expect(excerptOf("Two\n\nlines  here", null)).toBe("Two lines here");
+  });
+
+  it("is null for a link post and for a removed one", () => {
+    expect(excerptOf(null, "x")).toBeNull();
+    expect(excerptOf("[removed]", "x")).toBeNull();
+  });
+
+  it("opens at the start and cuts on a word", () => {
+    expect(excerptOf("alpha beta gamma delta", null, 12)).toBe("alpha beta...");
+  });
+
+  it("moves to the matched phrase when that sits past the cut", () => {
+    const body = `${"filler ".repeat(60)}we need a scraper now ${"tail ".repeat(60)}`;
+    const excerpt = excerptOf(body, "we need a scraper now", 120) ?? "";
+    expect(excerpt).toContain("we need a scraper now");
+    expect(excerpt.startsWith("...")).toBe(true);
+    expect(excerpt.endsWith("...")).toBe(true);
+  });
+});
+
 describe("chat payloads", () => {
   it("puts the headline and every lead in the Slack blocks", () => {
     const payload = payloadFor("slack", digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
@@ -187,11 +214,30 @@ describe("chat payloads", () => {
     expect(JSON.stringify(payload)).toContain("https://www.reddit.com/r/SaaS/comments/x/");
   });
 
-  it("keeps the Slack reason on its own line under the title", () => {
-    const one = lead({ id: "a", reason: "Ready to switch." });
+  it("shows a Slack lead as its linked title over the author's words, not the rubric", () => {
+    const one = lead({ id: "a", title: "Scraper <help> & advice" });
     const payload = payloadFor("slack", digestOf(selectLeads([one], SINCE, null)));
-    const section = (payload as { blocks: Array<{ text: { text: string } }> }).blocks[1];
-    expect(section.text.text).toMatch(/- .*\n_Ready to switch\._\n<https/);
+    const [first] = (
+      payload as { attachments: Array<{ color: string; blocks: Array<Record<string, unknown>> }> }
+    ).attachments;
+    const blocks = first.blocks;
+    expect(first.color).toBe("#e49e22");
+    expect(blocks[0]).toMatchObject({
+      text: {
+        text: "*<https://www.reddit.com/r/SaaS/comments/x/|Scraper &lt;help&gt; &amp; advice>*\nWe are paying too much for a scraper that breaks. What are people switching to?",
+      },
+    });
+    expect(JSON.stringify(blocks[1])).toContain(
+      "*Score 70*  ·  r/SaaS  ·  u/ella_builds  ·  2h ago  ·  12 comments",
+    );
+    expect(JSON.stringify(payload)).not.toContain("Names the tool and the price.");
+  });
+
+  it("says when the lead is a comment, and falls back to the phrase with no body", () => {
+    const one = lead({ id: "a", body: null, isComment: true });
+    const payload = JSON.stringify(payloadFor("slack", digestOf(selectLeads([one], SINCE, null))));
+    expect(payload).toContain("\\npaying too much");
+    expect(payload).toContain("comment by u/ella_builds");
   });
 
   it("gives Discord one embed per lead with the score and subreddit", () => {
@@ -199,7 +245,10 @@ describe("chat payloads", () => {
     expect(payload).toMatchObject({
       embeds: [
         {
+          author: { name: "u/ella_builds" },
           title: "Paying too much for a scraper",
+          description: expect.stringContaining("paying too much for a scraper that breaks"),
+          color: 0xe49e22,
           fields: [
             { name: "Score", value: "70" },
             { name: "Subreddit", value: "r/SaaS" },
@@ -212,7 +261,7 @@ describe("chat payloads", () => {
 
   it("ends every chat message and email with the AnyAPI line, tagged by channel", () => {
     const digest = digestOf(selectLeads([lead({ id: "a" })], SINCE, null));
-    const slack = (payloadFor("slack", digest) as { blocks: unknown[] }).blocks.at(-1);
+    const slack = (payloadFor("slack", digest) as { attachments: unknown[] }).attachments.at(-1);
     expect(JSON.stringify(slack)).toContain("utm_source=lurk&utm_medium=slack");
     expect(renderDigestHtml(digest)).toContain("utm_medium=email");
     expect(renderDigestText(digest)).toContain("utm_medium=email");
