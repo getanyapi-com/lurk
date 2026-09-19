@@ -12,7 +12,7 @@ import { judgeAnswers, triageAnswers } from "./jevAnswers";
  * opened with `reddit.post`, and that the Reddit SEO tab stays Google's.
  */
 
-const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
+const { askJev, generateStructured } = vi.hoisted(() => ({ askJev: vi.fn(), generateStructured: vi.fn() }));
 const fetchSearch = vi.fn();
 const fetchSubredditPosts = vi.fn();
 const fetchPost = vi.fn();
@@ -24,6 +24,10 @@ const fetchFeedThreads = vi.fn();
 vi.mock("@/lib/jev", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/jev")>()),
   askJev,
+}));
+vi.mock("@/lib/llm", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/llm")>()),
+  generateStructured,
 }));
 vi.mock("@/lib/reddit/skus", () => ({
   fetchSearch,
@@ -79,6 +83,9 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     ({ upsertPosts } = await import("@/lib/reddit/store"));
     ({ eq } = await import("drizzle-orm"));
     askJev.mockReset();
+    // No searches of the sweep's own, unless a test makes some up.
+    generateStructured.mockReset();
+    generateStructured.mockRejectedValue(new Error("no model"));
     for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchPostComments]) {
       mock.mockReset();
     }
@@ -269,9 +276,65 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
     const outcome = await runBackfill(row.id);
 
-    // Two pages, and the walk did not earn a third.
-    expect(callsOf()).toHaveLength(2);
+    // One page, and the walk did not earn a second.
+    expect(callsOf()).toHaveLength(1);
     expect(outcome.leads).toBe(0);
+  });
+
+  it("asks the searches it made up, and keeps the ones that found buyers as keywords", async () => {
+    const row = await project(["form with conditional logic"]);
+    generateStructured.mockResolvedValue({
+      searches: [
+        { kind: "tool_ask", text: "app for  conditional forms" },
+        { kind: "alternative_to", text: "alternative to Typeform" },
+      ],
+    });
+    // Only the tool ask finds anybody, and only on its one page.
+    const buyers = await posts(2);
+    fetchSearch.mockImplementation(async (_ctx: unknown, query: string) => ({
+      value: { posts: query === "app for conditional forms" ? buyers : [], nextCursor: null },
+      reused: true,
+      costUsd: 0,
+    }));
+    model();
+
+    await runBackfill(row.id);
+
+    expect(callsOf().map((call) => call.query).sort()).toEqual([
+      "alternative to Typeform",
+      "app for conditional forms",
+      "form builder",
+      "form with conditional logic",
+    ]);
+    const kept = await db()
+      .select()
+      .from(schema.projectKeywords)
+      .where(eq(schema.projectKeywords.projectId, row.id));
+    expect(kept.filter((item) => item.source === "sweep")).toMatchObject([
+      { keyword: "app for conditional forms", state: "active", freshLeads: 2, freshCandidates: 2 },
+    ]);
+  });
+
+  it("reads deeper only on the walks whose first page found the most buyers", async () => {
+    const row = await project();
+    generateStructured.mockResolvedValue({
+      searches: Array.from({ length: 12 }, (_, index) => ({ kind: "tool_ask", text: `tool for forms ${index}` })),
+    });
+    // Search n finds n buyers on its first page; the plan's own keyword finds none.
+    const asked = new Map<string, number>();
+    fetchSearch.mockImplementation(async (_ctx: unknown, query: string) => {
+      const page = asked.get(query) ?? 0;
+      asked.set(query, page + 1);
+      const index = Number(query.split(" ").at(-1));
+      const count = page === 0 && Number.isFinite(index) ? index : 0;
+      return { value: { posts: await posts(count), nextCursor: `${query}-${page}` }, reused: true, costUsd: 0 };
+    });
+    model();
+
+    await runBackfill(row.id);
+
+    const deep = [...asked].filter(([, pages]) => pages > 1).map(([query]) => query);
+    expect(deep.sort()).toEqual(Array.from({ length: 10 }, (_, index) => `tool for forms ${index + 2}`).sort());
   });
 
   it("stops a walk that keeps finding leads at its depth", async () => {
@@ -328,12 +391,12 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
 
   it("stops searching and scoring once it holds as many buyers as one person answers", async () => {
     const row = await project();
-    endless(100);
+    endless(200);
     model();
 
     const outcome = await runBackfill(row.id);
 
-    // Six pages of buyers were on offer. Two held the 150, and a chunk already
+    // Six pages of buyers were on offer. The first held the 150, and a chunk already
     // being judged finishes, so the sweep ends a few over and reads no deeper.
     expect(callsOf().length).toBeLessThan(6);
     expect(outcome.leads).toBeGreaterThanOrEqual(150);

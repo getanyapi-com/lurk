@@ -46,6 +46,7 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
     await db().insert(schema.projectKeywords).values([
       { projectId: project.id, keyword: "my own search", source: "user", state: "active" },
       { projectId: project.id, keyword: "an old compiled query", source: "serp", state: "active" },
+      { projectId: project.id, keyword: "app for hotel check in", source: "sweep", state: "active" },
     ]);
     await db()
       .insert(schema.projectCompetitors)
@@ -72,6 +73,7 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
       .where(eq(schema.projectKeywords.projectId, project.id));
     expect(keywords.map((row) => row.keyword).sort()).toEqual([
       "(hotel OR hotels) AND (18 OR 19)",
+      "app for hotel check in",
       "my own search",
     ]);
 

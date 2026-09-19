@@ -104,6 +104,36 @@ export async function creditSources(
 }
 
 /**
+ * Keeps searches a first sweep made up and found buyers with, as keywords of
+ * the plan, so every scan after it asks them too. `sweep` is their source:
+ * discovery did not find them and must not drop them when it publishes a plan
+ * (src/lib/discovery/plan.ts). A keyword the project already holds, in any
+ * state, is left as it is: a person may have excluded it.
+ */
+export async function keepSearches(
+  projectId: string,
+  searches: { text: string; candidates: number; leads: number }[],
+): Promise<void> {
+  if (searches.length === 0) {
+    return;
+  }
+  await db()
+    .insert(projectKeywords)
+    .values(
+      searches.map((search) => ({
+        projectId,
+        keyword: search.text,
+        source: "sweep",
+        state: "active",
+        lastCoveredAt: new Date(),
+        freshCandidates: search.candidates,
+        freshLeads: search.leads,
+      })),
+    )
+    .onConflictDoNothing();
+}
+
+/**
  * When each of these queries was last searched over a week or a month. A run of
  * day-wide searches only ever sees the newest posts, so this is what says a
  * query is owed its weekly reconciliation.

@@ -135,10 +135,11 @@ const PRESERVED_STATES = ["pinned", "excluded"];
 
 /**
  * So is one a person typed in, and so is a competitor the product's own page
- * reading named (src/lib/profile.ts): discovery did not find it, so discovery
- * finding nothing is no reason to drop it.
+ * reading named (src/lib/profile.ts), and a search a first sweep made up and
+ * found buyers with (src/lib/scan/backfill.ts): discovery did not find it, so
+ * discovery finding nothing is no reason to drop it.
  */
-const PRESERVED_SOURCES = ["user", "page"];
+const PRESERVED_SOURCES = ["user", "page", "sweep"];
 
 type PlanTable = typeof projectKeywords | typeof projectSubreddits | typeof projectCompetitors;
 

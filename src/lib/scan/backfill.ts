@@ -14,7 +14,8 @@ import { evaluationsFor, fetchAvatars, postItem, routed, toLead, unjudged } from
 import type { Judgement } from "./judgement";
 import { judgeItems, readOrder, triageTitles } from "./score";
 import type { StoredJudgement } from "./evaluations";
-import { creditSources, markCovered, recordSources, type CandidateSource } from "./sources";
+import { sweepSearches } from "./searches";
+import { creditSources, keepSearches, markCovered, recordSources, type CandidateSource } from "./sources";
 
 /**
  * The one-time sweep a new project starts with. A scan polls the last thirty
@@ -30,9 +31,10 @@ import { creditSources, markCovered, recordSources, type CandidateSource } from 
  * 22 walks that read every page: 4,229 posts, 137 leads, $0.46. Read this way
  * the same sweep keeps 130 of the 137 for $0.11:
  *
- *   depth    walks read FIRST_PASS_PAGES, and only one that found a lead reads
- *            on, to DEPTH_PAGES. Pages one and two held 71% of the qualified
- *            leads in 18% of the posts; pages nine and later held 3 in 1,074.
+ *   depth    walks read FIRST_PASS_PAGES, and only the DEEP_WALKS that found the
+ *            most leads there read on, to DEPTH_PAGES. Pages one and two held
+ *            71% of the qualified leads in 18% of the posts; pages nine and
+ *            later held 3 in 1,074.
  *   triage   a title under ASKING_FLOOR is not scored. Scoring a post costs
  *            six times what triaging it does, and 95% of scored posts were
  *            rejected.
@@ -56,8 +58,26 @@ const STALE_PAGES = 3;
  * the deepest listing holds; measured 2026-09-18, one relevance walk needed
  * 59 pages and the sweep waited 53 seconds on it. The walks then pick up from
  * their cursors and read the rest of the year.
+ *
+ * One page, of 25 posts, since 2026-09-19: a sweep now asks some twenty more
+ * searches than the page's own phrasings (src/lib/scan/searches.ts), and what
+ * a search finds on its first page says what the rest of it holds. Measured on
+ * 24 projects and 557 searches, the leads on page one ranked a search's two
+ * pages at 0.89 (Spearman, the median project) and its second page alone at
+ * 0.59, where the share of its titles passing triage managed 0.37.
  */
-const FIRST_PASS_PAGES = 2;
+const FIRST_PASS_PAGES = 1;
+
+/**
+ * Walks that read past the first pass: the ones whose first page found the most
+ * leads. On the same 24 projects, every search read two pages deep found 1,886
+ * leads at 6.8 in 100 posts; the best eight by page one, 1,614 at 8.6. Two
+ * more than that because a plan's keywords are walked here as well.
+ */
+const DEEP_WALKS = 10;
+
+/** Searches of the sweep's own that a project's scans go on asking: the ones that found the most leads. */
+const KEPT_SEARCHES = 8;
 
 /** Pages a walk reads in all, when its first pass found a lead. */
 const DEPTH_PAGES = 6;
@@ -208,7 +228,7 @@ async function walk(
  * as plain words. Measured 2026-09-10: a quoted phrasing returned nothing,
  * because a buyer rarely types the profile's exact sentence.
  */
-function queriesOf(project: ScanProject): Query[] {
+function queriesOf(project: ScanProject, added: string[] = []): Query[] {
   const rows = retrieved(project.queries);
   const byText = new Map<string, Query>();
   const add = (text: string, row: PlanRow | null) => {
@@ -226,7 +246,7 @@ function queriesOf(project: ScanProject): Query[] {
       add(text, row);
     }
   }
-  for (const phrasing of project.phrasings) {
+  for (const phrasing of [...project.phrasings, ...added]) {
     add(phrasing, null);
   }
   return [...byText.values()];
@@ -391,7 +411,9 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
 
   // A trial-size sweep is the same sweep over less: see src/lib/sweepScale.ts.
   const small = smallSweep();
-  const queries = small ? spread(queriesOf(project), SMALL_SWEEP.queries) : queriesOf(project);
+  await progress(jobId, "Working out what your buyers search for");
+  const all = queriesOf(project, small ? [] : await sweepSearches(projectId, project.product));
+  const queries = small ? spread(all, SMALL_SWEEP.queries) : all;
   const postBudget = small ? SMALL_SWEEP.posts : POST_BUDGET;
   const firstPassPages = small ? SMALL_SWEEP.pages : FIRST_PASS_PAGES;
   const depthPages = small ? SMALL_SWEEP.pages : DEPTH_PAGES;
@@ -440,10 +462,15 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   };
   const ends = await Promise.all(plan.map((item) => run(item, firstPassPages)));
   await judge.settle();
-  const leadPosts = new Set(judge.leads.map((lead) => lead.postId));
-  const deeper = plan.filter(
-    (item, index) => depthPages > firstPassPages && ends[index] === "paused" && [...item.walked].some((id) => leadPosts.has(id)),
-  );
+  /** Buyer leads among the posts this walk has been handed, as the sweep stands now. */
+  const buyersOf = (item: Walk): number => {
+    const buyers = new Set(judge.leads.filter((lead) => lead.kind === "buyer").map((lead) => lead.postId));
+    return [...item.walked].filter((id) => buyers.has(id)).length;
+  };
+  const deeper = plan
+    .filter((item, index) => depthPages > firstPassPages && ends[index] === "paused" && buyersOf(item) > 0)
+    .sort((a, b) => buyersOf(b) - buyersOf(a))
+    .slice(0, DEEP_WALKS);
   walks = plan.length - deeper.length;
   pass = "rest";
   await report();
@@ -479,6 +506,25 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
     judge.candidates.map((post) => post.id),
     judge.leads.map((lead) => lead.postId),
   );
+  // A search of the sweep's own belongs to no plan row, so the scans that
+  // follow would never ask it again. The ones that found the most buyers join
+  // the plan as keywords, where a person can switch them off like any other.
+  if (!small) {
+    const judgedPosts = new Set(judge.judged.map((judgement) => judgement.id));
+    await keepSearches(
+      projectId,
+      plan
+        .map((item) => ({ item, buyers: buyersOf(item) }))
+        .filter(({ item, buyers }) => item.query.rows.length === 0 && buyers > 0)
+        .sort((a, b) => b.buyers - a.buyers)
+        .slice(0, KEPT_SEARCHES)
+        .map(({ item, buyers }) => ({
+          text: item.query.text,
+          candidates: [...item.walked].filter((id) => judgedPosts.has(id)).length,
+          leads: buyers,
+        })),
+    );
+  }
   const at = new Date();
   for (const query of queries) {
     for (const row of query.rows) {
