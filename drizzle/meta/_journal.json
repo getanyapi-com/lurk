@@ -183,6 +183,13 @@
       "when": 1789765945222,
       "tag": "0025_search_run_completed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789784328255,
+      "tag": "0026_jobs_manual",
+      "breakpoints": true
     }
   ]
 }

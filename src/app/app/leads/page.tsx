@@ -2,11 +2,12 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Feed } from "@/components/leads/Feed";
 import { ListSkeleton, PillsSkeleton, Skeleton } from "@/components/Skeleton";
-import { Button } from "@/components/ui/button";
+import { ScanNowButton } from "@/components/scan/ScanNowButton";
 import { scanNowAction } from "@/app/app/scan";
 import { requireLocalUser } from "@/lib/auth";
 import type { FeedParams } from "@/lib/feed";
 import { activeProject } from "@/lib/projects";
+import { manualScanOpensAt } from "@/lib/scan/manual";
 
 type LeadsPageProps = { searchParams: Promise<FeedParams> };
 
@@ -43,6 +44,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   if (!project) {
     redirect("/app/projects/new");
   }
+  const scanOpensAt = await manualScanOpensAt(user.id, project.id);
 
   return (
     <div className="flex flex-col gap-1">
@@ -51,9 +53,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           {project.name}
         </h2>
         <form action={scanNowAction.bind(null, project.id)}>
-          <Button type="submit" size="lg">
-            Scan now
-          </Button>
+          <ScanNowButton opensAt={scanOpensAt} />
         </form>
       </div>
       {/*

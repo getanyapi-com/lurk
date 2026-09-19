@@ -5,6 +5,7 @@ import { ListEditor } from "@/components/product/ListEditor";
 import { PlanSections } from "@/components/product/PlanSections";
 import { ProfileForm } from "@/components/product/ProfileForm";
 import { ListSkeleton } from "@/components/Skeleton";
+import { ScanNowButton } from "@/components/scan/ScanNowButton";
 import { Button } from "@/components/ui/button";
 import {
   rebuildProfileAction,
@@ -15,6 +16,7 @@ import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { activeProject } from "@/lib/projects";
 import { activitySentence, projectActivity } from "@/lib/projectActivity";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
+import { manualScanOpensAt } from "@/lib/scan/manual";
 
 type ProductPageProps = { searchParams: Promise<{ project?: string }> };
 
@@ -39,7 +41,10 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
     );
   }
 
-  const activity = await projectActivity(project.id);
+  const [activity, scanOpensAt] = await Promise.all([
+    projectActivity(project.id),
+    manualScanOpensAt(user.id, project.id),
+  ]);
   const places = parseDestinations(project.destinations).map((place) => ({
     value: place.name,
     sourceText: place.sourceText,
@@ -141,9 +146,7 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
       <div className="flex flex-wrap items-center gap-3">
         <form action={scanAndOpenLeadsAction}>
           <input type="hidden" name="projectId" value={project.id} />
-          <Button type="submit" size="lg">
-            Scan now
-          </Button>
+          <ScanNowButton opensAt={scanOpensAt} align="start" />
         </form>
         <form action={rebuildProfileAction}>
           <input type="hidden" name="projectId" value={project.id} />

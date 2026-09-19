@@ -430,4 +430,6 @@ export const jobs = pgTable("jobs", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   progress: text("progress"),
   error: text("error"),
+  /** A scan a user asked for with Scan now, which the free tier rations. */
+  manual: boolean("manual").notNull().default(false),
 });
