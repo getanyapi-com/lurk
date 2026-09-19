@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, ExternalLink, EyeOff, ThumbsDown } from "lucide-react";
+import { ExternalLink, EyeOff, ThumbsDown } from "lucide-react";
 import { hideLeadAction, markNotFitAction } from "@/app/app/leads/actions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -18,7 +18,6 @@ type LeadActionsProps = {
   projectId: string;
   leadId: string;
   url: string;
-  title: string;
 };
 
 /**
@@ -26,16 +25,9 @@ type LeadActionsProps = {
  * this page leads to, so it is the only filled button; the rest take the lead
  * out of the feed or record why it was wrong.
  */
-export function LeadActions({ projectId, leadId, url, title }: LeadActionsProps) {
-  const [copied, setCopied] = useState(false);
+export function LeadActions({ projectId, leadId, url }: LeadActionsProps) {
   const [picking, setPicking] = useState(false);
   const iconClass = "size-3.5 text-fg-muted";
-
-  async function copyTitle() {
-    await navigator.clipboard.writeText(title);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
 
   return (
     <div className="flex shrink-0 flex-col gap-3 border-t p-4">
@@ -79,14 +71,6 @@ export function LeadActions({ projectId, leadId, url, title }: LeadActionsProps)
             Not a fit
           </Button>
         )}
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={copyTitle}>
-          {copied ? (
-            <Check className={iconClass} aria-hidden="true" />
-          ) : (
-            <Copy className={iconClass} aria-hidden="true" />
-          )}
-          {copied ? "Copied" : "Copy title"}
-        </Button>
       </div>
     </div>
   );

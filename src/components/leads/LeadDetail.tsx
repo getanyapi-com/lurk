@@ -181,7 +181,6 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
         projectId={projectId}
         leadId={lead.id}
         url={lead.url}
-        title={lead.title}
       />
     </Pane>
   );

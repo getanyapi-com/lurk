@@ -1,6 +1,6 @@
 "use client";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Copy, ExternalLink, EyeOff, MessageCircle, Search, ShieldCheck, ThumbsDown } from "lucide-react";
+import { ArrowUp, ExternalLink, EyeOff, MessageCircle, Search, ShieldCheck, ThumbsDown } from "lucide-react";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { AppMockLeads } from "./AppMockLeads";
@@ -8,7 +8,6 @@ import { SCAN_LEAD, SCAN_LEAD_FACTS } from "./mockContent";
 
 const ACTIONS = [
   ["Open on Reddit", ExternalLink],
-  ["Copy title", Copy],
   ["Hide", EyeOff],
   ["Not a fit", ThumbsDown],
 ] as const;
