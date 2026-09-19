@@ -3,6 +3,7 @@ import { ActivityPoll } from "@/components/ActivityPoll";
 import { hasWorkInFlight } from "@/lib/projectActivity";
 import { Header } from "@/components/Header";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
+import { ProjectSync } from "@/components/ProjectSync";
 import { Rail, type RailGroup } from "@/components/Rail";
 import { requireLocalUser } from "@/lib/auth";
 import { countMentions } from "@/lib/competitors/read";
@@ -67,9 +68,10 @@ async function requestedProject(): Promise<string | undefined> {
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireLocalUser();
+  const requested = await requestedProject();
   const [projects, project] = await Promise.all([
     listProjects(user.id),
-    requestedProject().then((requested) => activeProject(user.id, requested)),
+    activeProject(user.id, requested),
   ]);
   const [counts, busy] = project
     ? await Promise.all([countsFor(project.id), hasWorkInFlight(project.id)])
@@ -80,8 +82,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Here and not on each page: the rail's counts and every tab are filled
           by jobs that finish after the page was drawn. */}
       <ActivityPoll busy={busy} />
+      <ProjectSync drawnFor={requested ?? ""} />
       <div className="flex flex-1">
-        <Rail groups={groupsFor(counts)}>
+        <Rail groups={groupsFor(counts)} projectId={project?.id ?? null}>
           <ProjectSwitcher
             projects={projects.map((one) => ({ id: one.id, name: one.name, url: one.url }))}
             defaultId={project?.id ?? null}

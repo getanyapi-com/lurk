@@ -34,7 +34,12 @@ export type RailItem = {
 };
 export type RailGroup = { label: string; items: RailItem[] };
 
-type RailProps = { groups: RailGroup[]; children?: React.ReactNode };
+type RailProps = {
+  groups: RailGroup[];
+  /** The project the shell was drawn for, when the URL does not name one. */
+  projectId: string | null;
+  children?: React.ReactNode;
+};
 
 /**
  * Left navigation, grouped Engage / Research / Setup, with count pills. It is
@@ -45,15 +50,19 @@ type RailProps = { groups: RailGroup[]; children?: React.ReactNode };
  * Below md there is no room for a column beside the page, so the same rail is
  * a drawer: a button it draws over the header's left edge slides it in.
  */
-export function Rail({ groups, children }: RailProps) {
+export function Rail({ groups, projectId, children }: RailProps) {
   const pathname = usePathname();
+  const requested = useSearchParams().get("project");
+  // Every page reads its project from the URL, so a link that drops it lands on
+  // the first project while the switcher still names the one you picked.
+  const project = requested ?? projectId;
   // A project that does not exist yet has no leads to count and no pages to
   // open, so its rail is the shape of one with nothing in it.
   const creating = pathname === NEW_PROJECT_PATH;
   const [open, setOpen] = useState(false);
   // Arriving somewhere is the drawer's job done, and switching project keeps
   // the pathname, so the project is part of where you are.
-  const place = `${pathname}?${useSearchParams().get("project") ?? ""}`;
+  const place = `${pathname}?${requested ?? ""}`;
   const [openedAt, setOpenedAt] = useState(place);
   if (openedAt !== place) {
     setOpenedAt(place);
@@ -125,7 +134,7 @@ export function Rail({ groups, children }: RailProps) {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={project ? `${item.href}?project=${encodeURIComponent(project)}` : item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "transition-motion flex items-center justify-between gap-2 rounded-control px-2 py-1.5 text-body transition-colors",
