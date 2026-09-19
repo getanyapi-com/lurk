@@ -62,10 +62,10 @@ export const TIERS: Record<TierName, TierLimits> = {
     apiRequestsPerDay: 1000,
     actionsPerDay: {
       scan_now: 0,
-      rebuild_profile: 3,
-      seo_refresh: 3,
-      competitor_scan: 3,
-      insights: 5,
+      rebuild_profile: 1,
+      seo_refresh: 1,
+      competitor_scan: 1,
+      insights: 1,
     },
     discoveryQueries: 8,
     discoveryQueriesMax: 12,
@@ -90,7 +90,9 @@ export const TIERS: Record<TierName, TierLimits> = {
     apiRequestsPerDay: null,
     actionsPerDay: {
       scan_now: 24,
-      rebuild_profile: 10,
+      // A rebuild reads the site and runs discovery again: the dearest press
+      // there is, and the house pays its model calls on every tier.
+      rebuild_profile: 1,
       seo_refresh: 12,
       competitor_scan: 12,
       insights: 24,

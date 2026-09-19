@@ -59,16 +59,11 @@ describe.skipIf(!process.env.DATABASE_URL)("a free user pressing paid buttons", 
       // A second press while the first is still due queues nothing and counts nothing.
       await pressForJob(user.id, "seo_refresh", "seo_refresh", project.id);
       await pressForJob(user.id, "seo_refresh", "seo_refresh", project.id);
-      expect((await allowanceFor(user.id, "seo_refresh")).opensAt).toBeNull();
       const queued = await db().select().from(jobs).where(eq(jobs.projectId, project.id));
       expect(queued).toHaveLength(1);
 
-      // Once that one has started, each press buys a new job and counts.
+      // Free has one press, so once that job has started the next one is refused.
       await db().update(jobs).set({ startedAt: new Date() }).where(eq(jobs.projectId, project.id));
-      const limit = TIERS.free.actionsPerDay.seo_refresh;
-      for (let press = 1; press < limit; press += 1) {
-        await spendAllowance(user.id, "seo_refresh");
-      }
       const spent = await allowanceFor(user.id, "seo_refresh");
       expect(spent.opensAt?.getTime()).toBeGreaterThan(Date.now() + 23 * HOUR_MS);
       await expect(

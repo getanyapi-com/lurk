@@ -18,7 +18,8 @@ function reason({ limit, opensAt }: Allowance): string {
     return "Free runs this on its daily schedule.";
   }
   const until = opensAt ? relativeUntil(opensAt) : "soon";
-  return `You have used today's ${limit}. The next one opens ${until}.`;
+  const used = limit === 1 ? "This runs once a day." : `You have used today's ${limit}.`;
+  return `${used} The next one opens ${until}.`;
 }
 
 /**
