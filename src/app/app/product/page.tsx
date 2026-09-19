@@ -14,7 +14,7 @@ import {
 import { requireLocalUser } from "@/lib/auth";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { activeProject } from "@/lib/projects";
-import { activitySentence, projectActivity } from "@/lib/projectActivity";
+import { activitySentence, isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
 import { allowanceFor } from "@/lib/throttle";
 
@@ -145,10 +145,12 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
       </Suspense>
 
       <div className="flex flex-wrap items-center gap-3">
-        <form action={scanAndOpenLeadsAction}>
-          <input type="hidden" name="projectId" value={project.id} />
-          <PaidButton label="Scan now" allowance={scanNow} align="start" />
-        </form>
+        {isOnboarding(activity) ? null : (
+          <form action={scanAndOpenLeadsAction}>
+            <input type="hidden" name="projectId" value={project.id} />
+            <PaidButton label="Scan now" allowance={scanNow} align="start" />
+          </form>
+        )}
         <form action={rebuildProfileAction}>
           <input type="hidden" name="projectId" value={project.id} />
           <PaidButton

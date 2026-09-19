@@ -7,6 +7,7 @@ import { scanNowAction } from "@/app/app/scan";
 import { requireLocalUser } from "@/lib/auth";
 import type { FeedParams } from "@/lib/feed";
 import { activeProject } from "@/lib/projects";
+import { isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { allowanceFor } from "@/lib/throttle";
 
 type LeadsPageProps = { searchParams: Promise<FeedParams> };
@@ -47,7 +48,10 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   if (!project) {
     redirect("/app/projects/new");
   }
-  const scanNow = await allowanceFor(user.id, "scan_now");
+  const [scanNow, activity] = await Promise.all([
+    allowanceFor(user.id, "scan_now"),
+    projectActivity(project.id),
+  ]);
 
   return (
     // From lg up the page is exactly the window under the header, and never
@@ -59,9 +63,11 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         <h2 className="text-h3" style={{ fontWeight: 500 }}>
           {project.name}
         </h2>
-        <form action={scanNowAction.bind(null, project.id)}>
-          <PaidButton label="Scan now" allowance={scanNow} note="beside" />
-        </form>
+        {isOnboarding(activity) ? null : (
+          <form action={scanNowAction.bind(null, project.id)}>
+            <PaidButton label="Scan now" allowance={scanNow} note="beside" />
+          </form>
+        )}
       </div>
       {/*
         Deliberately unkeyed. Arriving on the page has nothing to show, so it

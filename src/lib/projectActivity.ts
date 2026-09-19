@@ -88,6 +88,15 @@ export function isBusy(activity: ProjectActivity): boolean {
   return activity.active.length > 0;
 }
 
+/**
+ * Whether a new project is still being set up or swept for the first time.
+ * Scan now has nothing to add then: the sweep is already reading everything a
+ * scan would, and pressing it only spends the allowance on the same threads.
+ */
+export function isOnboarding(activity: ProjectActivity): boolean {
+  return activity.active.some((job) => job.kind === "discovery_initial" || job.kind === "backfill");
+}
+
 const WAITING: Record<ActivityKind, string> = {
   discovery_initial: "Setting your project up: this starts within a minute.",
   backfill: "The first sweep of the past year is queued.",
