@@ -5,7 +5,7 @@ import { ListEditor } from "@/components/product/ListEditor";
 import { PlanSections } from "@/components/product/PlanSections";
 import { ProfileForm } from "@/components/product/ProfileForm";
 import { ListSkeleton } from "@/components/Skeleton";
-import { ScanNowButton } from "@/components/scan/ScanNowButton";
+import { PaidButton } from "@/components/PaidButton";
 import { Button } from "@/components/ui/button";
 import {
   rebuildProfileAction,
@@ -16,7 +16,7 @@ import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { activeProject } from "@/lib/projects";
 import { activitySentence, projectActivity } from "@/lib/projectActivity";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
-import { canScanNow } from "@/lib/scan/scanNow";
+import { allowanceFor } from "@/lib/throttle";
 
 type ProductPageProps = { searchParams: Promise<{ project?: string }> };
 
@@ -41,9 +41,10 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
     );
   }
 
-  const [activity, scanAllowed] = await Promise.all([
+  const [activity, scanNow, rebuild] = await Promise.all([
     projectActivity(project.id),
-    canScanNow(user.id),
+    allowanceFor(user.id, "scan_now"),
+    allowanceFor(user.id, "rebuild_profile"),
   ]);
   const places = parseDestinations(project.destinations).map((place) => ({
     value: place.name,
@@ -146,13 +147,16 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
       <div className="flex flex-wrap items-center gap-3">
         <form action={scanAndOpenLeadsAction}>
           <input type="hidden" name="projectId" value={project.id} />
-          <ScanNowButton allowed={scanAllowed} align="start" />
+          <PaidButton label="Scan now" allowance={scanNow} align="start" />
         </form>
         <form action={rebuildProfileAction}>
           <input type="hidden" name="projectId" value={project.id} />
-          <Button type="submit" variant="secondary" size="lg">
-            Rebuild profile
-          </Button>
+          <PaidButton
+            label="Rebuild profile"
+            allowance={rebuild}
+            variant="secondary"
+            align="start"
+          />
         </form>
         <span className="text-small text-fg-muted">
           Rebuilding reads your site again and replaces everything above.

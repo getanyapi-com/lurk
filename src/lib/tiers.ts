@@ -5,6 +5,14 @@
  */
 export type TierName = "free" | "connected";
 
+/** The buttons that spend money on a press, which each tier rations per user. */
+export type PaidAction =
+  | "scan_now"
+  | "rebuild_profile"
+  | "seo_refresh"
+  | "competitor_scan"
+  | "insights";
+
 export type TierLimits = {
   projects: number | null;
   keywordsPerProject: number | null;
@@ -18,8 +26,13 @@ export type TierLimits = {
   competitors: number | null;
   /** Null means no daily cap, which is what a connected wallet buys. */
   apiRequestsPerDay: number | null;
-  /** Whether Scan now is on. Free scans only on its schedule. */
-  scanNow: boolean;
+  /**
+   * How many times one user may press each paid button in any 24 hours, across
+   * all their projects. Zero means the button is off: free scans only on its
+   * schedule. The house pays every model call whatever the tier, so a
+   * connected wallet is rationed too, only more loosely.
+   */
+  actionsPerDay: Record<PaidAction, number>;
   /**
    * What discovery and one scan may buy. The starting values come from the
    * accepted second opinion and Kevin reviews them.
@@ -47,7 +60,13 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoRefreshDays: 7,
     competitors: 3,
     apiRequestsPerDay: 1000,
-    scanNow: false,
+    actionsPerDay: {
+      scan_now: 0,
+      rebuild_profile: 3,
+      seo_refresh: 3,
+      competitor_scan: 3,
+      insights: 5,
+    },
     discoveryQueries: 8,
     discoveryQueriesMax: 12,
     searchesPerScan: 8,
@@ -69,7 +88,13 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoRefreshDays: 1,
     competitors: null,
     apiRequestsPerDay: null,
-    scanNow: true,
+    actionsPerDay: {
+      scan_now: 24,
+      rebuild_profile: 10,
+      seo_refresh: 12,
+      competitor_scan: 12,
+      insights: 24,
+    },
     discoveryQueries: 12,
     discoveryQueriesMax: 20,
     searchesPerScan: 16,

@@ -1,7 +1,6 @@
 import { openSeoAction, refreshSeoAction } from "@/app/app/seo/actions";
 import { EmptyState } from "@/components/EmptyState";
 import { StartOnOpen } from "@/components/StartOnOpen";
-import { Button } from "@/components/ui/button";
 import { NoPhrasings } from "@/components/seo/NoPhrasings";
 import { RefreshStatus } from "@/components/seo/RefreshStatus";
 import { SeoFilters } from "@/components/seo/SeoFilters";
@@ -9,6 +8,8 @@ import { SplitView } from "@/components/seo/SplitView";
 import { ThreadTable } from "@/components/seo/ThreadTable";
 import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
+import { allowanceFor } from "@/lib/throttle";
+import { PaidButton } from "@/components/PaidButton";
 import { activeProject } from "@/lib/projects";
 import {
   listOpportunities,
@@ -80,12 +81,13 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
     competitor: params.competitor,
     closed: params.closed,
   };
-  const [rows, facets, last, next, competitors] = await Promise.all([
+  const [rows, facets, last, next, competitors, allowance] = await Promise.all([
     listOpportunities(project.id, filter),
     seoFacets(project.id, filter),
     lastRunJob("seo_refresh", project.id),
     nextQueuedJob("seo_refresh", project.id),
     watchedCompetitors(project.id),
+    allowanceFor(user.id, "seo_refresh"),
   ]);
   const nothingToLookUp = Boolean(last?.finishedAt) && last?.progress === NO_PHRASINGS_PROGRESS;
   // The order is decided here, over the rows in hand, because three of the four
@@ -115,9 +117,7 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
           ) : null}
         </div>
         <form action={refreshSeoAction.bind(null, project.id)}>
-          <Button type="submit" size="lg">
-            Refresh now
-          </Button>
+          <PaidButton label="Refresh now" allowance={allowance} />
         </form>
       </div>
       <SeoFilters facets={facets} />

@@ -5,6 +5,7 @@ import { CADENCE_MS } from "@/lib/alerts/select";
 import { runDiscoveryRefresh } from "@/lib/discovery/refresh";
 import { runInitialDiscovery } from "@/lib/discovery/initial";
 import { deleteExpiredPosts } from "@/lib/retention";
+import { deleteOldUserActions } from "@/lib/throttle";
 import { discoveryBudget } from "@/lib/discovery/run";
 import { runBackfill } from "@/lib/scan/backfill";
 import { runRescore } from "@/lib/scan/rescore";
@@ -95,6 +96,7 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
   digest: runDigest,
   retention: async () => {
     await deleteExpiredPosts();
+    await deleteOldUserActions();
     await enqueueOnce("retention", new Date(Date.now() + DAY_MS));
   },
 };

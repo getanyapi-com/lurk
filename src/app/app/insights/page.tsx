@@ -5,9 +5,10 @@ import { CommunitiesTable } from "@/components/insights/CommunitiesTable";
 import { InsightsTabs, type InsightsTab } from "@/components/insights/InsightsTabs";
 import { ThemeCard } from "@/components/insights/ThemeCard";
 import { relativeAge } from "@/lib/format";
-import { Button } from "@/components/ui/button";
 import { lastRunJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
+import { allowanceFor } from "@/lib/throttle";
+import { PaidButton } from "@/components/PaidButton";
 import { listCommunities, listThemes } from "@/lib/insights/read";
 import { activeProject } from "@/lib/projects";
 
@@ -40,10 +41,11 @@ export default async function InsightsPage({ searchParams }: InsightsPageProps) 
   }
 
   const tab: InsightsTab = params.tab === "communities" ? "communities" : "themes";
-  const [themes, communities, job] = await Promise.all([
+  const [themes, communities, job, allowance] = await Promise.all([
     listThemes(project.id),
     listCommunities(project.id),
     lastRunJob("insights", project.id),
+    allowanceFor(user.id, "insights"),
   ]);
 
   return (
@@ -60,9 +62,7 @@ export default async function InsightsPage({ searchParams }: InsightsPageProps) 
           </p>
         </div>
         <form action={refreshInsightsAction.bind(null, project.id)}>
-          <Button type="submit" size="lg">
-            Refresh
-          </Button>
+          <PaidButton label="Refresh" allowance={allowance} />
         </form>
       </div>
       <InsightsTabs active={tab} projectId={project.id} />

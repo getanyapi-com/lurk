@@ -5,9 +5,10 @@ import { MentionsBar } from "@/components/competitors/MentionsBar";
 import { TopCompetitors } from "@/components/competitors/TopCompetitors";
 import { EmptyState } from "@/components/EmptyState";
 import { relativeAge, relativeUntil } from "@/lib/format";
-import { Button } from "@/components/ui/button";
 import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
+import { allowanceFor } from "@/lib/throttle";
+import { PaidButton } from "@/components/PaidButton";
 import {
   domainsByName,
   listCompetitors,
@@ -63,11 +64,12 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
     );
   }
 
-  const [competitors, mentions, last, next] = await Promise.all([
+  const [competitors, mentions, last, next, allowance] = await Promise.all([
     listCompetitors(project.id),
     listMentions(project.id),
     lastRunJob("competitor_scan", project.id),
     nextQueuedJob("competitor_scan", project.id),
+    allowanceFor(user.id, "competitor_scan"),
   ]);
   const names = competitors.map((row) => row.name);
   const domains = domainsByName(competitors);
@@ -84,9 +86,7 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
           <p className="text-small text-fg-muted">{statusLine(last, next)}</p>
         </div>
         <form action={scanCompetitorsAction.bind(null, project.id)}>
-          <Button type="submit" size="lg">
-            Scan now
-          </Button>
+          <PaidButton label="Scan now" allowance={allowance} />
         </form>
       </div>
 

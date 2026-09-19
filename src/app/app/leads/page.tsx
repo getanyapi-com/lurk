@@ -2,12 +2,12 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Feed } from "@/components/leads/Feed";
 import { ListSkeleton, PillsSkeleton, Skeleton } from "@/components/Skeleton";
-import { ScanNowButton } from "@/components/scan/ScanNowButton";
+import { PaidButton } from "@/components/PaidButton";
 import { scanNowAction } from "@/app/app/scan";
 import { requireLocalUser } from "@/lib/auth";
 import type { FeedParams } from "@/lib/feed";
 import { activeProject } from "@/lib/projects";
-import { canScanNow } from "@/lib/scan/scanNow";
+import { allowanceFor } from "@/lib/throttle";
 
 type LeadsPageProps = { searchParams: Promise<FeedParams> };
 
@@ -44,7 +44,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   if (!project) {
     redirect("/app/projects/new");
   }
-  const scanAllowed = await canScanNow(user.id);
+  const scanNow = await allowanceFor(user.id, "scan_now");
 
   return (
     <div className="flex flex-col gap-1">
@@ -53,7 +53,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           {project.name}
         </h2>
         <form action={scanNowAction.bind(null, project.id)}>
-          <ScanNowButton allowed={scanAllowed} />
+          <PaidButton label="Scan now" allowance={scanNow} />
         </form>
       </div>
       {/*

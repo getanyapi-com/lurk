@@ -19,6 +19,7 @@ import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { buildProfile } from "@/lib/profile";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import { projectForUser } from "@/lib/projects";
+import { spendAllowance } from "@/lib/throttle";
 import { tierForUser } from "@/lib/tier";
 
 export type ChipKind = "keyword" | "subreddit" | "competitor";
@@ -476,6 +477,7 @@ export async function rebuildProfileAction(formData: FormData) {
   if (!project.url) {
     throw new Error("This project has no product URL to read.");
   }
+  await spendAllowance(user.id, "rebuild_profile");
   await buildProfile(project.id, user.id, project.url, { rejudge: true });
   await enqueueJob("discovery_initial", project.id);
   revalidatePath("/app", "layout");

@@ -431,3 +431,22 @@ export const jobs = pgTable("jobs", {
   progress: text("progress"),
   error: text("error"),
 });
+
+/**
+ * Every paid action a user pressed: Scan now, a profile rebuild, a refresh.
+ * The per-user daily allowance counts these, so one account looping a button
+ * runs out of its own presses long before it can trip the house caps that
+ * every other user's scans share.
+ */
+export const userActions = pgTable(
+  "user_actions",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    action: text("action").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("user_actions_user_action_at_idx").on(t.userId, t.action, t.at)],
+);
