@@ -86,7 +86,16 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
     const due = (kind: string) =>
       (first.find((row) => row.kind === kind)!.runAt.getTime() - Date.now()) / HOUR_MS;
     expect(due("backfill")).toBeLessThan(0.1);
-    expect(due("scan")).toBeGreaterThan(5);
+    // The recurring scan waits for the project's own next slot. A daily cadence
+    // puts that anywhere from minutes to a day away depending on the hour the
+    // test runs, so it is checked against the slot rather than a fixed gap.
+    const { cadenceFor } = await import("@/lib/settings");
+    const { tierForUser } = await import("@/lib/tier");
+    const { settings } = await tierForUser(user.id);
+    const slot = cadenceFor(settings.settings.cadence).nextRunAt(new Date()).getTime();
+    const scanAt = first.find((row) => row.kind === "scan")!.runAt.getTime();
+    expect(Math.abs(scanAt - slot)).toBeLessThan(60_000);
+    expect(due("scan")).toBeGreaterThan(0);
     expect(due("discovery_refresh")).toBeGreaterThan(24);
 
     await JOB_HANDLERS.discovery_initial(job);
