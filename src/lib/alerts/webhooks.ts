@@ -1,4 +1,5 @@
 import { postJson } from "./outbound";
+import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
 import type { Digest, DigestLead } from "./types";
 
 function headline(digest: Digest): string {
@@ -22,23 +23,41 @@ export function slackPayload(digest: Digest) {
         type: "section",
         text: { type: "mrkdwn", text: `${line(lead)}\n<${lead.url}|Source>` },
       })),
+      {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `${ANYAPI_PLUG} <${anyapiAlertUrl("slack")}|${ANYAPI_PLUG_CTA}>`,
+          },
+        ],
+      },
     ],
   };
 }
 
-/** Discord embeds, one per lead, so each carries its own clickable title. */
+/**
+ * Discord embeds, one per lead, so each carries its own clickable title. The
+ * AnyAPI line is its own embed after them: Discord allows ten, and the digest
+ * carries five leads.
+ */
 export function discordPayload(digest: Digest) {
   return {
     content: headline(digest),
-    embeds: digest.leads.map((lead) => ({
-      title: lead.title.slice(0, 256),
-      url: lead.url,
-      description: lead.reason ?? undefined,
-      fields: [
-        { name: "Score", value: String(lead.score), inline: true },
-        { name: "Subreddit", value: `r/${lead.subreddit}`, inline: true },
-      ],
-    })),
+    embeds: [
+      ...digest.leads.map((lead) => ({
+        title: lead.title.slice(0, 256),
+        url: lead.url,
+        description: lead.reason ?? undefined,
+        fields: [
+          { name: "Score", value: String(lead.score), inline: true },
+          { name: "Subreddit", value: `r/${lead.subreddit}`, inline: true },
+        ],
+      })),
+      {
+        description: `${ANYAPI_PLUG} [${ANYAPI_PLUG_CTA}](${anyapiAlertUrl("discord")})`,
+      },
+    ],
   };
 }
 

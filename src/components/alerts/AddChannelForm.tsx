@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Plus, Slack } from "lucide-react";
 import { addChannelAction } from "@/app/app/settings/alerts/actions";
+import { ChannelMark } from "@/components/alerts/ChannelMark";
+import { PillTabs } from "@/components/PillTabs";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ALERT_CHANNELS, CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "@/lib/alerts/types";
@@ -53,15 +55,18 @@ export function AddChannelForm({
 
   return (
     <form action={submit} className="flex flex-col gap-3 rounded-card border bg-surface p-4">
+      <input type="hidden" name="channel" value={channel} />
+      <PillTabs
+        className="self-start"
+        activeId={channel}
+        onSelect={(id) => setChannel(id as AlertChannel)}
+        tabs={ALERT_CHANNELS.map((one) => ({
+          id: one,
+          label: CHANNEL_LABELS[one],
+          icon: <ChannelMark channel={one} size={14} />,
+        }))}
+      />
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          name="channel"
-          ariaLabel="Channel type"
-          className="h-10 px-3 text-body"
-          value={channel}
-          onValueChange={(value) => setChannel(value as AlertChannel)}
-          options={ALERT_CHANNELS.map((one) => ({ value: one, label: CHANNEL_LABELS[one] }))}
-        />
         {pickSlack ? (
           <span className="min-w-64 flex-1 text-body text-fg-muted">
             Pick the channel on Slack&apos;s side.

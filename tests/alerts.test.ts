@@ -205,8 +205,18 @@ describe("chat payloads", () => {
             { name: "Subreddit", value: "r/SaaS" },
           ],
         },
+        { description: expect.stringContaining("utm_medium=discord") },
       ],
     });
+  });
+
+  it("ends every chat message and email with the AnyAPI line, tagged by channel", () => {
+    const digest = digestOf(selectLeads([lead({ id: "a" })], SINCE, null));
+    const slack = (payloadFor("slack", digest) as { blocks: unknown[] }).blocks.at(-1);
+    expect(JSON.stringify(slack)).toContain("utm_source=lurk&utm_medium=slack");
+    expect(renderDigestHtml(digest)).toContain("utm_medium=email");
+    expect(renderDigestText(digest)).toContain("utm_medium=email");
+    expect(JSON.stringify(payloadFor("webhook", digest))).not.toContain("AnyAPI");
   });
 
   it("hands a generic endpoint the digest unstyled", () => {
@@ -263,7 +273,7 @@ describe("the digest email", () => {
   });
 
   it("keeps the same table structure", () => {
-    expect(structure(html)).toMatchInlineSnapshot(`"!doctype html head meta meta title /title /head body table tr td table tr td table tr td img /td td /td /tr /table /td /tr tr td /td /tr tr td table tr td /td /tr tr td table tr td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div img /div div /div div /div /td td div /div div /div /td td div /div div /div /td /tr /table /td /tr /table /td /tr tr td table tr td img img /td td div /div div /div div /div div /div /td td div /div a /a /td /tr /table /td /tr tr td a /a a /a /td /tr /table /td /tr /table /body /html"`);
+    expect(structure(html)).toMatchInlineSnapshot(`"!doctype html head meta meta title /title /head body table tr td table tr td table tr td img /td td /td /tr /table /td /tr tr td /td /tr tr td table tr td /td /tr tr td table tr td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div img /div div /div div /div /td td div /div div /div /td td div /div div /div /td /tr /table /td /tr /table /td /tr tr td table tr td img img /td td div /div div /div div /div div /div /td td div /div a /a /td /tr /table /td /tr tr td table tr td a /a /td /tr /table /td /tr tr td a /a a /a /td /tr /table /td /tr /table /body /html"`);
   });
 
   it("says plainly when nothing came in", () => {

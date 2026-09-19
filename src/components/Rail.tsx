@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Bell, Box, Lightbulb, Menu, Radar, Receipt, Search, Settings, Swords, X } from "lucide-react";
+import { ChannelMark } from "@/components/alerts/ChannelMark";
 import { NEW_PROJECT_PATH } from "@/components/ProjectSwitcher";
+import type { AlertChannel } from "@/lib/alerts/types";
 import { cn } from "@/lib/utils";
 import { AnyapiRailCard } from "./AnyapiRailCard";
 
@@ -27,6 +29,8 @@ export type RailItem = {
   label: string;
   icon: RailIcon;
   count?: number;
+  /** Where this page sends things, drawn small and grey after the label. */
+  marks?: AlertChannel[];
 };
 export type RailGroup = { label: string; items: RailItem[] };
 
@@ -136,6 +140,13 @@ export function Rail({ groups, children }: RailProps) {
                       aria-hidden="true"
                     />
                     {item.label}
+                    {item.marks ? (
+                      <span className="flex items-center gap-1 opacity-60 grayscale">
+                        {item.marks.map((mark) => (
+                          <ChannelMark key={mark} channel={mark} size={12} />
+                        ))}
+                      </span>
+                    ) : null}
                   </span>
                   {item.count === undefined ? null : (
                     <span className="rounded-control bg-surface-2 px-1.5 text-small tabular-nums text-fg-muted">

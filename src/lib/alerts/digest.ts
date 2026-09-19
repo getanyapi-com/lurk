@@ -10,6 +10,7 @@ import {
   scoreColor,
   startOfDay,
 } from "./tokens";
+import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
 import type { Digest, DigestLead } from "./types";
 
 const WIDTH = 600;
@@ -117,6 +118,14 @@ ${reason}${phrase}</td>
 </tr></table></td></tr>`;
 }
 
+function anyapiRow(): string {
+  return `<tr><td style="padding:4px 24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.surface2};border-radius:${EMAIL_RADIUS.card}"><tr>
+<td style="padding:12px 16px;font-family:${EMAIL_FONT};font-size:13px;line-height:1.5;color:${C.fgMuted}">${escapeHtml(ANYAPI_PLUG)}
+<a href="${escapeHtml(anyapiAlertUrl("email"))}" style="color:${C.fg};text-decoration:underline">${escapeHtml(ANYAPI_PLUG_CTA)}</a></td>
+</tr></table></td></tr>`;
+}
+
 function footerRow(digest: Digest): string {
   return `<tr><td style="padding:8px 24px 28px;font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">
 <a href="${escapeHtml(digest.appUrl)}/app/leads" style="color:${C.fgMuted}">Open the feed</a> &middot;
@@ -139,7 +148,7 @@ export function renderDigestHtml(digest: Digest): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg}">
 <tr><td align="center" style="padding:24px 8px">
 <table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:${WIDTH}px;max-width:100%;background:${C.bg};border:1px solid ${C.border};border-radius:20px">
-${headerRow(digest)}${headlineRow(digest)}${body}${footerRow(digest)}
+${headerRow(digest)}${headlineRow(digest)}${body}${anyapiRow()}${footerRow(digest)}
 </table></td></tr></table></body></html>`;
 }
 
@@ -153,5 +162,6 @@ export function renderDigestText(digest: Digest): string {
     `${digest.leads.length} new leads for ${digest.projectName} ${windowPhrase(digest)}.`,
     ...lines,
     `${digest.appUrl}/app/leads`,
+    `${ANYAPI_PLUG} ${anyapiAlertUrl("email")}`,
   ].join("\n\n");
 }

@@ -2,8 +2,11 @@
 
 import { cn } from "@/lib/utils";
 
-/** `mark` is a brand image shown before the label, for a tab named after a platform. */
-export type PillTab = { id: string; label: string; mark?: string };
+/**
+ * `mark` is a brand image shown before the label, for a tab named after a
+ * platform; `icon` is drawn there instead when the mark is not an image.
+ */
+export type PillTab = { id: string; label: string; mark?: string; icon?: React.ReactNode };
 
 type PillTabsProps = {
   tabs: PillTab[];
@@ -33,11 +36,11 @@ export function PillTabs({ tabs, activeId, onSelect, className }: PillTabsProps)
               : "border border-transparent text-fg-muted hover:text-fg",
           )}
         >
-          {tab.mark ? (
+          {tab.icon ?? (tab.mark ? (
             // Brand art from public/brands; no image proxy needed.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={tab.mark} alt="" width={14} height={14} />
-          ) : null}
+          ) : null)}
           {tab.label}
         </button>
       ))}
