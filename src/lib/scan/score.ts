@@ -1,6 +1,6 @@
 import { askJev } from "@/lib/jev";
 import { productState, type ProductFacts } from "@/lib/product";
-import { askInBatches } from "./batches";
+import { askInBatches, stateTokens } from "./batches";
 import { SCORE_BATCH_SIZE, TRIAGE_BATCH_SIZE } from "./constants";
 import { assessmentFrom, readingFrom, triageFrom, type ReadingAnswers } from "./derive";
 import { isSentinel } from "./evidence";
@@ -15,6 +15,17 @@ function unevaluated(id: string): TriageItem {
   return { id, disposition: "uncertain", asking: 0 };
 }
 
+/** What one title adds to a triage request's state. */
+function titleState(candidate: TriageCandidate) {
+  return {
+    subreddit: candidate.subreddit,
+    title: candidate.title,
+    author: candidate.author ?? "unknown",
+    upvotes: candidate.score ?? 0,
+    age_hours: Math.round(candidate.ageHours),
+  };
+}
+
 async function triageBatch(
   projectId: string,
   product: ProductFacts,
@@ -24,13 +35,7 @@ async function triageBatch(
   let questions = {};
   candidates.forEach((candidate, index) => {
     const key = `c${index}`;
-    titles[key] = {
-      subreddit: candidate.subreddit,
-      title: candidate.title,
-      author: candidate.author ?? "unknown",
-      upvotes: candidate.score ?? 0,
-      age_hours: Math.round(candidate.ageHours),
-    };
+    titles[key] = titleState(candidate);
     questions = { ...questions, ...keyed(key, triageQuestions(`titles.${key}`)) };
   });
   const answers = await askJev({
@@ -59,6 +64,7 @@ export async function triageTitles(
     TRIAGE_BATCH_SIZE,
     (batch) => triageBatch(projectId, product, batch),
     (batch) => batch.map((candidate) => unevaluated(candidate.id)),
+    (candidate) => stateTokens(titleState(candidate)),
   );
 }
 
@@ -169,5 +175,6 @@ export async function judgeItems(
       return judged;
     },
     () => [],
+    (item) => stateTokens(itemState(item)),
   );
 }

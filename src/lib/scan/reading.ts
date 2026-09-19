@@ -2,7 +2,7 @@ import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { postReadings } from "@/db/schema";
 import { askJev } from "@/lib/jev";
-import { askInBatches } from "./batches";
+import { askInBatches, stateTokens } from "./batches";
 import { SCORE_BATCH_SIZE } from "./constants";
 import { readingFrom, type ReadingAnswers } from "./derive";
 import { contentHash } from "./evaluations";
@@ -146,6 +146,7 @@ export async function readPosts(
     SCORE_BATCH_SIZE,
     (batch) => readBatch(projectId, batch),
     () => [],
+    (item) => stateTokens(itemState(item)),
   );
   for (const [id, reading] of read) {
     readings.set(id, reading);

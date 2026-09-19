@@ -1,6 +1,6 @@
 import { askJev, choice, type Answers, type Question } from "@/lib/jev";
 import { productState, type ProductFacts } from "@/lib/product";
-import { askInBatches } from "@/lib/scan/batches";
+import { askInBatches, stateTokens } from "@/lib/scan/batches";
 
 /**
  * The one model pass in discovery. It reads deduplicated Google results and
@@ -216,6 +216,11 @@ function readLabel(
   return { id: candidate.id, relevance, destination, entities: labeled };
 }
 
+/** What one thread adds to a labelling request's state. */
+function threadState(candidate: LabelCandidate) {
+  return { community: `r/${candidate.subreddit}`, title: candidate.title, snippet: candidate.snippet };
+}
+
 /** One Jev request: these threads, judged against this product. */
 async function askLabels(
   input: LabelInput,
@@ -223,12 +228,7 @@ async function askLabels(
 ): Promise<ThreadLabel[]> {
   const keys = batch.map((_, index) => `t${index}`);
   const entities = batch.map(entityCandidates);
-  const threads = Object.fromEntries(
-    batch.map((candidate, index) => [
-      keys[index],
-      { community: `r/${candidate.subreddit}`, title: candidate.title, snippet: candidate.snippet },
-    ]),
-  );
+  const threads = Object.fromEntries(batch.map((candidate, index) => [keys[index], threadState(candidate)]));
   const questions = Object.assign(
     {},
     ...keys.map((key, index) => threadQuestions(key, input.destinations, entities[index])),
@@ -263,6 +263,7 @@ export async function labelThreads(input: LabelInput): Promise<ThreadLabel[]> {
     input.candidates.length,
     (batch) => askLabels(input, batch),
     () => [],
+    (candidate) => stateTokens(threadState(candidate)),
   );
   return keepCitedLabels(
     labels,
