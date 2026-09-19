@@ -1,62 +1,58 @@
-import { and, asc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { userActions } from "@/db/schema";
 import { enqueueJob, nextQueuedJob } from "@/jobs/enqueue";
 import { tierForUser } from "./tier";
-import type { PaidAction } from "./tiers";
+import type { ActionWindow, PaidAction } from "./tiers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** One tier's ration of one button: this many presses, per day or for good. */
+type Ration = { limit: number; window: ActionWindow };
+
 /**
  * What a user has left of one paid button. A null `limit` means no limit,
- * which is what a self-hosted instance gets, and zero means the button is off.
- * `opensAt` is when the next press comes back once they are all used, and null
- * while one is left.
+ * which is what a self-hosted instance gets. `spent` is true once no press is
+ * left, and `opensAt` is when the next comes back, which a press spent for
+ * good never does.
  */
-export type Allowance = { limit: number | null; opensAt: Date | null };
+export type Allowance = {
+  limit: number | null;
+  window: ActionWindow;
+  spent: boolean;
+  opensAt: Date | null;
+};
 
-/** Whether the button can be pressed now. */
-export function canPress(allowance: Allowance): boolean {
-  return allowance.limit !== 0 && allowance.opensAt === null;
-}
-
-/** Raised when a user has used every press of a paid button for the day. */
+/** Raised when a user has no press of a paid button left. */
 export class ActionThrottledError extends Error {
-  constructor(limit: number) {
+  constructor({ limit, window }: Ration) {
     super(
-      limit === 0
-        ? "This needs a connected wallet."
+      window === "ever"
+        ? "Free includes this once. Connect a wallet to run it again."
         : `You have used all ${limit} of today's presses. Try again later.`,
     );
     this.name = "ActionThrottledError";
   }
 }
 
-async function limitFor(userId: string, action: PaidAction): Promise<number | null> {
+async function rationFor(userId: string, action: PaidAction): Promise<Ration | null> {
   const { limits } = await tierForUser(userId);
-  return limits ? limits.actionsPerDay[action] : null;
+  return limits ? { limit: limits.actions.presses[action], window: limits.actions.window } : null;
 }
 
-/** The presses of this button in the 24 hours before `now`, oldest first. */
-async function pressesSince(userId: string, action: PaidAction, now: Date): Promise<Date[]> {
-  const rows = await db()
-    .select({ at: userActions.at })
-    .from(userActions)
-    .where(
-      and(
-        eq(userActions.userId, userId),
-        eq(userActions.action, action),
-        gte(userActions.at, new Date(now.getTime() - DAY_MS)),
-      ),
-    )
-    .orderBy(asc(userActions.at));
-  return rows.map((row) => row.at);
+/** The presses that still count under a window: the last 24 hours, or all of them. */
+function counted(userId: string, action: PaidAction, window: ActionWindow, now: Date) {
+  return and(
+    eq(userActions.userId, userId),
+    eq(userActions.action, action),
+    window === "day" ? gte(userActions.at, new Date(now.getTime() - DAY_MS)) : undefined,
+  );
 }
 
 /**
- * When the next press comes back, given the presses of the last 24 hours oldest
- * first, or null while one is left: each press counts for 24 hours, so the
- * press that frees a slot is the one `limit` from the newest.
+ * When the next press comes back, given the presses that count oldest first,
+ * or null while one is left: each press counts for 24 hours, so the press that
+ * frees a slot is the one `limit` from the newest.
  */
 export function opensAtFrom(presses: Date[], limit: number): Date | null {
   if (presses.length < limit) {
@@ -71,11 +67,24 @@ export async function allowanceFor(
   action: PaidAction,
   now = new Date(),
 ): Promise<Allowance> {
-  const limit = await limitFor(userId, action);
-  if (limit === null || limit === 0) {
-    return { limit, opensAt: null };
+  const ration = await rationFor(userId, action);
+  if (!ration) {
+    return { limit: null, window: "day", spent: false, opensAt: null };
   }
-  return { limit, opensAt: opensAtFrom(await pressesSince(userId, action, now), limit) };
+  const rows = await db()
+    .select({ at: userActions.at })
+    .from(userActions)
+    .where(counted(userId, action, ration.window, now))
+    .orderBy(asc(userActions.at));
+  const spent = rows.length >= ration.limit;
+  const opensAt =
+    spent && ration.limit > 0 && ration.window === "day"
+      ? opensAtFrom(
+          rows.map((row) => row.at),
+          ration.limit,
+        )
+      : null;
+  return { ...ration, spent, opensAt };
 }
 
 /**
@@ -84,8 +93,8 @@ export async function allowanceFor(
  * at once cannot both take the last press.
  */
 export async function spendAllowance(userId: string, action: PaidAction): Promise<void> {
-  const limit = await limitFor(userId, action);
-  if (limit === null) {
+  const ration = await rationFor(userId, action);
+  if (!ration) {
     return;
   }
   await db().transaction(async (tx) => {
@@ -93,15 +102,9 @@ export async function spendAllowance(userId: string, action: PaidAction): Promis
     const [row] = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(userActions)
-      .where(
-        and(
-          eq(userActions.userId, userId),
-          eq(userActions.action, action),
-          gte(userActions.at, new Date(Date.now() - DAY_MS)),
-        ),
-      );
-    if ((row?.count ?? 0) >= limit) {
-      throw new ActionThrottledError(limit);
+      .where(counted(userId, action, ration.window, new Date()));
+    if ((row?.count ?? 0) >= ration.limit) {
+      throw new ActionThrottledError(ration);
     }
     await tx.insert(userActions).values({ userId, action });
   });
@@ -124,11 +127,4 @@ export async function pressForJob(
   }
   await spendAllowance(userId, action);
   await enqueueJob(kind, projectId);
-}
-
-/** Drops presses too old to count against anything, which the retention job runs. */
-export async function deleteOldUserActions(now = new Date()): Promise<void> {
-  await db()
-    .delete(userActions)
-    .where(lt(userActions.at, new Date(now.getTime() - 2 * DAY_MS)));
 }

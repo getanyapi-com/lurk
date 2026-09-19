@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
 import { relativeUntil } from "@/lib/format";
-import { canPress, type Allowance } from "@/lib/throttle";
+import type { Allowance } from "@/lib/throttle";
 
 type PaidButtonProps = {
   label: string;
@@ -13,22 +13,24 @@ type PaidButtonProps = {
 };
 
 /** Why the button is off, in one sentence. */
-function reason({ limit, opensAt }: Allowance): string {
+function reason({ limit, window, opensAt }: Allowance): string {
   if (limit === 0) {
-    return "Free runs this on its daily schedule.";
+    return "Free runs this on its schedule.";
+  }
+  if (window === "ever") {
+    return "Free includes this once, and it has been used.";
   }
   const until = opensAt ? relativeUntil(opensAt) : "soon";
-  const used = limit === 1 ? "This runs once a day." : `You have used today's ${limit}.`;
-  return `${used} The next one opens ${until}.`;
+  return `You have used today's ${limit}. The next one opens ${until}.`;
 }
 
 /**
- * A submit button for a form whose press spends money. Once the user has used
- * their presses for the day it is off, says when the next one comes back, and
- * points at the wallet that buys more.
+ * A submit button for a form whose press spends money. Once the user has no
+ * press left it is off and says why: on free, that the one press is used and a
+ * wallet buys more; on a wallet, when tomorrow's press comes back.
  */
 export function PaidButton({ label, allowance, variant, align = "end" }: PaidButtonProps) {
-  if (canPress(allowance)) {
+  if (!allowance.spent) {
     return (
       <Button type="submit" size="lg" variant={variant}>
         {label}
@@ -41,11 +43,16 @@ export function PaidButton({ label, allowance, variant, align = "end" }: PaidBut
         {label}
       </Button>
       <span className="max-w-xs text-small text-fg-muted">
-        {reason(allowance)}{" "}
-        <Link href="/app/settings" className="underline">
-          Connect a wallet
-        </Link>{" "}
-        for more.
+        {reason(allowance)}
+        {allowance.window === "ever" ? (
+          <>
+            {" "}
+            <Link href="/app/settings" className="underline">
+              Connect a wallet
+            </Link>{" "}
+            for more.
+          </>
+        ) : null}
       </span>
     </div>
   );

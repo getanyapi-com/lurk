@@ -434,9 +434,9 @@ export const jobs = pgTable("jobs", {
 
 /**
  * Every paid action a user pressed: Scan now, a profile rebuild, a refresh.
- * The per-user daily allowance counts these, so one account looping a button
- * runs out of its own presses long before it can trip the house caps that
- * every other user's scans share.
+ * The per-user allowance counts these, so one account looping a button runs
+ * out of its own presses long before it can trip the house caps every other
+ * user's scans share. Free's presses count for good, so rows are never pruned.
  */
 export const userActions = pgTable(
   "user_actions",

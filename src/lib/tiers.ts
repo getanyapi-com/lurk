@@ -13,6 +13,9 @@ export type PaidAction =
   | "competitor_scan"
   | "insights";
 
+/** Whether a tier's presses come back after 24 hours, or are spent for good. */
+export type ActionWindow = "day" | "ever";
+
 export type TierLimits = {
   projects: number | null;
   keywordsPerProject: number | null;
@@ -27,12 +30,12 @@ export type TierLimits = {
   /** Null means no daily cap, which is what a connected wallet buys. */
   apiRequestsPerDay: number | null;
   /**
-   * How many times one user may press each paid button in any 24 hours, across
-   * all their projects. Zero means the button is off: free scans only on its
-   * schedule. The house pays every model call whatever the tier, so a
-   * connected wallet is rationed too, only more loosely.
+   * How many times one user may press each paid button, across all their
+   * projects: in any 24 hours, or ever. Free gets each once for good, because
+   * a rebuild or a refresh is dear and the house pays for it; zero means the
+   * button is off, which is free's Scan now.
    */
-  actionsPerDay: Record<PaidAction, number>;
+  actions: { window: ActionWindow; presses: Record<PaidAction, number> };
   /**
    * What discovery and one scan may buy. The starting values come from the
    * accepted second opinion and Kevin reviews them.
@@ -60,12 +63,15 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoRefreshDays: 7,
     competitors: 3,
     apiRequestsPerDay: 1000,
-    actionsPerDay: {
-      scan_now: 0,
-      rebuild_profile: 1,
-      seo_refresh: 1,
-      competitor_scan: 1,
-      insights: 1,
+    actions: {
+      window: "ever",
+      presses: {
+        scan_now: 0,
+        rebuild_profile: 1,
+        seo_refresh: 1,
+        competitor_scan: 1,
+        insights: 1,
+      },
     },
     discoveryQueries: 8,
     discoveryQueriesMax: 12,
@@ -88,14 +94,15 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoRefreshDays: 1,
     competitors: null,
     apiRequestsPerDay: null,
-    actionsPerDay: {
-      scan_now: 24,
-      // A rebuild reads the site and runs discovery again: the dearest press
-      // there is, and the house pays its model calls on every tier.
-      rebuild_profile: 1,
-      seo_refresh: 12,
-      competitor_scan: 12,
-      insights: 24,
+    actions: {
+      window: "day",
+      presses: {
+        scan_now: 10,
+        rebuild_profile: 2,
+        seo_refresh: 2,
+        competitor_scan: 2,
+        insights: 2,
+      },
     },
     discoveryQueries: 12,
     discoveryQueriesMax: 20,
