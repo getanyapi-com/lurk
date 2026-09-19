@@ -1,5 +1,5 @@
 import { GatewayError, createGateway } from "@ai-sdk/gateway";
-import { experimental_evaluate as evaluate } from "ai";
+import { RetryError, experimental_evaluate as evaluate } from "ai";
 import { z } from "zod";
 import { db } from "@/db";
 import { llmUsage } from "@/db/schema";
@@ -29,6 +29,16 @@ export const GATEWAY_FREE_UNTIL = new Date("2026-09-26T07:00:00Z");
  * OpenRouter attempt still fits inside the job's heartbeat.
  */
 const GATEWAY_TIMEOUT_MS = 60_000;
+
+/**
+ * How long the Gateway is left alone after it rate-limits us. Its free tier
+ * lets a few concurrent Jev calls through and 429s the rest (measured
+ * 2026-09-19: 4 of a burst of 20), and a scan fires far more than that at
+ * once. Asking it again for every call only doubles the requests; for this
+ * long every call goes straight to OpenRouter instead.
+ */
+const GATEWAY_REST_MS = 30_000;
+let gatewayRestingUntil = 0;
 
 const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
@@ -178,7 +188,7 @@ export async function askJev(call: JevCall): Promise<Answers> {
     throw new JevNotConfiguredError();
   }
   await assertUnderLlmCap();
-  if (AI_GATEWAY_API_KEY) {
+  if (AI_GATEWAY_API_KEY && Date.now() >= gatewayRestingUntil) {
     try {
       return await askGateway(AI_GATEWAY_API_KEY, call);
     } catch (error) {
@@ -203,13 +213,17 @@ async function askGateway(key: string, call: JevCall): Promise<Answers> {
           model: gateway.evaluationModel(JEV_GATEWAY_MODEL),
           state: call.state as Parameters<typeof evaluate>[0]["state"],
           questions: toGatewayQuestions(call.questions),
-          maxRetries: 1,
+          maxRetries: 0,
           abortSignal,
         }),
       GATEWAY_TIMEOUT_MS,
     );
-  } catch (error) {
+  } catch (thrown) {
+    const error = RetryError.isInstance(thrown) ? thrown.lastError : thrown;
     const status = GatewayError.isInstance(error) ? error.statusCode : null;
+    if (status === 429) {
+      gatewayRestingUntil = Date.now() + GATEWAY_REST_MS;
+    }
     await record(call, {
       inputTokens: 0,
       outputTokens: 0,
