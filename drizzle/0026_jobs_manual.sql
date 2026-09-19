@@ -1,1 +1,0 @@
-ALTER TABLE "jobs" ADD COLUMN "manual" boolean DEFAULT false NOT NULL;

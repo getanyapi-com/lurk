@@ -7,7 +7,7 @@ import { scanNowAction } from "@/app/app/scan";
 import { requireLocalUser } from "@/lib/auth";
 import type { FeedParams } from "@/lib/feed";
 import { activeProject } from "@/lib/projects";
-import { manualScanOpensAt } from "@/lib/scan/manual";
+import { canScanNow } from "@/lib/scan/scanNow";
 
 type LeadsPageProps = { searchParams: Promise<FeedParams> };
 
@@ -44,7 +44,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   if (!project) {
     redirect("/app/projects/new");
   }
-  const scanOpensAt = await manualScanOpensAt(user.id, project.id);
+  const scanAllowed = await canScanNow(user.id);
 
   return (
     <div className="flex flex-col gap-1">
@@ -53,7 +53,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
           {project.name}
         </h2>
         <form action={scanNowAction.bind(null, project.id)}>
-          <ScanNowButton opensAt={scanOpensAt} />
+          <ScanNowButton allowed={scanAllowed} />
         </form>
       </div>
       {/*

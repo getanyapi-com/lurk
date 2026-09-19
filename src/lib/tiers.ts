@@ -18,8 +18,8 @@ export type TierLimits = {
   competitors: number | null;
   /** Null means no daily cap, which is what a connected wallet buys. */
   apiRequestsPerDay: number | null;
-  /** Scan now presses per project in any 24 hours. Null means as many as they like. */
-  manualScansPerDay: number | null;
+  /** Whether Scan now is on. Free scans only on its schedule. */
+  scanNow: boolean;
   /**
    * What discovery and one scan may buy. The starting values come from the
    * accepted second opinion and Kevin reviews them.
@@ -47,7 +47,7 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoRefreshDays: 7,
     competitors: 3,
     apiRequestsPerDay: 1000,
-    manualScansPerDay: 1,
+    scanNow: false,
     discoveryQueries: 8,
     discoveryQueriesMax: 12,
     searchesPerScan: 8,
@@ -69,7 +69,7 @@ export const TIERS: Record<TierName, TierLimits> = {
     seoRefreshDays: 1,
     competitors: null,
     apiRequestsPerDay: null,
-    manualScansPerDay: null,
+    scanNow: true,
     discoveryQueries: 12,
     discoveryQueriesMax: 20,
     searchesPerScan: 16,

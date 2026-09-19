@@ -16,7 +16,7 @@ import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { activeProject } from "@/lib/projects";
 import { activitySentence, projectActivity } from "@/lib/projectActivity";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
-import { manualScanOpensAt } from "@/lib/scan/manual";
+import { canScanNow } from "@/lib/scan/scanNow";
 
 type ProductPageProps = { searchParams: Promise<{ project?: string }> };
 
@@ -41,9 +41,9 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
     );
   }
 
-  const [activity, scanOpensAt] = await Promise.all([
+  const [activity, scanAllowed] = await Promise.all([
     projectActivity(project.id),
-    manualScanOpensAt(user.id, project.id),
+    canScanNow(user.id),
   ]);
   const places = parseDestinations(project.destinations).map((place) => ({
     value: place.name,
@@ -146,7 +146,7 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
       <div className="flex flex-wrap items-center gap-3">
         <form action={scanAndOpenLeadsAction}>
           <input type="hidden" name="projectId" value={project.id} />
-          <ScanNowButton opensAt={scanOpensAt} align="start" />
+          <ScanNowButton allowed={scanAllowed} align="start" />
         </form>
         <form action={rebuildProfileAction}>
           <input type="hidden" name="projectId" value={project.id} />

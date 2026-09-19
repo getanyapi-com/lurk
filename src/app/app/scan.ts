@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { enqueueJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { projectForUser } from "@/lib/projects";
-import { manualScanOpensAt } from "@/lib/scan/manual";
+import { canScanNow } from "@/lib/scan/scanNow";
 
 /** Queues a scan for one of the caller's projects, replacing any queued scan. */
 export async function scanNowAction(projectId: string) {
@@ -12,10 +12,10 @@ export async function scanNowAction(projectId: string) {
   if (!(await projectForUser(user.id, projectId))) {
     throw new Error("That project is not yours");
   }
-  // The button is disabled while this holds, so only a stale page gets here.
-  if (await manualScanOpensAt(user.id, projectId)) {
-    throw new Error("Today's Scan now is used. Connect a wallet to scan as often as you like.");
+  // The button is disabled on free, so only a stale page gets here.
+  if (!(await canScanNow(user.id))) {
+    throw new Error("Scan now needs a connected wallet. Free scans once a day on its schedule.");
   }
-  await enqueueJob("scan", projectId, new Date(), true);
+  await enqueueJob("scan", projectId);
   revalidatePath("/app", "layout");
 }

@@ -30,7 +30,7 @@ type FeedProps = {
 };
 
 const EMPTY_SENTENCE: Record<LeadStatus, string> = {
-  new: "Nothing new in this window. The next scan runs on your schedule, or press Scan now.",
+  new: "Nothing new in this window. The next scan runs on your schedule.",
   hidden: "You have not hidden any leads yet.",
   not_fit: "You have not marked any leads as a miss yet.",
   resolved: "No lead has said in its thread that the need is already met.",
