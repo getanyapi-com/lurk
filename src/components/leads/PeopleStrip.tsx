@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { Avatar } from "@/components/Avatar";
-import { scoreRing, timeline } from "@/components/leads/stream";
+import { FaceStack } from "@/components/leads/FaceStack";
+import { timeline } from "@/components/leads/stream";
 import { atSentence } from "@/lib/feed";
 import { cn } from "@/lib/utils";
 import type { FeedParams, FeedWindow, Grain, LeadFace } from "@/lib/feed";
 
 import type { StreamColumn } from "@/components/leads/stream";
-import { redditAvatar } from "@/lib/redditAvatar";
 
 type PeopleStripProps = {
   faces: LeadFace[];
@@ -15,14 +14,9 @@ type PeopleStripProps = {
   at?: string;
   /** The filters the page is on, so a column keeps them when it adds its own. */
   params: FeedParams;
+  /** The feed's filter pills, drawn on the strip's top line, or alone when there is no strip. */
+  filters: React.ReactNode;
 };
-
-/**
- * How many faces one column stacks before the rest become a count. Four keeps
- * the card about a hundred pixels tall on the busiest day a project has had,
- * which is what lets the strip sit over the feed instead of pushing it down.
- */
-const STACK = 4;
 
 /** What the window over the strip is called, in the sentence above it. */
 const WINDOW: Record<`${FeedWindow}`, string> = {
@@ -33,7 +27,11 @@ const WINDOW: Record<`${FeedWindow}`, string> = {
 };
 
 /** What one column of this strip is, in the words the hover hint uses. */
-const GRAIN: Record<Grain, string> = { month: "month", day: "day", hour: "hour" };
+const GRAIN: Record<Grain, string> = {
+  month: "month",
+  day: "day",
+  hour: "hour",
+};
 
 /** The same page, with one slice picked or given back. */
 function href(params: FeedParams, at: string | null): string {
@@ -75,9 +73,9 @@ function counted(column: StreamColumn): string {
  * Reddit, so sixty copies of the same mark said nothing and covered a sixth of
  * each picture at the size these are drawn.
  */
-export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
+export function PeopleStrip({ faces, days, at, params, filters }: PeopleStripProps) {
   if (faces.length === 0) {
-    return null;
+    return filters;
   }
   const { columns, ticks, grain, live: now } = timeline(faces, { days, at });
   const label = new Map(ticks.map((tick) => [tick.index, tick]));
@@ -86,24 +84,28 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
   // the left rather than the one at the far end.
   const NOW = 0;
   return (
-    <figure className="@container flex flex-col gap-3 rounded-card border bg-surface px-4 pt-4 pb-3">
-      <figcaption className="flex flex-wrap items-baseline gap-x-2">
-        <span className="text-h3" style={{ fontWeight: 500 }}>
-          {faces.length} {faces.length === 1 ? "lead" : "leads"}{" "}
-          {at ? atSentence(at) : `in ${WINDOW[`${days}`]}`}.
-        </span>
-        {at ? (
-          <Link className="text-small text-fg-muted underline" href={href(params, null)}>
-            Back to {WINDOW[`${days}`]}
-          </Link>
-        ) : (
-          <span className="text-small text-fg-muted">Pick a {GRAIN[grain]} to filter the feed.</span>
-        )}
-      </figcaption>
+    <figure className="@container flex flex-col gap-2 rounded-card border bg-surface px-3 pt-2.5 pb-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <figcaption className="flex flex-wrap items-baseline gap-x-2">
+          <span style={{ fontWeight: 500 }}>
+            {faces.length} {faces.length === 1 ? "lead" : "leads"} {at ? atSentence(at) : `in ${WINDOW[`${days}`]}`}.
+          </span>
+          {at ? (
+            <Link className="text-small text-fg-muted underline" href={href(params, null)}>
+              Back to {WINDOW[`${days}`]}
+            </Link>
+          ) : (
+            <span className="text-small text-fg-muted">Pick a {GRAIN[grain]} to filter the feed.</span>
+          )}
+        </figcaption>
+        {filters}
+      </div>
 
       <div
         className="grid gap-x-1 @2xl:gap-x-2"
-        style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
+        }}
       >
         {columns.map((column, index) => {
           const picked = column.key === at;
@@ -118,40 +120,7 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
           );
           const body = (
             <>
-              {/* Dropped on a narrow card, where a column is thinner than the
-                  number is wide and five of them ran into one another. */}
-              {column.faces.length > STACK ? (
-                <span className="text-mono hidden tabular-nums text-fg-muted @2xl:block">
-                  +{column.faces.length - STACK}
-                </span>
-              ) : null}
-              {/* Best last, so the strongest lead sits on the baseline. */}
-              {column.faces
-                .slice(0, STACK)
-                .reverse()
-                .map((face) => (
-                  <span
-                    key={face.id}
-                    className={cn(
-                      // min-h-0 is what keeps it round. A face is a flex item,
-                      // and a flex item is at least as tall as its content
-                      // wants to be: some of these are portraits twice as tall
-                      // as they are wide, and that minimum beat the square.
-                      "aspect-square w-full max-w-[34px] min-h-0 rounded-full",
-                      scoreRing(face.score),
-                    )}
-                    title={`u/${face.author ?? "unknown"} in r/${face.subreddit}`}
-                  >
-                    <Avatar name={face.author} src={redditAvatar(face.author, face.avatarUrl)} size="fluid" />
-                  </span>
-                ))}
-              {column.faces.length === 0 ? (
-                // A quiet slice still takes up its room, and says so: the dot
-                // is a face's box, so it sits on the middle of the baseline.
-                <span className="flex aspect-square w-full max-w-[34px] items-center justify-center">
-                  <span className="size-1 rounded-full bg-border" />
-                </span>
-              ) : null}
+              <FaceStack faces={column.faces} />
 
               {/* The axis, and the hint, on the same line under the column. The
                   hint is a chip so it can be wider than the column it belongs
@@ -173,11 +142,7 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
                     className={cn(
                       "text-mono whitespace-nowrap group-hover:opacity-0",
                       tick.sparse ? null : "hidden @2xl:block",
-                      picked
-                        ? "text-fg"
-                        : index === NOW && now
-                          ? "text-score-hot"
-                          : "text-fg-muted",
+                      picked ? "text-fg" : index === NOW && now ? "text-score-hot" : "text-fg-muted",
                     )}
                   >
                     {tick.label}
@@ -187,11 +152,7 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
                   <span
                     className={cn(
                       "text-mono pointer-events-none absolute z-10 hidden whitespace-nowrap rounded-control border bg-surface px-1.5 py-0.5 text-fg shadow-sm group-hover:block",
-                      index === 0
-                        ? "left-0"
-                        : index === last
-                          ? "right-0"
-                          : "left-1/2 -translate-x-1/2",
+                      index === 0 ? "left-0" : index === last ? "right-0" : "left-1/2 -translate-x-1/2",
                     )}
                   >
                     {picked ? "Clear" : "Filter to"} {column.label} · {counted(column)}
@@ -203,11 +164,7 @@ export function PeopleStrip({ faces, days, at, params }: PeopleStripProps) {
           return live ? (
             // The whole slice lights up, not the face under the pointer: what
             // the click narrows to is the column, so that is what it shows.
-            <Link
-              key={column.key}
-              href={href(params, picked ? null : column.key)}
-              className={inside}
-            >
+            <Link key={column.key} href={href(params, picked ? null : column.key)} className={inside}>
               {body}
             </Link>
           ) : (

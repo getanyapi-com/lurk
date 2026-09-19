@@ -144,14 +144,20 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
   return (
     // Its own column, so the status line sits tight under the project's name
     // while everything below it keeps the page's own spacing.
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
       <div className="flex flex-wrap items-baseline gap-x-1.5">
         {total > 0 ? <p className="text-small text-fg-muted">{sentence}</p> : null}
         <ScanStatus activity={activity} />
       </div>
       {sweep ? <LiveSweep projectId={projectId} first={sweep} /> : null}
-      <PeopleStrip faces={faces} days={filter.days} at={filter.at} params={params} />
-      <FeedFilters facets={facets} at={filter.at} params={params} />
+      {/* The pills ride in the strip's top line, so the two cost one row between them. */}
+      <PeopleStrip
+        faces={faces}
+        days={filter.days}
+        at={filter.at}
+        params={params}
+        filters={<FeedFilters facets={facets} at={filter.at} params={params} />}
+      />
 
       <OpeningProvider serverSelectedId={selectedId}>
         <LeadWorkspace

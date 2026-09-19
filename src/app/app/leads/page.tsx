@@ -14,9 +14,12 @@ type LeadsPageProps = { searchParams: Promise<FeedParams> };
 /** What stands in for the feed while it is read, in the feed's own shape. */
 function FeedSkeleton() {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3">
       <Skeleton className="h-4 w-80 max-w-full" />
-      <PillsSkeleton count={4} />
+      <div className="flex flex-col gap-3 rounded-card border bg-surface px-3 py-2.5">
+        <PillsSkeleton count={4} />
+        <Skeleton className="h-16 w-full" />
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,9fr)]">
         <ListSkeleton rows={8} />
         <div className="flex flex-col gap-3 rounded-card border bg-surface p-4">
@@ -47,13 +50,17 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const scanNow = await allowanceFor(user.id, "scan_now");
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <h2 className="text-h2" style={{ fontWeight: 500 }}>
+    // From lg up the page is exactly the window under the header, and never
+    // scrolls: the list and the thread take whatever the rows over them leave,
+    // and each scrolls inside itself. A page that grew with the thread meant
+    // scrolling the window to reach the list's tenth row.
+    <div className="flex flex-col gap-1 lg:h-[calc(100dvh_-_var(--header-height)_-_var(--page-gutter)_*_2)]">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h2 className="text-h3" style={{ fontWeight: 500 }}>
           {project.name}
         </h2>
         <form action={scanNowAction.bind(null, project.id)}>
-          <PaidButton label="Scan now" allowance={scanNow} />
+          <PaidButton label="Scan now" allowance={scanNow} note="beside" />
         </form>
       </div>
       {/*

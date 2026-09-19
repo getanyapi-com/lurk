@@ -6,12 +6,11 @@ import { OpeningPane } from "@/components/leads/OpeningPane";
 import { useOpening } from "@/components/leads/opening";
 
 /**
- * From lg up, both panes fill the window under the pinned header, inside the
- * page gutter, so the list scrolls against a post that stays put. Every term
- * is a token.
+ * From lg up, both panes fill what the page leaves under the rows over them,
+ * so the list and the thread each scroll inside themselves and the window does
+ * not. The floor keeps them usable when a first sweep's board is on screen too.
  */
-const PANE =
-  "lg:sticky lg:top-[calc(var(--header-height)_+_var(--page-gutter))] lg:max-h-[calc(100dvh_-_var(--header-height)_-_var(--page-gutter)_*_2)]";
+const PANE = "lg:h-full lg:min-h-0";
 
 const COLUMN = "flex min-w-0 flex-col rounded-card border bg-surface";
 
@@ -41,7 +40,7 @@ export function LeadWorkspace({
   const { summary, closed, close } = useOpening();
   const covering = !closed && (summary !== null || asked);
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,9fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:min-h-[420px] lg:flex-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,9fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch">
       <div className={`${COLUMN} ${PANE} lg:overflow-y-auto`}>{list}</div>
       {summary || pane ? (
         <div
