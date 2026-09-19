@@ -26,6 +26,8 @@ export type DiscoveryPlan = {
   subreddits: PlannedSubreddit[];
   keywords: PlannedKeyword[];
   competitors: PlannedCompetitor[];
+  /** How many competitors the tier lets a project watch; null or absent is no limit. */
+  competitorLimit?: number | null;
 };
 
 export type PlanInput = {
@@ -124,11 +126,19 @@ export function planFromRanks(input: PlanInput): DiscoveryPlan {
       })),
       input.limits?.competitors,
     ),
+    competitorLimit: input.limits?.competitors ?? null,
   };
 }
 
 /** A row a person decided about is theirs, and a rebuild leaves it alone. */
 const PRESERVED_STATES = ["pinned", "excluded"];
+
+/**
+ * So is one a person typed in, and so is a competitor the product's own page
+ * reading named (src/lib/profile.ts): discovery did not find it, so discovery
+ * finding nothing is no reason to drop it.
+ */
+const PRESERVED_SOURCES = ["user", "page"];
 
 type PlanTable = typeof projectKeywords | typeof projectSubreddits | typeof projectCompetitors;
 
@@ -145,7 +155,7 @@ async function preservedRows<T extends PlanTable>(
     .where(
       and(
         eq(table.projectId, projectId),
-        or(inArray(table.state, PRESERVED_STATES), eq(table.source, "user")),
+        or(inArray(table.state, PRESERVED_STATES), inArray(table.source, PRESERVED_SOURCES)),
       ),
     );
   return rows as T["$inferSelect"][];
@@ -204,7 +214,14 @@ export async function publishDiscoveryPlan(projectId: string, plan: DiscoveryPla
     }
 
     const keptCompetitorNames = new Set(keptCompetitors.map((row) => row.name));
-    const competitors = plan.competitors.filter((row) => !keptCompetitorNames.has(row.name));
+    // What discovery found takes the room the standing competitors leave, so a
+    // project is never shown more of them than its tier will scan.
+    const standing = keptCompetitors.filter((row) => row.state !== "excluded").length;
+    const room =
+      plan.competitorLimit == null ? Infinity : Math.max(0, plan.competitorLimit - standing);
+    const competitors = plan.competitors
+      .filter((row) => !keptCompetitorNames.has(row.name))
+      .slice(0, room);
     if (competitors.length > 0) {
       await tx.insert(projectCompetitors).values(
         competitors.map((row) => ({

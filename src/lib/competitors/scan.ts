@@ -129,9 +129,8 @@ async function scanOne(
 /**
  * One pass over the competitors a project watches: this week's newest Reddit
  * posts naming each, read in full, then judged in one call per competitor. Only
- * a post about the competitor is stored, and the rest are counted as skipped. A
- * project with competitors books its next pass on the way out, at its tier's
- * scan interval.
+ * a post about the competitor is stored, and the rest are counted as skipped.
+ * Every pass books the next on the way out, at its tier's scan interval.
  */
 export async function runCompetitorScan(
   projectId: string,
@@ -146,6 +145,11 @@ export async function runCompetitorScan(
   const names = competitorsToScan(project.competitors, limits);
   if (names.length === 0) {
     await writeProgress(jobId, "No competitors to watch yet");
+    // The next pass is booked all the same. Without one waiting, every boot
+    // found a project that had run this kind and had nothing queued, and ran it
+    // again: five projects, twelve empty passes each, on 2026-09-19. A pass
+    // that finds no competitor buys nothing, and this one finds any added since.
+    await enqueueJob("competitor_scan", projectId, cadence.nextRunAt(new Date()));
     return { competitors: 0, read: 0, mentions: 0, skipped: 0, costUsd: 0 };
   }
   const ctx: FetchContext = {

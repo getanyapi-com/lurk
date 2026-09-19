@@ -55,4 +55,22 @@ describe("startOnOpen against a database", () => {
     await expect(startOnOpen("competitor_scan", project.id)).rejects.toThrow("not yours");
     expect(await queued(project.id, "competitor_scan")).toHaveLength(0);
   });
+
+  it("books the next competitor scan even when there was no competitor to watch", async () => {
+    // Without one waiting, every boot saw a project that had run this kind and
+    // had nothing queued, and ran the empty pass again.
+    const { runCompetitorScan } = await import("@/lib/competitors/scan");
+    const { project } = await owned();
+    const [job] = await db()
+      .insert(schema.jobs)
+      .values({ kind: "competitor_scan", projectId: project.id, startedAt: new Date() })
+      .returning();
+
+    const outcome = await runCompetitorScan(project.id, job.id);
+
+    expect(outcome.competitors).toBe(0);
+    const waiting = (await queued(project.id, "competitor_scan")).filter((row) => !row.startedAt);
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0].runAt.getTime()).toBeGreaterThan(Date.now());
+  });
 });

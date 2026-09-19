@@ -96,6 +96,47 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 
+  it("keeps the competitors the page named, and gives discovery only the room they leave", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { publishDiscoveryPlan } = await import("@/lib/discovery/plan");
+    const { eq } = await import("drizzle-orm");
+
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "YAROOMS" })
+      .returning();
+    await db().insert(schema.projectCompetitors).values([
+      { projectId: project.id, name: "Robin", source: "page", state: "active" },
+      { projectId: project.id, name: "Envoy", source: "page", state: "active" },
+      { projectId: project.id, name: "Found last week", source: "serp", state: "active" },
+    ]);
+
+    await publishDiscoveryPlan(project.id, {
+      subreddits: [],
+      keywords: [],
+      competitors: [
+        { name: "Robin", role: "direct_substitute", evidence: 5, domain: null },
+        { name: "skedda.com", role: "direct_substitute", evidence: 3, domain: "skedda.com" },
+        { name: "deskbird.com", role: "direct_substitute", evidence: 2, domain: "deskbird.com" },
+      ],
+      competitorLimit: 3,
+    });
+
+    const competitors = await db()
+      .select()
+      .from(schema.projectCompetitors)
+      .where(eq(schema.projectCompetitors.projectId, project.id));
+    expect(competitors.map((row) => row.name).sort()).toEqual(["Envoy", "Robin", "skedda.com"]);
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+  });
+
   it("records one thread once per query and files the model's verdict on all of them", async () => {
     process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");

@@ -470,6 +470,14 @@ export type CompetitorRank = {
  * a competitor called "Typeform" is paired with the typeform.com somebody else
  * in the evidence linked to. That pairing is what puts a real logo on the
  * competitor screen instead of a favicon guessed off the spelling.
+ *
+ * A name is counted only from a thread that was not irrelevant, and
+ * `mergeCompetitors` then keeps one that no domain in the evidence belongs to
+ * only once it has been called a substitute twice. The spans offered to the
+ * labeller are every capitalised run in a snippet, and on 2026-09-19 that made
+ * competitors of "AI", "Cheap", "Another", "Generating Backgrounds" and "DMs":
+ * an acronym is never one, and a phrase one thread used is not yet one. The
+ * well known rivals no longer depend on this; the page reading names those.
  */
 export function competitorsFrom(labels: ThreadLabel[]): CompetitorRank[] {
   const counts = new Map<string, number>();
@@ -484,7 +492,7 @@ export function competitorsFrom(labels: ThreadLabel[]): CompetitorRank[] {
       if (host) {
         domains.add(host);
       }
-      if (entity.role === "direct_substitute") {
+      if (entity.role === "direct_substitute" && label.relevance !== "irrelevant") {
         counts.set(name, (counts.get(name) ?? 0) + 1);
       }
     }
@@ -497,6 +505,20 @@ export function competitorsFrom(labels: ThreadLabel[]): CompetitorRank[] {
       domain: matchCompetitorDomain(name, domains),
     }))
     .sort((left, right) => right.evidence - left.evidence || left.name.localeCompare(right.name));
+}
+
+/** "AI", "MCP", "DMs": capitals and at most a plural, which names a thing and not a product. */
+const ACRONYM = /^[A-Z]{2,5}s?$/;
+
+/**
+ * Whether a span called a substitute is enough of a name to watch Reddit for:
+ * a domain, a name the same evidence linked a domain to, or one said twice.
+ */
+function namesAProduct(item: CompetitorRank): boolean {
+  if (item.domain) {
+    return true;
+  }
+  return !ACRONYM.test(item.name) && item.evidence >= 2;
 }
 
 /**
@@ -519,7 +541,9 @@ export function mergeCompetitors(
       domain: current?.domain ?? item.domain,
     });
   }
-  return [...merged.values()].sort(
+  // Judged on the total, so a standing name one more thread repeats is counted
+  // with what it already had and not as a stranger said once.
+  return [...merged.values()].filter(namesAProduct).sort(
     (left, right) => right.evidence - left.evidence || left.name.localeCompare(right.name),
   );
 }

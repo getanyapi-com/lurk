@@ -735,8 +735,33 @@ describe("competitors", () => {
         destination: null,
         entities: [{ name: "Typeform", role: "direct_substitute" }],
       },
+      {
+        id: "t11",
+        relevance: "plausible",
+        destination: null,
+        entities: [{ name: "Typeform", role: "direct_substitute" }],
+      },
     ];
     expect(competitorsFrom(unnamed)[0].domain).toBeNull();
+  });
+
+  it("keeps a snippet's loose words out of the competitors", () => {
+    const thread = (id: string, relevance: ThreadLabel["relevance"], names: string[]): ThreadLabel => ({
+      id,
+      relevance,
+      destination: null,
+      entities: names.map((name) => ({ name, role: "direct_substitute" })),
+    });
+    const labels = [
+      // An acronym however often, a phrase said once, and anything an
+      // irrelevant thread said: none of them is a product to watch.
+      thread("t20", "relevant", ["AI", "Cheap", "Generating Backgrounds", "marker.io", "Expandi"]),
+      thread("t21", "relevant", ["AI", "Expandi"]),
+      thread("t22", "irrelevant", ["Cheap", "Generating Backgrounds", "Scrapely"]),
+      thread("t23", "irrelevant", ["Scrapely"]),
+    ];
+    const kept = mergeCompetitors([], competitorsFrom(labels));
+    expect(kept.map((item) => item.name)).toEqual(["Expandi", "marker.io"]);
   });
 
   it("adds a delta's evidence to what already stood", () => {

@@ -33,14 +33,32 @@ export type ScanProject = {
   productText: string;
 };
 
+/** A person's own competitors first, then the page's, then discovery's by evidence. */
+const SOURCE_RANK: Record<string, number> = { user: 0, page: 1 };
+
+/**
+ * The order a tier's cap cuts competitors in, so the ones it drops are the
+ * ones discovery was least sure of and never the ones somebody named.
+ */
+function byStanding(
+  a: { name: string; source: string; state: string; evidence: number },
+  b: { name: string; source: string; state: string; evidence: number },
+): number {
+  const pinned = Number(b.state === "pinned") - Number(a.state === "pinned");
+  const source = (SOURCE_RANK[a.source] ?? 2) - (SOURCE_RANK[b.source] ?? 2);
+  return pinned || source || b.evidence - a.evidence || a.name.localeCompare(b.name);
+}
+
 /**
  * The competitors a scan is allowed to use. A competitor row carries the plan's
  * own state vocabulary but is not a plan row, so `retrieved` reads the states
  * off a stand-in rather than off the table itself.
  */
-function retrievedNames(rows: { id: string; name: string; source: string; state: string }[]) {
+function retrievedNames(
+  rows: { id: string; name: string; source: string; state: string; evidence: number }[],
+) {
   return retrieved(
-    rows.map((row) => ({
+    [...rows].sort(byStanding).map((row) => ({
       id: row.id,
       table: "keyword" as const,
       key: row.name,

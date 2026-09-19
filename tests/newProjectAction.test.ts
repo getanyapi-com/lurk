@@ -57,6 +57,8 @@ const profile = {
   destinations: [],
   problemPhrasings: ["forms that branch"],
   platforms: ["Zapier"],
+  sellsPlatformData: false,
+  competitors: [{ name: "Typeform", domain: "typeform.com" }],
   budgetFit: "Under $50 a month",
 };
 
@@ -114,11 +116,16 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
     // The page read names the project; the form never asked.
     expect(project.name).toBe("Formcraft");
     expect(project.pain).toBe(profile.pain);
-    // The platform the page names is stored as the searches a buyer types.
-    expect(project.problemPhrasings).toEqual([
-      "forms that branch",
-      "zapier api",
-      "zapier scraper",
+    // A form builder that connects to Zapier does not sell Zapier's data, so
+    // nobody is searched for under "zapier scraper".
+    expect(project.problemPhrasings).toEqual(["forms that branch"]);
+    // The competitor the page reading named is there before discovery has run.
+    const competitors = await db()
+      .select()
+      .from(schema.projectCompetitors)
+      .where(eq(schema.projectCompetitors.projectId, made.id));
+    expect(competitors.map((row) => [row.name, row.domain, row.source])).toEqual([
+      ["Typeform", "typeform.com", "page"],
     ]);
   });
 });
