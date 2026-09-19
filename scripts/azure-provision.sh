@@ -214,6 +214,7 @@ add_secret app-encryption-key APP_ENCRYPTION_KEY
 add_secret clerk-secret-key CLERK_SECRET_KEY
 add_secret anyapi-house-api-key ANYAPI_HOUSE_API_KEY
 add_secret openrouter-api-key OPENROUTER_API_KEY
+add_secret ai-gateway-api-key AI_GATEWAY_API_KEY
 add_secret azure-email-connection-string AZURE_EMAIL_CONNECTION_STRING
 add_secret smtp-url SMTP_URL
 add_secret slack-client-secret SLACK_CLIENT_SECRET

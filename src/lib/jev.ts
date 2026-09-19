@@ -1,3 +1,5 @@
+import { GatewayError, createGateway } from "@ai-sdk/gateway";
+import { experimental_evaluate as evaluate } from "ai";
 import { z } from "zod";
 import { db } from "@/db";
 import { llmUsage } from "@/db/schema";
@@ -6,15 +8,27 @@ import { assertUnderLlmCap, withCallTimeout } from "./llm";
 
 /**
  * TypeSafe's Jev: one state in, typed answers with probabilities out, no
- * generated text. Every scan judgement goes through here. It is reached through
- * OpenRouter's Decisions endpoint, on the same key as every muse call; the
- * three question types and the answer shapes are the ones in
- * https://docs.typesafe.ai/api.md. OpenRouter bills what OpenRouter says in
- * `usage.cost`; the price below, read from its Jev 1.13 listing on 2026-09-18
+ * generated text. Every scan judgement goes through here. It is asked through
+ * Vercel's AI Gateway first when AI_GATEWAY_API_KEY is set, where Jev is free
+ * until 2026-09-25 (@vercel_dev, 2026-09-19), and through OpenRouter's
+ * Decisions endpoint, on the same key as every muse call, when the Gateway is
+ * not configured or fails. The three question types and the answer shapes are
+ * the ones in https://docs.typesafe.ai/api.md. Each route bills what it says
+ * it billed; the price below, read from Jev's listing on both on 2026-09-18
  * ($0.042 per million input tokens, output free), only covers an answer that
  * leaves the cost out.
  */
 export const JEV_PRICE_USD_PER_MILLION_INPUT = 0.042;
+
+/** The last moment of the Gateway's free Jev offer: the end of Sept 25, Pacific time. */
+export const GATEWAY_FREE_UNTIL = new Date("2026-09-26T07:00:00Z");
+
+/**
+ * How long the Gateway gets before the call moves to OpenRouter. A Jev answer
+ * takes seconds, so a Gateway that is quiet for a minute is down, and the
+ * OpenRouter attempt still fits inside the job's heartbeat.
+ */
+const GATEWAY_TIMEOUT_MS = 60_000;
 
 const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
@@ -33,18 +47,19 @@ export type ScoreQuestion = { type: "score"; instructions: string; criteria: str
 export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 
 const noulAnswer = z.object({ type: z.literal("noul"), noul: z.number() });
+/** The Gateway leaves out probabilities and confidence; nothing downstream reads either. */
 const choiceAnswer = z.object({
   type: z.literal("choice"),
   choice: z.string(),
-  probabilities: z.record(z.string(), z.number()),
-  confidence: z.number(),
+  probabilities: z.record(z.string(), z.number()).optional(),
+  confidence: z.number().optional(),
 });
 const scoreAnswer = z.object({
   type: z.literal("score"),
   score: z.number(),
   legend: z.record(z.string(), z.string()).optional(),
-  probabilities: z.record(z.string(), z.number()),
-  confidence: z.number(),
+  probabilities: z.record(z.string(), z.number()).optional(),
+  confidence: z.number().optional(),
 });
 const responseSchema = z.object({
   model: z.string(),
@@ -63,10 +78,10 @@ export type ScoreAnswer = z.infer<typeof scoreAnswer>;
 export type Answer = NoulAnswer | ChoiceAnswer | ScoreAnswer;
 export type Answers = Record<string, Answer>;
 
-/** Raised when the instance has no OpenRouter key, so nothing can be judged. */
+/** Raised when the instance has neither a Gateway nor an OpenRouter key, so nothing can be judged. */
 export class JevNotConfiguredError extends Error {
   constructor() {
-    super("Set OPENROUTER_API_KEY to let this instance judge leads.");
+    super("Set AI_GATEWAY_API_KEY or OPENROUTER_API_KEY to let this instance judge leads.");
     this.name = "JevNotConfiguredError";
   }
 }
@@ -74,7 +89,8 @@ export class JevNotConfiguredError extends Error {
 /**
  * Raised when one request carried more than the endpoint reads. OpenRouter
  * lists Jev with a 32k context and passes TypeSafe's refusal through as a 400
- * naming `max_tokens_exceeded` (seen 2026-09-18). A caller that batches items
+ * naming `max_tokens_exceeded` (seen 2026-09-18). Both routes read the same
+ * 32k, so this is never retried on the other one: a caller that batches items
  * splits the batch and asks again.
  */
 export class JevRequestTooLargeError extends Error {
@@ -153,21 +169,86 @@ async function record(
  * One Jev request, billed to the house and recorded in llm_usage beside every
  * muse call, so the daily cap, the Data usage screen and the scorer report
  * read one table. A refused request writes a row too: what a scan spent and
- * whether it was answered is a query, never a rerun.
+ * whether it was answered is a query, never a rerun. A Gateway failure writes
+ * its own row before the call moves to OpenRouter.
  */
 export async function askJev(call: JevCall): Promise<Answers> {
-  const { OPENROUTER_API_KEY, JEV_MODEL } = config();
-  if (!OPENROUTER_API_KEY) {
+  const { AI_GATEWAY_API_KEY, OPENROUTER_API_KEY } = config();
+  if (!AI_GATEWAY_API_KEY && !OPENROUTER_API_KEY) {
     throw new JevNotConfiguredError();
   }
   await assertUnderLlmCap();
+  if (AI_GATEWAY_API_KEY) {
+    try {
+      return await askGateway(AI_GATEWAY_API_KEY, call);
+    } catch (error) {
+      if (error instanceof JevRequestTooLargeError || !OPENROUTER_API_KEY) {
+        throw error;
+      }
+      console.warn(`[jev] Gateway failed, asking OpenRouter: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+  return askOpenRouter(OPENROUTER_API_KEY!, call);
+}
+
+async function askGateway(key: string, call: JevCall): Promise<Answers> {
+  const { JEV_GATEWAY_MODEL } = config();
+  const gateway = createGateway({ apiKey: key });
+  const startedAt = Date.now();
+  let result;
+  try {
+    result = await withCallTimeout(
+      (abortSignal) =>
+        evaluate({
+          model: gateway.evaluationModel(JEV_GATEWAY_MODEL),
+          state: call.state as Parameters<typeof evaluate>[0]["state"],
+          questions: toGatewayQuestions(call.questions),
+          maxRetries: 1,
+          abortSignal,
+        }),
+      GATEWAY_TIMEOUT_MS,
+    );
+  } catch (error) {
+    const status = GatewayError.isInstance(error) ? error.statusCode : null;
+    await record(call, {
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      model: JEV_GATEWAY_MODEL,
+      provider: "vercel",
+      latencyMs: Date.now() - startedAt,
+      finishReason: status ? `http_${status}` : error instanceof Error ? error.name : null,
+      answered: null,
+    });
+    if (status === 400 && mentionsTooLarge(error)) {
+      throw new JevRequestTooLargeError();
+    }
+    throw error;
+  }
+  const answers = fromGatewayAnswers(result.answers, result.providerMetadata);
+  const inputTokens = result.usage.inputTokens ?? 0;
+  await record(call, {
+    inputTokens,
+    outputTokens: result.usage.outputTokens ?? 0,
+    costUsd: gatewayCost(result.providerMetadata, inputTokens),
+    model: result.response.modelId,
+    provider: "vercel",
+    latencyMs: Date.now() - startedAt,
+    finishReason: "answered",
+    answered: Object.keys(answers).length,
+  });
+  return answers;
+}
+
+async function askOpenRouter(key: string, call: JevCall): Promise<Answers> {
+  const { JEV_MODEL } = config();
   const body = JSON.stringify({
     state: call.state,
     model: JEV_MODEL,
     questions: withoutNullCriteria(call.questions),
   });
   const startedAt = Date.now();
-  const response = await withCallTimeout((signal) => post(OPENROUTER_API_KEY, body, signal));
+  const response = await withCallTimeout((signal) => post(key, body, signal));
   const text = await response.text();
   if (!response.ok) {
     await record(call, {
@@ -197,6 +278,63 @@ export async function askJev(call: JevCall): Promise<Answers> {
     answered: Object.keys(parsed.answers).length,
   });
   return parsed.answers;
+}
+
+type GatewayQuestion = Parameters<typeof evaluate>[0]["questions"][string];
+type GatewayResult = Awaited<ReturnType<typeof evaluate>>;
+
+/** The Gateway calls TypeSafe's noul question a boolean; the other two keep their names. */
+function toGatewayQuestions(questions: Record<string, Question>): Record<string, GatewayQuestion> {
+  return Object.fromEntries(
+    Object.entries(questions).map(([key, question]) => [
+      key,
+      question.type === "noul"
+        ? { type: "boolean" as const, instructions: question.instructions, criteria: question.criteria }
+        : question,
+    ]),
+  );
+}
+
+/**
+ * The Gateway's answers in the shape the OpenRouter route returns, so callers
+ * never learn which route answered. Confidence, when TypeSafe sends it, rides
+ * in provider metadata keyed by question.
+ */
+function fromGatewayAnswers(
+  answers: GatewayResult["answers"],
+  metadata: GatewayResult["providerMetadata"],
+): Answers {
+  const confidence = (metadata?.typesafe as { confidence?: Record<string, unknown> } | undefined)?.confidence;
+  const parsed = Object.entries(answers).map(([key, answer]) => {
+    const sure = typeof confidence?.[key] === "number" ? (confidence[key] as number) : undefined;
+    if (answer.type === "boolean") {
+      return [key, noulAnswer.parse({ type: "noul", noul: answer.probability })] as const;
+    }
+    const schema = answer.type === "choice" ? choiceAnswer : scoreAnswer;
+    return [key, schema.parse({ ...answer, confidence: sure })] as const;
+  });
+  return Object.fromEntries(parsed);
+}
+
+/**
+ * What the Gateway billed, when it says. When it does not, the call is free
+ * inside the offer window and priced at the list price after it.
+ */
+function gatewayCost(metadata: GatewayResult["providerMetadata"], inputTokens: number): number {
+  const reported = Number((metadata?.gateway as { cost?: unknown } | undefined)?.cost);
+  if (Number.isFinite(reported)) {
+    return reported;
+  }
+  return Date.now() < GATEWAY_FREE_UNTIL.getTime()
+    ? 0
+    : (inputTokens * JEV_PRICE_USD_PER_MILLION_INPUT) / 1_000_000;
+}
+
+/** Whether a Gateway refusal names the same too-large error OpenRouter passes through. */
+function mentionsTooLarge(error: unknown): boolean {
+  const cause = (error as { cause?: { responseBody?: unknown } }).cause;
+  const text = `${error instanceof Error ? error.message : ""} ${String(cause?.responseBody ?? "")}`;
+  return text.includes("max_tokens_exceeded");
 }
 
 /**

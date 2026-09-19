@@ -27,7 +27,13 @@ const schema = z.object({
     z.string().default("meta/muse-spark-1.3-contributor"),
   ),
 
-  /** TypeSafe's Jev, through OpenRouter, judges every candidate the scan reads. */
+  /**
+   * TypeSafe's Jev judges every candidate the scan reads: through Vercel's AI
+   * Gateway when its key is set, through OpenRouter when it is not or when the
+   * Gateway fails. See src/lib/jev.ts.
+   */
+  AI_GATEWAY_API_KEY: optional(z.string()),
+  JEV_GATEWAY_MODEL: z.preprocess(blankIsAbsent, z.string().default("typesafe-ai/jev")),
   JEV_MODEL: z.preprocess(blankIsAbsent, z.string().default("~typesafe/jev-latest")),
 
   /**

@@ -90,7 +90,9 @@ npm run anyapi:register
 | `ANYAPI_HOUSE_API_KEY` | no | - | The key used when a user has not connected a wallet. |
 | `OPENROUTER_API_KEY` | no | - | Pays for judging every title, post and comment the scan reads (TypeSafe's Jev), and for the product profile, competitor classification and clustering. Without it nothing is scored. |
 | `OPENROUTER_MODEL` | no | `meta/muse-spark-1.3-contributor` | Override the model. |
-| `JEV_MODEL` | no | `~typesafe/jev-latest` | Override the judging model. |
+| `JEV_MODEL` | no | `~typesafe/jev-latest` | Override the judging model on OpenRouter. |
+| `AI_GATEWAY_API_KEY` | no | - | A Vercel AI Gateway key. When set, Jev is asked through the Gateway first and OpenRouter only answers when the Gateway fails. |
+| `JEV_GATEWAY_MODEL` | no | `typesafe-ai/jev` | Override the judging model on the Gateway. |
 | `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and one of the two below. |
 | `AZURE_EMAIL_CONNECTION_STRING` | no | - | Sends the digest through Azure Communication Services. Wins when both are set. |
 | `SMTP_URL` | no | - | Sends the digest through any SMTP server, as `smtps://user:pass@host:465`. |
@@ -224,6 +226,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 ANYAPI_HOUSE_API_KEY=
 OPENROUTER_API_KEY=
+AI_GATEWAY_API_KEY=
 ALERTS_FROM_EMAIL=
 AZURE_EMAIL_CONNECTION_STRING=
 SMTP_URL=
