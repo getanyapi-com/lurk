@@ -1,5 +1,5 @@
 import { Cron } from "croner";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { config } from "@/lib/config";
@@ -92,7 +92,9 @@ export async function seedProjectScans(): Promise<void> {
       await db()
         .selectDistinct({ projectId: jobs.projectId })
         .from(jobs)
-        .where(eq(jobs.kind, "profile_reseed"))
+        // A reseed that failed is still owed: the first one queued was claimed
+        // by the revision on its way out, which had no handler for it.
+        .where(and(eq(jobs.kind, "profile_reseed"), isNull(jobs.error)))
     ).map((row) => row.projectId),
   );
   for (const row of rows) {
