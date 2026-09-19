@@ -7,7 +7,7 @@ export const BRAND_MARKS = {
   ChatGPT: "/brands/chatgpt.svg",
   Perplexity: "/brands/perplexity.svg",
   Claude: "/brands/claude.svg",
-  Slack: "/brands/slack.svg",
+  Slack: "/brands/slack-color.svg",
   Discord: "/brands/discord.svg",
 } as const;
 export type BrandName = keyof typeof BRAND_MARKS;

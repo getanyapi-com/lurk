@@ -62,7 +62,7 @@ export function MarketingDecisionTiles() {
             <div className="quiet-card quiet-digest">
               <div className="quiet-channels">
                 <span>
-                  <BrandImage name="Slack" src="/brands/slack.svg" size={18} />
+                  <BrandImage name="Slack" src="/brands/slack-color.svg" size={18} />
                   Slack
                 </span>
                 <span>

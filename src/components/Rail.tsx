@@ -141,9 +141,9 @@ export function Rail({ groups, children }: RailProps) {
                     />
                     {item.label}
                     {item.marks ? (
-                      <span className="flex items-center gap-1 opacity-60 grayscale">
+                      <span className="flex items-center gap-1">
                         {item.marks.map((mark) => (
-                          <ChannelMark key={mark} channel={mark} size={12} />
+                          <ChannelMark key={mark} channel={mark} size={12} mono />
                         ))}
                       </span>
                     ) : null}
