@@ -179,7 +179,7 @@ describe("the Gateway first, OpenRouter behind it", () => {
     expect(recorded[1]).toMatchObject({ provider: "typesafe", finishReason: "answered" });
   });
 
-  it("leaves the Gateway alone for a while after it rate-limits", async () => {
+  it("asks the Gateway first every time, even after it rate-limits", async () => {
     recorded.length = 0;
     settings.AI_GATEWAY_API_KEY = "vck_test";
     const fetch = twoRoutes(
@@ -192,13 +192,13 @@ describe("the Gateway first, OpenRouter behind it", () => {
     await askJev(call);
 
     const gatewayCalls = fetch.mock.calls.filter(([url]) => String(url).includes("ai-gateway.vercel.sh"));
-    expect(gatewayCalls).toHaveLength(1);
+    expect(gatewayCalls).toHaveLength(2);
     expect(recorded.map((row) => `${row.provider}:${row.finishReason}`)).toEqual([
       "vercel:http_429",
       "typesafe:answered",
+      "vercel:http_429",
       "typesafe:answered",
     ]);
-    vi.useFakeTimers({ now: Date.now() + 31_000, toFake: ["Date"] });
   });
 
   it("does not ask OpenRouter again for a request too large for either", async () => {
@@ -211,7 +211,6 @@ describe("the Gateway first, OpenRouter behind it", () => {
     vi.stubGlobal("fetch", fetch);
 
     await expect(askJev(call)).rejects.toBeInstanceOf(JevRequestTooLargeError);
-    vi.useRealTimers();
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(recorded).toHaveLength(1);
   });

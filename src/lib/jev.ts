@@ -31,16 +31,6 @@ export const GATEWAY_FREE_UNTIL = new Date("2026-09-26T07:00:00Z");
  */
 const GATEWAY_TIMEOUT_MS = 15_000;
 
-/**
- * How long the Gateway is left alone after it rate-limits us. Its free tier
- * lets a few concurrent Jev calls through and 429s the rest (measured
- * 2026-09-19: 4 of a burst of 20), and a scan fires far more than that at
- * once. Asking it again for every call only doubles the requests; for this
- * long every call goes straight to OpenRouter instead.
- */
-const GATEWAY_REST_MS = 30_000;
-let gatewayRestingUntil = 0;
-
 const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
 export type NoulQuestion = {
@@ -189,7 +179,7 @@ export async function askJev(call: JevCall): Promise<Answers> {
     throw new JevNotConfiguredError();
   }
   await assertUnderLlmCap();
-  if (AI_GATEWAY_API_KEY && Date.now() >= gatewayRestingUntil) {
+  if (AI_GATEWAY_API_KEY) {
     try {
       return await askGateway(AI_GATEWAY_API_KEY, call);
     } catch (error) {
@@ -222,9 +212,6 @@ async function askGateway(key: string, call: JevCall): Promise<Answers> {
   } catch (thrown) {
     const error = RetryError.isInstance(thrown) ? thrown.lastError : thrown;
     const status = GatewayError.isInstance(error) ? error.statusCode : null;
-    if (status === 429) {
-      gatewayRestingUntil = Date.now() + GATEWAY_REST_MS;
-    }
     await record(call, {
       inputTokens: 0,
       outputTokens: 0,
