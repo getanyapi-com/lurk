@@ -93,7 +93,10 @@ export function assessmentFrom(
   prefix: string,
 ): Assessment {
   const fit = fitFrom(answers, prefix);
-  const intent = Math.round(score(answers, `${prefix}__intent`).score);
+  // Someone who would not welcome a product at all has no need of one to act
+  // on, however explicit their question: they are asking for advice, not for this.
+  const asked = Math.round(score(answers, `${prefix}__intent`).score);
+  const intent = noul(answers, `${prefix}__wants_offering`) < YES ? Math.min(asked, 1) : asked;
   return {
     id,
     relationship: reading.relationship,

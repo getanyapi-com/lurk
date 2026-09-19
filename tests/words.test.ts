@@ -35,7 +35,7 @@ describe("the words a card says instead of a percent", () => {
 
   it("keeps the rubric's own sentences for the detail view, one labelled line each", () => {
     expect(judgementSentence(4, 3)).toBe(
-      `Where they are: an explicit ask for a recommendation, a replacement or a comparison.\n` +
+      `Where they are: an explicit ask for a product, tool, service or provider to use: a recommendation, a replacement or a comparison.\n` +
         `Whether you fit: ${FIT[4]}.`,
     );
   });

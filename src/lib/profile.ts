@@ -86,7 +86,7 @@ export function platformPhrasings(platforms: string[], sellsPlatformData: boolea
  * Reads the product page. It buys no shared run, so it counts against the house
  * cap through the same seam every Reddit fetch uses, and is refused by it.
  */
-async function scrapeProduct(projectId: string, userId: string, url: string) {
+export async function scrapeProduct(projectId: string, userId: string, url: string) {
   const funded = await clientForUser(userId);
   if (funded.funding === "house") {
     await assertHouseDataUnderCap();
@@ -220,41 +220,44 @@ export type PageReseed = {
   sellsPlatformData: boolean;
   droppedPhrasings: string[];
   competitors: string[];
+  /** The exclusions and not-buyers written, which is none when the project already had its own. */
+  exclusions: string[];
+  notBuyers: string[];
 };
 
 /** What `platformPhrasings` builds, recognised by its shape: nothing else may end this way. */
 const PLATFORM_PHRASING = / (?:api|scraper)$/;
 
 /**
- * Brings a project made before 2026-09-19 up to what a new one gets, and
- * touches nothing else. The page is read again for the two things it was never
- * asked: the platform searches are dropped when the product does not sell its
- * platforms' data, and the competitors the reading names are written. The facts
- * a person may since have edited stay as they are, and the profile version does
- * not move, so no verdict is judged again. The caller queues the discovery that
- * turns the corrected searches into a plan.
+ * Brings an older project up to what a new one gets, and touches nothing else.
+ * The page is read again for what it was never asked: the platform searches are
+ * dropped when the product does not sell its platforms' data, the competitors
+ * the reading names are written, and a project with no exclusions or no
+ * not-buyers gets the ones the page implies (before 2026-09-19 they were asked
+ * for only where the page stated them, and 54 of 79 projects had none). A list
+ * that holds anything is a person's or an earlier reading's and stays as it is.
+ * Filling either one bumps the profile version, because a verdict made without
+ * them is a verdict about a different product. The caller queues the discovery
+ * that turns the corrected searches into a plan.
  */
 export async function reseedFromPage(
-  project: { id: string; userId: string; url: string; problemPhrasings: string[] },
+  project: {
+    id: string;
+    userId: string;
+    url: string;
+    problemPhrasings: string[];
+    exclusions: string[];
+    notBuyers: string[];
+  },
   options: { dryRun?: boolean } = {},
 ): Promise<PageReseed> {
   const page = await scrapeProduct(project.id, project.userId, project.url);
-  const profile = await generateStructured({
-    purpose: "profile",
-    projectId: project.id,
-    schema: profileSchema,
-    system: PROFILE_SYSTEM,
-    prompt: [
-      `Website: ${page.url}`,
-      `Title: ${page.title}`,
-      `Description: ${page.description}`,
-      "",
-      (page.markdown ?? "").slice(0, 12000),
-    ].join("\n"),
-  });
+  const profile = await profileFromPage(project.id, page);
   const droppedPhrasings = profile.sellsPlatformData
     ? []
     : project.problemPhrasings.filter((item) => PLATFORM_PHRASING.test(item));
+  const exclusions = project.exclusions.length === 0 ? profile.exclusions : [];
+  const notBuyers = project.notBuyers.length === 0 ? profile.notBuyers : [];
   const { limits } = await tierForUser(project.userId);
   const competitors = capped(
     pageCompetitors(profile.name, profile.competitors),
@@ -268,13 +271,45 @@ export async function reseedFromPage(
         .set({ problemPhrasings: project.problemPhrasings.filter((item) => !dropped.has(item)) })
         .where(eq(projects.id, project.id));
     }
+    if (exclusions.length > 0 || notBuyers.length > 0) {
+      await db()
+        .update(projects)
+        .set({
+          ...(exclusions.length > 0 ? { exclusions } : {}),
+          ...(notBuyers.length > 0 ? { notBuyers } : {}),
+          profileVersion: sql`${projects.profileVersion} + 1`,
+        })
+        .where(eq(projects.id, project.id));
+    }
     await writePageCompetitors(project.id, competitors);
   }
   return {
     sellsPlatformData: profile.sellsPlatformData,
     droppedPhrasings,
     competitors: competitors.map((item) => item.name),
+    exclusions,
+    notBuyers,
   };
+}
+
+/** What one scraped page says the product is. Reads the page and writes nothing. */
+export async function profileFromPage(
+  projectId: string,
+  page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
+): Promise<ProductProfile> {
+  return generateStructured({
+    purpose: "profile",
+    projectId,
+    schema: profileSchema,
+    system: PROFILE_SYSTEM,
+    prompt: [
+      `Website: ${page.url}`,
+      `Title: ${page.title}`,
+      `Description: ${page.description}`,
+      "",
+      (page.markdown ?? "").slice(0, 12000),
+    ].join("\n"),
+  });
 }
 
 /**
@@ -294,19 +329,7 @@ export async function buildProfile(
   const page = await scrapeProduct(projectId, userId, url);
 
   await onStep?.("profile");
-  const profile = await generateStructured({
-    purpose: "profile",
-    projectId,
-    schema: profileSchema,
-    system: PROFILE_SYSTEM,
-    prompt: [
-      `Website: ${page.url}`,
-      `Title: ${page.title}`,
-      `Description: ${page.description}`,
-      "",
-      (page.markdown ?? "").slice(0, 12000),
-    ].join("\n"),
-  });
+  const profile = await profileFromPage(projectId, page);
 
   const problemPhrasings = [
     ...profile.problemPhrasings,

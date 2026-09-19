@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitFrom, readingFrom, triageFrom } from "@/lib/scan/derive";
+import { assessmentFrom, fitFrom, readingFrom, triageFrom } from "@/lib/scan/derive";
 import { judgeAnswers, triageAnswers } from "./jevAnswers";
 
 /**
@@ -25,6 +25,21 @@ describe("the fit a judgement is derived from", () => {
     expect(fit({ hardRequirement: "unknown" })).toBe(2);
     expect(fit({ hardRequirement: "none_stated" })).toBe(3);
     expect(fit({ hardRequirement: "met" })).toBe(4);
+  });
+});
+
+describe("the intent a judgement is derived from", () => {
+  const reading = { relationship: "buyer", needState: "open", quote: null } as const;
+  const intent = (spec: Parameters<typeof judgeAnswers>[0][number]) =>
+    assessmentFrom("a", reading, judgeAnswers([spec]), "p0").intent;
+
+  it("takes the model's level for someone a product could answer", () => {
+    expect(intent({ intent: 3.2 })).toBe(3);
+  });
+
+  it("holds an explicit question no product could answer below the gate", () => {
+    expect(intent({ intent: 3.2, wantsOffering: 0.1 })).toBe(1);
+    expect(intent({ intent: 0, wantsOffering: 0.1 })).toBe(0);
   });
 });
 

@@ -47,13 +47,22 @@ describe("profile phrasings", () => {
 /**
  * The profile only ever described who the buyer is, so a person who shares the
  * product's vocabulary and will never buy had no way into the facts the judge
- * reads. The page is still the only source, so the field is allowed to be empty.
+ * reads. Asked only for what the page states, 70 of 79 production profiles
+ * came back with no not-buyer and 54 with no exclusion (2026-09-19), because a
+ * marketing page never says who it is not for. Both are now read from what the
+ * page does say: who it sells to, what it runs on, where it works.
  */
-describe("profile not-buyers", () => {
-  it("asks who is not a buyer, only where the page supports it", () => {
+describe("profile not-buyers and exclusions", () => {
+  it("reads who is not a buyer from who the page sells to", () => {
     const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- notBuyers:"));
     expect(bullet).toBeDefined();
-    expect(bullet).toMatch(/not its buyer/);
-    expect(bullet).toMatch(/Empty list when the page gives no ground/);
+    expect(bullet).toMatch(/would not buy it/);
+    expect(bullet).toMatch(/Read them from who the page sells to/);
+  });
+
+  it("asks what a buyer must already have, and forbids guessing a missing feature", () => {
+    const bullet = PROFILE_SYSTEM.split("\n").find((line) => line.startsWith("- exclusions:"));
+    expect(bullet).toMatch(/what a buyer must already have or be/);
+    expect(bullet).toMatch(/never a guess about a feature the page is silent on/);
   });
 });

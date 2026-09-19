@@ -190,6 +190,16 @@ describe("routing a judgement to a lane", () => {
   it("drops a need the person says is already met, however good the fit", () => {
     expect(routeLead(assessment({ needState: "resolved", fit: 4 }))).toBeNull();
   });
+
+  // Labelled 2026-09-19: 68% of context leads were not worth a comment, most
+  // of them a rival being promoted or a thread the product only might fit.
+  it("drops someone promoting their own thing, however good the fit", () => {
+    expect(routeLead(assessment({ relationship: "seller", fit: 4 }))).toBeNull();
+  });
+
+  it("drops a thread the product only plausibly fits", () => {
+    expect(routeLead(assessment({ relationship: "helper", fit: 2 }))).toBeNull();
+  });
 });
 
 describe("content Reddit has taken away", () => {
