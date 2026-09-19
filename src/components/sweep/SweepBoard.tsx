@@ -31,7 +31,15 @@ const RING_STEP_MS = 90;
 
 const CARD_W = 340;
 const CARD_H = 176;
-const POSTS_PER_SHEET = 40;
+/** The pile's fixed height, and the sheet sizes it steps through to stay inside it. */
+const PILE_H = 96;
+const PILE_MAX_SHEETS = Math.floor((PILE_H - 6) / 2);
+const SHEET_SIZES = [40, 100, 250, 500, 1000, 2500, 5000, 10000];
+
+/** The smallest round sheet that keeps the whole year under the pile's height. */
+function postsPerSheet(found: number): number {
+  return SHEET_SIZES.find((size) => Math.ceil(found / size) <= PILE_MAX_SHEETS) ?? Math.ceil(found / PILE_MAX_SHEETS);
+}
 
 const COUNT_KEYS = ["found", "triaged", "scored", "asideAtTitle", "buyers", "review", "leads"] as const;
 
@@ -177,13 +185,12 @@ function ink(name: string): string {
 }
 
 /** The year's posts as one stack of paper going down, and three going up. */
-function Pile({ counts }: { counts: SweepCounts }) {
+function Pile({ counts, perSheet }: { counts: SweepCounts; perSheet: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const leads = counts.leads;
   const review = counts.review;
   const aside = Math.max(0, counts.asideAtTitle + counts.scored - leads - review);
   const unread = Math.max(0, counts.found - counts.asideAtTitle - counts.scored);
-  const height = Math.max(60, Math.ceil(counts.found / POSTS_PER_SHEET) * 2 + 12);
   useEffect(() => {
     const canvas = ref.current;
     const parent = canvas?.parentElement;
@@ -205,7 +212,7 @@ function Pile({ counts }: { counts: SweepCounts }) {
     const stack = (x: number, width: number, posts: number, color: string, alpha: number) => {
       ctx.fillStyle = color;
       ctx.globalAlpha = alpha;
-      const sheets = Math.ceil(posts / POSTS_PER_SHEET);
+      const sheets = Math.ceil(posts / perSheet);
       for (let i = 0; i < sheets; i += 1) {
         // Paper never stacks square, and the offset has to stay put per sheet.
         const nudge = ((i * 7919) % 5) - 2;
@@ -228,7 +235,7 @@ function Pile({ counts }: { counts: SweepCounts }) {
   );
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative w-full transition-[height]" style={{ height }}>
+      <div className="relative w-full" style={{ height: PILE_H }}>
         <canvas ref={ref} className="absolute inset-0" />
       </div>
       <div className="h-px w-full" style={{ background: "var(--border)" }} />
@@ -504,6 +511,7 @@ export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSn
   const view = useSweepView(snapshot, cols * rows);
   const running = snapshot?.state === "running" || snapshot?.state === "waiting" || snapshot === null;
   const over = !running && view.counts.scored === snapshot?.counts.scored;
+  const perSheet = postsPerSheet(view.counts.found);
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,4fr)_minmax(0,11fr)]">
       <RedditTheme />
@@ -527,9 +535,9 @@ export function SweepBoard({ snapshot, cols = 6, rows = 8 }: { snapshot: SweepSn
         <section className="flex flex-col gap-4 rounded-card border bg-surface p-4">
           <div className="flex items-baseline justify-between gap-2">
             <Eyebrow>The past year</Eyebrow>
-            <span className="text-mono text-fg-muted">one sheet is {POSTS_PER_SHEET} threads</span>
+            <span className="text-mono text-fg-muted">one sheet is {perSheet.toLocaleString()} threads</span>
           </div>
-          <Pile counts={view.counts} />
+          <Pile counts={view.counts} perSheet={perSheet} />
         </section>
         <section className="flex flex-col gap-4 rounded-card border bg-surface p-4">
           <Eyebrow>What got through</Eyebrow>
