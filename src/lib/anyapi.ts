@@ -93,30 +93,57 @@ export async function walletConnection(userId: string) {
   return rows[0] ?? null;
 }
 
+type WalletRow = typeof walletConnections.$inferSelect;
+
+function freshAccessToken(row: WalletRow, key: string): string | null {
+  const fresh =
+    row.accessToken &&
+    row.accessTokenExpiresAt &&
+    row.accessTokenExpiresAt.getTime() - EXPIRY_SKEW_MS > Date.now();
+  return fresh && row.accessToken ? decryptSecret(row.accessToken, key) : null;
+}
+
+/**
+ * AnyAPI rotates the refresh token on every use and treats a second use of an
+ * old one as theft, revoking the connection. Two jobs for one user that both
+ * find the access token expired must therefore not both refresh: the row is
+ * locked for the exchange, and whoever waited reads what the first one stored.
+ */
 async function walletAccessToken(userId: string): Promise<string | null> {
   const row = await walletConnection(userId);
   if (!row) {
     return null;
   }
   const key = config().APP_ENCRYPTION_KEY;
-  const fresh =
-    row.accessToken &&
-    row.accessTokenExpiresAt &&
-    row.accessTokenExpiresAt.getTime() - EXPIRY_SKEW_MS > Date.now();
-  if (fresh && row.accessToken) {
-    return decryptSecret(row.accessToken, key);
+  const held = freshAccessToken(row, key);
+  if (held) {
+    return held;
   }
-  const tokens = await refreshTokens(decryptSecret(row.refreshToken, key));
-  await db()
-    .update(walletConnections)
-    .set({
-      refreshToken: encryptSecret(tokens.refresh_token, key),
-      accessToken: encryptSecret(tokens.access_token, key),
-      accessTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-      scope: tokens.scope,
-    })
-    .where(eq(walletConnections.userId, userId));
-  return tokens.access_token;
+  return db().transaction(async (tx) => {
+    const [locked] = await tx
+      .select()
+      .from(walletConnections)
+      .where(eq(walletConnections.userId, userId))
+      .for("update");
+    if (!locked) {
+      return null;
+    }
+    const stored = freshAccessToken(locked, key);
+    if (stored) {
+      return stored;
+    }
+    const tokens = await refreshTokens(decryptSecret(locked.refreshToken, key));
+    await tx
+      .update(walletConnections)
+      .set({
+        refreshToken: encryptSecret(tokens.refresh_token, key),
+        accessToken: encryptSecret(tokens.access_token, key),
+        accessTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+        scope: tokens.scope,
+      })
+      .where(eq(walletConnections.userId, userId));
+    return tokens.access_token;
+  });
 }
 
 /** Store a freshly issued token pair for a user, encrypting both secrets. */
