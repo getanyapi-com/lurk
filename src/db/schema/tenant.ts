@@ -45,6 +45,13 @@ export const walletConnections = pgTable("wallet_connections", {
   scope: text("scope"),
   capUsd: numeric("cap_usd", { precision: 12, scale: 6 }),
   capPeriod: text("cap_period"),
+  /**
+   * When the owner was last emailed that the wallet is empty, or that the
+   * connection was revoked. A failing job asks every hour; the person is told
+   * once, and again only if it is still so days later or after a reconnect.
+   */
+  balanceNoticeAt: timestamp("balance_notice_at", { withTimezone: true }),
+  reconnectNoticeAt: timestamp("reconnect_notice_at", { withTimezone: true }),
   connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

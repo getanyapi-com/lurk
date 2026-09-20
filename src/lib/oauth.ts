@@ -47,6 +47,14 @@ export function authorizeUrl(state: string, challenge: string): string {
   return `${ANYAPI_BASE_URL.replace(/\/$/, "")}/oauth/authorize?${query.toString()}`;
 }
 
+/** The token endpoint said no. A 400 or 401 on a refresh means the grant is gone. */
+export class TokenRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`AnyAPI token request failed with status ${status}`);
+    this.name = "TokenRequestError";
+  }
+}
+
 async function postToken(form: URLSearchParams): Promise<TokenResponse> {
   const response = await fetch(`${config().ANYAPI_BASE_URL.replace(/\/$/, "")}/oauth/token`, {
     method: "POST",
@@ -54,7 +62,7 @@ async function postToken(form: URLSearchParams): Promise<TokenResponse> {
     body: form,
   });
   if (!response.ok) {
-    throw new Error(`AnyAPI token request failed with status ${response.status}`);
+    throw new TokenRequestError(response.status);
   }
   return (await response.json()) as TokenResponse;
 }
