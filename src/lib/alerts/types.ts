@@ -45,6 +45,8 @@ export type Digest = {
   since: Date;
   cadence: AlertCadence;
   leads: DigestLead[];
+  /** How many more the window held than the message lists. */
+  more?: number;
   appUrl: string;
 };
 

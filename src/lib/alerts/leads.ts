@@ -4,7 +4,7 @@ import { leads, redditAuthors, redditComments, redditPosts } from "@/db/schema";
 import type { SelectableLead } from "./select";
 
 /**
- * Leads a project scored since a moment, with the author's face attached. The
+ * Leads a project first found since a moment, with the author's face attached. The
  * ordering and the cap are `selectLeads`, so the same rules cover a live send
  * and a test.
  */
@@ -16,7 +16,8 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
       reason: leads.reason,
       matchedPhrase: leads.matchedPhrase,
       status: leads.status,
-      scoredAt: leads.scoredAt,
+      kind: leads.kind,
+      foundAt: leads.foundAt,
       title: redditPosts.title,
       body: sql<string | null>`coalesce(${redditComments.body}, ${redditPosts.body})`,
       isComment: sql<boolean>`${leads.commentId} is not null`,
@@ -41,7 +42,7 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
       and(
         eq(leads.projectId, projectId),
         eq(leads.status, "new"),
-        gte(leads.scoredAt, since),
+        gte(leads.foundAt, since),
       ),
     );
   return rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) }));

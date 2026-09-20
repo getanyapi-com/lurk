@@ -16,6 +16,19 @@ export const CADENCE_MS: Record<AlertCadence, number> = {
 /** The contract's number: Slack and Discord carry the top five leads. */
 export const CHAT_LEAD_CAP = 5;
 
+/** The email lists this many and counts the rest, so a big day stays readable. */
+export const EMAIL_LEAD_CAP = 20;
+
+/** Below this a lead is in the feed and not worth a message. */
+export const ALERT_SCORE_FLOOR = 55;
+
+/**
+ * How much older than the window's start a post or comment may be. A scan reads
+ * a week or a month back, so what it finds today is not always from today, and
+ * an alert is for a conversation that is still open.
+ */
+export const FRESH_SLACK_MS = CADENCE_MS.daily;
+
 /**
  * What a channel actually sends at. A free-tier channel is daily whatever it
  * asked for; a connected wallet and a self-hosted instance get what they asked.
@@ -49,23 +62,33 @@ export function windowStart(lastSentAt: Date | null, cadence: AlertCadence, now:
 export type SelectableLead = Omit<DigestLead, "excerpt"> & {
   body: string | null;
   status: string;
-  scoredAt: Date;
+  kind: string;
+  foundAt: Date;
 };
 
 /**
- * The leads one message carries: still new, scored inside the window, best
- * first. `limit` is null for the email digest, which lists every one of them.
+ * Every lead worth a message, best first: a buyer the user has not touched,
+ * first found inside the window, at or over the floor, on a post or comment
+ * that is still fresh. The window is on `foundAt`, which a rescore never moves,
+ * so consecutive windows carry each lead once.
  */
-export function selectLeads(
-  rows: SelectableLead[],
-  since: Date,
-  limit: number | null,
-): DigestLead[] {
-  const inWindow = rows
-    .filter((row) => row.status === "new" && row.scoredAt.getTime() >= since.getTime())
+export function alertable(rows: SelectableLead[], since: Date): SelectableLead[] {
+  const freshFrom = since.getTime() - FRESH_SLACK_MS;
+  return rows
+    .filter(
+      (row) =>
+        row.status === "new" &&
+        row.kind === "buyer" &&
+        row.score >= ALERT_SCORE_FLOOR &&
+        row.foundAt.getTime() >= since.getTime() &&
+        row.createdAt.getTime() >= freshFrom,
+    )
     .sort((a, b) => b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime());
-  const kept = limit == null ? inWindow : inWindow.slice(0, limit);
-  return kept.map((row) => ({
+}
+
+/** The leads one message carries: the top `limit` of `alertable`. */
+export function selectLeads(rows: SelectableLead[], since: Date, limit: number): DigestLead[] {
+  return alertable(rows, since).slice(0, limit).map((row) => ({
     id: row.id,
     title: row.title,
     url: row.url,

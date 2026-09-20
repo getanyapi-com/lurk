@@ -20,8 +20,13 @@ function windowPhrase(digest: Digest): string {
   return digest.cadence === "hourly" ? "in the last hour" : "in the last 24 hours";
 }
 
+/** Every lead the window held, listed or not. */
+function totalOf(digest: Digest): number {
+  return digest.leads.length + (digest.more ?? 0);
+}
+
 export function digestSubject(digest: Digest): string {
-  const count = digest.leads.length;
+  const count = totalOf(digest);
   return `${count} new ${count === 1 ? "lead" : "leads"} for ${digest.projectName}`;
 }
 
@@ -40,7 +45,7 @@ function headerRow(digest: Digest): string {
 }
 
 function headlineRow(digest: Digest): string {
-  const count = digest.leads.length;
+  const count = totalOf(digest);
   const noun = count === 1 ? "new lead" : "new leads";
   return `<tr><td style="padding:24px 24px 8px;font-family:${EMAIL_FONT};font-size:20px;line-height:1.3;font-weight:500;color:${C.fg}">${count} ${noun} for ${escapeHtml(digest.projectName)} ${windowPhrase(digest)}.</td></tr>`;
 }
@@ -136,6 +141,13 @@ function footerRow(digest: Digest): string {
 &middot; ${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>`;
 }
 
+function moreRow(digest: Digest): string {
+  if (!digest.more) {
+    return "";
+  }
+  return `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:14px;color:${C.fgMuted}">And ${digest.more} more <a href="${escapeHtml(digest.appUrl)}/app/leads" style="color:${C.fg};text-decoration:underline">in the feed</a>.</td></tr>`;
+}
+
 function emptyRow(digest: Digest): string {
   return `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:15px;color:${C.fgMuted}">Nothing new ${windowPhrase(digest)}. The next scan runs on your schedule.</td></tr>`;
 }
@@ -143,7 +155,7 @@ function emptyRow(digest: Digest): string {
 /** The whole email: table layout, inline styles, no stylesheet to strip. */
 export function renderDigestHtml(digest: Digest): string {
   const body = digest.leads.length
-    ? `${timelineRow(digest)}${digest.leads.map((lead) => leadRow(lead, digest)).join("")}`
+    ? `${timelineRow(digest)}${digest.leads.map((lead) => leadRow(lead, digest)).join("")}${moreRow(digest)}`
     : emptyRow(digest);
   return `<!doctype html>
 <html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>${escapeHtml(digestSubject(digest))}</title></head>
@@ -162,8 +174,9 @@ export function renderDigestText(digest: Digest): string {
       `${lead.score} - ${lead.title} (r/${lead.subreddit}, u/${lead.author ?? "unknown"}, ${shortAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}`,
   );
   return [
-    `${digest.leads.length} new leads for ${digest.projectName} ${windowPhrase(digest)}.`,
+    `${totalOf(digest)} new leads for ${digest.projectName} ${windowPhrase(digest)}.`,
     ...lines,
+    ...(digest.more ? [`And ${digest.more} more in the feed.`] : []),
     `${digest.appUrl}/app/leads`,
     `${ANYAPI_PLUG} ${anyapiAlertUrl("email")}`,
   ].join("\n\n");

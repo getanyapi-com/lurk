@@ -252,6 +252,11 @@ export const leads = pgTable(
      */
     threadReadCount: integer("thread_read_count"),
     scoredAt: timestamp("scored_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * When the project first held this lead. A rescore moves `scoredAt` and
+     * never this, so an alert window on it carries each lead exactly once.
+     */
+    foundAt: timestamp("found_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index("leads_project_score_idx").on(t.projectId, t.score.desc()),

@@ -148,6 +148,9 @@ describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and lead
       .from(schema.leads)
       .where(eq(schema.leads.projectId, project.id));
     expect(asBuyer.map((row) => row.kind)).toEqual(["buyer"]);
+    // A rescore is a new judgement of the same find, so an alert never repeats it.
+    expect(asBuyer[0].foundAt).toEqual(asContext[0].foundAt);
+    expect(asBuyer[0].scoredAt.getTime()).toBeGreaterThanOrEqual(asContext[0].scoredAt.getTime());
 
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });

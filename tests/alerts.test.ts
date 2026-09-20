@@ -34,6 +34,10 @@ import {
   effectiveCadence,
   isDue,
   selectLeads,
+  alertable,
+  ALERT_SCORE_FLOOR,
+  EMAIL_LEAD_CAP,
+  FRESH_SLACK_MS,
   customWebhookAllowance,
   customWebhookCapText,
   type SelectableLead,
@@ -63,7 +67,8 @@ function lead(overrides: Partial<SelectableLead> & { id: string }): SelectableLe
     numComments: 12,
     createdAt: new Date(2026, 8, 5, 7, 0, 0),
     status: "new",
-    scoredAt: new Date(2026, 8, 5, 8, 0, 0),
+    kind: "buyer",
+    foundAt: new Date(2026, 8, 5, 8, 0, 0),
     ...overrides,
   };
 }
@@ -101,28 +106,39 @@ describe("cadence", () => {
 describe("what one message carries", () => {
   const since = SINCE;
 
-  it("takes only new leads scored inside the window, best first", () => {
+  it("takes only new leads first found inside the window, best first", () => {
     const rows = [
-      lead({ id: "old", scoredAt: new Date(2026, 8, 5, 5, 0, 0), score: 99 }),
+      lead({ id: "old", foundAt: new Date(2026, 8, 5, 5, 0, 0), score: 99 }),
       lead({ id: "hidden", status: "hidden", score: 98 }),
       lead({ id: "low", score: 61 }),
       lead({ id: "high", score: 88 }),
     ];
-    expect(selectLeads(rows, since, null).map((one) => one.id)).toEqual(["high", "low"]);
+    expect(selectLeads(rows, since, EMAIL_LEAD_CAP).map((one) => one.id)).toEqual(["high", "low"]);
   });
 
-  it("caps a chat channel at the top five and leaves email uncapped", () => {
-    const rows = Array.from({ length: 8 }, (_, index) =>
+  it("leaves out a thread nobody asks in, a weak score and a stale post", () => {
+    const rows = [
+      lead({ id: "context", kind: "context", score: 90 }),
+      lead({ id: "weak", score: ALERT_SCORE_FLOOR - 1 }),
+      lead({ id: "stale", createdAt: new Date(since.getTime() - FRESH_SLACK_MS - 1000) }),
+      lead({ id: "fresh", createdAt: new Date(since.getTime() - FRESH_SLACK_MS) }),
+    ];
+    expect(alertable(rows, since).map((one) => one.id)).toEqual(["fresh"]);
+  });
+
+  it("caps a chat channel at the top five and the email at twenty", () => {
+    const rows = Array.from({ length: 25 }, (_, index) =>
       lead({ id: `l${index}`, score: 90 - index }),
     );
     expect(selectLeads(rows, since, CHAT_LEAD_CAP)).toHaveLength(CHAT_LEAD_CAP);
-    expect(selectLeads(rows, since, null)).toHaveLength(8);
+    expect(selectLeads(rows, since, EMAIL_LEAD_CAP)).toHaveLength(EMAIL_LEAD_CAP);
+    expect(alertable(rows, since)).toHaveLength(25);
   });
 
   it("hands back digest leads without the selection columns", () => {
-    const [only] = selectLeads([lead({ id: "a" })], since, null);
+    const [only] = selectLeads([lead({ id: "a" })], since, EMAIL_LEAD_CAP);
     expect(only).not.toHaveProperty("status");
-    expect(only).not.toHaveProperty("scoredAt");
+    expect(only).not.toHaveProperty("foundAt");
   });
 });
 
@@ -209,14 +225,14 @@ describe("the excerpt", () => {
 
 describe("chat payloads", () => {
   it("puts the headline and every lead in the Slack blocks", () => {
-    const payload = payloadFor("slack", digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
+    const payload = payloadFor("slack", digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)));
     expect(payload).toMatchObject({ text: "1 new lead for Acme in the last 24 hours." });
     expect(JSON.stringify(payload)).toContain("https://www.reddit.com/r/SaaS/comments/x/");
   });
 
   it("shows a Slack lead as its linked title over the author's words, not the rubric", () => {
     const one = lead({ id: "a", title: "Scraper <help> & advice" });
-    const payload = payloadFor("slack", digestOf(selectLeads([one], SINCE, null)));
+    const payload = payloadFor("slack", digestOf(selectLeads([one], SINCE, EMAIL_LEAD_CAP)));
     const [first] = (
       payload as { attachments: Array<{ color: string; blocks: Array<Record<string, unknown>> }> }
     ).attachments;
@@ -235,13 +251,13 @@ describe("chat payloads", () => {
 
   it("says when the lead is a comment, and falls back to the phrase with no body", () => {
     const one = lead({ id: "a", body: null, isComment: true });
-    const payload = JSON.stringify(payloadFor("slack", digestOf(selectLeads([one], SINCE, null))));
+    const payload = JSON.stringify(payloadFor("slack", digestOf(selectLeads([one], SINCE, EMAIL_LEAD_CAP))));
     expect(payload).toContain("\\npaying too much");
     expect(payload).toContain("comment by u/ella_builds");
   });
 
   it("gives Discord one embed per lead with the score and subreddit", () => {
-    const payload = payloadFor("discord", digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
+    const payload = payloadFor("discord", digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)));
     expect(payload).toMatchObject({
       embeds: [
         {
@@ -260,7 +276,7 @@ describe("chat payloads", () => {
   });
 
   it("ends every chat message and email with the AnyAPI line, tagged by channel", () => {
-    const digest = digestOf(selectLeads([lead({ id: "a" })], SINCE, null));
+    const digest = digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP));
     const slack = (payloadFor("slack", digest) as { attachments: unknown[] }).attachments.at(-1);
     expect(JSON.stringify(slack)).toContain("utm_source=lurk&utm_medium=slack");
     expect(renderDigestHtml(digest)).toContain("utm_medium=email");
@@ -269,7 +285,7 @@ describe("chat payloads", () => {
   });
 
   it("hands a generic endpoint the digest unstyled", () => {
-    const payload = payloadFor("webhook", digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
+    const payload = payloadFor("webhook", digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)));
     expect(payload).toMatchObject({ project: "Acme", cadence: "daily" });
   });
 });
@@ -282,11 +298,11 @@ function structure(html: string): string {
 }
 
 describe("the digest email", () => {
-  const html = renderDigestHtml(digestOf(selectLeads([lead({ id: "a" })], SINCE, null)));
+  const html = renderDigestHtml(digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)));
 
   it("names the project and the count in the subject", () => {
     expect(digestSubject(digestOf([]))).toBe("0 new leads for Acme");
-    expect(digestSubject(digestOf(selectLeads([lead({ id: "a" })], SINCE, null)))).toBe(
+    expect(digestSubject(digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)))).toBe(
       "1 new lead for Acme",
     );
   });
@@ -315,7 +331,7 @@ describe("the digest email", () => {
 
   it("escapes what a Reddit title can contain", () => {
     const nasty = renderDigestHtml(
-      digestOf(selectLeads([lead({ id: "a", title: '<script>"x"</script>' })], SINCE, null)),
+      digestOf(selectLeads([lead({ id: "a", title: '<script>"x"</script>' })], SINCE, EMAIL_LEAD_CAP)),
     );
     expect(nasty).not.toContain("<script>");
     expect(nasty).toContain("&lt;script&gt;");
@@ -367,7 +383,7 @@ describe("delivery", () => {
       await sendToChannel(
         "webhook",
         hook.url,
-        digestOf(selectLeads([lead({ id: "a" })], SINCE, null)),
+        digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)),
       );
       expect(hook.seen[0].path).toBe("/hooks");
       expect(JSON.parse(hook.seen[0].body)).toMatchObject({ project: "Acme" });
@@ -452,7 +468,7 @@ describe("delivery", () => {
     await sendToChannel(
       "email",
       "you@company.com",
-      digestOf(selectLeads([lead({ id: "a" })], SINCE, null)),
+      digestOf(selectLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP)),
     );
     expect(azureSend).toHaveBeenCalledTimes(1);
     const [connection, message] = azureSend.mock.calls[0];

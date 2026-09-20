@@ -4,6 +4,8 @@ import { newLeadsSince } from "@/lib/alerts/leads";
 import {
   CADENCE_MS,
   CHAT_LEAD_CAP,
+  EMAIL_LEAD_CAP,
+  alertable,
   effectiveCadence,
   isDue,
   selectLeads,
@@ -40,7 +42,8 @@ async function digestFor(
   }
   const since = windowStart(channel.lastSentAt, cadence, now);
   const rows = await newLeadsSince(channel.projectId, since);
-  const leads = selectLeads(rows, since, channel.channel === "email" ? null : CHAT_LEAD_CAP);
+  const limit = channel.channel === "email" ? EMAIL_LEAD_CAP : CHAT_LEAD_CAP;
+  const leads = selectLeads(rows, since, limit);
   if (leads.length === 0) {
     return null;
   }
@@ -50,6 +53,7 @@ async function digestFor(
     since,
     cadence,
     leads,
+    more: alertable(rows, since).length - leads.length,
     appUrl: config().APP_URL,
   };
 }
