@@ -1,0 +1,2 @@
+ALTER TABLE "wallet_connections" ADD COLUMN "balance_notice_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "wallet_connections" ADD COLUMN "reconnect_notice_at" timestamp with time zone;

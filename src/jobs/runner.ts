@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
+import { noticeWalletTrouble } from "@/lib/alerts/walletNotice";
 import { enqueueOnce } from "./enqueue";
 import { HEARTBEAT_MS, LEASE_MS } from "./lease";
 import { handlerFor, nextRunAt, type Job } from "./registry";
@@ -257,6 +258,8 @@ export async function runClaimedJob(job: Job): Promise<void> {
     }
     if (await finish(job, lease, reasonFor(error))) {
       await requeueRecurring(job);
+      // Best effort: telling the owner must never change how the job ended.
+      await noticeWalletTrouble(job.projectId, error).catch(() => undefined);
     }
   } finally {
     stop();

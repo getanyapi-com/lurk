@@ -158,6 +158,8 @@ export async function saveWalletTokens(
     accessToken: encryptSecret(tokens.access_token, key),
     accessTokenExpiresAt: new Date(Date.now() + tokens.expires_in * 1000),
     scope: tokens.scope,
+    balanceNoticeAt: null,
+    reconnectNoticeAt: null,
     connectedAt: new Date(),
   };
   await db()
