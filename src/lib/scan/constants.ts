@@ -122,14 +122,19 @@ export function engagementScore(ageHours: number, numComments: number | null): n
  * The feed's sort order, 0-100. Only leads the gates qualified reach the feed,
  * so this decides order among leads that already passed, never admission:
  *
- *   score = 100 * (2 * fit + 2 * intent + engagement) / 20
+ *   quality = 0.6 * match + 0.2 * intent / 4 + 0.2 * engagement / 4
+ *   score   = 50 + 50 * (quality - 0.4) / 0.6, held to 0-100
  *
- * fit and intent are the model's 0-4 scales and carry double the weight of the
- * 0-4 engagement, because what the person needs outranks how fresh the thread
- * is. A missing fit or intent counts as 0. A qualified lead is fit >= 3 and
- * intent >= 2, so the qualified band starts at 50 and the maximum is 100.
+ * match is how well the product suits the person (derive.ts), and carries
+ * three times the weight of intent or of the 0-4 engagement, because it is
+ * what told good leads from bad on the posts labelled 2026-09-20; the fit and
+ * intent sort it replaced was barely better than chance on 2026-09-22. A
+ * qualified lead has every match answer at 0.5 or more and intent 2 or more,
+ * so its quality is at least 0.4: the qualified band starts at 50, and the
+ * maximum is 100. A missing match or intent counts as 0.
  */
-export function foldScore(fit: number | null, intent: number | null, engagement: number): number {
-  const weighted = (fit ?? 0) * 2 + (intent ?? 0) * 2 + engagement;
-  return Math.round((weighted / 20) * 100);
+export function foldScore(match: number | null, intent: number | null, engagement: number): number {
+  const quality = 0.6 * (match ?? 0) + (0.2 * (intent ?? 0)) / 4 + (0.2 * engagement) / 4;
+  const score = Math.round(50 + (50 * (quality - 0.4)) / 0.6);
+  return Math.min(100, Math.max(0, score));
 }

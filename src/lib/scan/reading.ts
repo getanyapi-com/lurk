@@ -176,6 +176,7 @@ function notAsking(reading: Reading): Assessment {
     needState: reading.needState,
     fit: null,
     intent: null,
+    match: null,
     stage: "none",
     decision: "reject",
     // Every reading that reaches here fails a gate, so the gate names it.

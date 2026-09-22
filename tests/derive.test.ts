@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessmentFrom, fitFrom, readingFrom, triageFrom } from "@/lib/scan/derive";
+import { assessmentFrom, fitFrom, matchFrom, readingFrom, triageFrom } from "@/lib/scan/derive";
 import { judgeAnswers, triageAnswers } from "./jevAnswers";
 
 /**
@@ -21,14 +21,32 @@ describe("the fit a judgement is derived from", () => {
     expect(fit({ solvesProblem: 0.1, audience: 0.1 })).toBe(0);
   });
 
-  it("does not let the audience answer outweigh a product that does the job", () => {
-    expect(fit({ solvesProblem: 0.9, audience: 0.1, hardRequirement: "none_stated" })).toBe(3);
+  it("counts a different kind of product as the wrong job, even for its audience", () => {
+    expect(fit({ sameKind: 0.2, audience: 0.9 })).toBe(0);
+  });
+
+  it("counts someone the product does not serve, or who could not use it, as overlap", () => {
+    expect(fit({ audience: 0.1, hardRequirement: "none_stated" })).toBe(1);
+    expect(fit({ canUse: 0.3, hardRequirement: "met" })).toBe(1);
   });
 
   it("lets the requirement decide once the product does the job", () => {
     expect(fit({ hardRequirement: "unknown" })).toBe(2);
     expect(fit({ hardRequirement: "none_stated" })).toBe(3);
     expect(fit({ hardRequirement: "met" })).toBe(4);
+  });
+});
+
+describe("how well the product matches the person", () => {
+  const match = (spec: Parameters<typeof judgeAnswers>[0][number]) => matchFrom(judgeAnswers([spec]), "p0");
+
+  it("is the geometric mean of the five match answers", () => {
+    expect(match({ solvesProblem: 0.8, wantsOffering: 0.8, sameKind: 0.8, canUse: 0.8, audience: 0.8 })).toBeCloseTo(0.8);
+  });
+
+  it("lets one confident no drag it down however sure the rest are", () => {
+    expect(match({ audience: 0.05 })).toBeLessThan(0.6);
+    expect(match({ audience: 0.05 })).toBeLessThan(match({ audience: 0.6 }));
   });
 });
 

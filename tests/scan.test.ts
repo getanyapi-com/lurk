@@ -43,6 +43,7 @@ function assessment(patch: Partial<Assessment> = {}): Assessment {
     needState: "open",
     fit: 4,
     intent: 3,
+    match: 0.9,
     stage: "solution_seeking",
     decision: "qualify",
     reasonCode: "supported_open_need",
@@ -53,15 +54,16 @@ function assessment(patch: Partial<Assessment> = {}): Assessment {
 }
 
 describe("score folding", () => {
-  it("weights a point of fit or intent at twice a point of liveliness", () => {
-    expect(foldScore(4, 4, 4)).toBe(100);
-    expect(foldScore(4, 2, 0)).toBe(foldScore(3, 2, 2));
-    expect(foldScore(3, 3, 0)).toBeGreaterThan(foldScore(3, 2, 1));
+  it("weights match three times as heavily as intent or liveliness", () => {
+    expect(foldScore(1, 4, 4)).toBe(100);
+    expect(foldScore(0.9, 2, 0)).toBeGreaterThan(foldScore(0.6, 3, 1));
+    expect(foldScore(0.7, 3, 1)).toBeGreaterThan(foldScore(0.7, 2, 1));
   });
 
   it("starts the qualified band at 50 and counts a missing scale as zero", () => {
-    expect(foldScore(3, 2, 0)).toBe(50);
-    expect(foldScore(null, null, 0)).toBe(0);
+    expect(foldScore(0.5, 2, 0)).toBe(50);
+    expect(foldScore(null, null, 0)).toBe(foldScore(0, 0, 0));
+    expect(foldScore(null, null, 4)).toBeLessThan(50);
   });
 });
 

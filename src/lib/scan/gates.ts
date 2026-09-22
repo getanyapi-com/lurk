@@ -153,7 +153,7 @@ export function judge(item: Assessment, source: ScorableItem): Judgement {
     decision,
     reasonCode,
     engagement,
-    score: foldScore(item.fit, item.intent, engagement),
+    score: foldScore(item.match, item.intent, engagement),
     matchedPhrase: item.needEvidence?.quote ?? "",
     sellerSide: item.relationship === "seller",
   };

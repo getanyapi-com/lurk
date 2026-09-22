@@ -40,27 +40,56 @@ export function readingFrom(answers: Answers, prefix: string, sentences: Spans):
 }
 
 /**
- * lurk's 0-4 fit from three answers. A requirement the product explicitly
- * cannot meet is a wrong job whatever else is true. A job the product does not
- * do is audience overlap at best. Otherwise the requirement decides: met is 4,
- * none stated is 3, and one the facts cannot settle is 2, which the gates hold
- * for review unless the person is asking outright.
+ * lurk's 0-4 fit from five answers. A requirement the product explicitly
+ * cannot meet is a wrong job whatever else is true, and so is a job the
+ * product does not do, unless the person is its audience, which is overlap
+ * at best. Wanting a different kind of product is a wrong job too. A person
+ * the product does not serve, or who could not use it, is overlap. Otherwise
+ * the requirement decides: met is 4, none stated is 3, and one the facts
+ * cannot settle is 2, which the gates hold for review unless the person is
+ * asking outright.
  *
- * The audience answer is deliberately not read once the product does the job.
- * Gating on a confident no took the wrong leads shown from 18% to 14% on the
- * posts labelled 2026-09-19, and took 21 of the 143 strongest real leads with
- * them: "who buys it" is one sentence off a homepage, and an agency burned by
- * an expired QR code is not the "indie makers" it names.
+ * On 2026-09-19 the audience answer was left out once the product did the job,
+ * because gating on it lost 21 of the 143 strongest leads. On 457 production
+ * leads labelled 2026-09-20, requiring audience, same kind and can use took
+ * the buyer feed from 57% good and 10% bad to 76% good and 3% bad, and kept
+ * 150 of the 198 good ones. By then a first sweep found three times the leads,
+ * so a wrong lead cost more than a lost one.
  */
 export function fitFrom(answers: Answers, prefix: string): number {
   const requirement = oneOf(choice(answers, `${prefix}__hard_requirement`).choice, REQUIREMENT, "unknown");
   if (requirement === "unmet") {
     return 0;
   }
+  const audience = noul(answers, `${prefix}__audience`) >= YES;
   if (noul(answers, `${prefix}__solves_problem`) < YES) {
-    return noul(answers, `${prefix}__audience`) >= YES ? 1 : 0;
+    return audience ? 1 : 0;
+  }
+  if (noul(answers, `${prefix}__same_kind`) < YES) {
+    return 0;
+  }
+  if (!audience || noul(answers, `${prefix}__can_use`) < YES) {
+    return 1;
   }
   return { met: 4, none_stated: 3, unknown: 2 }[requirement];
+}
+
+/** The five yes-or-no answers that say whether this product suits this person. */
+const MATCH_QUESTIONS = ["solves_problem", "wants_offering", "same_kind", "can_use", "audience"] as const;
+
+/**
+ * How well this product matches this person, 0-1: the geometric mean of the
+ * five match answers, so one confident no drags it down however sure the
+ * others are. It orders the feed. On the 457 leads labelled 2026-09-20 it told
+ * good from bad at an AUC of 0.86, against 0.71 for the 0-4 fit and intent the
+ * feed was sorted by.
+ */
+export function matchFrom(answers: Answers, prefix: string): number {
+  const product = MATCH_QUESTIONS.reduce(
+    (total, question) => total * Math.max(noul(answers, `${prefix}__${question}`), 0.001),
+    1,
+  );
+  return product ** (1 / MATCH_QUESTIONS.length);
 }
 
 const WHO: Record<Assessment["relationship"], string> = {
@@ -110,6 +139,7 @@ export function assessmentFrom(
     needState: reading.needState,
     fit,
     intent,
+    match: matchFrom(answers, prefix),
     stage: oneOf(choice(answers, `${prefix}__stage`).choice, STAGES, "none"),
     decision: "qualify",
     reasonCode: "supported_open_need",

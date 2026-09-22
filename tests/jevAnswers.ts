@@ -29,6 +29,8 @@ export type JevSpec = {
   solvesProblem?: number;
   hardRequirement?: string;
   audience?: number;
+  sameKind?: number;
+  canUse?: number;
   wantsOffering?: number;
   intent?: number;
   stage?: string;
@@ -51,6 +53,8 @@ export function judgeAnswers(specs: JevSpec[], prefix = "p"): Answers {
     answers[`${key}__solves_problem`] = noulAnswer(spec.solvesProblem ?? 0.9);
     answers[`${key}__hard_requirement`] = choiceAnswer(spec.hardRequirement ?? "met");
     answers[`${key}__audience`] = noulAnswer(spec.audience ?? 0.9);
+    answers[`${key}__same_kind`] = noulAnswer(spec.sameKind ?? 0.9);
+    answers[`${key}__can_use`] = noulAnswer(spec.canUse ?? 0.9);
     answers[`${key}__wants_offering`] = noulAnswer(spec.wantsOffering ?? 0.9);
     answers[`${key}__intent`] = scoreAnswer(spec.intent ?? 3);
     answers[`${key}__stage`] = choiceAnswer(spec.stage ?? "solution_seeking");
