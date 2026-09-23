@@ -201,12 +201,12 @@ describe("routing a judgement to a lane", () => {
     expect(routeLead(assessment())).toBe("buyer");
   });
 
-  it("keeps a helper as context when the product plainly does the job", () => {
-    expect(routeLead(assessment({ relationship: "helper", fit: 3 }))).toBe("context");
+  it("drops a helper, even when the product plainly does the job", () => {
+    expect(routeLead(assessment({ relationship: "helper", fit: 3 }))).toBeNull();
   });
 
-  it("drops a helper the product does not do the job for", () => {
-    expect(routeLead(assessment({ relationship: "helper", fit: 1 }))).toBeNull();
+  it("drops a thread where nobody asks, even when the product plainly does the job", () => {
+    expect(routeLead(assessment({ needState: "no_active_need", fit: 3 }))).toBeNull();
   });
 
   it("drops a need the person says is already met, however good the fit", () => {

@@ -100,31 +100,22 @@ export function decide(item: Assessment): { decision: Decision; reasonCode: Reas
   return { decision: settledDisqualifier(item) ? "reject" : "review", reasonCode: failure };
 }
 
-/** What a lead is for. A `context` lead is a thread worth a comment, not an ask. */
+/**
+ * What a lead is for. A `context` lead was a thread worth a comment, not an
+ * ask. No judgement is routed there any more, but leads a user already acted
+ * on from that lane keep the kind.
+ */
 export type LeadKind = "buyer" | "context";
 
-/** The gate failures that are still a thread worth commenting in. */
-const CONTEXT_FAILURES: ReasonCode[] = ["helper_only", "no_active_need"];
-
 /**
- * Where this assessment belongs, or null when it belongs nowhere. A buyer with
- * an open need the product covers is the feed's own lead. Someone helping
- * another person and a thread where nobody asks are not buyers, but when the
- * product plainly does the job they are talking about (fit 3, not the fit 2 a
- * missing fact leaves) a comment there is worth writing. Someone promoting
- * their own thing is not: on the posts labelled 2026-09-19 those threads were
- * a rival's launch, and a reply there is an advert under an advert. A settled
- * need and a job the product does not do stay rejections too.
+ * Where this assessment belongs, or null when it belongs nowhere. Only a buyer
+ * with an open need the product covers is a lead. Helpers and threads where
+ * nobody asks used to go to a "worth a comment" lane when the product plainly
+ * fit, but on the 442 leads labelled 2026-09-22 that lane showed 11 threads,
+ * none good and 5 bad, and it skipped the lead model that decides buyers.
  */
 export function routeLead(item: Assessment): LeadKind | null {
-  const failure = gateFailure(item);
-  if (decide(item).decision === "qualify") {
-    return "buyer";
-  }
-  if (failure && CONTEXT_FAILURES.includes(failure) && item.fit !== null && item.fit >= 3) {
-    return "context";
-  }
-  return null;
+  return decide(item).decision === "qualify" ? "buyer" : null;
 }
 
 /**

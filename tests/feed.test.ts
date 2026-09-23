@@ -82,14 +82,24 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     expect(await listLeads(project.id, { status: "new", days: 30 })).toHaveLength(1);
   });
 
-  it("shows a context lead the score floor would hide, because it is not a buyer", async () => {
+  it("hides a new context lead left from before the lane was switched off", async () => {
     const { db, schema, project, post } = await fixture(70);
     const { listLeads } = await import("@/lib/leads");
     await db()
       .insert(schema.leads)
-      .values({ projectId: project.id, postId: post.id, score: 40, stage: "none", kind: "context" });
+      .values({ projectId: project.id, postId: post.id, score: 90, stage: "none", kind: "context" });
 
-    const shown = await listLeads(project.id, { status: "new", days: "all" });
+    expect(await listLeads(project.id, { status: "new", days: "all" })).toEqual([]);
+  });
+
+  it("keeps a context lead the user resolved, though the score floor would hide it", async () => {
+    const { db, schema, project, post } = await fixture(70);
+    const { listLeads } = await import("@/lib/leads");
+    await db()
+      .insert(schema.leads)
+      .values({ projectId: project.id, postId: post.id, score: 40, stage: "none", kind: "context", status: "resolved" });
+
+    const shown = await listLeads(project.id, { status: "resolved", days: "all" });
     expect(shown.map((lead) => lead.kind)).toEqual(["context"]);
   });
 

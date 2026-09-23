@@ -128,12 +128,15 @@ export function onAt(at: string | undefined) {
 /**
  * The project's own minimum score, applied when the feed is read. Moving it on
  * the Product page changes the next page load, with no rescan and nothing
- * deleted, because the judgement and the user's floor are different facts. The
- * floor is a buyer-quality bar, so a `context` thread - kept for a comment, not
- * for its buyer intent - is never measured against it; its score is the
- * intent of someone who is not the buyer, and would always fall short.
+ * deleted, because the judgement and the user's floor are different facts.
+ *
+ * A new `context` thread is not shown: the scan stopped routing to that lane on
+ * 2026-09-23, and one left from before is hidden rather than deleted. One the
+ * user already resolved or hid stays where they put it, never measured
+ * against the floor, since its score is the intent of someone who is not the
+ * buyer and would always fall short.
  */
-const OVER_THRESHOLD = sql`(${leads.kind} = 'context' OR ${leads.score} >= coalesce(${projects.scoreThreshold}, ${DEFAULT_SCORE_THRESHOLD}))`;
+const OVER_THRESHOLD = sql`((${leads.kind} = 'buyer' AND ${leads.score} >= coalesce(${projects.scoreThreshold}, ${DEFAULT_SCORE_THRESHOLD})) OR (${leads.kind} = 'context' AND ${leads.status} <> 'new'))`;
 
 /**
  * The lead ids one Insights theme holds. The theme owns the list, so narrowing
