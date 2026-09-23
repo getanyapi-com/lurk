@@ -76,6 +76,14 @@ export async function withCallTimeout<T>(
  * the two efforts did from each other. Triage moved the same way: 39.5s
  * against 106.6s, and it keeps more titles, which is the safe direction for a
  * pass whose job is to spend a reading budget rather than to reject anybody.
+ *
+ * The product reading, which also writes the brief, stays low too. Measured on
+ * 2026-09-23 over 167 sites and 2,256 labelled posts (.context/exp), a higher
+ * effort bought little and cost the user waiting on onboarding:
+ *
+ *   low      32s median   68% good, 7% bad leads
+ *   medium   53s median   69% good, 6% bad
+ *   high     75s median   70% good, 6% bad
  */
 const REASONING_EFFORT = "low";
 
@@ -148,12 +156,6 @@ export type LlmCall<T> = {
   itemsAnswered?: (value: T) => number;
   /** 1 for the first call, 2 for the one asking again for the ids it skipped. */
   attempt?: number;
-  /**
-   * How hard the model thinks, low unless the call says otherwise. The product
-   * reading asks high: it is once per product, and its brief measured 0.874
-   * AUC high against 0.862 low (.context/exp, 2026-09-22).
-   */
-  effort?: "low" | "high";
 };
 
 /** What one call left behind, whether it answered or failed. */
@@ -242,7 +244,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
         schema: call.schema,
         system: call.system,
         prompt: call.prompt,
-        providerOptions: { openrouter: { reasoning: { effort: call.effort ?? REASONING_EFFORT } } },
+        providerOptions: { openrouter: { reasoning: { effort: REASONING_EFFORT } } },
         abortSignal,
       }),
     );

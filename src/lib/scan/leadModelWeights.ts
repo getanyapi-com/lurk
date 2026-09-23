@@ -1,16 +1,17 @@
 import type { LeadModel } from "./leadModel";
 
 /**
- * The fitted lead models. Fitted 2026-09-22 by .context/exp/fit.py on 2,362
- * posts labelled good, weak or bad against each of 172 products' own sites,
- * judged with exactly the request the scan sends (score.ts judgeRequest), one
- * post a request, with briefs Muse wrote through lib/brief.ts. Logistic
- * regression on standardised answers, trained on the posts the shared reading
- * lets through; the threshold keeps as many good leads as the gates it
- * replaced. Out of fold, by product:
+ * The fitted lead models. Fitted 2026-09-23 by .context/exp/fit-low.py on
+ * 2,362 posts labelled good, weak or bad against each of 172 products' own
+ * sites, judged with exactly the request the scan sends (score.ts
+ * judgeRequest), one post a request. The briefs are the ones the onboarding
+ * reading writes on low effort (profile.ts profileFromPage), which covered
+ * 2,257 of the posts. Logistic regression on standardised answers, trained on
+ * the posts the shared reading lets through; the threshold keeps as many
+ * good leads as the gates it replaced. Out of fold, by product:
  *
- *   with a brief      gates before: 606 shown, 62% good,  7% bad, 375 of 672 good kept
- *                     this model:   540 shown, 69% good,  5% bad, 375 of 672 good kept
+ *   with a brief      gates before: 590 shown, 62% good,  8% bad, 363 of 650 good kept
+ *                     this model:   540 shown, 67% good,  7% bad, 363 of 650 good kept
  *   without a brief   gates before: 625 shown, 60% good,  9% bad, 374 of 672 good kept
  *                     this model:   587 shown, 64% good,  8% bad, 374 of 672 good kept
  *
@@ -41,22 +42,22 @@ export const LEAD_MODELS: { withBrief: LeadModel; withoutBrief: LeadModel } = {
       "wants_offering",
     ],
     mean: [
-      0.47233, 0.709537, 0.538443, 0.49485, 0.158943, 0.506228, 2.29849,
-      0.115918, 0.535229, 0.204613, 0.424524, 0.273225, 0.058059, 0.050058,
-      0.349342, 0.092646, 0.55172, 0.57475, 0.580642,
+      0.482497, 0.721333, 0.54412, 0.551809, 0.172027, 0.513197, 2.295563,
+      0.112776, 0.542443, 0.207486, 0.496093, 0.26976, 0.057492, 0.051153,
+      0.347645, 0.082962, 0.560519, 0.586191, 0.587951,
     ],
     scale: [
-      0.246172, 0.183858, 0.213769, 0.36854, 0.276371, 0.271634, 0.483479,
-      0.209818, 0.371134, 0.26408, 0.264321, 0.320816, 0.116351, 0.09693,
-      0.269212, 0.157512, 0.27046, 0.252145, 0.231797,
+      0.24371, 0.175866, 0.20674, 0.372036, 0.289856, 0.271069, 0.485979,
+      0.216362, 0.374051, 0.268424, 0.277056, 0.318868, 0.115925, 0.098889,
+      0.268542, 0.144908, 0.268474, 0.24545, 0.225644,
     ],
     coef: [
-      0.47857, 0.017385, 0.805309, 0.161214, -0.034739, -0.420866, 0.263893,
-      0.072428, 0.351235, 0.123108, 0.45645, 0.149011, 0.171104, -0.138012,
-      0.208203, 0.417117, 0.465383, 0.042301, -0.000129,
+      0.431765, 0.22344, 0.769264, 0.078581, 0.069813, -0.370658, 0.235341,
+      0.097648, 0.349546, 0.257982, 0.360841, 0.152017, 0.182111, -0.131802,
+      0.140734, 0.385901, 0.4138, 0.054731, -0.007839,
     ],
-    intercept: -1.150196,
-    threshold: 0.4995,
+    intercept: -1.104691,
+    threshold: 0.5014,
   },
   withoutBrief: {
     features: [

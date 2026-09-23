@@ -86,7 +86,6 @@ export async function briefFromPage(
       "",
       page.markdown ? page.markdown : "(the site could not be read)",
     ].join("\n"),
-    effort: "high",
   });
 }
 

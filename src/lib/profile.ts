@@ -450,7 +450,6 @@ export async function profileFromPage(
     schema: readingSchema,
     system: READING_SYSTEM,
     prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", markdown].join("\n"),
-    effort: "high",
   });
   const siteText = `${page.title ?? ""}\n${page.description ?? ""}\n${markdown}`;
   return {
