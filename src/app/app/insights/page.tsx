@@ -1,5 +1,6 @@
 import { AnyapiLink } from "@/components/AnyapiLink";
-import { refreshInsightsAction } from "@/app/app/insights/actions";
+import { openInsightsAction, refreshInsightsAction } from "@/app/app/insights/actions";
+import { StartOnOpen } from "@/components/StartOnOpen";
 import { EmptyState } from "@/components/EmptyState";
 import { CommunitiesTable } from "@/components/insights/CommunitiesTable";
 import { InsightsTabs, type InsightsTab } from "@/components/insights/InsightsTabs";
@@ -50,6 +51,8 @@ export default async function InsightsPage({ searchParams }: InsightsPageProps) 
 
   return (
     <div className="flex flex-col gap-5">
+      {/* Keyed so switching projects mounts StartOnOpen again for the new one. */}
+      <StartOnOpen key={project.id} start={openInsightsAction.bind(null, project.id)} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-h2" style={{ fontWeight: 500 }}>
@@ -57,8 +60,8 @@ export default async function InsightsPage({ searchParams }: InsightsPageProps) 
           </h1>
           <p className="text-small text-fg-muted">{lastRunSentence(job)}</p>
           <p className="text-small text-fg-muted">
-            Themes regroup after every scan that finds leads, and reading them costs nothing on{" "}
-            <AnyapiLink />.
+            Themes regroup when you open this page after new leads arrive, and reading them costs
+            nothing on <AnyapiLink />.
           </p>
         </div>
         <form action={refreshInsightsAction.bind(null, project.id)}>

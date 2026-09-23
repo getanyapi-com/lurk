@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { kickScheduler } from "@/jobs/scheduler";
 
 export type LocalUser = typeof users.$inferSelect;
 
@@ -82,5 +83,31 @@ export async function requireLocalUser(): Promise<LocalUser> {
   if (!user) {
     redirect("/sign-in");
   }
+  await noteSeen(user.id);
   return user;
+}
+
+/** How often a visit is written down; the queue only needs it to the hour. */
+const SEEN_EVERY_MS = 5 * 60 * 1000;
+
+/**
+ * Stamps the visit, and hands out work at once when it is the first in a
+ * while: the routine jobs of a project nobody attended are due and waiting
+ * (see ATTENDED_KINDS), and without the kick they would sit for up to a minute
+ * while the person looks at yesterday's feed.
+ */
+export async function noteSeen(userId: string, now = new Date()): Promise<void> {
+  const stamped = await db()
+    .update(users)
+    .set({ lastSeenAt: now })
+    .where(
+      and(
+        eq(users.id, userId),
+        or(isNull(users.lastSeenAt), lt(users.lastSeenAt, new Date(now.getTime() - SEEN_EVERY_MS))),
+      ),
+    )
+    .returning({ id: users.id });
+  if (stamped.length > 0) {
+    kickScheduler();
+  }
 }

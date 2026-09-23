@@ -30,6 +30,12 @@ export const users = pgTable("users", {
    * reader and the one writer.
    */
   settings: jsonb("settings"),
+  /**
+   * When this person last opened the app, stamped at most every few minutes.
+   * The queue reads it: a project nobody looks at and nothing alerts from has
+   * its routine jobs held until somebody does (see jobs/runner.ts).
+   */
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

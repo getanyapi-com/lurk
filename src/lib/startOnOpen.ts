@@ -1,3 +1,6 @@
+import { and, eq, gt } from "drizzle-orm";
+import { db } from "@/db";
+import { leads } from "@/db/schema";
 import { enqueueJob, lastRunJob } from "@/jobs/enqueue";
 import { kickScheduler } from "@/jobs/scheduler";
 import { requireLocalUser } from "@/lib/auth";
@@ -20,6 +23,35 @@ export async function startOnOpen(kind: "seo_refresh" | "competitor_scan", proje
     return false;
   }
   await enqueueJob(kind, projectId);
+  kickScheduler();
+  return true;
+}
+
+/**
+ * Groups a project's leads again when its Insights tab is opened and leads have
+ * arrived since the last grouping began. Themes are only read on that tab (and
+ * through the API), so grouping after every scan paid for themes nobody saw.
+ */
+export async function regroupOnOpen(projectId: string): Promise<boolean> {
+  const user = await requireLocalUser();
+  if (!(await projectForUser(user.id, projectId))) {
+    throw new Error("That project is not yours");
+  }
+  const last = await lastRunJob("insights", projectId);
+  if (last && !last.finishedAt) {
+    return false;
+  }
+  const [newer] = await db()
+    .select({ id: leads.id })
+    .from(leads)
+    .where(
+      and(eq(leads.projectId, projectId), last?.startedAt ? gt(leads.foundAt, last.startedAt) : undefined),
+    )
+    .limit(1);
+  if (!newer) {
+    return false;
+  }
+  await enqueueJob("insights", projectId);
   kickScheduler();
   return true;
 }
