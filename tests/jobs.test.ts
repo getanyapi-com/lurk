@@ -457,6 +457,87 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
     await db().delete(users).where(eq(users.id, user.id));
   });
 
+  it("holds a routine job of a project nobody attends, and runs it once somebody does", async () => {
+    const { db, jobs, users, user, project } = await fixture();
+    const { claimNextJob } = await import("@/jobs/runner");
+    const { alerts, apiKeys, projects } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+
+    const [scan] = await db()
+      .insert(jobs)
+      .values({ kind: "scan", projectId: project.id, runAt: LONG_AGO })
+      .returning();
+    const [setup] = await db()
+      .insert(jobs)
+      .values({ kind: "discovery_initial", projectId: project.id, runAt: new Date(LONG_AGO.getTime() + 1000) })
+      .returning();
+
+    // Never seen and no channel: the setup still runs, the scan waits.
+    expect((await claimNextJob(NOW))?.id).toBe(setup.id);
+    await db().delete(jobs).where(eq(jobs.id, setup.id));
+    expect(await claimNextJob(NOW)).toBeNull();
+
+    // Seen two days ago is not attended either.
+    await db()
+      .update(users)
+      .set({ lastSeenAt: new Date(NOW.getTime() - 48 * 60 * 60 * 1000) })
+      .where(eq(users.id, user.id));
+    expect(await claimNextJob(NOW)).toBeNull();
+
+    await db().update(users).set({ lastSeenAt: NOW }).where(eq(users.id, user.id));
+    expect((await claimNextJob(NOW))?.id).toBe(scan.id);
+
+    // An alert channel keeps a project running with nobody looking.
+    await db().update(users).set({ lastSeenAt: null }).where(eq(users.id, user.id));
+    const [alerting] = await db()
+      .insert(projects)
+      .values({ userId: user.id, name: "Alerts on" })
+      .returning();
+    await db()
+      .insert(alerts)
+      .values({ projectId: alerting.id, channel: "email", target: "a@example.com", cadence: "daily" });
+    const [alerted] = await db()
+      .insert(jobs)
+      .values({ kind: "insights", projectId: alerting.id, runAt: LONG_AGO })
+      .returning();
+    expect((await claimNextJob(NOW))?.id).toBe(alerted.id);
+
+    // So does an API key the owner called with inside the window.
+    const [called] = await db()
+      .insert(projects)
+      .values({ userId: user.id, name: "Read over the API" })
+      .returning();
+    const [refresh] = await db()
+      .insert(jobs)
+      .values({ kind: "seo_refresh", projectId: called.id, runAt: LONG_AGO })
+      .returning();
+    expect(await claimNextJob(NOW)).toBeNull();
+    await db()
+      .insert(apiKeys)
+      .values({ userId: user.id, hash: randomUUID(), name: "ci", prefix: "lk_", lastUsedAt: NOW });
+    expect((await claimNextJob(NOW))?.id).toBe(refresh.id);
+
+    await db().delete(users).where(eq(users.id, user.id));
+  });
+
+  it("stamps a visit at most every few minutes, and hands out work on the first", async () => {
+    const { db, users, user } = await fixture();
+    const { noteSeen } = await import("@/lib/auth");
+    const { eq } = await import("drizzle-orm");
+    const seenAt = async () =>
+      (await db().select().from(users).where(eq(users.id, user.id)))[0].lastSeenAt;
+
+    await noteSeen(user.id, NOW);
+    expect(await seenAt()).toEqual(NOW);
+    await noteSeen(user.id, new Date(NOW.getTime() + 60_000));
+    expect(await seenAt()).toEqual(NOW);
+    const later = new Date(NOW.getTime() + 10 * 60_000);
+    await noteSeen(user.id, later);
+    expect(await seenAt()).toEqual(later);
+
+    await db().delete(users).where(eq(users.id, user.id));
+  });
+
   it("seeds a scan for a project that has been set up, and the setup for one that has not", async () => {
     const { db, jobs, projects, users, user, project } = await fixture();
     const { seedProjectScans } = await import("@/jobs/scheduler");
@@ -505,8 +586,8 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
 });
 
 /**
- * Nothing else queues insights, so a project whose owner never opened the
- * insights page had no themes at all. This suite runs last: it leaves
+ * Themes are grouped when the Insights tab is opened (see regroupOnOpen), not
+ * after every scan: most were never read. This suite runs last: it leaves
  * enqueueOnce faked, which the database-backed queue tests above rely on being
  * real.
  */
@@ -526,28 +607,20 @@ describe("what a finished scan queues", () => {
     scan.mockReset();
   });
 
-  it("groups the leads again once a scan has written some", async () => {
+  it("does not group the leads again, however many a scan wrote", async () => {
     scan.mockResolvedValue({ candidates: 9, read: 4, leads: 2, gaps: [] });
-
-    await JOB_HANDLERS.scan(job);
-
-    expect(booked).toHaveBeenCalledWith("insights", expect.any(Date), "project-1");
-  });
-
-  it("queues nothing when a scan found no leads, so themes stay as they were", async () => {
-    scan.mockResolvedValue({ candidates: 9, read: 4, leads: 0, gaps: [] });
 
     await JOB_HANDLERS.scan(job);
 
     expect(booked).not.toHaveBeenCalled();
   });
 
-  it("groups the leads a first year sweep wrote, which is a project's first themes", async () => {
+  it("does not group what a first year sweep wrote either", async () => {
     vi.mocked(runBackfill).mockResolvedValue({ walks: 20, found: 500, judged: 500, leads: 7, cutShort: 0 });
 
     await JOB_HANDLERS.backfill(job);
 
-    expect(booked).toHaveBeenCalledWith("insights", expect.any(Date), "project-1");
+    expect(booked).not.toHaveBeenCalled();
   });
 });
 

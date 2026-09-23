@@ -201,8 +201,15 @@
     {
       "idx": 28,
       "version": "7",
-      "when": 1790138374418,
-      "tag": "0028_project_brief",
+      "when": 1790138274661,
+      "tag": "0028_user_last_seen",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790177420275,
+      "tag": "0029_project_brief",
       "breakpoints": true
     }
   ]

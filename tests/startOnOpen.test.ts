@@ -56,6 +56,34 @@ describe("startOnOpen against a database", () => {
     expect(await queued(project.id, "competitor_scan")).toHaveLength(0);
   });
 
+  it("groups the leads again on open only when some arrived since the last grouping", async () => {
+    const { regroupOnOpen } = await import("@/lib/startOnOpen");
+    const { user, project } = await owned();
+    signedIn = { id: user.id };
+
+    // No leads, nothing to group.
+    expect(await regroupOnOpen(project.id)).toBe(false);
+
+    await db().insert(schema.leads).values({ projectId: project.id, score: 80 });
+    expect(await regroupOnOpen(project.id)).toBe(true);
+    // Queued and not yet run: a second open queues nothing more.
+    expect(await regroupOnOpen(project.id)).toBe(false);
+    expect(await queued(project.id, "insights")).toHaveLength(1);
+
+    // Once it has run, the same leads are not grouped again.
+    const ranAt = new Date();
+    await db()
+      .update(schema.jobs)
+      .set({ startedAt: ranAt, finishedAt: ranAt })
+      .where(and(eq(schema.jobs.projectId, project.id), eq(schema.jobs.kind, "insights")));
+    expect(await regroupOnOpen(project.id)).toBe(false);
+
+    await db()
+      .insert(schema.leads)
+      .values({ projectId: project.id, score: 70, foundAt: new Date(ranAt.getTime() + 1000) });
+    expect(await regroupOnOpen(project.id)).toBe(true);
+  });
+
   it("books the next competitor scan even when there was no competitor to watch", async () => {
     // Without one waiting, every boot saw a project that had run this kind and
     // had nothing queued, and ran the empty pass again.

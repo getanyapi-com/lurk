@@ -1,6 +1,6 @@
 {
-  "id": "03ff3111-b81d-42da-bdb1-2a8e4deae4ff",
-  "prevId": "36cdfaf8-ed98-4059-b9bb-605b65dbf9c8",
+  "id": "20c6c2b1-838d-4bc4-b5ac-6a2ded29cf32",
+  "prevId": "03ff3111-b81d-42da-bdb1-2a8e4deae4ff",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2314,6 +2314,18 @@
         "problem_phrasings": {
           "name": "problem_phrasings",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brief": {
+          "name": "brief",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brief_profile_version": {
+          "name": "brief_profile_version",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },

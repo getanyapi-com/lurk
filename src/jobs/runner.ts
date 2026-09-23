@@ -25,6 +25,50 @@ function noSiblingRunning(leaseCutoff: Date) {
 export const WATCHED_KINDS = ["discovery_initial", "backfill"];
 
 /**
+ * The routine kinds that only run for a project somebody is paying attention
+ * to. Each one keeps booking its successor as before; a project nobody attends
+ * simply leaves that successor due and unclaimed, so the next visit runs it at
+ * once and nothing is spent in between. A new project's setup and sweep, the
+ * one-off profile reading, and the instance-wide jobs are not held.
+ */
+export const ATTENDED_KINDS = [
+  "scan",
+  "competitor_scan",
+  "seo_refresh",
+  "discovery_refresh",
+  "insights",
+  "rescore",
+];
+
+/** How long one visit, or one API call, keeps a project's routine jobs running. */
+export const ATTENDED_FOR_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A project is attended when it can alert somebody, or its owner opened the
+ * app or called the API inside the window. Without an alert channel a scan
+ * nobody reads buys nothing, so it waits for the next visit.
+ */
+function attendedOrUnheld(now: Date) {
+  const since = new Date(now.getTime() - ATTENDED_FOR_MS).toISOString();
+  return sql`(
+    ${notInArray(jobs.kind, ATTENDED_KINDS)}
+    or ${jobs.projectId} is null
+    or exists (select 1 from alerts a where a.project_id = ${jobs.projectId})
+    or exists (
+      select 1 from projects p join users u on u.id = p.user_id
+      where p.id = ${jobs.projectId}
+        and (
+          u.last_seen_at >= ${since}::timestamptz
+          or exists (
+            select 1 from api_keys k
+            where k.user_id = u.id and k.last_used_at >= ${since}::timestamptz
+          )
+        )
+    )
+  )`;
+}
+
+/**
  * Takes one due job, a watched one first. The scheduler asks for only one sort
  * when the other has no room left to run. The UPDATE ... RETURNING is the claim: a second worker
  * running the same statement sees a live lease and gets no row. A job whose
@@ -48,6 +92,7 @@ export async function claimNextJob(
         lte(jobs.runAt, now),
         or(isNull(jobs.startedAt), lt(jobs.startedAt, leaseCutoff)),
         noSiblingRunning(leaseCutoff),
+        attendedOrUnheld(now),
         only === "watched" ? inArray(jobs.kind, WATCHED_KINDS) : undefined,
         only === "routine" ? notInArray(jobs.kind, WATCHED_KINDS) : undefined,
       ),
