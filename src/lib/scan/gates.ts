@@ -2,11 +2,12 @@ import { engagementScore, foldScore } from "./constants";
 import type { Assessment, Decision, Judgement, ReasonCode, ScorableItem } from "./judgement";
 
 /**
- * The qualification gates. They are non-compensatory and they live here, in
- * code, because a model asked for one number will always let a strong intent
- * pay for a missing fit. A lead qualifies only when the person is a buyer with
- * a need still open, the product plausibly does the job, and they are looking
- * for one.
+ * The qualification gates. They live here, in code, because a model asked for
+ * one verdict cannot be inspected or tuned. A lead qualifies only when the
+ * shared reading found a buyer whose need is still open, and the lead model
+ * (scan/leadModel.ts), fitted on what founders called leads, puts them at or
+ * over its threshold. A seller, a helper and a settled need are rejected
+ * before the model is read at all.
  */
 
 /**
@@ -28,31 +29,26 @@ export function gateFailure(item: Assessment): ReasonCode | null {
   if (item.needState === "no_active_need" || item.relationship === "discussion") {
     return "no_active_need";
   }
-  if (item.fit === 0) {
+  // From here the lead model decides, which read every answer the fit and
+  // intent below were made from and was fitted on what a founder wanted
+  // (scan/leadModel.ts). They still name the reason for one it turns down.
+  const lead = item.quality !== null && item.quality >= 0.5;
+  if (item.fit === 0 && !lead) {
     return "wrong_job";
-  }
-  if (item.fit === 1) {
-    return "wrong_audience";
   }
   if (item.relationship !== "buyer" || item.needState === "unknown") {
     return "insufficient_evidence";
   }
-  // A requirement the product facts cannot settle (fit 2) holds a lead, except
-  // for someone asking outright for a thing to use. The facts are a few pages of
-  // a website and are silent on most of what people ask for: "under $100",
-  // "works on a Mac". Holding those cost 8 of the 156 strongest labelled leads
-  // on 2026-09-19 and kept out almost nothing wrong.
-  const askingOutright = item.intent !== null && item.intent >= 3;
-  if (item.fit === null || (item.fit === 2 && !askingOutright)) {
-    return "insufficient_evidence";
+  if (lead) {
+    return null;
   }
-  if (item.intent === null) {
-    return "insufficient_evidence";
+  if (item.fit === 1) {
+    return "wrong_audience";
   }
-  if (item.intent < 2) {
+  if (item.intent !== null && item.intent < 2) {
     return "no_active_need";
   }
-  return null;
+  return "insufficient_evidence";
 }
 
 /**
@@ -153,7 +149,7 @@ export function judge(item: Assessment, source: ScorableItem): Judgement {
     decision,
     reasonCode,
     engagement,
-    score: foldScore(item.match, item.intent, engagement),
+    score: foldScore(item.quality, engagement),
     matchedPhrase: item.needEvidence?.quote ?? "",
     sellerSide: item.relationship === "seller",
   };

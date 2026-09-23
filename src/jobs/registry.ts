@@ -5,10 +5,12 @@ import { CADENCE_MS } from "@/lib/alerts/select";
 import { runDiscoveryRefresh } from "@/lib/discovery/refresh";
 import { runInitialDiscovery } from "@/lib/discovery/initial";
 import { parseTextList } from "@/lib/discovery/store";
-import { reseedFromPage } from "@/lib/profile";
+import { briefFromPage, writeBrief } from "@/lib/brief";
+import { readSite, reseedFromPage } from "@/lib/profile";
 import { deleteExpiredPosts } from "@/lib/retention";
 import { discoveryBudget } from "@/lib/discovery/run";
 import { runBackfill } from "@/lib/scan/backfill";
+import { loadScanProject } from "@/lib/scan/project";
 import { runRescore } from "@/lib/scan/rescore";
 import { runScan } from "@/lib/scan/run";
 import type { ScanCadence } from "@/lib/settings";
@@ -116,6 +118,32 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
     if (result.droppedPhrasings.length > 0) {
       await enqueueOnce("discovery_initial", new Date(), project.id);
     }
+  },
+  /**
+   * The brief for a project whose profile it was not written against: every
+   * project made before briefs existed, queued at boot, and any whose profile
+   * was edited since. The site is read again, because the brief may say what
+   * the profile may not, and the verdicts are then judged again with it. An
+   * unreadable site still gets a brief from the profile alone.
+   */
+  brief: async (job) => {
+    if (!job.projectId) {
+      throw new Error("A brief needs a project");
+    }
+    const project = await loadScanProject(job.projectId);
+    if (!project) {
+      return;
+    }
+    const page = project.product.url
+      ? await readSite(project.id, project.userId, project.product.url).catch(() => null)
+      : null;
+    const brief = await briefFromPage(
+      project.id,
+      { url: project.product.url ?? "", markdown: page?.markdown ?? null },
+      { ...project.product, brief: undefined },
+    );
+    await writeBrief(project.id, brief, project.profileVersion);
+    await enqueueOnce("rescore", new Date(), project.id);
   },
   discovery_refresh: async (job) => {
     if (!job.projectId) {

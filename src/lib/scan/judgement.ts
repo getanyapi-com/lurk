@@ -46,8 +46,11 @@ export const assessmentSchema = z.object({
   needState: z.enum(["open", "evaluating", "resolved", "no_active_need", "unknown"]),
   fit: z.number().int().min(0).max(4).nullable(),
   intent: z.number().int().min(0).max(4).nullable(),
-  /** How well the product matches the person, 0-1 (derive.ts matchFrom). Null when never judged. */
-  match: z.number().min(0).max(1).nullable(),
+  /**
+   * The lead model's verdict, 0-1, with 0.5 at its threshold: at or over it the
+   * person is a lead (scan/leadModel.ts). Null when the judge never read them.
+   */
+  quality: z.number().min(0).max(1).nullable(),
   stage: z.enum(["none", "problem_aware", "solution_seeking", "comparing", "purchase_ready"]),
   decision: z.enum(["qualify", "review", "reject"]),
   reasonCode: z.enum(REASON_CODES),

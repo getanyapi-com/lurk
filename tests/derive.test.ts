@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assessmentFrom, fitFrom, matchFrom, readingFrom, triageFrom } from "@/lib/scan/derive";
+import { assessmentFrom, featuresFrom, fitFrom, readingFrom, triageFrom } from "@/lib/scan/derive";
 import { judgeAnswers, triageAnswers } from "./jevAnswers";
 
 /**
@@ -37,16 +37,25 @@ describe("the fit a judgement is derived from", () => {
   });
 });
 
-describe("how well the product matches the person", () => {
-  const match = (spec: Parameters<typeof judgeAnswers>[0][number]) => matchFrom(judgeAnswers([spec]), "p0");
-
-  it("is the geometric mean of the five match answers", () => {
-    expect(match({ solvesProblem: 0.8, wantsOffering: 0.8, sameKind: 0.8, canUse: 0.8, audience: 0.8 })).toBeCloseTo(0.8);
+describe("the features the lead model reads", () => {
+  it("reads one number per answer, and the brief's only when there is a brief", () => {
+    const features = featuresFrom(judgeAnswers([{ founderWouldReply: 0.7 }]), "p0", false);
+    expect(features.founder_would_reply).toBe(0.7);
+    expect(features.req_met).toBe(1);
+    expect(features).not.toHaveProperty("lead_like");
   });
 
-  it("lets one confident no drag it down however sure the rest are", () => {
-    expect(match({ audience: 0.05 })).toBeLessThan(0.6);
-    expect(match({ audience: 0.05 })).toBeLessThan(match({ audience: 0.6 }));
+  it("sums the chance of every buyer group and takes the likeliest neighbour", () => {
+    const answers = judgeAnswers([{}]);
+    answers.p0__wanted_kind = { type: "choice", choice: "n1", probabilities: { this_product: 0.3, n0: 0.1, n1: 0.5, nothing: 0.1 }, confidence: 0.5 };
+    answers.p0__author_group = { type: "choice", choice: "b0", probabilities: { b0: 0.4, b1: 0.2, x0: 0.3, unclear: 0.1 }, confidence: 0.4 };
+    answers.p0__is_lead_like = { type: "noul", noul: 0.6 };
+    const features = featuresFrom(answers, "p0", true);
+    expect(features.kind_this).toBe(0.3);
+    expect(features.kind_neighbour_max).toBe(0.5);
+    expect(features.group_buyer).toBeCloseTo(0.6);
+    expect(features.group_non_buyer).toBeCloseTo(0.3);
+    expect(features.lead_like).toBe(0.6);
   });
 });
 

@@ -1,3 +1,4 @@
+import type { ProductBrief } from "@/lib/brief";
 import type { Question } from "@/lib/jev";
 
 /**
@@ -146,6 +147,119 @@ export function judgeQuestions(path: string): Record<string, Question> {
         solution_seeking: "Looking for something that solves it",
         comparing: "Weighing specific options",
         purchase_ready: "About to decide, book or buy, with concrete evidence",
+      },
+    },
+  };
+}
+
+/** A yes/no question whose boundary is pinned by what each side means and a few cases of it. */
+function noul(instructions: string, yes: string, yesCases: string[], no: string, noCases: string[]): Question {
+  return {
+    type: "noul",
+    instructions: `${instructions} ${TRUST}`,
+    criteria: { true: { what: yes, examples: yesCases }, false: { what: no, examples: noCases } },
+  };
+}
+
+/**
+ * Five narrow questions beside the judge's own. Of the 27 asked of 2,362
+ * labelled posts on 2026-09-22 (.context/exp/atomic.ts), these are the five
+ * that each added the most to the lead model on top of the judge and the
+ * brief, in the order they were picked: a single holistic "would the founder
+ * reply" is the strongest one Jev answers.
+ */
+export function signalQuestions(path: string): Record<string, Question> {
+  return {
+    founder_would_reply: noul(
+      `Would the founder of \`product\` be glad to reply to \`${path}\` and suggest \`product\`?`,
+      "A reply suggesting `product` would be welcome and useful to the author",
+      [],
+      "A reply suggesting `product` would be off-topic, unwelcome or spam",
+      [],
+    ),
+    has_product_pain: noul(
+      `Does the author of \`${path}\` have the problem described in \`product.pain_it_solves\`?`,
+      "Their own words show this problem",
+      [],
+      "Their words do not show this problem",
+      [],
+    ),
+    promotes_own_thing: noul(
+      `Is the author of \`${path}\` promoting, launching or announcing something of their own?`,
+      "Promotes their own product, service, content or launch",
+      ["I built a tool that...", "We just launched X, feedback welcome", "Anyone else wasting hours on this? I made something that fixes it"],
+      "Not promoting anything of their own",
+      ["Is there a tool that...?", "I tried X and it failed"],
+    ),
+    offers_services: noul(
+      `Is the author of \`${path}\` offering their services or looking to hire someone?`,
+      "Offers work, or recruits for a job",
+      ["[For hire] React developer available", "We're hiring a marketer"],
+      "Neither offers work nor recruits",
+      ["Looking for a tool to schedule posts"],
+    ),
+    names_current_tool: noul(
+      `Does the author of \`${path}\` name a specific product or service they use now?`,
+      "Names a brand, app or service they currently use",
+      ["We use HubSpot but...", "I'm on Shopify"],
+      "Names no product they use",
+      ["We track leads in our heads", "Looking for a store builder"],
+    ),
+  };
+}
+
+/** The option for this product among its neighbours, and the two that are neither. */
+export const THIS_PRODUCT = "this_product";
+export const NOTHING = "nothing";
+
+/**
+ * The questions a product's brief makes possible. How alike a post and a
+ * product are is asked as a choice among contrastive options, the product's
+ * own kind and the kinds it is not, rather than as a yes/no: Jev compares
+ * better than it rates, and the neighbours are exactly the adjacent asks the
+ * old questions let through. The lead-like question carries the brief's own
+ * examples on each side of the line; alone it told good from bad at 0.83 AUC
+ * on 2026-09-22, the best of any single question.
+ */
+export function briefQuestions(path: string, brief: ProductBrief): Record<string, Question> {
+  const kinds: Record<string, { [key: string]: unknown }> = { [THIS_PRODUCT]: { what: brief.kind } };
+  brief.neighbours.forEach((item, index) => {
+    kinds[`n${index}`] = { what: item.kind, not_for: `${brief.kind} (${item.whyNot})` };
+  });
+  kinds.other = { what: "some other product or service not listed" };
+  kinds[NOTHING] = { what: "nothing to use: advice, opinions, a story, or feedback on their own work" };
+  const groups: Record<string, { [key: string]: unknown }> = {};
+  brief.buyers.forEach((item, index) => {
+    groups[`b${index}`] = { what: item };
+  });
+  brief.nonBuyers.forEach((item, index) => {
+    groups[`x${index}`] = { what: item };
+  });
+  groups.unclear = { what: "the post does not show who they are" };
+  return {
+    wanted_kind: {
+      type: "choice",
+      instructions: {
+        question: `Which kind of thing is the author of \`${path}\` asking to get or use?`,
+        focus: "What they want to get, not the topic they mention.",
+        note: TRUST,
+      },
+      criteria: kinds,
+    },
+    author_group: {
+      type: "choice",
+      instructions: { question: `Which of these groups does the author of \`${path}\` belong to?`, note: TRUST },
+      criteria: groups,
+    },
+    is_lead_like: {
+      type: "noul",
+      instructions: `Is \`${path}\` the same sort of request as the good asks, rather than the near misses? ${TRUST}`,
+      criteria: {
+        true: { what: `A request that ${brief.kind} would answer`, examples: brief.goodAsks },
+        false: {
+          what: "Related in topic but not a request this product answers",
+          examples: brief.nearMisses.map((item) => `${item.ask} (${item.why})`),
+        },
       },
     },
   };

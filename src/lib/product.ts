@@ -1,5 +1,6 @@
 import type { projects } from "@/db/schema";
 import { parseTextList } from "@/lib/discovery/store";
+import { usableBrief, type ProductBrief } from "./brief";
 
 /**
  * What the product's own page said it is, as every judgement reads it. One
@@ -18,6 +19,8 @@ export type ProductFacts = {
   exclusions: string[];
   notBuyers: string[];
   competitors: string[];
+  /** What the judge reads beside the facts (lib/brief.ts). Absent until the project has one. */
+  brief?: ProductBrief | null;
 };
 
 /** The facts as the projects row holds them, with the competitors a scan may name. */
@@ -37,6 +40,7 @@ export function productFacts(
     exclusions: parseTextList(row.exclusions),
     notBuyers: parseTextList(row.notBuyers),
     competitors,
+    brief: usableBrief(row.brief),
   };
 }
 
@@ -64,6 +68,11 @@ export function productState(facts: ProductFacts): Record<string, unknown> {
   put("serves_in", facts.serviceGeography);
   put("budget", facts.budgetFit);
   put("competitors", facts.competitors);
+  if (facts.brief) {
+    put("kind", facts.brief.kind);
+    put("price", facts.brief.price);
+    put("sold_to", facts.brief.buyers);
+  }
   return state;
 }
 

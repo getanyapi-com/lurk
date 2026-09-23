@@ -5,6 +5,7 @@ import { projectCompetitors, projects, subreddits } from "@/db/schema";
 import { clientForUser } from "./anyapi";
 import { competitorHost } from "./competitors/host";
 import { generateStructured } from "./llm";
+import { BRIEF_INSTRUCTIONS, briefSchema, usableBrief, type ProductBrief } from "./brief";
 import { PROFILE_SYSTEM, PROMO_POLICY_SYSTEM } from "./prompts";
 import { normalizeQuery, recordUsage } from "./reddit/fetch";
 import { capped, tierForUser } from "./tier";
@@ -42,14 +43,28 @@ export const profileSchema = z.object({
 
 export type ProductProfile = z.infer<typeof profileSchema>;
 
+/** The profile as one reading of the site returns it, with the brief beside it. */
+export type SiteReading = ProductProfile & { brief: ProductBrief };
+
 /** One limit as the model returns it: the claim, and the page's own words it rests on. */
 const groundedSchema = z.object({ text: z.string(), sourceText: z.string() });
 
-/** What the model is asked for: the profile, with every limit carrying its source. */
+/**
+ * What the model is asked for: the profile, with every limit carrying its
+ * source, and the brief the scan's judge reads (lib/brief.ts). They are one
+ * call because they read the same pages. Asked together on 167 sites on
+ * 2026-09-22, every exclusion still quoted the site and the brief judged as
+ * well as one asked on its own (.context/exp, AUC 0.871 against 0.874).
+ */
 const readingSchema = profileSchema.extend({
   exclusions: z.array(groundedSchema),
   notBuyers: z.array(groundedSchema),
+  brief: briefSchema,
 });
+
+const READING_SYSTEM = `${PROFILE_SYSTEM}
+
+- brief: one more field, for a different reader, and the one field where the rule above does not hold. ${BRIEF_INSTRUCTIONS}`;
 
 /** Text as a quote is compared against it: no markdown, no case, no spacing. */
 function flat(text: string): string {
@@ -407,6 +422,11 @@ export async function reseedFromPage(
         .where(eq(projects.id, project.id));
     }
     await writePageCompetitors(project.id, competitors);
+    // Last, so it is stamped with whatever version the updates above left.
+    await db()
+      .update(projects)
+      .set({ brief: usableBrief(profile.brief), briefProfileVersion: sql`${projects.profileVersion}` })
+      .where(eq(projects.id, project.id));
   }
   return {
     sellsPlatformData: profile.sellsPlatformData,
@@ -422,14 +442,15 @@ export async function reseedFromPage(
 export async function profileFromPage(
   projectId: string,
   page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
-): Promise<ProductProfile> {
+): Promise<SiteReading> {
   const markdown = page.markdown ?? "";
   const reading = await generateStructured({
     purpose: "profile",
     projectId,
     schema: readingSchema,
-    system: PROFILE_SYSTEM,
+    system: READING_SYSTEM,
     prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", markdown].join("\n"),
+    effort: "high",
   });
   const siteText = `${page.title ?? ""}\n${page.description ?? ""}\n${markdown}`;
   return {
@@ -451,7 +472,7 @@ export async function buildProfile(
   url: string,
   options: ProfileOptions = {},
   onStep?: (step: ProfileStep) => Promise<void> | void,
-): Promise<ProductProfile> {
+): Promise<SiteReading> {
   await onStep?.("scrape");
   const page = await readSite(projectId, userId, url);
 
@@ -477,6 +498,11 @@ export async function buildProfile(
       notBuyers: profile.notBuyers,
       destinations: profile.destinations,
       problemPhrasings,
+      brief: usableBrief(profile.brief),
+      // Postgres reads the old row on the right, so this is the version being written.
+      briefProfileVersion: options.rejudge
+        ? sql`${projects.profileVersion} + 1`
+        : sql`${projects.profileVersion}`,
       ...(options.rejudge
         ? { profileVersion: sql`${projects.profileVersion} + 1` }
         : {}),

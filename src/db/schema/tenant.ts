@@ -83,6 +83,16 @@ export const projects = pgTable("projects", {
   destinations: jsonb("destinations"),
   /** How buyers say the problem, in their words, taken from the product page. */
   problemPhrasings: jsonb("problem_phrasings"),
+  /**
+   * What the scan's judge reads to tell a buyer of this product from someone
+   * asking for its neighbour: the product's precise kind, the kinds it is not,
+   * who pays and who only talks, and example asks on both sides of the line.
+   * Unlike the facts above it may say what the site does not, so it is kept
+   * apart from them and never shown as the profile (lib/brief.ts).
+   */
+  brief: jsonb("brief"),
+  /** The profile version the brief was written against. Behind the profile means it is owed again. */
+  briefProfileVersion: integer("brief_profile_version"),
   tierSnapshot: text("tier_snapshot"),
   /**
    * When the first discovery finished and the project's own jobs were queued.

@@ -464,8 +464,12 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
 
     await db()
       .update(projects)
-      .set({ discoveredAt: new Date() })
+      .set({ discoveredAt: new Date(), briefProfileVersion: 1 })
       .where(eq(projects.id, project.id));
+    const [unbriefed] = await db()
+      .insert(projects)
+      .values({ userId: user.id, name: "Made before briefs", discoveredAt: new Date() })
+      .returning();
     const [fresh] = await db()
       .insert(projects)
       .values({ userId: user.id, name: "Never discovered" })
@@ -480,6 +484,8 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
     // No SEO pass and no competitor scan: those wait for their tab to be opened.
     expect(await kinds(project.id)).toEqual(["discovery_refresh", "scan"]);
     expect(await kinds(fresh.id)).toEqual(["discovery_initial"]);
+    // A project with no brief for its profile gets one, and the rescore waits for it.
+    expect(await kinds(unbriefed.id)).toEqual(["brief", "discovery_refresh", "scan"]);
 
     // A project whose tab was opened has had one, and is owed the next.
     const ran = new Date();
@@ -492,9 +498,10 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
 
     await db()
       .delete(jobs)
-      .where(inArray(jobs.projectId, [project.id, fresh.id]));
+      .where(inArray(jobs.projectId, [project.id, fresh.id, unbriefed.id]));
     await db().delete(users).where(eq(users.id, user.id));
-  });
+    // It walks every project in the test database, which other files leave behind.
+  }, 60_000);
 });
 
 /**

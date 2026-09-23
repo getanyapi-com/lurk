@@ -102,6 +102,11 @@ export async function saveProfileAction(
         ...(edited ? { profileVersion: sql`${projects.profileVersion} + 1` } : {}),
       })
       .where(eq(projects.id, project.id));
+    // The brief was written for the product as it was. A new one is read, and
+    // the verdicts are judged again once it is written.
+    if (edited) {
+      await enqueueJob("brief", project.id);
+    }
     // The feed applies this project's own minimum score when it is read, so the
     // read it is holding was made against the old floor.
     forgetProjectFeed(project.id);

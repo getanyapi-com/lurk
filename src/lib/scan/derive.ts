@@ -1,6 +1,7 @@
 import { choice, noul, score, type Answers } from "@/lib/jev";
 import type { Assessment, TriageItem } from "./judgement";
-import { FIT, INTENT_LEVELS, NEED_STATES, NO_QUOTE, RELATIONSHIPS, REQUIREMENT, STAGES } from "./questions";
+import { leadQuality } from "./leadModel";
+import { FIT, INTENT_LEVELS, NEED_STATES, NOTHING, NO_QUOTE, RELATIONSHIPS, REQUIREMENT, STAGES, THIS_PRODUCT } from "./questions";
 import type { Spans } from "./spans";
 
 /**
@@ -74,22 +75,53 @@ export function fitFrom(answers: Answers, prefix: string): number {
   return { met: 4, none_stated: 3, unknown: 2 }[requirement];
 }
 
-/** The five yes-or-no answers that say whether this product suits this person. */
-const MATCH_QUESTIONS = ["solves_problem", "wants_offering", "same_kind", "can_use", "audience"] as const;
+/** One choice answer's probability for an option, from its probabilities or, when absent, its pick. */
+function chance(answers: Answers, key: string, option: string): number {
+  const answer = choice(answers, key);
+  return answer.probabilities ? (answer.probabilities[option] ?? 0) : answer.choice === option ? 1 : 0;
+}
+
+/** The chance of each option that passes the test, from its probabilities or, when absent, its pick. */
+function chanceOf(answers: Answers, key: string, test: (option: string) => boolean): number[] {
+  const answer = choice(answers, key);
+  const probabilities = answer.probabilities ?? { [answer.choice]: 1 };
+  return Object.entries(probabilities)
+    .filter(([option]) => test(option))
+    .map(([, value]) => value);
+}
 
 /**
- * How well this product matches this person, 0-1: the geometric mean of the
- * five match answers, so one confident no drags it down however sure the
- * others are. It orders the feed. On the 457 leads labelled 2026-09-20 it told
- * good from bad at an AUC of 0.86, against 0.71 for the 0-4 fit and intent the
- * feed was sorted by.
+ * The numbers the lead model reads, one per answer (scan/leadModel.ts). The
+ * brief's features are there only when the product has a brief, and the
+ * model fitted without them judges a product that has none.
  */
-export function matchFrom(answers: Answers, prefix: string): number {
-  const product = MATCH_QUESTIONS.reduce(
-    (total, question) => total * Math.max(noul(answers, `${prefix}__${question}`), 0.001),
-    1,
-  );
-  return product ** (1 / MATCH_QUESTIONS.length);
+export function featuresFrom(answers: Answers, prefix: string, withBrief: boolean): Record<string, number> {
+  const at = (name: string) => `${prefix}__${name}`;
+  const features: Record<string, number> = {
+    solves_problem: noul(answers, at("solves_problem")),
+    wants_offering: noul(answers, at("wants_offering")),
+    same_kind: noul(answers, at("same_kind")),
+    can_use: noul(answers, at("can_use")),
+    audience: noul(answers, at("audience")),
+    intent: score(answers, at("intent")).score,
+    req_unmet: chance(answers, at("hard_requirement"), "unmet"),
+    req_met: chance(answers, at("hard_requirement"), "met"),
+    founder_would_reply: noul(answers, at("founder_would_reply")),
+    has_product_pain: noul(answers, at("has_product_pain")),
+    promotes_own_thing: noul(answers, at("promotes_own_thing")),
+    offers_services: noul(answers, at("offers_services")),
+    names_current_tool: noul(answers, at("names_current_tool")),
+  };
+  if (withBrief) {
+    const neighbours = chanceOf(answers, at("wanted_kind"), (option) => /^n\d+$/.test(option));
+    features.kind_this = chance(answers, at("wanted_kind"), THIS_PRODUCT);
+    features.kind_nothing = chance(answers, at("wanted_kind"), NOTHING);
+    features.kind_neighbour_max = Math.max(0, ...neighbours);
+    features.group_buyer = chanceOf(answers, at("author_group"), (option) => /^b\d+$/.test(option)).reduce((a, b) => a + b, 0);
+    features.group_non_buyer = chanceOf(answers, at("author_group"), (option) => /^x\d+$/.test(option)).reduce((a, b) => a + b, 0);
+    features.lead_like = noul(answers, at("is_lead_like"));
+  }
+  return features;
 }
 
 const WHO: Record<Assessment["relationship"], string> = {
@@ -127,6 +159,7 @@ export function assessmentFrom(
   reading: ReadingAnswers,
   answers: Answers,
   prefix: string,
+  withBrief = false,
 ): Assessment {
   const fit = fitFrom(answers, prefix);
   // Someone who would not welcome a product at all has no need of one to act
@@ -139,7 +172,7 @@ export function assessmentFrom(
     needState: reading.needState,
     fit,
     intent,
-    match: matchFrom(answers, prefix),
+    quality: leadQuality(featuresFrom(answers, prefix, withBrief), withBrief),
     stage: oneOf(choice(answers, `${prefix}__stage`).choice, STAGES, "none"),
     decision: "qualify",
     reasonCode: "supported_open_need",

@@ -188,7 +188,8 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
   const wrongJob: JevSpec = { solvesProblem: 0.1, audience: 0.1 };
 
   /** A judgement the gates hold for review: a requirement the facts cannot settle. */
-  const oneUnknown: JevSpec = { hardRequirement: "unknown", intent: 2 };
+  /** A buyer the lead model turns down but no settled disqualifier rejects: held for review. */
+  const oneUnknown: JevSpec = { hardRequirement: "unknown", intent: 2, audience: 0.1, founderWouldReply: 0.05 };
 
   async function evaluations(projectId: string) {
     return db()

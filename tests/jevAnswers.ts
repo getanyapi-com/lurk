@@ -31,6 +31,7 @@ export type JevSpec = {
   audience?: number;
   sameKind?: number;
   canUse?: number;
+  founderWouldReply?: number;
   wantsOffering?: number;
   intent?: number;
   stage?: string;
@@ -55,6 +56,11 @@ export function judgeAnswers(specs: JevSpec[], prefix = "p"): Answers {
     answers[`${key}__audience`] = noulAnswer(spec.audience ?? 0.9);
     answers[`${key}__same_kind`] = noulAnswer(spec.sameKind ?? 0.9);
     answers[`${key}__can_use`] = noulAnswer(spec.canUse ?? 0.9);
+    answers[`${key}__founder_would_reply`] = noulAnswer(spec.founderWouldReply ?? 0.9);
+    answers[`${key}__has_product_pain`] = noulAnswer(0.8);
+    answers[`${key}__promotes_own_thing`] = noulAnswer(0.05);
+    answers[`${key}__offers_services`] = noulAnswer(0.05);
+    answers[`${key}__names_current_tool`] = noulAnswer(0.3);
     answers[`${key}__wants_offering`] = noulAnswer(spec.wantsOffering ?? 0.9);
     answers[`${key}__intent`] = scoreAnswer(spec.intent ?? 3);
     answers[`${key}__stage`] = choiceAnswer(spec.stage ?? "solution_seeking");

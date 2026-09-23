@@ -4,13 +4,26 @@ import { TIERS, type TierLimits } from "@/lib/tiers";
  * The user's optional extra floor on the feed, set on the Product page. The
  * non-compensatory gates in gates.ts decide what qualifies; this only hides
  * qualified leads a user considers too weak. The default is the bottom of the
- * qualified band (fit 3, intent 2, engagement 0 folds to 50), so out of the box
- * it admits every qualified lead.
+ * qualified band (a lead just at the lead model's threshold folds to 50), so
+ * out of the box it admits every qualified lead.
  */
 export const DEFAULT_SCORE_THRESHOLD = 50;
 
-/** How many items one scoring call judges at a time. */
-export const SCORE_BATCH_SIZE = 10;
+/**
+ * How many items one scoring call judges at a time. One: the other posts in a
+ * request are distractors to the one being asked about, and on 2,362 labelled
+ * posts on 2026-09-22 the same questions told good from bad at 0.843 AUC one
+ * post at a time against 0.828 ten at a time (.context/exp). At Jev's price the
+ * product facts sent again with every post cost under a cent a thousand.
+ */
+export const SCORE_BATCH_SIZE = 1;
+
+/**
+ * How many posts one shared reading call reads at a time. The reading carries
+ * no product, so ten a request costs the three product-agnostic questions
+ * nothing in accuracy and a tenth of the requests.
+ */
+export const READING_BATCH_SIZE = 10;
 
 /**
  * How many Reddit calls one job has in flight at once, whether it is opening
@@ -122,19 +135,20 @@ export function engagementScore(ageHours: number, numComments: number | null): n
  * The feed's sort order, 0-100. Only leads the gates qualified reach the feed,
  * so this decides order among leads that already passed, never admission:
  *
- *   quality = 0.6 * match + 0.2 * intent / 4 + 0.2 * engagement / 4
- *   score   = 50 + 50 * (quality - 0.4) / 0.6, held to 0-100
+ *   qualified (quality >= 0.5)   score = 50 + 50 * (0.8 * (quality - 0.5) / 0.5 + 0.2 * engagement / 4)
+ *   not qualified                score = 98 * quality, under 50
  *
- * match is how well the product suits the person (derive.ts), and carries
- * three times the weight of intent or of the 0-4 engagement, because it is
- * what told good leads from bad on the posts labelled 2026-09-20; the fit and
- * intent sort it replaced was barely better than chance on 2026-09-22. A
- * qualified lead has every match answer at 0.5 or more and intent 2 or more,
- * so its quality is at least 0.4: the qualified band starts at 50, and the
- * maximum is 100. A missing match or intent counts as 0.
+ * quality is the lead model's verdict with its threshold at 0.5
+ * (scan/leadModel.ts), and carries four times the weight of the 0-4
+ * engagement, because how likely the person is to buy outranks how fresh the
+ * thread is. The qualified band starts at 50 and ends at 100, so the default
+ * threshold and the alert floor keep their meaning. A missing quality counts
+ * as 0.
  */
-export function foldScore(match: number | null, intent: number | null, engagement: number): number {
-  const quality = 0.6 * (match ?? 0) + (0.2 * (intent ?? 0)) / 4 + (0.2 * engagement) / 4;
-  const score = Math.round(50 + (50 * (quality - 0.4)) / 0.6);
-  return Math.min(100, Math.max(0, score));
+export function foldScore(quality: number | null, engagement: number): number {
+  const q = quality ?? 0;
+  if (q < 0.5) {
+    return Math.min(49, Math.round(98 * q));
+  }
+  return Math.round(50 + 50 * ((0.8 * (q - 0.5)) / 0.5 + (0.2 * engagement) / 4));
 }

@@ -148,6 +148,12 @@ export type LlmCall<T> = {
   itemsAnswered?: (value: T) => number;
   /** 1 for the first call, 2 for the one asking again for the ids it skipped. */
   attempt?: number;
+  /**
+   * How hard the model thinks, low unless the call says otherwise. The product
+   * reading asks high: it is once per product, and its brief measured 0.874
+   * AUC high against 0.862 low (.context/exp, 2026-09-22).
+   */
+  effort?: "low" | "high";
 };
 
 /** What one call left behind, whether it answered or failed. */
@@ -236,7 +242,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
         schema: call.schema,
         system: call.system,
         prompt: call.prompt,
-        providerOptions: { openrouter: { reasoning: { effort: REASONING_EFFORT } } },
+        providerOptions: { openrouter: { reasoning: { effort: call.effort ?? REASONING_EFFORT } } },
         abortSignal,
       }),
     );

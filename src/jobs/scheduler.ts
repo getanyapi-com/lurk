@@ -84,6 +84,8 @@ export async function seedProjectScans(): Promise<void> {
       discoveredAt: projects.discoveredAt,
       createdAt: projects.createdAt,
       url: projects.url,
+      profileVersion: projects.profileVersion,
+      briefProfileVersion: projects.briefProfileVersion,
     })
     .from(projects);
   const stale = await projectsWithStaleEvaluations();
@@ -125,7 +127,24 @@ const PROFILES_READ_WHOLE_SINCE = new Date("2026-09-20T00:00:00Z");
 const RESEED_GAP_MS = 2 * 60 * 1000;
 let reseedsQueued = 0;
 
-type SeedRow = { id: string; discoveredAt: Date | null; createdAt: Date; url: string | null };
+/**
+ * Briefs owed at boot start after the outgoing revision is gone, since a job it
+ * claims for a kind it has no handler for fails, and follow each other a few
+ * seconds apart: each reads a site and asks one long model call, and the
+ * rescore it queues is the expensive part.
+ */
+const BRIEF_START_MS = 3 * 60 * 1000;
+const BRIEF_GAP_MS = 5 * 1000;
+let briefsQueued = 0;
+
+type SeedRow = {
+  id: string;
+  discoveredAt: Date | null;
+  createdAt: Date;
+  url: string | null;
+  profileVersion: number;
+  briefProfileVersion: number | null;
+};
 
 async function seedProject(row: SeedRow, stale: boolean, reseeded: boolean): Promise<void> {
   if (!row.discoveredAt) {
@@ -147,7 +166,12 @@ async function seedProject(row: SeedRow, stale: boolean, reseeded: boolean): Pro
       await enqueueOnce(kind, new Date(), row.id);
     }
   }
-  if (stale) {
+  // A project whose brief is behind its profile gets the brief first, and the
+  // brief job queues the rescore, so its verdicts are judged once, with it.
+  if (row.briefProfileVersion === null || row.briefProfileVersion < row.profileVersion) {
+    await enqueueOnce("brief", new Date(Date.now() + BRIEF_START_MS + briefsQueued * BRIEF_GAP_MS), row.id);
+    briefsQueued += 1;
+  } else if (stale) {
     await enqueueOnce("rescore", new Date(), row.id);
   }
   if (row.url && row.createdAt < PROFILES_READ_WHOLE_SINCE && !reseeded) {

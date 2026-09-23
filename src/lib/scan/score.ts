@@ -1,4 +1,4 @@
-import { askJev } from "@/lib/jev";
+import { askJev, type Question } from "@/lib/jev";
 import { productState, type ProductFacts } from "@/lib/product";
 import { askInBatches, stateTokens } from "./batches";
 import { SCORE_BATCH_SIZE, TRIAGE_BATCH_SIZE } from "./constants";
@@ -6,7 +6,7 @@ import { assessmentFrom, readingFrom, triageFrom, type ReadingAnswers } from "./
 import { isSentinel } from "./evidence";
 import { judge } from "./gates";
 import type { Judgement, ScorableItem, TriageCandidate, TriageItem } from "./judgement";
-import { judgeQuestions, keyed, readingQuestions, triageQuestions } from "./questions";
+import { briefQuestions, judgeQuestions, keyed, readingQuestions, signalQuestions, triageQuestions } from "./questions";
 import { itemState, spans } from "./spans";
 import { withCheckedEvidence } from "./validate";
 
@@ -100,38 +100,53 @@ export function readOrder(triage: TriageItem[], facts: Map<string, ReadFacts>): 
 }
 
 /**
- * One request: these candidates against this product. The three shared
- * reading questions are asked only for a candidate no reading covers, which
- * is every comment and any post the reading could not read.
+ * The request for these candidates against this product: the judge's own
+ * questions, the narrow signals beside them, and the brief's questions when
+ * the product has a brief. The three shared reading questions are asked only
+ * for a candidate no reading covers, which is every comment and any post the
+ * reading could not read. Exported so the lead model is fitted on exactly the
+ * request the scan sends (.context/exp/fit.py).
  */
+export function judgeRequest(
+  product: ProductFacts,
+  batch: ScorableItem[],
+  readings: Map<string, ReadingAnswers>,
+): { state: Record<string, unknown>; questions: Record<string, Question> } {
+  const posts: Record<string, unknown> = {};
+  let questions: Record<string, Question> = {};
+  batch.forEach((item, index) => {
+    const key = `p${index}`;
+    const path = `posts.${key}`;
+    posts[key] = itemState(item);
+    questions = { ...questions, ...keyed(key, judgeQuestions(path)), ...keyed(key, signalQuestions(path)) };
+    if (product.brief) {
+      questions = { ...questions, ...keyed(key, briefQuestions(path, product.brief)) };
+    }
+    if (!readings.has(item.id)) {
+      const ids = Object.keys(spans(item.title, item.body));
+      questions = { ...questions, ...keyed(key, readingQuestions(path, ids)) };
+    }
+  });
+  return { state: { product: productState(product), posts }, questions };
+}
+
 async function judgeBatch(
   projectId: string,
   product: ProductFacts,
   batch: ScorableItem[],
   readings: Map<string, ReadingAnswers>,
 ): Promise<Judgement[]> {
-  const posts: Record<string, unknown> = {};
-  let questions = {};
-  batch.forEach((item, index) => {
-    const key = `p${index}`;
-    posts[key] = itemState(item);
-    questions = { ...questions, ...keyed(key, judgeQuestions(`posts.${key}`)) };
-    if (!readings.has(item.id)) {
-      const ids = Object.keys(spans(item.title, item.body));
-      questions = { ...questions, ...keyed(key, readingQuestions(`posts.${key}`, ids)) };
-    }
-  });
   const answers = await askJev({
     purpose: "score",
     projectId,
-    state: { product: productState(product), posts },
-    questions,
+    ...judgeRequest(product, batch, readings),
     itemsAsked: batch.length,
   });
   return batch.map((item, index) => {
     const key = `p${index}`;
     const reading = readings.get(item.id) ?? readingFrom(answers, key, spans(item.title, item.body));
-    return withCheckedEvidence(judge(assessmentFrom(item.id, reading, answers, key), item), item);
+    const assessment = assessmentFrom(item.id, reading, answers, key, Boolean(product.brief));
+    return withCheckedEvidence(judge(assessment, item), item);
   });
 }
 

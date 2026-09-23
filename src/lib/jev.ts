@@ -42,18 +42,24 @@ const GATEWAY_503_WAITS_MS = [400, 1200];
 
 const ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
 
+/**
+ * What an instruction or a criterion may be: a sentence, or a JSON object
+ * such as `{ what, not_for, examples }` that pins a fuzzy boundary down with
+ * cases on each side (https://docs.typesafe.ai/primitives/advanced.md).
+ */
+export type Entry = string | { [key: string]: unknown };
 export type NoulQuestion = {
   type: "noul";
-  instructions: string;
-  criteria?: { true: string; false: string };
+  instructions: Entry;
+  criteria?: { true: Entry; false: Entry };
 };
 export type ChoiceQuestion = {
   type: "choice";
-  instructions: string;
+  instructions: Entry;
   /** An option with nothing to say about it takes null; it is sent as "". */
-  criteria: Record<string, string | null>;
+  criteria: Record<string, Entry | null>;
 };
-export type ScoreQuestion = { type: "score"; instructions: string; criteria: string[] };
+export type ScoreQuestion = { type: "score"; instructions: Entry; criteria: Entry[] };
 export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 
 const noulAnswer = z.object({ type: z.literal("noul"), noul: z.number() });
@@ -313,9 +319,9 @@ function toGatewayQuestions(questions: Record<string, Question>): Record<string,
   return Object.fromEntries(
     Object.entries(questions).map(([key, question]) => [
       key,
-      question.type === "noul"
+      (question.type === "noul"
         ? { type: "boolean" as const, instructions: question.instructions, criteria: question.criteria }
-        : question,
+        : question) as GatewayQuestion,
     ]),
   );
 }

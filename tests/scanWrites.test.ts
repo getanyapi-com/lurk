@@ -17,7 +17,7 @@ function judgement(score: number): Judgement {
     needState: "open",
     fit: 4,
     intent: 3,
-    match: 0.9,
+    quality: 0.9,
     stage: "solution_seeking",
     decision: "qualify",
     reasonCode: "supported_open_need",

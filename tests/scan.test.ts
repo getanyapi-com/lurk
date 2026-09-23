@@ -43,7 +43,7 @@ function assessment(patch: Partial<Assessment> = {}): Assessment {
     needState: "open",
     fit: 4,
     intent: 3,
-    match: 0.9,
+    quality: 0.9,
     stage: "solution_seeking",
     decision: "qualify",
     reasonCode: "supported_open_need",
@@ -54,16 +54,16 @@ function assessment(patch: Partial<Assessment> = {}): Assessment {
 }
 
 describe("score folding", () => {
-  it("weights match three times as heavily as intent or liveliness", () => {
-    expect(foldScore(1, 4, 4)).toBe(100);
-    expect(foldScore(0.9, 2, 0)).toBeGreaterThan(foldScore(0.6, 3, 1));
-    expect(foldScore(0.7, 3, 1)).toBeGreaterThan(foldScore(0.7, 2, 1));
+  it("starts the qualified band at 50 at the lead model's threshold and ends at 100", () => {
+    expect(foldScore(0.5, 0)).toBe(50);
+    expect(foldScore(1, 4)).toBe(100);
+    expect(foldScore(0.49, 4)).toBeLessThan(50);
+    expect(foldScore(null, 4)).toBe(0);
   });
 
-  it("starts the qualified band at 50 and counts a missing scale as zero", () => {
-    expect(foldScore(0.5, 2, 0)).toBe(50);
-    expect(foldScore(null, null, 0)).toBe(foldScore(0, 0, 0));
-    expect(foldScore(null, null, 4)).toBeLessThan(50);
+  it("weights the model's verdict four times as heavily as liveliness", () => {
+    expect(foldScore(0.9, 0)).toBeGreaterThan(foldScore(0.7, 4));
+    expect(foldScore(0.7, 3)).toBeGreaterThan(foldScore(0.7, 1));
   });
 });
 
@@ -77,9 +77,9 @@ describe("engagement", () => {
 
 describe("the qualification gates", () => {
   it("does not let a live thread and top intent pay for a wrong-job fit", () => {
-    const judged = judge(assessment({ fit: 0, intent: 4 }), { ...item, ageHours: 1, numComments: 0 });
+    const judged = judge(assessment({ fit: 0, intent: 4, quality: 0.3 }), { ...item, ageHours: 1, numComments: 0 });
     expect(judged.engagement).toBe(4);
-    expect(judged.score).toBeGreaterThan(50);
+    expect(judged.score).toBeLessThan(50);
     expect(judged.decision).toBe("reject");
     expect(judged.reasonCode).toBe("wrong_job");
   });
@@ -103,7 +103,7 @@ describe("the qualification gates", () => {
       [{ relationship: "helper" as const }, "helper_only"],
       [{ needState: "resolved" as const }, "resolved"],
       [{ needState: "no_active_need" as const }, "no_active_need"],
-      [{ fit: 0 }, "wrong_job"],
+      [{ fit: 0, quality: 0.2 }, "wrong_job"],
       [
         { relationship: "unknown" as const, needState: "unknown" as const, fit: null },
         "insufficient_evidence",
@@ -122,7 +122,7 @@ describe("the qualification gates", () => {
   });
 
   it("holds category overlap alone for review rather than rejecting the person", () => {
-    const judged = judge(assessment({ fit: 1, intent: 4 }), item);
+    const judged = judge(assessment({ fit: 1, intent: 4, quality: 0.3 }), item);
     expect(judged.decision).toBe("review");
     expect(judged.reasonCode).toBe("wrong_audience");
   });
@@ -163,12 +163,24 @@ describe("the qualification gates", () => {
     }
   });
 
-  it("qualifies an unsettled requirement only for someone asking outright", () => {
-    expect(decide(assessment({ fit: 2, intent: 3 })).decision).toBe("qualify");
-    expect(decide(assessment({ fit: 2, intent: 2 }))).toEqual({
+  it("lets the lead model decide once the reading found a buyer with an open need", () => {
+    expect(decide(assessment({ fit: 2, intent: 2, quality: 0.5 })).decision).toBe("qualify");
+    expect(decide(assessment({ fit: 0, quality: 0.8 })).decision).toBe("qualify");
+    expect(decide(assessment({ fit: 4, intent: 4, quality: 0.49 }))).toEqual({
       decision: "review",
       reasonCode: "insufficient_evidence",
     });
+  });
+
+  it("never lets the lead model qualify a seller, a helper or a settled need", () => {
+    for (const patch of [
+      { relationship: "seller" as const },
+      { relationship: "helper" as const },
+      { needState: "resolved" as const },
+      { relationship: "discussion" as const },
+    ]) {
+      expect(decide(assessment({ ...patch, quality: 1 })).decision).not.toBe("qualify");
+    }
   });
 
   it("still holds a plausible buyer with one material unknown for review", () => {
@@ -256,29 +268,60 @@ describe("judging a batch", () => {
     expect(await judgeItems("project-1", product, [item])).toEqual([]);
   });
 
-  it("splits a batch the model refuses as too large and asks for each half", async () => {
+  it("asks about one post a request, and keeps no verdict for one too large to ask", async () => {
     askJev.mockReset();
     askJev.mockRejectedValueOnce(new JevRequestTooLargeError());
     askJev.mockResolvedValue(judgeAnswers([{}]));
     const judged = await judgeItems("project-1", product, [item, { ...item, id: "p2" }]);
-    expect(askJev).toHaveBeenCalledTimes(3);
-    expect(askJev.mock.calls[1][0].itemsAsked).toBe(1);
-    expect(judged.map((one) => one.id).sort()).toEqual(["p1", "p2"]);
+    expect(askJev).toHaveBeenCalledTimes(2);
+    expect(askJev.mock.calls.every((call) => call[0].itemsAsked === 1)).toBe(true);
+    expect(judged).toHaveLength(1);
   });
 
   it("asks the three reading questions only for a candidate no reading covers", async () => {
     askJev.mockReset();
-    askJev.mockResolvedValueOnce(judgeAnswers([{}, {}]));
+    askJev.mockResolvedValue(judgeAnswers([{}]));
     await judgeItems(
       "project-1",
       product,
       [item, { ...item, id: "p2" }],
       new Map([["p1", { relationship: "buyer" as const, needState: "open" as const, quote: null }]]),
     );
-    const questions = askJev.mock.calls[0][0].questions as Record<string, unknown>;
-    expect(questions).not.toHaveProperty("p0__relationship");
-    expect(questions).toHaveProperty("p0__solves_problem");
-    expect(questions).toHaveProperty("p1__relationship");
+    const asked = askJev.mock.calls.map((call) => call[0].questions as Record<string, unknown>);
+    expect(asked[0]).not.toHaveProperty("p0__relationship");
+    expect(asked[0]).toHaveProperty("p0__solves_problem");
+    expect(asked[1]).toHaveProperty("p0__relationship");
+  });
+
+  it("asks the brief's questions only for a product that has a brief", async () => {
+    const brief = {
+      kind: "form builder with payments",
+      neighbours: [
+        { kind: "paper forms", whyNot: "not software" },
+        { kind: "survey panel", whyNot: "sells respondents" },
+      ],
+      buyers: ["founders"],
+      nonBuyers: ["students"],
+      price: "cheap self-serve",
+      freePlan: true,
+      limits: [],
+      goodAsks: ["need a form that takes payments"],
+      nearMisses: [{ ask: "how do I print a form", why: "paper" }],
+    };
+    askJev.mockReset();
+    askJev.mockResolvedValue(judgeAnswers([{}]));
+    await judgeItems("project-1", product, [item]);
+    expect(askJev.mock.calls[0][0].questions).not.toHaveProperty("p0__wanted_kind");
+    askJev.mockReset();
+    const withBrief = judgeAnswers([{}]);
+    withBrief.p0__wanted_kind = { type: "choice", choice: "this_product", probabilities: { this_product: 0.9, n0: 0.1 }, confidence: 0.9 };
+    withBrief.p0__author_group = { type: "choice", choice: "b0", probabilities: { b0: 0.8, x0: 0.2 }, confidence: 0.8 };
+    withBrief.p0__is_lead_like = { type: "noul", noul: 0.8 };
+    askJev.mockResolvedValue(withBrief);
+    const [judged] = await judgeItems("project-1", { ...product, brief }, [item]);
+    const questions = askJev.mock.calls[0][0].questions as Record<string, { criteria?: Record<string, unknown> }>;
+    expect(Object.keys(questions.p0__wanted_kind.criteria ?? {})).toEqual(["this_product", "n0", "n1", "other", "nothing"]);
+    expect(judged.quality).not.toBeNull();
   });
 
   it("shows the model plain typography, so a curly apostrophe cannot be garbled back", () => {

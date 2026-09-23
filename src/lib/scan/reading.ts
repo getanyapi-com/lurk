@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { postReadings } from "@/db/schema";
 import { askJev } from "@/lib/jev";
 import { askInBatches, stateTokens } from "./batches";
-import { SCORE_BATCH_SIZE } from "./constants";
+import { READING_BATCH_SIZE } from "./constants";
 import { readingFrom, type ReadingAnswers } from "./derive";
 import { contentHash } from "./evaluations";
 import { isSentinel } from "./evidence";
@@ -143,7 +143,7 @@ export async function readPosts(
   const todo = live.filter((item) => !readings.has(item.id));
   const read = await askInBatches(
     todo,
-    SCORE_BATCH_SIZE,
+    READING_BATCH_SIZE,
     (batch) => readBatch(projectId, batch),
     () => [],
     (item) => stateTokens(itemState(item)),
@@ -176,7 +176,7 @@ function notAsking(reading: Reading): Assessment {
     needState: reading.needState,
     fit: null,
     intent: null,
-    match: null,
+    quality: null,
     stage: "none",
     decision: "reject",
     // Every reading that reaches here fails a gate, so the gate names it.
