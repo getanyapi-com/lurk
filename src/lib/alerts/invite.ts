@@ -160,18 +160,6 @@ function text(size: number, color: string, weight = 400): string {
   return `font-family:${EMAIL_FONT};font-size:${size}px;line-height:1.45;font-weight:${weight};color:${color}`;
 }
 
-/** The two promises the ask rests on, said right under each button. */
-function promises(): string {
-  const tick = `<span style="color:${C.scoreHot};font-weight:600">&#10003;</span>`;
-  return ["Free", "One click", "We'll only ask you once"]
-    .map((item) => `<td style="padding:0 8px;${text(14, C.fg, 500)};white-space:nowrap">${tick} ${item}</td>`)
-    .join("");
-}
-
-function promisesRow(bottom: string): string {
-  return `<tr><td align="center" style="padding:12px 24px ${bottom}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>${promises()}</tr></table></td></tr>`;
-}
-
 function acceptButton(appUrl: string, href: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
 <td style="border-radius:${EMAIL_RADIUS.control};background:${C.brand}">
@@ -205,28 +193,25 @@ export function renderInvite(invitee: Invitee, leads: DigestLead[], appUrl: stri
 <div style="display:inline-block;padding:4px 12px;border-radius:999px;background:${C.surface2};${text(13, C.fgMuted, 500)}">
 <img src="${escapeHtml(appUrl)}/email/reddit.png" width="14" height="14" alt="" style="vertical-align:-2px;margin-right:6px" />${leadsPhrase(invitee.recentCount)} for ${name}</div></td></tr>
 <tr><td align="center" style="padding:14px 32px 6px;${text(24, C.fg, 500)};line-height:1.25">People on Reddit are asking for what you make.</td></tr>
-<tr><td align="center" style="padding:0 40px 20px;${text(15, C.fgMuted)}">One click and we'll email you the new ones every day.</td></tr>
-<tr><td align="center" style="padding:0 24px">${acceptButton(appUrl, links.accept)}</td></tr>
-${promisesRow("28px")}
+<tr><td align="center" style="padding:0 40px 24px;${text(15, C.fgMuted)}">The newest ones worth a look.</td></tr>
 ${cards}
-<tr><td align="center" style="padding:20px 32px 6px;${text(17, C.fg, 500)}">Get leads like these the day they're posted</td></tr>
-<tr><td align="center" style="padding:0 40px 18px;${text(14, C.fgMuted)}">One email a day, only when there's someone new. Off anytime.</td></tr>
-<tr><td align="center" style="padding:0 24px">${acceptButton(appUrl, links.accept)}</td></tr>
-${promisesRow("18px")}
+<tr><td align="center" style="padding:20px 32px 6px;${text(17, C.fg, 500)}">Want these as they come in?</td></tr>
+<tr><td align="center" style="padding:0 40px 18px;${text(14, C.fgMuted)}">One email a day, only when there's someone new. It's free, and this is the only time we'll ask.</td></tr>
+<tr><td align="center" style="padding:0 24px 18px">${acceptButton(appUrl, links.accept)}</td></tr>
 <tr><td align="center" style="padding:0 24px 32px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
 <td style="padding:0 6px 0 0;${text(13, C.fgMuted)}">or send them to</td>
 ${chatPill(appUrl, links.chat, "slack", "Slack")}${chatPill(appUrl, links.chat, "discord", "Discord")}
 </tr></table></td></tr>
-<tr><td align="center" style="padding:16px 32px 24px;border-top:1px solid ${C.border};${text(12, C.fgMuted)}">You signed up for ${escapeHtml(PRODUCT_NAME)} with this address. This is the only time we'll ask.<br />${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>
+<tr><td align="center" style="padding:16px 32px 24px;border-top:1px solid ${C.border};${text(12, C.fgMuted)}">You signed up for ${escapeHtml(PRODUCT_NAME)} with this address.<br />${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>
 </table></td></tr></table></body></html>`;
   const lines = leads.map((lead) => `- ${lead.title} (r/${lead.subreddit})\n  ${lead.url}`);
   const plain = [
-    `${leadsPhrase(invitee.recentCount)} for ${invitee.projectName}. One click and we'll email you the new ones every day. It's free, and we'll only ask you once:\n${links.accept}\n\nThe best of them:`,
+    `${leadsPhrase(invitee.recentCount)} for ${invitee.projectName}. The newest ones worth a look:`,
     ...lines,
-    `Turn on email alerts (free, one click, off anytime): ${links.accept}`,
+    `Want these as they come in? One email a day, only when there's someone new. It's free, and this is the only time we'll ask.\n${links.accept}`,
     `Or send them to Slack or Discord: ${links.chat}`,
-    `You signed up for ${PRODUCT_NAME} with this address. This is the only time we'll ask.`,
+    `You signed up for ${PRODUCT_NAME} with this address.`,
   ].join("\n\n");
   return { to: invitee.email, subject: inviteSubject(invitee), html, text: plain };
 }
