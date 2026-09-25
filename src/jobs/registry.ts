@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { sendAlertInvites } from "@/lib/alerts/invite";
 import { CADENCE_MS } from "@/lib/alerts/select";
+import { config } from "@/lib/config";
 import { runDiscoveryRefresh } from "@/lib/discovery/refresh";
 import { runInitialDiscovery } from "@/lib/discovery/initial";
 import { parseTextList } from "@/lib/discovery/store";
@@ -157,10 +158,13 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
   /**
    * Asks people with leads and no alert channel, once each, whether they want
    * new leads by email. A few dozen a pass, hourly, so the asks stay inside the
-   * email service's hourly allowance alongside the digests.
+   * email service's hourly allowance alongside the digests. Nothing goes out
+   * until ALERT_INVITES is on; the pass keeps checking hourly until then.
    */
   alert_invites: async () => {
-    await sendAlertInvites();
+    if (config().ALERT_INVITES) {
+      await sendAlertInvites();
+    }
     await enqueueOnce("alert_invites", new Date(Date.now() + CADENCE_MS.hourly));
   },
   retention: async () => {

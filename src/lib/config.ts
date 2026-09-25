@@ -43,6 +43,8 @@ const schema = z.object({
   AZURE_EMAIL_CONNECTION_STRING: optional(z.string()),
   SMTP_URL: optional(z.string()),
   ALERTS_FROM_EMAIL: optional(z.email()),
+  /** The one-time ask to turn alerts on goes out only once this is true. */
+  ALERT_INVITES: z.preprocess(blankIsAbsent, bool),
 
   /** A Slack app with the incoming-webhook scope turns the paste-a-URL step into Add to Slack. */
   SLACK_CLIENT_ID: optional(z.string()),
