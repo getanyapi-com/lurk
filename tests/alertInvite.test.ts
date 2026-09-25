@@ -127,6 +127,43 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
     expect((await sampleLeads(project.id)).map((lead) => lead.title)).toEqual(["month", "fresh"]);
   });
 
+  it("shows one lead per thread, the thread's best, and fills from other threads", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { upsertComments, upsertPosts } = await import("@/lib/reddit/store");
+    const { sampleLeads } = await import("@/lib/alerts/invite");
+    const { project } = await person({ leads: 0 });
+    const now = Math.floor(Date.now() / 1000);
+    const [busy, other] = await upsertPosts(
+      ["busy", "other"].map((title) => ({
+        id: `p${randomUUID().slice(0, 8)}`,
+        subreddit: "saas",
+        author: "asker",
+        title,
+        body: "Anyone know one?",
+        permalink: `/r/saas/comments/${randomUUID().slice(0, 6)}/x/`,
+        createdUtc: now - 3600,
+      })),
+    );
+    const replies = await upsertComments(
+      busy.id,
+      ["first reply", "second reply"].map((body) => ({ id: `c${randomUUID().slice(0, 8)}`, body, createdUtc: now - 60 })),
+    );
+    await db()
+      .insert(schema.leads)
+      .values([
+        { projectId: project.id, postId: busy.id, commentId: replies[0].id, score: 90 },
+        { projectId: project.id, postId: busy.id, commentId: replies[1].id, score: 85 },
+        { projectId: project.id, postId: other.id, score: 60 },
+      ]);
+
+    const shown = await sampleLeads(project.id);
+    expect(shown.map((lead) => [lead.title, lead.score])).toEqual([
+      ["busy", 90],
+      ["other", 60],
+    ]);
+  });
+
   it("turns on a daily email to their own address for every project, once", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");

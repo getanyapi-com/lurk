@@ -54,6 +54,7 @@ const SINCE = new Date(2026, 8, 5, 6, 0, 0);
 
 function lead(overrides: Partial<SelectableLead> & { id: string }): SelectableLead {
   return {
+    postId: overrides.id,
     title: "Paying too much for a scraper",
     url: "https://www.reddit.com/r/SaaS/comments/x/",
     subreddit: "SaaS",

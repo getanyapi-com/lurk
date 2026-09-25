@@ -60,6 +60,8 @@ export function windowStart(lastSentAt: Date | null, cadence: AlertCadence, now:
 }
 
 export type SelectableLead = Omit<DigestLead, "excerpt"> & {
+  /** The thread the lead is in, whether it is the post itself or a reply. */
+  postId: string;
   body: string | null;
   status: string;
   kind: string;
@@ -88,7 +90,11 @@ export function alertable(rows: SelectableLead[], since: Date): SelectableLead[]
 
 /** The leads one message carries: the top `limit` of `alertable`. */
 export function selectLeads(rows: SelectableLead[], since: Date, limit: number): DigestLead[] {
-  return alertable(rows, since).slice(0, limit).map((row) => ({
+  return alertable(rows, since).slice(0, limit).map(digestLead);
+}
+
+export function digestLead(row: SelectableLead): DigestLead {
+  return {
     id: row.id,
     title: row.title,
     url: row.url,
@@ -102,7 +108,7 @@ export function selectLeads(rows: SelectableLead[], since: Date, limit: number):
     isComment: row.isComment,
     numComments: row.numComments,
     createdAt: row.createdAt,
-  }));
+  };
 }
 
 export function isCustomWebhook(channel: AlertChannel): boolean {

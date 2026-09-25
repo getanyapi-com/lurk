@@ -11,7 +11,7 @@ import { addChannel } from "./channels";
 import { sendEmail, type EmailMessage } from "./email";
 import { leadRow } from "./digest";
 import { newLeadsSince } from "./leads";
-import { ALERT_SCORE_FLOOR, selectLeads } from "./select";
+import { ALERT_SCORE_FLOOR, alertable, digestLead, type SelectableLead } from "./select";
 import { EMAIL_COLORS as C, EMAIL_FONT, EMAIL_RADIUS, escapeHtml } from "./tokens";
 import type { DigestLead } from "./types";
 
@@ -137,14 +137,23 @@ export function inviteSubject(invitee: Invitee): string {
 /** How many of the project's best leads the invite shows. */
 export const INVITE_LEAD_SAMPLE = 3;
 
-/** The project's best recent leads, as the digest would list them. */
+/**
+ * The project's best recent leads, as the digest would list them, one per
+ * thread: three replies to the same post read as one lead said three times.
+ */
 export async function sampleLeads(projectId: string, now = new Date()): Promise<DigestLead[]> {
   const rows = await newLeadsSince(projectId, new Date(0));
-  const recent = selectLeads(rows, new Date(now.getTime() - SAMPLE_RECENT_MS), INVITE_LEAD_SAMPLE);
-  const shown = new Set(recent.map((lead) => lead.id));
-  const filler = selectLeads(rows, new Date(now.getTime() - SAMPLE_WINDOW_MS), INVITE_LEAD_SAMPLE)
-    .filter((lead) => !shown.has(lead.id));
-  return [...recent, ...filler].slice(0, INVITE_LEAD_SAMPLE).sort((a, b) => b.score - a.score);
+  const picked: SelectableLead[] = [];
+  const threads = new Set<string>();
+  for (const window of [SAMPLE_RECENT_MS, SAMPLE_WINDOW_MS]) {
+    for (const row of alertable(rows, new Date(now.getTime() - window))) {
+      if (picked.length < INVITE_LEAD_SAMPLE && !threads.has(row.postId)) {
+        threads.add(row.postId);
+        picked.push(row);
+      }
+    }
+  }
+  return picked.map(digestLead).sort((a, b) => b.score - a.score);
 }
 
 export type InviteLinks = { accept: string; chat: string };

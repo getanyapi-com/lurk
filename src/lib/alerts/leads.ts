@@ -12,6 +12,7 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
   const rows = await db()
     .select({
       id: leads.id,
+      postId: redditPosts.id,
       score: leads.score,
       reason: leads.reason,
       matchedPhrase: leads.matchedPhrase,
