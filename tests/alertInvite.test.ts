@@ -80,11 +80,13 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
     }
     const found = (await invitees(new Date(), 10_000)).find((one) => one.userId === asked.user.id);
     expect(found?.leadCount).toBe(2);
+    expect(found?.recentCount).toBe(2);
 
     await sendAlertInvites(new Date(), 10_000);
-    const mails = sent.mock.calls.map(([mail]) => mail as { to: string; html: string });
+    const mails = sent.mock.calls.map(([mail]) => mail as { to: string; subject: string; html: string });
     const mine = mails.filter((mail) => mail.to === asked.email);
     expect(mine).toHaveLength(1);
+    expect(mine[0].subject).toBe(`2 new Reddit leads for ${asked.project.name}. Get the new ones daily?`);
     expect(mine[0].html).toContain("/alerts/on?t=");
     expect(mine[0].html).toContain("Looking for a tool");
     expect(mine[0].html).toContain(`/app/settings/alerts?project=${asked.project.id}`);
@@ -121,7 +123,8 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
       .insert(schema.leads)
       .values(posts.map((post, i) => ({ projectId: project.id, postId: post.id, score: cases[i].score })));
 
-    expect((await sampleLeads(project.id)).map((lead) => lead.title)).toEqual(["fresh", "month"]);
+    // The week's best is picked first, then the three are listed best first.
+    expect((await sampleLeads(project.id)).map((lead) => lead.title)).toEqual(["month", "fresh"]);
   });
 
   it("turns on a daily email to their own address for every project, once", async () => {

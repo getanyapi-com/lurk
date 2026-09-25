@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Wordmark";
 import { db } from "@/db";
 import { projects, users } from "@/db/schema";
 import { userForToken } from "@/lib/alerts/invite";
 import { acceptInviteAction } from "./actions";
+import { AutoAccept } from "./AutoAccept";
 
 type InvitePageProps = { searchParams: Promise<{ t?: string; done?: string }> };
 
 /**
- * Where "Email me new leads" in the invite lands. It asks for one more press
- * rather than acting on the visit, because mail scanners open every link in a
- * message and would otherwise sign people up who never clicked.
+ * Where "Turn on email alerts" in the invite lands. The server does nothing on
+ * the visit, since mail scanners fetch every link in a message; the page's own
+ * script presses the button, so a person who clicked is signed up at once.
  */
 export default async function InvitePage({ searchParams }: InvitePageProps) {
   const { t = "", done } = await searchParams;
@@ -58,17 +58,13 @@ export default async function InvitePage({ searchParams }: InvitePageProps) {
         ) : (
           <>
             <h1 className="text-h3" style={{ fontWeight: 500 }}>
-              Email me new leads
+              Turning on email alerts…
             </h1>
             <p className="text-body text-fg-muted">
               One email a day to {user.email} with new leads for {list}, only on days there are
               some. Free.
             </p>
-            <form action={acceptInviteAction.bind(null, t)}>
-              <Button type="submit" size="lg" className="w-full">
-                Turn on email alerts
-              </Button>
-            </form>
+            <AutoAccept action={acceptInviteAction.bind(null, t)} />
             <Link href="/app/settings/alerts" className="text-small text-fg-muted underline">
               Rather use Slack or Discord
             </Link>

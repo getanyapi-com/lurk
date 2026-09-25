@@ -316,6 +316,25 @@ describe("the digest email", () => {
     expect(html).toContain("Source");
   });
 
+  it("shows the matched line in place of the excerpt, unless it only repeats the title", () => {
+    const quoted = renderDigestHtml(
+      digestOf(selectLeads([lead({ id: "a", body: "Intro text. We are paying too much." })], SINCE, EMAIL_LEAD_CAP)),
+    );
+    expect(quoted).toContain("&ldquo;paying too much&rdquo;");
+    expect(quoted).not.toContain("Intro text.");
+    const echo = renderDigestHtml(
+      digestOf(
+        selectLeads(
+          [lead({ id: "a", body: "Intro text.", matchedPhrase: "Paying too much for a scraper!" })],
+          SINCE,
+          EMAIL_LEAD_CAP,
+        ),
+      ),
+    );
+    expect(echo).toContain("Intro text.");
+    expect(echo).not.toContain("&ldquo;");
+  });
+
   it("stays email safe: tables, inline styles, no stylesheet or class", () => {
     expect(html).not.toContain("<style");
     expect(html).not.toContain("class=");
@@ -338,7 +357,7 @@ describe("the digest email", () => {
   });
 
   it("keeps the same table structure", () => {
-    expect(structure(html)).toMatchInlineSnapshot(`"!doctype html head meta meta title /title /head body table tr td table tr td table tr td img /td td /td /tr /table /td /tr tr td /td /tr tr td table tr td /td /tr tr td table tr td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div img /div div /div div /div /td td div /div div /div /td td div /div div /div /td /tr /table /td /tr /table /td /tr tr td table tr td img img /td td div /div div /div div /div div /div /td td div /div a /a /td /tr /table /td /tr tr td table tr td a /a /td /tr /table /td /tr tr td a /a a /a /td /tr /table /td /tr /table /body /html"`);
+    expect(structure(html)).toMatchInlineSnapshot(`"!doctype html head meta meta title /title /head body table tr td table tr td table tr td img /td td /td /tr /table /td /tr tr td /td /tr tr td table tr td /td /tr tr td table tr td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div /div div /div /td td div img /div div /div div /div /td td div /div div /div /td td div /div div /div /td /tr /table /td /tr /table /td /tr tr td table tr td img img /td td div /div div /div div /div /td td div /div a /a /td /tr /table /td /tr tr td table tr td a /a /td /tr /table /td /tr tr td a /a a /a /td /tr /table /td /tr /table /body /html"`);
   });
 
   it("says plainly when nothing came in", () => {

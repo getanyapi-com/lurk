@@ -70,6 +70,8 @@ export type Invitee = {
   projectId: string;
   projectName: string;
   leadCount: number;
+  /** Of those, how many were posted in the last month: the "new" the email counts. */
+  recentCount: number;
 };
 
 /**
@@ -86,10 +88,17 @@ export async function invitees(now: Date, limit: number): Promise<Invitee[]> {
     project_id: string;
     project_name: string;
     lead_count: number;
+    recent_count: number;
   }>(sql`
     select distinct on (u.id) u.id as user_id, u.email, p.id as project_id, p.name as project_name,
       (select count(*)::int from leads l
-        where l.project_id = p.id and l.kind = 'buyer' and l.score >= ${ALERT_SCORE_FLOOR}) as lead_count
+        where l.project_id = p.id and l.kind = 'buyer' and l.score >= ${ALERT_SCORE_FLOOR}) as lead_count,
+      (select count(*)::int from leads rl
+        join reddit_posts rp on rp.id = rl.post_id
+        left join reddit_comments rc on rc.id = rl.comment_id
+        where rl.project_id = p.id and rl.kind = 'buyer' and rl.status = 'new'
+          and rl.score >= ${ALERT_SCORE_FLOOR}
+          and coalesce(rc.created_at, rp.created_at) >= ${recent.toISOString()}) as recent_count
     from ${users} u
     join ${projects} p on p.user_id = u.id
     where u.email is not null
@@ -105,7 +114,7 @@ export async function invitees(now: Date, limit: number): Promise<Invitee[]> {
     order by u.id, lead_count desc, p.created_at asc
   `);
   return [...rows]
-    .filter((row) => row.lead_count > 0)
+    .filter((row) => row.recent_count > 0)
     .slice(0, limit)
     .map((row) => ({
       userId: row.user_id,
@@ -113,15 +122,16 @@ export async function invitees(now: Date, limit: number): Promise<Invitee[]> {
       projectId: row.project_id,
       projectName: row.project_name,
       leadCount: row.lead_count,
+      recentCount: row.recent_count,
     }));
 }
 
 function leadsPhrase(count: number): string {
-  return `${count} ${count === 1 ? "lead" : "leads"}`;
+  return `${count} new Reddit ${count === 1 ? "lead" : "leads"}`;
 }
 
 export function inviteSubject(invitee: Invitee): string {
-  return `${leadsPhrase(invitee.leadCount)} for ${invitee.projectName} so far. Want the new ones?`;
+  return `${leadsPhrase(invitee.recentCount)} for ${invitee.projectName}. Get the new ones daily?`;
 }
 
 /** How many of the project's best leads the invite shows. */
@@ -134,7 +144,7 @@ export async function sampleLeads(projectId: string, now = new Date()): Promise<
   const shown = new Set(recent.map((lead) => lead.id));
   const filler = selectLeads(rows, new Date(now.getTime() - SAMPLE_WINDOW_MS), INVITE_LEAD_SAMPLE)
     .filter((lead) => !shown.has(lead.id));
-  return [...recent, ...filler].slice(0, INVITE_LEAD_SAMPLE);
+  return [...recent, ...filler].slice(0, INVITE_LEAD_SAMPLE).sort((a, b) => b.score - a.score);
 }
 
 export type InviteLinks = { accept: string; chat: string };
@@ -154,7 +164,7 @@ function acceptButton(appUrl: string, href: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
 <td style="border-radius:${EMAIL_RADIUS.control};background:${C.brand}">
 <a href="${escapeHtml(href)}" style="display:inline-block;padding:14px 26px;${text(16, "#ffffff", 500)};text-decoration:none">
-<img src="${escapeHtml(appUrl)}/email/mail.png" width="18" height="18" alt="" style="vertical-align:-3px;margin-right:10px;border:0" />Email me new leads</a></td></tr></table>`;
+<img src="${escapeHtml(appUrl)}/email/mail.png" width="18" height="18" alt="" style="vertical-align:-3px;margin-right:10px;border:0" />Turn on email alerts</a></td></tr></table>`;
 }
 
 function chatPill(appUrl: string, href: string, icon: string, label: string): string {
@@ -181,12 +191,13 @@ export function renderInvite(invitee: Invitee, leads: DigestLead[], appUrl: stri
 <img src="${escapeHtml(appUrl)}/email/lurk.png" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:8px" />${escapeHtml(PRODUCT_NAME)}</td></tr>
 <tr><td align="center" style="padding:32px 32px 4px">
 <div style="display:inline-block;padding:4px 12px;border-radius:999px;background:${C.surface2};${text(13, C.fgMuted, 500)}">
-<img src="${escapeHtml(appUrl)}/email/reddit.png" width="14" height="14" alt="" style="vertical-align:-2px;margin-right:6px" />${leadsPhrase(invitee.leadCount)} found for ${name}</div></td></tr>
+<img src="${escapeHtml(appUrl)}/email/reddit.png" width="14" height="14" alt="" style="vertical-align:-2px;margin-right:6px" />${leadsPhrase(invitee.recentCount)} for ${name}</div></td></tr>
 <tr><td align="center" style="padding:14px 32px 6px;${text(24, C.fg, 500)};line-height:1.25">People on Reddit are asking for what you make.</td></tr>
-<tr><td align="center" style="padding:0 40px 24px;${text(15, C.fgMuted)}">The newest ones worth a look.</td></tr>
+<tr><td align="center" style="padding:0 40px 20px;${text(15, C.fgMuted)}">One click and we'll email you the new ones every day. Free.</td></tr>
+<tr><td align="center" style="padding:0 24px 28px">${acceptButton(appUrl, links.accept)}</td></tr>
 ${cards}
-<tr><td align="center" style="padding:20px 32px 6px;${text(17, C.fg, 500)}">Get the new ones the day they're posted</td></tr>
-<tr><td align="center" style="padding:0 40px 18px;${text(14, C.fgMuted)}">One email a day, only when there's someone new. Free.</td></tr>
+<tr><td align="center" style="padding:20px 32px 6px;${text(17, C.fg, 500)}">Get leads like these the day they're posted</td></tr>
+<tr><td align="center" style="padding:0 40px 18px;${text(14, C.fgMuted)}">One click turns it on. One email a day, only when there's someone new. Free, and off anytime.</td></tr>
 <tr><td align="center" style="padding:0 24px 18px">${acceptButton(appUrl, links.accept)}</td></tr>
 <tr><td align="center" style="padding:0 24px 32px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
@@ -197,10 +208,9 @@ ${chatPill(appUrl, links.chat, "slack", "Slack")}${chatPill(appUrl, links.chat, 
 </table></td></tr></table></body></html>`;
   const lines = leads.map((lead) => `- ${lead.title} (r/${lead.subreddit})\n  ${lead.url}`);
   const plain = [
-    `${invitee.projectName} has ${leadsPhrase(invitee.leadCount)} on Reddit so far. The newest ones worth a look:`,
+    `${leadsPhrase(invitee.recentCount)} for ${invitee.projectName}. One click and we'll email you the new ones every day, free:\n${links.accept}\n\nThe best of them:`,
     ...lines,
-    "Get the new ones the day they're posted: one email a day, only when there's someone new. Free.",
-    `Email me new leads: ${links.accept}`,
+    `Turn on email alerts (one click, free, off anytime): ${links.accept}`,
     `Or send them to Slack or Discord: ${links.chat}`,
     `You signed up for ${PRODUCT_NAME} with this address. This is the only time we'll ask.`,
   ].join("\n\n");
