@@ -1,0 +1,147 @@
+import { randomUUID } from "node:crypto";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const sent = vi.fn();
+vi.mock("@/lib/alerts/email", () => ({ sendEmail: (mail: unknown) => sent(mail) }));
+
+process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+
+describe("invite tokens", () => {
+  it("names the person it was issued for and refuses an altered one", async () => {
+    const { inviteToken, userForToken } = await import("@/lib/alerts/invite");
+    const token = inviteToken("user-1");
+    expect(userForToken(token)).toBe("user-1");
+    expect(userForToken(token.replace("user-1", "user-2"))).toBeNull();
+    expect(userForToken(`${token}x`)).toBeNull();
+    expect(userForToken("nonsense")).toBeNull();
+  });
+});
+
+/**
+ * Who gets asked, and that nobody is asked twice. Proven against a real
+ * database, because the eligibility query is the claim.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
+  beforeEach(() => sent.mockReset());
+
+  async function person(opts: { leads: number; alert?: boolean; ageMs?: number; postedDaysAgo?: number }) {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const email = `invite-${randomUUID()}@example.com`;
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}`, email })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({
+        userId: user.id,
+        name: `Proj ${randomUUID().slice(0, 6)}`,
+        createdAt: new Date(Date.now() - (opts.ageMs ?? 3 * 24 * 3600 * 1000)),
+      })
+      .returning();
+    if (opts.leads > 0) {
+      const posts = await upsertPosts(
+        Array.from({ length: opts.leads }, (_, i) => ({
+          id: `p${randomUUID().slice(0, 8)}`,
+          subreddit: "saas",
+          author: "asker",
+          title: `Looking for a tool ${i}`,
+          body: "Anyone know one?",
+          permalink: `/r/saas/comments/${randomUUID().slice(0, 6)}/x/`,
+          createdUtc: Math.floor(Date.now() / 1000) - (opts.postedDaysAgo ?? 0) * 24 * 3600,
+        })),
+      );
+      await db()
+        .insert(schema.leads)
+        .values(posts.map((post) => ({ projectId: project.id, postId: post.id, score: 80 })));
+    }
+    if (opts.alert) {
+      await db()
+        .insert(schema.alerts)
+        .values({ projectId: project.id, channel: "email", target: email, cadence: "daily" });
+    }
+    return { user, project, email };
+  }
+
+  it("asks a person with leads and no channel once, and skips everyone else", async () => {
+    const { invitees, sendAlertInvites } = await import("@/lib/alerts/invite");
+    const asked = await person({ leads: 2 });
+    const hasAlert = await person({ leads: 2, alert: true });
+    const noLeads = await person({ leads: 0 });
+    const tooNew = await person({ leads: 2, ageMs: 60 * 1000 });
+    const onlyOld = await person({ leads: 2, postedDaysAgo: 90 });
+
+    const ids = (await invitees(new Date(), 10_000)).map((one) => one.userId);
+    expect(ids).toContain(asked.user.id);
+    for (const skipped of [hasAlert, noLeads, tooNew, onlyOld]) {
+      expect(ids).not.toContain(skipped.user.id);
+    }
+    const found = (await invitees(new Date(), 10_000)).find((one) => one.userId === asked.user.id);
+    expect(found?.leadCount).toBe(2);
+
+    await sendAlertInvites(new Date(), 10_000);
+    const mails = sent.mock.calls.map(([mail]) => mail as { to: string; html: string });
+    const mine = mails.filter((mail) => mail.to === asked.email);
+    expect(mine).toHaveLength(1);
+    expect(mine[0].html).toContain("/alerts/on?t=");
+    expect(mine[0].html).toContain("Looking for a tool");
+    expect(mine[0].html).toContain(`/app/settings/alerts?project=${asked.project.id}`);
+
+    sent.mockReset();
+    await sendAlertInvites(new Date(), 10_000);
+    expect(sent.mock.calls.some(([mail]) => (mail as { to: string }).to === asked.email)).toBe(false);
+  });
+
+  it("shows the best of the last week, filled from the month, never older", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const { sampleLeads } = await import("@/lib/alerts/invite");
+    const { project } = await person({ leads: 0 });
+    const day = 24 * 3600;
+    const cases = [
+      { role: "fresh", daysAgo: 2, score: 60 },
+      { role: "month", daysAgo: 20, score: 95 },
+      { role: "ancient", daysAgo: 200, score: 99 },
+    ];
+    const posts = await upsertPosts(
+      cases.map((one) => ({
+        id: `p${randomUUID().slice(0, 8)}`,
+        subreddit: "saas",
+        author: "asker",
+        title: one.role,
+        body: "Anyone know one?",
+        permalink: `/r/saas/comments/${randomUUID().slice(0, 6)}/x/`,
+        createdUtc: Math.floor(Date.now() / 1000) - one.daysAgo * day,
+      })),
+    );
+    await db()
+      .insert(schema.leads)
+      .values(posts.map((post, i) => ({ projectId: project.id, postId: post.id, score: cases[i].score })));
+
+    expect((await sampleLeads(project.id)).map((lead) => lead.title)).toEqual(["fresh", "month"]);
+  });
+
+  it("turns on a daily email to their own address for every project, once", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { acceptInvite } = await import("@/lib/alerts/invite");
+    const { user, project, email } = await person({ leads: 1 });
+    const [second] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "Second" })
+      .returning();
+
+    await acceptInvite(user.id);
+    await acceptInvite(user.id);
+
+    for (const projectId of [project.id, second.id]) {
+      const rows = await db().select().from(schema.alerts).where(eq(schema.alerts.projectId, projectId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ channel: "email", target: email, cadence: "daily" });
+    }
+  });
+});

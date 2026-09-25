@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
+import { sendAlertInvites } from "@/lib/alerts/invite";
 import { CADENCE_MS } from "@/lib/alerts/select";
 import { runDiscoveryRefresh } from "@/lib/discovery/refresh";
 import { runInitialDiscovery } from "@/lib/discovery/initial";
@@ -13,6 +14,7 @@ import { runBackfill } from "@/lib/scan/backfill";
 import { loadScanProject } from "@/lib/scan/project";
 import { runRescore } from "@/lib/scan/rescore";
 import { runScan } from "@/lib/scan/run";
+import { widenSearches } from "@/lib/scan/widen";
 import type { ScanCadence } from "@/lib/settings";
 import { cadenceFor, PRESETS, settingsForUser } from "@/lib/settings";
 import { tierForUser } from "@/lib/tier";
@@ -131,6 +133,17 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
     await writeBrief(project.id, brief, project.profileVersion);
     await enqueueOnce("rescore", new Date(), project.id);
   },
+  /**
+   * The sweep's best searches for a project that has none, and one scan with
+   * them. It runs once per project and is never held, so a project nobody
+   * attends still gets the leads its invite is built from.
+   */
+  widen_searches: async (job) => {
+    if (!job.projectId) {
+      throw new Error("Widening searches needs a project");
+    }
+    await widenSearches(job.projectId, job.id);
+  },
   discovery_refresh: async (job) => {
     if (!job.projectId) {
       throw new Error("A discovery refresh needs a project");
@@ -141,6 +154,15 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
   competitor_scan: runCompetitorsJob,
   seo_refresh: runSeoRefreshJob,
   digest: runDigest,
+  /**
+   * Asks people with leads and no alert channel, once each, whether they want
+   * new leads by email. A few dozen a pass, hourly, so the asks stay inside the
+   * email service's hourly allowance alongside the digests.
+   */
+  alert_invites: async () => {
+    await sendAlertInvites();
+    await enqueueOnce("alert_invites", new Date(Date.now() + CADENCE_MS.hourly));
+  },
   retention: async () => {
     await deleteExpiredPosts();
     await enqueueOnce("retention", new Date(Date.now() + DAY_MS));
@@ -199,7 +221,7 @@ export async function nextRunAt(job: Job): Promise<Date | null> {
   if (job.kind === "retention" || (job.kind === "seo_refresh" && job.projectId)) {
     return new Date(now + DAY_MS);
   }
-  if (job.kind === "digest") {
+  if (job.kind === "digest" || job.kind === "alert_invites") {
     return new Date(now + CADENCE_MS.hourly);
   }
   return null;

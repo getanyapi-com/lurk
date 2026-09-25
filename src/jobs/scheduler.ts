@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { config } from "@/lib/config";
 import { projectsWithStaleEvaluations } from "@/lib/scan/rescore";
+import { projectsOwedSearches } from "@/lib/scan/widen";
 import { enqueueOnce, lastRunJob } from "./enqueue";
 import { WATCHED_KINDS, claimNextJob, runClaimedJob } from "./runner";
 
@@ -99,6 +100,16 @@ export async function seedProjectScans(): Promise<void> {
         .where(and(eq(jobs.kind, "profile_reseed"), isNull(jobs.error)))
     ).map((row) => row.projectId),
   );
+  const owedSearches = await projectsOwedSearches(new Date());
+  for (const [index, projectId] of owedSearches.entries()) {
+    try {
+      await enqueueOnce("widen_searches", new Date(Date.now() + BRIEF_START_MS + index * WIDEN_GAP_MS), projectId);
+    } catch (error) {
+      if (!isMissingProject(error)) {
+        throw error;
+      }
+    }
+  }
   for (const row of rows) {
     try {
       await seedProject(row, stale.has(row.id), reseeded.has(row.id));
@@ -136,6 +147,13 @@ let reseedsQueued = 0;
 const BRIEF_START_MS = 3 * 60 * 1000;
 const BRIEF_GAP_MS = 5 * 1000;
 let briefsQueued = 0;
+
+/**
+ * Projects owed searches (lib/scan/widen.ts) start with the briefs and follow
+ * each other a minute apart, so a hundred of them spread over two hours of the
+ * house's daily data and model caps rather than landing in one tick.
+ */
+const WIDEN_GAP_MS = 60 * 1000;
 
 type SeedRow = {
   id: string;
@@ -199,7 +217,7 @@ export function kickScheduler(): void {
 
 /**
  * One tick a minute, handing due jobs to a bounded set of workers. Startup
- * queues the two instance-wide jobs and any project schedule that went missing;
+ * queues the instance-wide jobs and any project schedule that went missing;
  * from then on each job queues its own next run, and the runner re-queues a
  * recurring one that failed.
  */
@@ -209,6 +227,8 @@ export function startScheduler(): Cron {
     const watchedWorkers = config().SCHEDULER_WATCHED_WORKERS;
     void enqueueOnce("retention");
     void enqueueOnce("digest");
+    // After the outgoing revision is gone, which has no handler for it yet.
+    void enqueueOnce("alert_invites", new Date(Date.now() + BRIEF_START_MS));
     if (config().SCHEDULER_SEED) {
       void seedProjectScans();
     }

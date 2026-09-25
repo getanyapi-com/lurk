@@ -39,7 +39,7 @@ function headerRow(digest: Digest): string {
   return `<tr><td style="padding:20px 24px;border-bottom:1px solid ${C.border}">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td align="left" style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${C.fg}">
-<img src="${escapeHtml(digest.appUrl)}/icon.svg" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:8px" />${escapeHtml(PRODUCT_NAME)}</td>
+<img src="${escapeHtml(digest.appUrl)}/email/lurk.png" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:8px" />${escapeHtml(PRODUCT_NAME)}</td>
 <td align="right" style="font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted}">${escapeHtml(date)}</td>
 </tr></table></td></tr>`;
 }
@@ -93,10 +93,11 @@ function timelineRow(digest: Digest): string {
 function authorCell(lead: DigestLead, appUrl: string): string {
   return `<td valign="top" width="44" style="padding:16px 0 16px 16px">
 ${avatarHtml(lead.author, lead.avatarUrl, 28)}
-<img src="${escapeHtml(appUrl)}/brands/reddit.svg" width="14" height="14" alt="Reddit" style="display:block;margin:-8px 0 0 16px;border-radius:7px" /></td>`;
+<img src="${escapeHtml(appUrl)}/email/reddit.png" width="14" height="14" alt="Reddit" style="display:block;margin:-8px 0 0 16px;border-radius:7px" /></td>`;
 }
 
-function leadRow(lead: DigestLead, digest: Digest): string {
+/** One lead as a card. The invite shows the same cards, so it is shared. */
+export function leadRow(lead: DigestLead, digest: Pick<Digest, "appUrl" | "generatedAt">): string {
   const meta = [
     `u/${lead.author ?? "unknown"}`,
     `r/${lead.subreddit}`,

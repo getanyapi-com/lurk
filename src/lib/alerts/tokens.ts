@@ -25,6 +25,8 @@ export const EMAIL_COLORS = {
   scoreWarm: "#e49e22",
   /** --reddit oklch(0.66 0.20 40) */
   reddit: "#f25914",
+  /** The blue of the mark in src/app/icon.svg, for the one button an email asks you to press. */
+  brand: "#1f4fe0",
 } as const;
 
 /** --radius-card and --radius-control, in the units an email understands. */

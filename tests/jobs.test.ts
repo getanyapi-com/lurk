@@ -555,6 +555,11 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
       .insert(projects)
       .values({ userId: user.id, name: "Never discovered" })
       .returning();
+    // Both already search, so neither is owed the sweep's searches (tests/widenSearches.test.ts).
+    const { projectKeywords } = await import("@/db/schema");
+    await db()
+      .insert(projectKeywords)
+      .values([project.id, unbriefed.id].map((projectId) => ({ projectId, keyword: "forms" })));
 
     await seedProjectScans();
 
