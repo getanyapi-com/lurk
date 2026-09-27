@@ -13,6 +13,7 @@ let started: Cron | null = null;
 let running = 0;
 let watched = 0;
 let pumping = false;
+let pumpAgain = false;
 
 /**
  * Fills every free worker slot, claiming one job at a time. Serial claiming is
@@ -27,6 +28,11 @@ let pumping = false;
  */
 async function pump(workers: number, watchedWorkers: number): Promise<void> {
   if (pumping) {
+    // A claim can already be returning no row when a sibling finishes or a
+    // request queues a job. Remember that wake-up: dropping it here could
+    // leave a watched job until the next minute tick (reviewed 2026-09-25).
+    // Claims still run serially, so the per-project exclusion stays intact.
+    pumpAgain = true;
     return;
   }
   pumping = true;
@@ -63,6 +69,10 @@ async function pump(workers: number, watchedWorkers: number): Promise<void> {
     }
   } finally {
     pumping = false;
+    if (pumpAgain) {
+      pumpAgain = false;
+      void pump(workers, watchedWorkers);
+    }
   }
 }
 

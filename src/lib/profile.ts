@@ -6,7 +6,7 @@ import { clientForUser } from "./anyapi";
 import { competitorHost } from "./competitors/host";
 import { generateStructured } from "./llm";
 import { BRIEF_INSTRUCTIONS, briefSchema, usableBrief, type ProductBrief } from "./brief";
-import { PROFILE_SYSTEM, PROMO_POLICY_SYSTEM } from "./prompts";
+import { FAST_READING_SYSTEM, PROFILE_SYSTEM, PROMO_POLICY_SYSTEM } from "./prompts";
 import { normalizeQuery, recordUsage } from "./reddit/fetch";
 import { capped, tierForUser } from "./tier";
 import { fetchSubredditDetails } from "./reddit/skus";
@@ -60,6 +60,25 @@ const readingSchema = profileSchema.extend({
   exclusions: z.array(groundedSchema),
   notBuyers: z.array(groundedSchema),
   brief: briefSchema,
+});
+
+/**
+ * What the fast reading is asked for: the facts the judge reads, the limits
+ * grounded as the full reading's are, the searches the first sweep starts from,
+ * and a shorter brief. Geography, destinations, platforms and competitors wait
+ * for the full reading, since nothing before the first leads reads them.
+ */
+const fastReadingSchema = z.object({
+  name: z.string(),
+  pain: z.string(),
+  solution: z.string(),
+  targetUsers: z.string(),
+  budgetFit: z.string(),
+  capabilities: z.array(z.string()),
+  problemPhrasings: z.array(z.string()),
+  brief: briefSchema.omit({ freePlan: true, limits: true }),
+  exclusions: z.array(groundedSchema),
+  notBuyers: z.array(groundedSchema),
 });
 
 const READING_SYSTEM = `${PROFILE_SYSTEM}
@@ -147,7 +166,13 @@ async function scrapeProduct(projectId: string, userId: string, url: string) {
   if (funded.funding === "house") {
     await assertHouseDataUnderCap();
   }
-  const { result: res, requestId } = await funded.call(() => funded.client.web.scrape({ url }));
+  // Markdown alone. The default also sends the whole page's HTML, which nothing
+  // here reads: on 20 product homepages 2026-09-24 asking for markdown only
+  // took the median from 3.0 s to 2.4 s and the slowest from 8.6 s to 6.2 s,
+  // on the same lane at the same price.
+  const { result: res, requestId } = await funded.call(() =>
+    funded.client.web.scrape({ url, formats: ["markdown"] }),
+  );
   await recordUsage({
     projectId,
     sku: "web.scrape",
@@ -460,6 +485,44 @@ export async function profileFromPage(
 }
 
 /**
+ * The fast reading of the same pages (FAST_READING_SYSTEM), as a SiteReading
+ * with the fields it does not ask for left empty. The judge never reads the
+ * brief's freePlan or limits, so they are left out of the question.
+ */
+export async function fastProfileFromPage(
+  projectId: string,
+  page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
+): Promise<SiteReading> {
+  const markdown = page.markdown ?? "";
+  const reading = await generateStructured({
+    purpose: "profile_fast",
+    projectId,
+    schema: fastReadingSchema,
+    system: FAST_READING_SYSTEM,
+    effort: "minimal",
+    prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", markdown].join("\n"),
+  });
+  const siteText = `${page.title ?? ""}\n${page.description ?? ""}\n${markdown}`;
+  return {
+    name: reading.name,
+    pain: reading.pain,
+    solution: reading.solution,
+    targetUsers: reading.targetUsers,
+    budgetFit: reading.budgetFit,
+    capabilities: reading.capabilities.slice(0, 10),
+    problemPhrasings: reading.problemPhrasings,
+    exclusions: groundedLimits(reading.exclusions, siteText),
+    notBuyers: groundedLimits(reading.notBuyers, siteText),
+    serviceGeography: "",
+    destinations: [],
+    platforms: [],
+    sellsPlatformData: false,
+    competitors: [],
+    brief: { ...reading.brief, freePlan: null, limits: [] },
+  };
+}
+
+/**
  * Reads the product's own page and writes what the page says the product is.
  * That is all it does: where and how the buyers ask is learned by the initial
  * discovery job, which the caller queues, because reading Google takes minutes
@@ -476,14 +539,39 @@ export async function buildProfile(
   const page = await readSite(projectId, userId, url);
 
   await onStep?.("profile");
-  const profile = await profileFromPage(projectId, page);
+  // The tier only caps the competitors written below; it supplies nothing to
+  // the model. Read it during the profile call, measured at about 30 seconds
+  // on 2026-09-25, instead of adding its database reads after that call.
+  const [profile, { limits }] = await Promise.all([
+    profileFromPage(projectId, page),
+    tierForUser(userId),
+  ]);
+  const written = await writeReading(projectId, profile, limits?.competitors, options);
 
-  const problemPhrasings = [
-    ...profile.problemPhrasings,
-    ...platformPhrasings(profile.platforms, profile.sellsPlatformData),
-  ];
+  await onStep?.("done");
+  return written;
+}
 
-  await db()
+/** The profile a reading gives, with the searches built for its platforms added. */
+function withPlatformPhrasings(profile: SiteReading): SiteReading {
+  return {
+    ...profile,
+    problemPhrasings: [
+      ...profile.problemPhrasings,
+      ...platformPhrasings(profile.platforms, profile.sellsPlatformData),
+    ],
+  };
+}
+
+/** Writes a reading over the project's profile, its brief and its competitors. */
+async function writeReading(
+  projectId: string,
+  reading: SiteReading,
+  competitorCap: number | null | undefined,
+  options: ProfileOptions = {},
+): Promise<SiteReading & { profileVersion: number }> {
+  const profile = withPlatformPhrasings(reading);
+  const [row] = await db()
     .update(projects)
     .set({
       name: profile.name || undefined,
@@ -496,7 +584,7 @@ export async function buildProfile(
       exclusions: profile.exclusions,
       notBuyers: profile.notBuyers,
       destinations: profile.destinations,
-      problemPhrasings,
+      problemPhrasings: profile.problemPhrasings,
       brief: usableBrief(profile.brief),
       // Postgres reads the old row on the right, so this is the version being written.
       briefProfileVersion: options.rejudge
@@ -506,13 +594,143 @@ export async function buildProfile(
         ? { profileVersion: sql`${projects.profileVersion} + 1` }
         : {}),
     })
-    .where(eq(projects.id, projectId));
-  const { limits } = await tierForUser(userId);
+    .where(eq(projects.id, projectId))
+    .returning({ profileVersion: projects.profileVersion });
   await writePageCompetitors(
     projectId,
-    capped(pageCompetitors(profile.name, profile.competitors), limits?.competitors),
+    capped(pageCompetitors(profile.name, profile.competitors), competitorCap),
   );
+  return { ...profile, profileVersion: row?.profileVersion ?? 1 };
+}
 
+/** A new project's first reading, and the full one still on its way. */
+export type FastProfile = {
+  reading: SiteReading;
+  /**
+   * Settles once the full reading has landed: true when it replaced the fast
+   * one, false when it failed or somebody had changed the profile first. It
+   * never rejects.
+   */
+  full: Promise<boolean>;
+};
+
+/**
+ * A new project's profile, written as soon as the fast reading is back, so the
+ * first sweep starts about 15 seconds sooner. The full reading of the same
+ * pages runs beside it and replaces the facts and the brief when it lands,
+ * and adds what only it reads: geography, destinations, platforms and
+ * competitors. It keeps the profile version, so no verdict is judged again: the
+ * two readings judged alike (see FAST_READING_SYSTEM), and a rescore of the
+ * first sweep would cost more than the difference. It writes only over the
+ * fast reading: a profile somebody changed in between is theirs.
+ *
+ * Whichever reading lands first with an answer is written; when the fast one
+ * fails the full one is waited for, as before there was a fast one.
+ */
+export async function buildProfileFast(
+  projectId: string,
+  userId: string,
+  url: string,
+  onStep?: (step: ProfileStep) => Promise<void> | void,
+): Promise<FastProfile> {
+  await onStep?.("scrape");
+  const page = await readSite(projectId, userId, url);
+
+  await onStep?.("profile");
+  const tier = tierForUser(userId);
+  const fullRead = profileFromPage(projectId, page).then(
+    (reading) => ({ reading }),
+    (error: unknown) => ({ error }),
+  );
+  const fastRead = fastProfileFromPage(projectId, page).catch((error: unknown) => {
+    console.warn(`[profile] the fast reading failed, waiting for the full one: ${messageOf(error)}`);
+    return null;
+  });
+  const first = await Promise.race([
+    fastRead.then((reading) => (reading ? { fast: reading } : null)),
+    fullRead,
+  ]);
+  const { limits } = await tier;
+
+  if (first && "fast" in first) {
+    const written = await writeReading(projectId, first.fast, limits?.competitors);
+    await onStep?.("done");
+    return {
+      reading: written,
+      full: fullRead.then(async (landed) => {
+        if ("error" in landed) {
+          console.warn(`[profile] the full reading failed, keeping the fast one: ${messageOf(landed.error)}`);
+          return false;
+        }
+        return replaceFastReading(projectId, written, landed.reading, limits?.competitors);
+      }),
+    };
+  }
+  // The full reading answered first, or the fast one failed: write the full
+  // one, or failing that the fast one, as the only reading there is.
+  const landed = first && "reading" in first ? first : await fullRead;
+  let reading: SiteReading;
+  if ("reading" in landed) {
+    reading = landed.reading;
+  } else {
+    const fast = await fastRead;
+    if (!fast) {
+      throw landed.error;
+    }
+    reading = fast;
+  }
+  const written = await writeReading(projectId, reading, limits?.competitors);
   await onStep?.("done");
-  return { ...profile, problemPhrasings };
+  return { reading: written, full: Promise.resolve(false) };
+}
+
+/**
+ * Puts the full reading where the fast one was, unless the profile has moved
+ * on since: a new version, or facts that are no longer the fast reading's.
+ */
+async function replaceFastReading(
+  projectId: string,
+  fast: SiteReading & { profileVersion: number },
+  reading: SiteReading,
+  competitorCap: number | null | undefined,
+): Promise<boolean> {
+  const profile = withPlatformPhrasings(reading);
+  const replaced = await db()
+    .update(projects)
+    .set({
+      name: profile.name || undefined,
+      pain: profile.pain,
+      solution: profile.solution,
+      targetUsers: profile.targetUsers,
+      geography: profile.serviceGeography || null,
+      budgetFit: profile.budgetFit,
+      capabilities: profile.capabilities,
+      exclusions: profile.exclusions,
+      notBuyers: profile.notBuyers,
+      destinations: profile.destinations,
+      problemPhrasings: profile.problemPhrasings,
+      brief: usableBrief(profile.brief),
+    })
+    .where(
+      and(
+        eq(projects.id, projectId),
+        eq(projects.profileVersion, fast.profileVersion),
+        eq(projects.pain, fast.pain),
+        eq(projects.solution, fast.solution),
+        eq(projects.targetUsers, fast.targetUsers),
+      ),
+    )
+    .returning({ id: projects.id });
+  if (replaced.length === 0) {
+    return false;
+  }
+  await writePageCompetitors(
+    projectId,
+    capped(pageCompetitors(profile.name, profile.competitors), competitorCap),
+  );
+  return true;
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

@@ -2,7 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
-import { buildProfile } from "@/lib/profile";
+import { buildProfileFast } from "@/lib/profile";
 import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts } from "@/lib/product";
@@ -87,22 +87,24 @@ export async function runInitialDiscovery(
     throw new Error("This project no longer exists");
   }
   // A project made a moment ago is a URL and nothing else. Its page is read
-  // here and not in the request that made it: the read is one model call of
-  // about 25 seconds, and the person who asked is better off watching the
-  // work start than a button that says it is thinking.
+  // here and not in the request that made it, and read twice at once: a fast
+  // reading of about 10 seconds that discovery and the sweep start from, and
+  // the full one of about 25 that replaces it when it lands (buildProfileFast).
+  let fullReading: Promise<boolean> | undefined;
   if (!project.pain && project.url) {
     const host = URL.canParse(project.url) ? new URL(project.url).hostname.replace(/^www\./, "") : project.url;
-    const built = await buildProfile(projectId, project.userId, project.url, {}, (step) =>
+    const built = await buildProfileFast(projectId, project.userId, project.url, (step) =>
       step === "scrape"
         ? progress(jobId, `Opening ${host}`)
         : step === "profile"
           ? progress(jobId, "Reading the page: what you sell, and who buys it")
           : undefined,
     );
+    fullReading = built.full;
     project = (await read()) ?? project;
     await progress(
       jobId,
-      `${project.name} · ${built.problemPhrasings.length} ways your buyers describe the problem`,
+      `${project.name} · ${built.reading.problemPhrasings.length} ways your buyers describe the problem`,
     );
   }
   const { limits, settings } = await tierForUser(project.userId);
@@ -126,5 +128,8 @@ export async function runInitialDiscovery(
     cadenceFor(settings.settings.cadence).nextRunAt(new Date()),
     discoveryBudget(limits).refreshDays,
   );
+  // The sweep is already booked. The job stays open until the full reading
+  // is written rather than leave it to a promise nothing waits for.
+  await fullReading;
   return { queuedChildren };
 }

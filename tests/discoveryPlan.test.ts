@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { DiscoveryPlan } from "@/lib/discovery/plan";
+import type { ThreadLabel } from "@/lib/discovery/label";
 
 /**
  * Publishing a plan replaces what discovery itself wrote and nothing else. A
@@ -22,6 +23,48 @@ const PLAN: DiscoveryPlan = {
 };
 
 describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => {
+  it("files a round in one trip with the same destinations and verdicts as individual writes", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { applyRelevance, applyRelevances, loadEvidence, writeObservations } = await import("@/lib/discovery/store");
+    const { eq } = await import("drizzle-orm");
+    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
+    const projects = await db().insert(schema.projects).values(
+      ["serial", "batch", "untouched"].map((name) => ({ userId: user.id, name })),
+    ).returning();
+    try {
+      for (const project of projects) {
+        await writeObservations(project.id, ["a", "b", "c", "d"].flatMap((postId) =>
+          [null, "Miami"].map((destination) => ({
+            postId, destination, query: destination ?? "broad", family: null,
+            canonicalUrl: `https://reddit.com/r/hotels/comments/${postId}`,
+            subreddit: "hotels", position: 1, title: "Hotel?", snippet: null,
+          })),
+        ));
+      }
+      const labels: ThreadLabel[] = [
+        { id: "a", relevance: "relevant", destination: "Las Vegas", entities: [] },
+        { id: "b", relevance: "irrelevant", destination: null, entities: [] },
+        { id: "c", relevance: "plausible", destination: "", entities: [] },
+        // Even a repeated id has the serial write's last verdict and last
+        // nonempty destination, rather than UPDATE FROM choosing one at random.
+        { id: "a", relevance: "plausible", destination: null, entities: [] },
+      ];
+      for (const label of labels) {
+        await applyRelevance(projects[0].id, label.id, label.relevance, label.destination);
+      }
+      await applyRelevances(projects[1].id, labels);
+      await applyRelevances(projects[1].id, []);
+      const read = async (id: string) => (await loadEvidence(id))
+        .map((row) => [row.postId, row.query, row.relevance, row.destination])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      expect(await read(projects[1].id)).toEqual(await read(projects[0].id));
+      expect((await loadEvidence(projects[2].id)).every((row) => row.relevance === "unlabeled")).toBe(true);
+    } finally {
+      await db().delete(schema.users).where(eq(schema.users.id, user.id));
+    }
+  });
+
   it("replaces what discovery wrote and keeps what a person decided", async () => {
     process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");

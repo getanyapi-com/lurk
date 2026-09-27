@@ -315,6 +315,53 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     ]);
   });
 
+  it("prepares the client and held verdicts beside search generation, before starting any walk", async () => {
+    const row = await project(["forms that branch"]);
+    await db().insert(schema.projectCompetitors).values({
+      projectId: row.id, name: "Typeform", source: "serp", state: "active",
+    });
+    const anyapi = await import("@/lib/anyapi");
+    const evaluations = await import("@/lib/scan/evaluations");
+    const funded = await anyapi.clientForUser(row.userId);
+    let releaseClient = () => {};
+    let releaseModel = () => {};
+    const clientHeld = new Promise<void>((resolve) => { releaseClient = resolve; });
+    const modelHeld = new Promise<void>((resolve) => { releaseModel = resolve; });
+    const client = vi.spyOn(anyapi, "clientForUser").mockImplementation(async () => {
+      await clientHeld;
+      return funded;
+    });
+    const stored = vi.spyOn(evaluations, "loadEvaluations");
+    generateStructured.mockImplementation(async () => {
+      await modelHeld;
+      return { searches: [{ kind: "alternative_to", text: "alternative to Typeform" }] };
+    });
+    pages([{ posts: [], nextCursor: null }]);
+    const sweep = runBackfill(row.id);
+    try {
+      await vi.waitFor(() => {
+        expect(client).toHaveBeenCalledOnce();
+        expect(stored).toHaveBeenCalledWith(row.id);
+        expect(generateStructured).toHaveBeenCalledOnce();
+      });
+      expect(fetchSearch).not.toHaveBeenCalled();
+      releaseClient();
+      expect(fetchSearch).not.toHaveBeenCalled();
+      expect(JSON.parse(generateStructured.mock.calls[0][0].prompt).product.competitors).toEqual(["Typeform"]);
+      releaseModel();
+      await sweep;
+      expect(callsOf().map((call) => call.query)).toEqual([
+        "form builder", "forms that branch", "alternative to Typeform",
+      ]);
+    } finally {
+      releaseClient();
+      releaseModel();
+      await sweep;
+      client.mockRestore();
+      stored.mockRestore();
+    }
+  });
+
   it("reads deeper only on the walks whose first page found the most buyers", async () => {
     const row = await project();
     generateStructured.mockResolvedValue({
@@ -478,6 +525,44 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
     // Two batches were in the feed while the third had not answered yet.
     expect(midRun).toBe(SCORE_BATCH_SIZE * 2);
   });
+
+  /**
+   * Posts wait for a triage call's worth to arrive, and on 2026-09-24 two
+   * searches that took 141 s held the 50 posts already in behind them. Here
+   * one walk answers with a few posts and the others hang: the few are judged
+   * and written while the others are still out.
+   */
+  it("judges what has arrived when the other searches go quiet", async () => {
+    const row = await project(["forms that branch", "a form that asks one question"]);
+    const found = await posts(5);
+    let release = () => {};
+    const hung = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    fetchSearch.mockImplementation(async () => {
+      calls += 1;
+      if (calls > 1) {
+        await hung;
+        return { value: { posts: [], nextCursor: null }, reused: false, costUsd: 0 };
+      }
+      return { value: { posts: found, nextCursor: null }, reused: false, costUsd: 0 };
+    });
+    model();
+
+    const sweep = runBackfill(row.id);
+    let midRun = 0;
+    for (let tries = 0; tries < 60 && midRun === 0; tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      midRun = (
+        await db().select().from(schema.leads).where(eq(schema.leads.projectId, row.id))
+      ).length;
+    }
+    release();
+    await sweep;
+
+    expect(midRun).toBe(5);
+  }, 15_000);
 
   it("asks both the plan's keywords and the problem's phrasings, by relevance over a year", async () => {
     const row = await project(["forms that branch"]);

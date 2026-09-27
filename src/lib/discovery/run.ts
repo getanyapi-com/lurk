@@ -25,7 +25,7 @@ import {
 } from "./rank";
 import { runDiscoveryQueries } from "./serp";
 import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
-import { applyRelevance, loadEvidence, UNLABELED, type EvidenceRow } from "./store";
+import { applyRelevances, loadEvidence, UNLABELED, type EvidenceRow } from "./store";
 
 /**
  * One whole discovery pass: ask Google where and how this product's buyers
@@ -75,8 +75,8 @@ async function runRound(
   });
   for (const label of labels) {
     labelled.add(label.id);
-    await applyRelevance(ctx.projectId, label.id, label.relevance, label.destination);
   }
+  await applyRelevances(ctx.projectId, labels);
   return {
     labels,
     newRelevant: labels.filter((label) => label.relevance === "relevant").length,

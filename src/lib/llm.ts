@@ -87,6 +87,13 @@ export async function withCallTimeout<T>(
  */
 const REASONING_EFFORT = "low";
 
+/**
+ * The efforts a call may ask for instead. `minimal` is the lowest the endpoint
+ * takes: `none`, `enabled: false` and a zero token budget are all refused with
+ * "reasoning is mandatory" (2026-09-25).
+ */
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high";
+
 /** Raised when the instance has no OpenRouter key, so nothing can be scored. */
 export class LlmNotConfiguredError extends Error {
   constructor() {
@@ -156,6 +163,8 @@ export type LlmCall<T> = {
   itemsAnswered?: (value: T) => number;
   /** 1 for the first call, 2 for the one asking again for the ids it skipped. */
   attempt?: number;
+  /** How hard to think, when a call has measured a different answer to REASONING_EFFORT. */
+  effort?: ReasoningEffort;
 };
 
 /** What one call left behind, whether it answered or failed. */
@@ -244,7 +253,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
         schema: call.schema,
         system: call.system,
         prompt: call.prompt,
-        providerOptions: { openrouter: { reasoning: { effort: REASONING_EFFORT } } },
+        providerOptions: { openrouter: { reasoning: { effort: call.effort ?? REASONING_EFFORT } } },
         abortSignal,
       }),
     );

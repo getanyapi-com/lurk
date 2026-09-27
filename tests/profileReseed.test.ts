@@ -82,6 +82,47 @@ describe.skipIf(!process.env.DATABASE_URL)("reading an older project's site agai
     generateStructured.mockResolvedValue(reading);
   });
 
+  it("reads the tier during a new profile's model call and still caps its competitors", async () => {
+    const { db, schema, user, project } = await fixture(1);
+    const { eq } = await import("drizzle-orm");
+    const tier = await import("@/lib/tier");
+    const { buildProfile } = await import("@/lib/profile");
+    const current = await tier.tierForUser(user.id);
+    const lookup = vi.spyOn(tier, "tierForUser").mockResolvedValue({
+      ...current, limits: { ...(await import("@/lib/tiers")).TIERS.free, competitors: 1 },
+    });
+    let release = () => {};
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    generateStructured.mockImplementation(async () => {
+      await held;
+      return { ...reading, competitors: [
+        { name: "Typeform", domain: "typeform.com" },
+        { name: "Other", domain: "other.test" },
+      ] };
+    });
+    const build = buildProfile(project.id, user.id, project.url!, { rejudge: true });
+    try {
+      await vi.waitFor(() => {
+        expect(generateStructured).toHaveBeenCalledOnce();
+        expect(lookup).toHaveBeenCalledWith(user.id);
+      });
+      release();
+      const result = await build;
+      expect(result.problemPhrasings).toEqual(reading.problemPhrasings);
+      const competitors = await db().select().from(schema.projectCompetitors)
+        .where(eq(schema.projectCompetitors.projectId, project.id));
+      expect(competitors.map((row) => row.name)).toEqual(["Typeform"]);
+      const [written] = await db().select().from(schema.projects).where(eq(schema.projects.id, project.id));
+      expect(written.profileVersion).toBe(2);
+      expect(written.briefProfileVersion).toBe(2);
+      expect(written.pain).toBe(reading.pain);
+    } finally {
+      release();
+      await build;
+      lookup.mockRestore();
+    }
+  });
+
   async function reseed(projectId: string) {
     const { JOB_HANDLERS } = await import("@/jobs/registry");
     const job = { id: randomUUID(), projectId } as unknown as Parameters<

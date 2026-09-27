@@ -48,6 +48,16 @@ const HOUR_MS = 60 * 60 * 1000;
 /** Lead authors a sweep looks up, best leads first. $0.00038 each through `reddit.avatar`, so 2¢. */
 const FACES = 50;
 
+/**
+ * How long posts wait for a triage call's worth to join them. Pages land a
+ * couple of seconds apart, but one slow search can hold the rest for minutes:
+ * on 2026-09-24 two `reddit.search` calls took 141 s, and the 50 posts
+ * already in sat unjudged behind them, so a new project's first lead came
+ * two and a half minutes in rather than four seconds. Past this, what is
+ * queued is judged as it is.
+ */
+const QUIET_MS = 3000;
+
 /** Pages in a row carrying nothing new to their walk before the walk ends. */
 const STALE_PAGES = 3;
 
@@ -271,6 +281,7 @@ class Judge {
   private seen = new Set<string>();
   private running: Promise<void> | null = null;
   private draining = false;
+  private quiet: ReturnType<typeof setTimeout> | null = null;
   readonly judged: Judgement[] = [];
   readonly leads: LeadRow[] = [];
   readonly candidates: StoredPost[] = [];
@@ -300,6 +311,7 @@ class Judge {
 
   /** Judges whatever is queued, and resolves once every chunk has landed. */
   async settle(): Promise<void> {
+    this.stopQuiet();
     this.draining = true;
     this.pump();
     while (this.running) {
@@ -308,11 +320,26 @@ class Judge {
     this.draining = false;
   }
 
-  private pump(): void {
+  private stopQuiet(): void {
+    if (this.quiet) {
+      clearTimeout(this.quiet);
+      this.quiet = null;
+    }
+  }
+
+  private pump(flush = false): void {
     if (this.running) {
       return;
     }
-    if (this.pending.length === 0 || (!this.draining && this.pending.length < TRIAGE_BATCH_SIZE)) {
+    this.stopQuiet();
+    if (this.pending.length === 0) {
+      return;
+    }
+    if (!this.draining && !flush && this.pending.length < TRIAGE_BATCH_SIZE) {
+      this.quiet = setTimeout(() => {
+        this.quiet = null;
+        this.pump(true);
+      }, QUIET_MS);
       return;
     }
     const chunk = this.pending;
@@ -402,7 +429,17 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const funded = await clientForUser(project.userId);
+  // These reads supply nothing to the search-writing model. On 2026-09-25
+  // that call took 11-15 seconds at the median; use that wait to prepare the
+  // client and the held verdicts, then start exactly the same walks together.
+  // Keep the post-discovery product: Google can add competitors to its input.
+  const small = smallSweep();
+  const [funded, stored, added] = await Promise.all([
+    clientForUser(project.userId),
+    loadEvaluations(projectId),
+    small ? Promise.resolve([]) : sweepSearches(projectId, project.product),
+    progress(jobId, "Working out what your buyers search for"),
+  ]);
   // A backfill reuses nothing. A retry exists because the first attempt was
   // truncated or died, and a cached page from that attempt would hand the retry
   // the same truncated listing: the 2026-09-10 run served all 532 of its
@@ -410,9 +447,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   const ctx: FetchContext = { projectId, funded, maxAgeMs: 0 };
 
   // A trial-size sweep is the same sweep over less: see src/lib/sweepScale.ts.
-  const small = smallSweep();
-  await progress(jobId, "Working out what your buyers search for");
-  const all = queriesOf(project, small ? [] : await sweepSearches(projectId, project.product));
+  const all = queriesOf(project, added);
   const queries = small ? spread(all, SMALL_SWEEP.queries) : all;
   const postBudget = small ? SMALL_SWEEP.posts : POST_BUDGET;
   const firstPassPages = small ? SMALL_SWEEP.pages : FIRST_PASS_PAGES;
@@ -434,7 +469,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
           ? `Reading further where the leads are · ${walks} of ${plan.length} searches done · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
           : `Scoring ${judge.candidates.length} posts · ${judge.judged.length} scored · ${judge.leads.length} leads`,
     );
-  const judge: Judge = new Judge(project, await loadEvaluations(projectId), sourcesByPost, report);
+  const judge: Judge = new Judge(project, stored, sourcesByPost, report);
 
   // Every walk is independent of every other and nearly all waiting on Reddit,
   // so all of them start at once and the shared pace in src/lib/reddit/pace.ts

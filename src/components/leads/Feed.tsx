@@ -8,7 +8,8 @@ import { OpeningProvider } from "@/components/leads/opening";
 import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
-import { LiveSweep } from "@/components/sweep/LiveSweep";
+import { FirstSweep } from "@/components/leads/FirstSweep";
+import { Skeleton } from "@/components/Skeleton";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
@@ -16,9 +17,9 @@ import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@
 import { competitorsNamedIn } from "@/lib/competitors/read";
 import { feedPage } from "@/lib/feedPage";
 import { findLead } from "@/lib/leads";
-import { projectActivity } from "@/lib/projectActivity";
+import { isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
-import { sweepShown, sweepSnapshot } from "@/lib/sweep";
+import { sweepShown, sweepStatus } from "@/lib/sweep";
 
 import type { StreamEntry } from "@/components/leads/stream";
 
@@ -35,6 +36,51 @@ const EMPTY_SENTENCE: Record<LeadStatus, string> = {
   not_fit: "You have not marked any leads as a miss yet.",
   resolved: "No lead has said in its thread that the need is already met.",
 };
+
+/**
+ * The list of a project whose first leads are still being found: the rows they
+ * will fill, and a line saying they are on their way. A new project spends
+ * its first minute here, and "nothing new in this window" was the wrong thing
+ * to tell someone who had just been promised leads.
+ */
+function ArrivingLeads() {
+  return (
+    <div className="flex flex-col">
+      <p className="text-small border-b p-3 text-fg-muted">
+        Your first leads appear here as soon as they are found, usually within a minute. You can stay
+        on this page; it fills in by itself.
+      </p>
+      {Array.from({ length: 5 }, (_, index) => (
+        <div key={index} className="flex items-center gap-3 border-b p-3 last:border-b-0" style={{ opacity: 1 - index * 0.17 }}>
+          <Skeleton className="size-8 shrink-0 rounded-full" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className="h-4 w-full max-w-80" />
+            <Skeleton className="h-3 w-40" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Where the first lead will open, so the half of the page it will fill is not blank until then. */
+function ArrivingPane() {
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <p style={{ fontWeight: 500 }}>The best lead opens here</p>
+      <ul className="text-small flex list-disc flex-col gap-1.5 pl-4 text-fg-muted">
+        <li>The post, in full, and who wrote it.</li>
+        <li>Why it matched your product, in one sentence.</li>
+        <li>The community&rsquo;s rule on mentioning a product, before you reply.</li>
+      </ul>
+      <div className="flex flex-col gap-2 pt-2">
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    </div>
+  );
+}
 
 /** The prefix a lead's entry id carries, so a held item can never be one. */
 const LEAD_PREFIX = "lead-";
@@ -124,10 +170,13 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
     page = await feedPage(projectId, filter);
   }
   const { total, faces, facets, elsewhere } = page;
-  // The first sweep is drawn while it runs and for a moment after, so the
-  // page a new project lands on shows the year being read rather than an
-  // empty feed and one line of text.
-  const sweep = sweepShown(activity) ? await sweepSnapshot(projectId) : null;
+  // The first sweep is reported while it runs and for a moment after, over the
+  // feed it fills, so the page a new project lands on says what is being read
+  // and draws each lead as it is judged.
+  const sweep = sweepShown(activity) ? await sweepStatus(projectId) : null;
+  // A project still being set up or swept has no leads yet because none have
+  // been found yet, not because there are none: its empty list says so.
+  const arriving = isOnboarding(activity) && filter.status === "new";
   const entries = buildStream(page.rows.map(toCard));
   const held = filter.status === "new" ? page.review : [];
   const selection = await openOn(projectId, entries, held, params.lead);
@@ -147,17 +196,20 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
     <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
       <div className="flex flex-wrap items-baseline gap-x-1.5">
         {total > 0 ? <p className="text-small text-fg-muted">{sentence}</p> : null}
-        <ScanStatus activity={activity} />
+        {/* The sweep's own line says what the project is doing while it is up. */}
+        {sweep ? null : <ScanStatus activity={activity} />}
       </div>
-      {sweep ? <LiveSweep projectId={projectId} first={sweep} /> : null}
+      {sweep ? <FirstSweep projectId={projectId} first={sweep} /> : null}
       {/* The pills ride in the strip's top line, so the two cost one row between them. */}
-      <PeopleStrip
-        faces={faces}
-        days={filter.days}
-        at={filter.at}
-        params={params}
-        filters={<FeedFilters facets={facets} at={filter.at} params={params} />}
-      />
+      {arriving && total === 0 ? null : (
+        <PeopleStrip
+          faces={faces}
+          days={filter.days}
+          at={filter.at}
+          params={params}
+          filters={<FeedFilters facets={facets} at={filter.at} params={params} />}
+        />
+      )}
 
       <OpeningProvider serverSelectedId={selectedId}>
         <LeadWorkspace
@@ -169,7 +221,9 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
                 <span className="text-mono tracking-wide text-fg-muted uppercase">Leads</span>
                 <span className="text-mono tabular-nums text-fg-muted">{total}</span>
               </div>
-              {total === 0 ? (
+              {total === 0 && arriving ? (
+                <ArrivingLeads />
+              ) : total === 0 ? (
                 <p className="text-small p-3 text-fg-muted">
                   {filter.status !== "new" ? (
                     EMPTY_SENTENCE[filter.status]
@@ -224,6 +278,8 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
           pane={
             selection ? (
               <LeadDetail selection={selection} projectId={projectId} competitors={competitors} />
+            ) : arriving ? (
+              <ArrivingPane />
             ) : null
           }
         />

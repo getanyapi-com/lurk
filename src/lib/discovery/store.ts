@@ -1,7 +1,7 @@
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { discoveryEvidence } from "@/db/schema";
-import type { Relevance } from "./label";
+import type { Relevance, ThreadLabel } from "./label";
 import type { Destination } from "./queries";
 
 /** One Google result about one thread, before anything has judged it. */
@@ -69,6 +69,38 @@ export async function applyRelevance(
     .update(discoveryEvidence)
     .set(destination ? { relevance, destination } : { relevance })
     .where(and(eq(discoveryEvidence.projectId, projectId), eq(discoveryEvidence.postId, postId)));
+}
+
+/**
+ * Files a whole round's labels in one database trip. Initial discovery spent
+ * 4-6 seconds on the 2026-09-25 signup path; its old per-thread await added a
+ * round trip for every label before the next Google round or the sweep could
+ * start. The verdicts and destinations are unchanged, and every observation
+ * of a thread still gets its verdict. A missing destination leaves the query's
+ * own place standing, just as applyRelevance does.
+ */
+export async function applyRelevances(projectId: string, labels: ThreadLabel[]): Promise<void> {
+  const kept = new Map<string, { relevance: Relevance; destination: string | null }>();
+  for (const label of labels) {
+    kept.set(label.id, {
+      relevance: label.relevance,
+      destination: label.destination || kept.get(label.id)?.destination || null,
+    });
+  }
+  if (kept.size === 0) {
+    return;
+  }
+  const values = [...kept].map(([id, label]) =>
+    sql`(${id}::text, ${label.relevance}::text, ${label.destination}::text)`,
+  );
+  await db().execute(sql`
+    update ${discoveryEvidence}
+    set relevance = verdict.relevance,
+        destination = coalesce(verdict.destination, ${discoveryEvidence.destination})
+    from (values ${sql.join(values, sql`, `)}) as verdict(post_id, relevance, destination)
+    where ${discoveryEvidence.projectId} = ${projectId}
+      and ${discoveryEvidence.postId} = verdict.post_id
+  `);
 }
 
 /** Every observation this project has collected, newest plan included. */

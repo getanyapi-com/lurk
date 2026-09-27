@@ -7,7 +7,7 @@ import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
 import { leadInSubreddit, listLeads, setLeadStatus } from "@/lib/leads";
 import { promoPolicyFor } from "@/lib/profile";
 import { projectForUser } from "@/lib/projects";
-import { sweepSnapshot, sweepThreadDetail, type SweepSnapshot } from "@/lib/sweep";
+import { sweepStatus, sweepThreadDetail, type SweepStatus } from "@/lib/sweep";
 
 async function ownedProject(projectId: string) {
   const user = await requireLocalUser();
@@ -53,10 +53,10 @@ export async function moreLeadsAction(
   return rows.map(toRow);
 }
 
-/** The first sweep as it stands, for the board that draws it while it runs. */
-export async function sweepAction(projectId: string): Promise<SweepSnapshot | null> {
+/** The first sweep as it stands, for the line that reports it while it runs. */
+export async function sweepAction(projectId: string): Promise<SweepStatus | null> {
   await ownedProject(projectId);
-  return sweepSnapshot(projectId);
+  return sweepStatus(projectId);
 }
 
 /** One thread off the sweep's board, in full, for the shelf a phone opens it on. */
