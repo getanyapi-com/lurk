@@ -165,6 +165,8 @@ export type LlmCall<T> = {
   attempt?: number;
   /** How hard to think, when a call has measured a different answer to REASONING_EFFORT. */
   effort?: ReasoningEffort;
+  /** How long to wait before giving up, when a caller cannot hold a job for the default. */
+  timeoutMs?: number;
 };
 
 /** What one call left behind, whether it answered or failed. */
@@ -256,6 +258,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
         providerOptions: { openrouter: { reasoning: { effort: call.effort ?? REASONING_EFFORT } } },
         abortSignal,
       }),
+      call.timeoutMs,
     );
   } catch (error) {
     const spent = spentOnFailure(error);

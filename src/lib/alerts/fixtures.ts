@@ -6,6 +6,7 @@ const HOUR_MS = 60 * 60 * 1000;
 const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
   {
     id: "sample-1",
+    platform: "reddit",
     title: "Paying $99/mo for a scraper that breaks every other week",
     url: "https://www.reddit.com/r/SaaS/comments/sample1/",
     subreddit: "SaaS",
@@ -22,6 +23,7 @@ const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
   },
   {
     id: "sample-2",
+    platform: "reddit",
     title: "How are you all pulling Reddit data without getting rate limited?",
     url: "https://www.reddit.com/r/webdev/comments/sample2/",
     subreddit: "webdev",
@@ -38,6 +40,7 @@ const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
   },
   {
     id: "sample-3",
+    platform: "reddit",
     title: "Anyone compared the lead finders that watch subreddits?",
     url: "https://www.reddit.com/r/growmybusiness/comments/sample3/",
     subreddit: "growmybusiness",

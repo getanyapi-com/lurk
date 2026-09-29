@@ -11,10 +11,38 @@ export type PaidAction =
   | "rebuild_profile"
   | "seo_refresh"
   | "competitor_scan"
-  | "insights";
+  | "insights"
+  | "x_scan_now";
 
 /** Whether a tier's presses come back after 24 hours, or are spent for good. */
 export type ActionWindow = "day" | "ever";
+
+/**
+ * What X leads may buy for one project (src/lib/x). Every tier runs every
+ * search lurk writes and judges as much; a wallet buys freshness (hourly, a
+ * second page, Scan now), never features. An X search page costs $0.00065
+ * whether it holds 20 posts or none, so everything here is counted in pages
+ * and calls. Free at every cap is about $0.07 a project-day, typically about
+ * a cent, and the house's X sub-caps bound the total whatever the user count.
+ */
+export type XLimits = {
+  /** Searches the project runs; null is every one lurk writes for it (usually 4 to 14). */
+  lanes: number | null;
+  /** How often a scan runs, and the longest a quiet search may back off to. */
+  cadenceHours: number;
+  maxBackoffHours: number;
+  /** Page 2 is only ever taken after a full page 1. */
+  pagesPerLane: number;
+  pagesPerDay: number | null;
+  /** How far a reply is walked up to what it answers, and how many such lookups a day. */
+  parentHops: number;
+  parentsPerDay: number | null;
+  /** First judgements, and bios bought for the complete one, a day. */
+  judgedPerDay: number | null;
+  profilesPerDay: number | null;
+  /** Posts a day checked for whether they are worth a reply, one Muse call each. */
+  replyChecksPerDay: number | null;
+};
 
 export type TierLimits = {
   projects: number | null;
@@ -49,6 +77,7 @@ export type TierLimits = {
   searchPagesPerQuery: number;
   hydrationPerScan: number;
   discoveryRefreshDays: number;
+  x: XLimits;
 };
 
 export const TIERS: Record<TierName, TierLimits> = {
@@ -71,6 +100,7 @@ export const TIERS: Record<TierName, TierLimits> = {
         seo_refresh: 1,
         competitor_scan: 1,
         insights: 1,
+        x_scan_now: 0,
       },
     },
     discoveryQueries: 8,
@@ -82,6 +112,20 @@ export const TIERS: Record<TierName, TierLimits> = {
     searchPagesPerQuery: 2,
     hydrationPerScan: 40,
     discoveryRefreshDays: 7,
+    // Every search lurk writes, once a day: a search page is $0.00065, so
+    // breadth costs the house cents; hourly freshness is what a wallet buys.
+    x: {
+      lanes: null,
+      cadenceHours: 24,
+      maxBackoffHours: 24,
+      pagesPerLane: 1,
+      pagesPerDay: 30,
+      parentHops: 3,
+      parentsPerDay: 40,
+      judgedPerDay: 150,
+      profilesPerDay: 20,
+      replyChecksPerDay: 15,
+    },
   },
   connected: {
     projects: null,
@@ -102,6 +146,7 @@ export const TIERS: Record<TierName, TierLimits> = {
         seo_refresh: 2,
         competitor_scan: 2,
         insights: 2,
+        x_scan_now: 10,
       },
     },
     discoveryQueries: 12,
@@ -113,11 +158,42 @@ export const TIERS: Record<TierName, TierLimits> = {
     searchPagesPerQuery: 4,
     hydrationPerScan: 100,
     discoveryRefreshDays: 3,
+    x: {
+      lanes: null,
+      cadenceHours: 1,
+      maxBackoffHours: 8,
+      pagesPerLane: 2,
+      pagesPerDay: 150,
+      parentHops: 3,
+      parentsPerDay: 40,
+      judgedPerDay: 150,
+      profilesPerDay: 20,
+      replyChecksPerDay: 15,
+    },
   },
 };
 
 /** Days shared Reddit rows are kept from their creation time. */
 export const RETENTION_DAYS = 30;
+
+/**
+ * X's limits for a tier's limits. Self-hosted (null) runs at the connected
+ * shape with no caps at all: the operator's own keys, the operator's call.
+ */
+export function xLimitsFor(limits: TierLimits | null): XLimits {
+  if (limits) {
+    return limits.x;
+  }
+  return {
+    ...TIERS.connected.x,
+    lanes: null,
+    pagesPerDay: null,
+    parentsPerDay: null,
+    judgedPerDay: null,
+    profilesPerDay: null,
+    replyChecksPerDay: null,
+  };
+}
 
 /** Null means "no limit", which is what a self-hosted instance always gets. */
 export function limitsFor(tier: TierName, selfHosted: boolean): TierLimits | null {

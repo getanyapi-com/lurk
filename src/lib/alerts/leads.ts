@@ -1,6 +1,8 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { leads, redditAuthors, redditComments, redditPosts } from "@/db/schema";
+import { leads, redditAuthors, redditComments, redditPosts, xLeads, xPosts, xProjects } from "@/db/schema";
+import { canonicalUrl, ownWords } from "@/lib/x/map";
+import { headlineOf } from "@/lib/x/read";
 import type { SelectableLead } from "./select";
 
 /**
@@ -46,5 +48,66 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
         gte(leads.foundAt, since),
       ),
     );
-  return rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt) }));
+  return rows.map((row) => ({
+    ...row,
+    platform: "reddit" as const,
+    createdAt: new Date(row.createdAt),
+  }));
+}
+
+/**
+ * One X ask as the digest reads it: headed the way the X tab heads it, quoting
+ * the post's own words, grouped by its conversation. The face is the one the
+ * post was fetched with; x_authors holds no picture.
+ */
+export function xAskLead(
+  lead: typeof xLeads.$inferSelect,
+  post: typeof xPosts.$inferSelect,
+): SelectableLead {
+  return {
+    id: lead.id,
+    platform: "x",
+    postId: lead.conversationId ?? post.conversationId ?? post.id,
+    title: headlineOf(post.text, post.isReply, lead.matchedPhrase),
+    url: canonicalUrl(post.authorUsername, post.id),
+    subreddit: null,
+    author: post.authorUsername,
+    avatarUrl: post.authorImage,
+    score: lead.score,
+    reason: lead.reason,
+    matchedPhrase: lead.matchedPhrase,
+    body: ownWords(post),
+    isComment: false,
+    numComments: post.replyCount,
+    createdAt: post.createdAt,
+    status: lead.status,
+    // `alertable` sends buyers only, and an ask is X's buyer.
+    kind: "buyer",
+    foundAt: lead.foundAt,
+  };
+}
+
+/**
+ * The X asks a project first found since a moment. Replies are never alerted:
+ * they are worth answering for about five hours, which a digest cannot keep.
+ * A post X no longer shows is left out, as the tab leaves it out.
+ */
+export async function newXLeadsSince(projectId: string, since: Date): Promise<SelectableLead[]> {
+  const rows = await db()
+    .select({ lead: xLeads, post: xPosts })
+    .from(xLeads)
+    .innerJoin(xPosts, eq(xPosts.id, xLeads.tweetId))
+    // The owner can keep X asks out of the project's channels (Settings, X).
+    .leftJoin(xProjects, eq(xProjects.projectId, xLeads.projectId))
+    .where(
+      and(
+        eq(xLeads.projectId, projectId),
+        eq(xLeads.kind, "ask"),
+        eq(xLeads.status, "new"),
+        or(isNull(xProjects.alerts), eq(xProjects.alerts, true)),
+        gte(xLeads.foundAt, since),
+        isNull(xPosts.unavailableAt),
+      ),
+    );
+  return rows.map(({ lead, post }) => xAskLead(lead, post));
 }

@@ -192,6 +192,10 @@ export type LeadFace = {
   author: string | null;
   avatarUrl: string | null;
   subreddit: string;
+  /** What hovering the face says, when it is not a Reddit author in a subreddit (an X face). */
+  label?: string;
+  /** Draw the picture as it is, with no Reddit default in its place (an X face). */
+  plainAvatar?: boolean;
 };
 
 export type LeadCost = { sku: string; costUsd: number; requestId: string | null };

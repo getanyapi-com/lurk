@@ -9,6 +9,7 @@ import { NEW_PROJECT_PATH } from "@/components/ProjectSwitcher";
 import type { AlertChannel } from "@/lib/alerts/types";
 import { cn } from "@/lib/utils";
 import { AnyapiRailCard } from "./AnyapiRailCard";
+import { XMark } from "./x/XMark";
 
 /** One icon per destination, so the rail reads at a glance. */
 const ICONS = {
@@ -21,6 +22,9 @@ const ICONS = {
   bell: Bell,
   receipt: Receipt,
   settings: Settings,
+  // X's brand mark, not an icon. The key does not clash with lucide's `X`
+  // imported above, which is the drawer's close button.
+  x: XMark,
 } as const;
 
 export type RailIcon = keyof typeof ICONS;

@@ -5,7 +5,15 @@ import { enqueueOnce } from "./enqueue";
 import { HEARTBEAT_MS, LEASE_MS } from "./lease";
 import { handlerFor, nextRunAt, type Job } from "./registry";
 
-/** No other unfinished job of this project may hold a live lease. */
+/**
+ * No other unfinished job of this project, in the same family, may hold a live
+ * lease. X leads' jobs (kinds starting `x_`) are one family and every other
+ * kind the other, so an X scan runs beside a Reddit setup or scan of the same
+ * project instead of waiting minutes behind it, while two X jobs, or two
+ * Reddit jobs, of one project still never overlap. With no `x_` job anywhere
+ * the family test is true for every pair, which is exactly the old rule.
+ * It compares with `left()` rather than LIKE, where `_` is a wildcard.
+ */
 function noSiblingRunning(leaseCutoff: Date) {
   return sql`not exists (
     select 1 from ${jobs} sibling
@@ -13,6 +21,7 @@ function noSiblingRunning(leaseCutoff: Date) {
       and sibling.finished_at is null
       and sibling.started_at is not null
       and sibling.started_at >= ${leaseCutoff.toISOString()}::timestamptz
+      and (left(sibling.kind, 2) = 'x_') = (left(${jobs.kind}, 2) = 'x_')
   )`;
 }
 
@@ -38,6 +47,7 @@ export const ATTENDED_KINDS = [
   "discovery_refresh",
   "insights",
   "rescore",
+  "x_scan",
 ];
 
 /** How long one visit, or one API call, keeps a project's routine jobs running. */

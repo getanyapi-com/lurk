@@ -156,6 +156,21 @@ export async function channelForProject(
   return rows[0] ? typed(rows[0]) : null;
 }
 
+/**
+ * Whether anything would carry this project's new leads out of the app. A
+ * channel belongs to one project, and every channel on it is live: there is no
+ * off switch, only removal. An X scan keeps running while this holds, so the
+ * digest does not go quiet when the owner stops opening the tab.
+ */
+export async function projectHasAlertChannel(projectId: string): Promise<boolean> {
+  const rows = await db()
+    .select({ id: alerts.id })
+    .from(alerts)
+    .where(eq(alerts.projectId, projectId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 export async function markSent(alertId: string, at: Date): Promise<void> {
   await db().update(alerts).set({ lastSentAt: at }).where(eq(alerts.id, alertId));
 }

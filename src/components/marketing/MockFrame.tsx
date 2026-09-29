@@ -1,5 +1,6 @@
 import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, Swords, Telescope } from "lucide-react";
 import type { RailIcon } from "@/components/Rail";
+import { XMark } from "@/components/x/XMark";
 import { BrandImage } from "./BrandImage";
 import { MOCK_RAIL } from "./mockContent";
 
@@ -13,6 +14,7 @@ const ICONS: Record<RailIcon, React.ComponentType<{ className?: string }>> = {
   bell: Bell,
   receipt: Receipt,
   settings: Settings,
+  x: XMark,
 };
 type MockFrameProps = {
   active: string;

@@ -1,4 +1,5 @@
 import { redditAvatar } from "@/lib/redditAvatar";
+import type { LeadPlatform } from "./types";
 
 /**
  * The light theme of `src/styles/tokens.css` converted to sRGB hex, because an
@@ -76,10 +77,17 @@ export function initials(name: string | null): string {
  * A round face at any size: the real picture when we have one, the first two
  * letters of the name when we do not.
  */
-export function avatarHtml(name: string | null, src: string | null, size: number): string {
+export function avatarHtml(
+  name: string | null,
+  src: string | null,
+  size: number,
+  platform: LeadPlatform = "reddit",
+): string {
   const radius = `${size / 2}px`;
-  // Every face in an email is a Reddit author's.
-  src = redditAvatar(name, src);
+  // A Reddit author with no picture gets the Snoo Reddit would draw; X has no such default.
+  if (platform === "reddit") {
+    src = redditAvatar(name, src);
+  }
   if (src) {
     return `<img src="${escapeHtml(src)}" width="${size}" height="${size}" alt="" style="display:block;width:${size}px;height:${size}px;border-radius:${radius};border:1px solid ${EMAIL_COLORS.border};object-fit:cover" />`;
   }

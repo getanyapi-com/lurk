@@ -9,6 +9,7 @@ export const BRAND_MARKS = {
   Claude: "/brands/claude.svg",
   Slack: "/brands/slack-color.svg",
   Discord: "/brands/discord.svg",
+  X: "/brands/x.svg",
 } as const;
 export type BrandName = keyof typeof BRAND_MARKS;
 

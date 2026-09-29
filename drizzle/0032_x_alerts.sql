@@ -1,0 +1,1 @@
+ALTER TABLE "x_projects" ADD COLUMN "alerts" boolean DEFAULT true NOT NULL;

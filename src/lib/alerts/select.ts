@@ -23,6 +23,16 @@ export const EMAIL_LEAD_CAP = 20;
 export const ALERT_SCORE_FLOOR = 55;
 
 /**
+ * The floor is on the Reddit lead model's scale. An X ask has already passed
+ * X's own gates (src/lib/x/gates.ts `decide`), and its score only orders asks:
+ * a qualified ask with fit 1 and intent 2 folds to 30, so Reddit's floor would
+ * silently drop real asks. X asks have none.
+ */
+function floorFor(row: SelectableLead): number {
+  return row.platform === "x" ? 0 : ALERT_SCORE_FLOOR;
+}
+
+/**
  * How much older than the window's start a post or comment may be. A scan reads
  * a week or a month back, so what it finds today is not always from today, and
  * an alert is for a conversation that is still open.
@@ -83,34 +93,79 @@ function borrowsTheQuestion(row: SelectableLead): boolean {
 }
 
 /**
- * Every lead worth a message, best first: a buyer the user has not touched,
- * first found inside the window, at or over the floor, on a post or comment
- * that is still fresh. The window is on `foundAt`, which a rescore never moves,
- * so consecutive windows carry each lead once.
+ * The moment a post must be newer than, less the slack. Fresh is measured from
+ * the window's start. An X ask is also measured from `askFloor`, which the
+ * digest sets one cadence before now: a first look writes a month of asks as
+ * found now, and a channel quiet for weeks has a window as long. Reddit keeps
+ * the window alone, so a channel that could not deliver for a while still
+ * sends what it missed.
  */
-export function alertable(rows: SelectableLead[], since: Date): SelectableLead[] {
-  const freshFrom = since.getTime() - FRESH_SLACK_MS;
-  return rows
+function freshFrom(row: SelectableLead, since: Date, askFloor: Date): number {
+  const from = row.platform === "x" ? Math.max(since.getTime(), askFloor.getTime()) : since.getTime();
+  return from - FRESH_SLACK_MS;
+}
+
+/**
+ * Each platform's leads best first by its own score, the platforms taking
+ * turns, Reddit first. An X ask's score is not on the Reddit lead model's
+ * scale, so one list sorted by both would put asks wherever the scales happen
+ * to cross, and a chat channel's five could hold none of them.
+ */
+function inTurns(rows: SelectableLead[]): SelectableLead[] {
+  const lanes = (["reddit", "x"] as const).map((platform) =>
+    rows.filter((row) => row.platform === platform),
+  );
+  const longest = Math.max(...lanes.map((lane) => lane.length));
+  const turns: SelectableLead[] = [];
+  for (let index = 0; index < longest; index += 1) {
+    for (const lane of lanes) {
+      if (index < lane.length) {
+        turns.push(lane[index]);
+      }
+    }
+  }
+  return turns;
+}
+
+/**
+ * Every lead worth a message, in the order a message lists them: a buyer the
+ * user has not touched, first found inside the window, at or over its floor,
+ * on a post or comment that is still fresh. The window is on `foundAt`, which a
+ * rescore never moves, so consecutive windows carry each lead once.
+ */
+export function alertable(
+  rows: SelectableLead[],
+  since: Date,
+  askFloor: Date = since,
+): SelectableLead[] {
+  const fresh = rows
     .filter(
       (row) =>
         row.status === "new" &&
         row.kind === "buyer" &&
-        row.score >= ALERT_SCORE_FLOOR &&
+        row.score >= floorFor(row) &&
         !borrowsTheQuestion(row) &&
         row.foundAt.getTime() >= since.getTime() &&
-        row.createdAt.getTime() >= freshFrom,
+        row.createdAt.getTime() >= freshFrom(row, since, askFloor),
     )
     .sort((a, b) => b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime());
+  return inTurns(fresh);
 }
 
-/** The leads one message carries: the top `limit` of `alertable`. */
-export function selectLeads(rows: SelectableLead[], since: Date, limit: number): DigestLead[] {
-  return alertable(rows, since).slice(0, limit).map(digestLead);
+/** The leads one message carries: the first `limit` of `alertable`. */
+export function selectLeads(
+  rows: SelectableLead[],
+  since: Date,
+  limit: number,
+  askFloor: Date = since,
+): DigestLead[] {
+  return alertable(rows, since, askFloor).slice(0, limit).map(digestLead);
 }
 
 export function digestLead(row: SelectableLead): DigestLead {
   return {
     id: row.id,
+    platform: row.platform,
     title: row.title,
     url: row.url,
     subreddit: row.subreddit,

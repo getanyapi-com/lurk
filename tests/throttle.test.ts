@@ -25,6 +25,7 @@ describe("when a paid button comes back", () => {
       seo_refresh: 1,
       competitor_scan: 1,
       insights: 1,
+      x_scan_now: 0,
     });
     expect(TIERS.connected.actions.window).toBe("day");
   });

@@ -10,9 +10,19 @@ import {
   scoreColor,
   startOfDay,
 } from "./tokens";
+import {
+  FEED_PATH,
+  handleOf,
+  PLATFORM_ICON,
+  PLATFORM_NAME,
+  platformsOf,
+  repliesPhrase,
+  showsScore,
+  venueOf,
+} from "./platform";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
 import { sameWords } from "./select";
-import type { Digest, DigestLead } from "./types";
+import type { Digest, DigestLead, LeadPlatform } from "./types";
 
 const WIDTH = 600;
 const AXIS_MARKS = [0, 6, 12, 18];
@@ -78,7 +88,7 @@ function timelineRow(digest: Digest): string {
       const faces = inHour
         .map(
           (lead) =>
-            `<div style="margin-top:2px" title="u/${escapeHtml(lead.author ?? "unknown")}">${avatarHtml(lead.author, lead.avatarUrl, 24)}</div>`,
+            `<div style="margin-top:2px" title="${escapeHtml(handleOf(lead))}">${avatarHtml(lead.author, lead.avatarUrl, 24, lead.platform)}</div>`,
         )
         .join("");
       return `<td valign="bottom" align="center" style="width:26px;padding:0 1px">${faces}<div style="height:6px;border-left:1px solid ${C.border};margin:4px auto 2px;width:1px"></div><div style="font-family:${EMAIL_FONT};font-size:10px;color:${C.fgMuted};height:12px">${AXIS_MARKS.includes(hour) ? hourLabel(hour) : ""}</div></td>`;
@@ -93,8 +103,8 @@ function timelineRow(digest: Digest): string {
 
 function authorCell(lead: DigestLead, appUrl: string): string {
   return `<td valign="top" width="44" style="padding:16px 0 16px 16px">
-${avatarHtml(lead.author, lead.avatarUrl, 28)}
-<img src="${escapeHtml(appUrl)}/email/reddit.png" width="14" height="14" alt="Reddit" style="display:block;margin:-8px 0 0 16px;border-radius:7px" /></td>`;
+${avatarHtml(lead.author, lead.avatarUrl, 28, lead.platform)}
+<img src="${escapeHtml(appUrl)}/email/${PLATFORM_ICON[lead.platform]}" width="14" height="14" alt="${PLATFORM_NAME[lead.platform]}" style="display:block;margin:-8px 0 0 16px;border-radius:7px" /></td>`;
 }
 
 /**
@@ -106,8 +116,8 @@ export function leadAge(date: Date, now: Date): string {
   return hours >= 1 && hours < 48 ? `${Math.round(hours)}h` : shortAge(date, now);
 }
 
-function commentsPhrase(count: number | null): string[] {
-  return count == null ? [] : [`${count} ${count === 1 ? "comment" : "comments"}`];
+function commentsPhrase(count: number | null, platform: LeadPlatform): string[] {
+  return count == null ? [] : [repliesPhrase(count, platform)];
 }
 
 /** What the person wrote: the line that made it a lead, or the start of it. */
@@ -125,38 +135,44 @@ function wordsOf(lead: DigestLead, size: number): string {
     : "";
 }
 
-/** A comment that is a lead, set under the thread it replies to. */
+/**
+ * A comment that is a lead, set under the thread it replies to. On X it is
+ * another ask in the same conversation, which is not always a reply to the
+ * one heading the card.
+ */
 function replyBlock(lead: DigestLead, digest: Pick<Digest, "generatedAt">): string {
-  const meta = [`u/${lead.author ?? "unknown"} replied`, leadAge(lead.createdAt, digest.generatedAt)]
+  const verb = lead.platform === "x" ? "also asked" : "replied";
+  const meta = [`${handleOf(lead)} ${verb}`, leadAge(lead.createdAt, digest.generatedAt)]
     .map(escapeHtml)
     .join(" &middot; ");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px"><tr>
-<td valign="top" width="26" style="padding:2px 0 0 10px;border-left:2px solid ${C.border}">${avatarHtml(lead.author, lead.avatarUrl, 20)}</td>
+<td valign="top" width="26" style="padding:2px 0 0 10px;border-left:2px solid ${C.border}">${avatarHtml(lead.author, lead.avatarUrl, 20, lead.platform)}</td>
 <td valign="top" style="padding:0 0 0 8px">
-<div style="font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">${meta} &middot; <span style="font-weight:500;color:${scoreColor(lead.score)}">${lead.score}</span> &middot; <a href="${escapeHtml(lead.url)}" style="color:${C.fgMuted};text-decoration:underline">Source</a></div>
+<div style="font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">${meta} &middot; ${showsScore(lead) ? `<span style="font-weight:500;color:${scoreColor(lead.score)}">${lead.score}</span> &middot; ` : ""}<a href="${escapeHtml(lead.url)}" style="color:${C.fgMuted};text-decoration:underline">Source</a></div>
 ${wordsOf(lead, 13)}</td></tr></table>`;
 }
 
 /**
  * One thread as a card: the post when it is a lead itself, and every reply
- * that is a lead beneath it, so a busy thread reads as one conversation. The
- * invite shows the same cards, so it is shared.
+ * that is a lead beneath it, so a busy thread reads as one conversation. Two
+ * X asks in one conversation are both posts, so the second is set beneath the
+ * first rather than lost. The invite shows the same cards, so it is shared.
  */
 export function threadRow(group: DigestLead[], digest: Pick<Digest, "appUrl" | "generatedAt">): string {
   const post = group.find((lead) => !lead.isComment) ?? null;
-  const replies = group.filter((lead) => lead.isComment);
+  const replies = group.filter((lead) => lead !== post);
   const first = post ?? replies[0];
   const best = Math.max(...group.map((lead) => lead.score));
   const meta = (
     post
-      ? [`u/${post.author ?? "unknown"}`, `r/${post.subreddit}`, leadAge(post.createdAt, digest.generatedAt), ...commentsPhrase(post.numComments)]
-      : [`Thread in r/${first.subreddit}`, ...commentsPhrase(first.numComments)]
+      ? [handleOf(post), venueOf(post), leadAge(post.createdAt, digest.generatedAt), ...commentsPhrase(post.numComments, post.platform)]
+      : [`Thread in ${venueOf(first)}`, ...commentsPhrase(first.numComments, first.platform)]
   )
     .map(escapeHtml)
     .join(" &middot; ");
   const face = post
     ? authorCell(post, digest.appUrl)
-    : `<td valign="top" width="44" style="padding:16px 0 16px 16px"><img src="${escapeHtml(digest.appUrl)}/email/reddit.png" width="28" height="28" alt="Reddit" style="display:block;border-radius:14px" /></td>`;
+    : `<td valign="top" width="44" style="padding:16px 0 16px 16px"><img src="${escapeHtml(digest.appUrl)}/email/${PLATFORM_ICON[first.platform]}" width="28" height="28" alt="${PLATFORM_NAME[first.platform]}" style="display:block;border-radius:14px" /></td>`;
   return `<tr><td style="padding:0 24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.surface};border:1px solid ${C.border};border-radius:${EMAIL_RADIUS.card}"><tr>
 ${face}
@@ -165,8 +181,7 @@ ${face}
 <div style="margin-top:4px;font-family:${EMAIL_FONT};font-size:15px;line-height:1.4;color:${C.fg}">${escapeHtml(first.title)}</div>
 ${post ? wordsOf(post, 13) : ""}${replies.map((reply) => replyBlock(reply, digest)).join("")}</td>
 <td valign="top" align="right" width="72" style="padding:16px 16px 16px 0">
-<div style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${scoreColor(best)}">${best}</div>
-<a href="${escapeHtml(first.url)}" style="display:inline-block;margin-top:8px;font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted};text-decoration:underline">Source</a></td>
+${showsScore(first) ? `<div style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${scoreColor(best)}">${best}</div>\n` : ""}<a href="${escapeHtml(first.url)}" style="display:inline-block;margin-top:8px;font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted};text-decoration:underline">Source</a></td>
 </tr></table></td></tr>`;
 }
 
@@ -193,18 +208,54 @@ function anyapiRow(): string {
 </tr></table></td></tr>`;
 }
 
+const FEED_LINK: Record<LeadPlatform, string> = { reddit: "Open the feed", x: "Open X leads" };
+
+/** Every platform the message lists a lead on or leaves one out on, so each gets its link. */
+function linkedPlatforms(digest: Digest): LeadPlatform[] {
+  return platformsOf([
+    ...digest.leads,
+    ...(digest.morePlatforms ?? []).map((platform) => ({ platform })),
+  ]);
+}
+
 function footerRow(digest: Digest): string {
+  const feeds = linkedPlatforms(digest)
+    .map(
+      (platform) =>
+        `<a href="${escapeHtml(digest.appUrl)}${FEED_PATH[platform]}" style="color:${C.fgMuted}">${FEED_LINK[platform]}</a> &middot;\n`,
+    )
+    .join("");
   return `<tr><td style="padding:8px 24px 28px;font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">
-<a href="${escapeHtml(digest.appUrl)}/app/leads" style="color:${C.fgMuted}">Open the feed</a> &middot;
-<a href="${escapeHtml(digest.appUrl)}/app/settings/alerts" style="color:${C.fgMuted}">Alert settings</a>
+${feeds}<a href="${escapeHtml(digest.appUrl)}/app/settings/alerts" style="color:${C.fgMuted}">Alert settings</a>
 &middot; ${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>`;
+}
+
+const MORE_LINK: Record<LeadPlatform, string> = { reddit: "in the feed", x: "in X leads" };
+
+/**
+ * Where "the rest" are listed: the tab of each platform the message left leads
+ * out on, which is not always one it lists. A digest built without that says
+ * the platforms it lists.
+ */
+function leftoverPlatforms(digest: Digest): LeadPlatform[] {
+  return digest.morePlatforms?.length ? digest.morePlatforms : platformsOf(digest.leads);
+}
+
+/** Each of those as `place` writes it, joined by "and": "in the feed and in X leads". */
+function morePlaces(digest: Digest, place: (platform: LeadPlatform) => string): string {
+  return leftoverPlatforms(digest).map(place).join(" and ");
 }
 
 function moreRow(digest: Digest): string {
   if (!digest.more) {
     return "";
   }
-  return `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:14px;color:${C.fgMuted}">And ${digest.more} more <a href="${escapeHtml(digest.appUrl)}/app/leads" style="color:${C.fg};text-decoration:underline">in the feed</a>.</td></tr>`;
+  const places = morePlaces(
+    digest,
+    (platform) =>
+      `<a href="${escapeHtml(digest.appUrl)}${FEED_PATH[platform]}" style="color:${C.fg};text-decoration:underline">${MORE_LINK[platform]}</a>`,
+  );
+  return `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:14px;color:${C.fgMuted}">And ${digest.more} more ${places}.</td></tr>`;
 }
 
 function emptyRow(digest: Digest): string {
@@ -230,13 +281,13 @@ ${headerRow(digest)}${headlineRow(digest)}${body}${anyapiRow()}${footerRow(diges
 export function renderDigestText(digest: Digest): string {
   const lines = digest.leads.map(
     (lead) =>
-      `${lead.score} - ${lead.isComment ? "Reply in: " : ""}${lead.title} (r/${lead.subreddit}, u/${lead.author ?? "unknown"}, ${leadAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}`,
+      `${showsScore(lead) ? `${lead.score} - ` : ""}${lead.isComment ? "Reply in: " : ""}${lead.title} (${venueOf(lead)}, ${handleOf(lead)}, ${leadAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}`,
   );
   return [
     `${totalOf(digest)} new leads for ${digest.projectName}, found ${windowPhrase(digest)}.`,
     ...lines,
-    ...(digest.more ? [`And ${digest.more} more in the feed.`] : []),
-    `${digest.appUrl}/app/leads`,
+    ...(digest.more ? [`And ${digest.more} more ${morePlaces(digest, (platform) => MORE_LINK[platform])}.`] : []),
+    ...linkedPlatforms(digest).map((platform) => `${digest.appUrl}${FEED_PATH[platform]}`),
     `${ANYAPI_PLUG} ${anyapiAlertUrl("email")}`,
   ].join("\n\n");
 }

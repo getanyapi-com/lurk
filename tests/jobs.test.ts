@@ -457,6 +457,38 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
     await db().delete(users).where(eq(users.id, user.id));
   });
 
+  it("runs an X job beside a Reddit job of the same project, and never two X jobs at once", async () => {
+    const { db, jobs, users, user, project } = await fixture();
+    const { claimNextJob } = await import("@/jobs/runner");
+    const { eq } = await import("drizzle-orm");
+
+    await db()
+      .insert(jobs)
+      .values({ kind: "noop", projectId: project.id, runAt: LONG_AGO, startedAt: NOW });
+    // Any kind starting x_ is X's family; x_scan itself waits for a visit, which is not what this tests.
+    const [first] = await db()
+      .insert(jobs)
+      .values({ kind: "x_noop", projectId: project.id, runAt: new Date(LONG_AGO.getTime() + 1000) })
+      .returning();
+    expect((await claimNextJob(NOW))?.id).toBe(first.id);
+
+    // With that X job running, a second X job of the project waits, and so
+    // does a Reddit one behind the Reddit job already running.
+    const [second] = await db()
+      .insert(jobs)
+      .values({ kind: "x_noop", projectId: project.id, runAt: new Date(LONG_AGO.getTime() + 2000) })
+      .returning();
+    const [reddit] = await db()
+      .insert(jobs)
+      .values({ kind: "noop", projectId: project.id, runAt: new Date(LONG_AGO.getTime() + 3000) })
+      .returning();
+    const claimed = await claimNextJob(NOW);
+    expect(claimed?.id).not.toBe(second.id);
+    expect(claimed?.id).not.toBe(reddit.id);
+
+    await db().delete(users).where(eq(users.id, user.id));
+  });
+
   it("holds a routine job of a project nobody attends, and runs it once somebody does", async () => {
     const { db, jobs, users, user, project } = await fixture();
     const { claimNextJob } = await import("@/jobs/runner");
@@ -647,6 +679,7 @@ describe.skipIf(!process.env.DATABASE_URL)("when a failed recurring job is due a
       "discovery_refresh",
       "competitor_scan",
       "seo_refresh",
+      "x_scan",
     ];
     for (const kind of recurring) {
       const due = await nextRunAt(job(kind, projectId));

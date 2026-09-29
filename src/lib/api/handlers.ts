@@ -1,4 +1,5 @@
 import { RETENTION_DAYS } from "@/lib/tiers";
+import { xEnabledFor } from "@/lib/x/enabled";
 import type { ApiCaller } from "./auth";
 import { parseLeadQuery } from "./leadsQuery";
 import { getApiLead, listApiLeads } from "./leadsRead";
@@ -22,6 +23,21 @@ function feedWindowDays(caller: ApiCaller): number {
   return caller.limits?.feedWindowDays ?? RETENTION_DAYS;
 }
 
+/**
+ * The tier limits as the API has always shown them. X leads' limits are shown
+ * only to a caller X is on for, so a feature that ships dark stays dark here.
+ */
+function publicLimits(caller: ApiCaller) {
+  if (!caller.limits || xEnabledFor(caller.user.id)) {
+    return caller.limits;
+  }
+  const rest: Partial<typeof caller.limits> = { ...caller.limits };
+  delete rest.x;
+  const presses: Partial<typeof caller.limits.actions.presses> = { ...caller.limits.actions.presses };
+  delete presses.x_scan_now;
+  return { ...rest, actions: { ...caller.limits.actions, presses } };
+}
+
 export async function me(caller: ApiCaller) {
   return {
     user: {
@@ -31,7 +47,7 @@ export async function me(caller: ApiCaller) {
     },
     tier: caller.tier,
     selfHosted: caller.selfHosted,
-    limits: caller.limits,
+    limits: publicLimits(caller),
     key: { prefix: caller.keyPrefix, scopes: caller.scopes },
     requestsToday: await requestsToday(caller.keyId),
     requestsPerDay: caller.limits?.apiRequestsPerDay ?? null,

@@ -32,3 +32,10 @@ export function relativeUntil(date: Date, now = new Date()): string {
   }
   return `in ${shortAge(now, date)}`;
 }
+
+/** A count as a short mono figure: 950, 1.2k, 18k, 2.4M. */
+export function compactCount(value: number): string {
+  if (value < 1000) return String(value);
+  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0).replace(/\.0$/u, "")}k`;
+  return `${(value / 1_000_000).toFixed(1).replace(/\.0$/u, "")}M`;
+}

@@ -13,6 +13,8 @@ export type OpeningSummary = {
   createdAt: Date;
   /** The row's own rating: a score for a lead, a verdict for a held item. */
   trailing: React.ReactNode;
+  /** An X row: named by its @handle, with no community. Reddit rows leave it unset. */
+  platform?: "x";
 };
 
 type Opening = {

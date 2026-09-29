@@ -19,12 +19,17 @@ export const CHANNEL_LABELS: Record<AlertChannel, string> = {
   webhook: "Webhook",
 };
 
+/** Where a lead was posted. An X lead is always an ask (src/lib/x/read.ts), never a reply. */
+export type LeadPlatform = "reddit" | "x";
+
 /** One lead as the digest shows it. Everything a message needs, nothing else. */
 export type DigestLead = {
   id: string;
+  platform: LeadPlatform;
   title: string;
   url: string;
-  subreddit: string;
+  /** Null on X, which has no venue a post is in. */
+  subreddit: string | null;
   author: string | null;
   avatarUrl: string | null;
   score: number;
@@ -49,6 +54,8 @@ export type Digest = {
   leads: DigestLead[];
   /** How many more the window held than the message lists. */
   more?: number;
+  /** The platforms those are on, Reddit first, so the email links where they are listed. */
+  morePlatforms?: LeadPlatform[];
   appUrl: string;
 };
 

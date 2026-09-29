@@ -13,7 +13,12 @@ export type FetchKind =
   | "comments"
   | "subreddit"
   | "profile"
-  | "serp";
+  | "serp"
+  // X leads (src/lib/x/skus.ts). Their own kinds, never "keyword" or "profile":
+  // sourceYield joins costs on kind without the sku.
+  | "x_search"
+  | "x_tweet"
+  | "x_profile";
 
 export type FetchContext = { projectId: string; funded: FundedClient; maxAgeMs: number };
 

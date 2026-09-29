@@ -104,6 +104,12 @@ npm run anyapi:register
 | `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
 | `HOUSE_DATA_CAP_USD_PER_DAY` | no | `50` | Daily ceiling on data spend from the house key. |
 | `HOUSE_LLM_CAP_USD_PER_DAY` | no | `100` (`10` under the Compose file) | Daily ceiling on language model spend. |
+| `X_LEADS` | no | `false` | Turns on the X leads tab and its jobs (beta, off by default). |
+| `X_LEADS_USERS` | no | empty | Comma-separated `users.id` values X is limited to while `X_LEADS` is on. Empty means everyone. |
+| `X_REPLIES` | no | `true` | Shows X posts worth a reply beside the asks. `false` turns off only that kind. |
+| `HOUSE_X_DATA_CAP_USD_PER_DAY` | no | `5` | X's share of the house data ceiling. |
+| `HOUSE_X_LLM_CAP_USD_PER_DAY` | no | `5` | X's share of the house language model ceiling. |
+| `X_CALLS_IN_FLIGHT` | no | `8` | Paid X calls in flight at once. |
 | `ALERTS_ALLOW_PRIVATE_WEBHOOKS` | no | `false` | Webhooks may only reach public addresses. Set `true` on a self-hosted instance to deliver to your own network. |
 
 A variable set to nothing counts as unset, so an empty line in `.env` never half-configures a
@@ -118,7 +124,7 @@ A hosted instance has two tiers. Self-hosting is neither: it has no limits at al
 | Projects | 2 | unlimited |
 | Keywords per project | 25 | unlimited |
 | Tracked subreddits per project | 10 | unlimited |
-| Scan cadence | every 6 hours | hourly |
+| Scan cadence | daily, at an hour you pick | hourly |
 | Comment scan | top 20 scored threads per scan | every thread over your threshold |
 | Feed window | 30 days | 30 days |
 | Alerts | daily digest, Slack and Discord, + 1 custom webhook | hourly, unlimited custom webhooks |

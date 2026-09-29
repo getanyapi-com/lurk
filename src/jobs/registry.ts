@@ -16,6 +16,7 @@ import { loadScanProject } from "@/lib/scan/project";
 import { runRescore } from "@/lib/scan/rescore";
 import { runScan } from "@/lib/scan/run";
 import { widenSearches } from "@/lib/scan/widen";
+import { deleteExpiredXData } from "@/lib/x/retention";
 import type { ScanCadence } from "@/lib/settings";
 import { cadenceFor, PRESETS, settingsForUser } from "@/lib/settings";
 import { tierForUser } from "@/lib/tier";
@@ -169,7 +170,23 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
   },
   retention: async () => {
     await deleteExpiredPosts();
+    await deleteExpiredXData();
     await enqueueOnce("retention", new Date(Date.now() + DAY_MS));
+  },
+  /**
+   * X leads (src/lib/x). The first scan is queued only by opening the X tab,
+   * and each scan books its own successor, so with X_LEADS off nothing ever
+   * queues one; a job that is somehow queued anyway returns without writing
+   * or booking anything (runXScan checks the switch for the project's owner).
+   * The pipeline is loaded on first use, so nothing X imports is on the path
+   * every Reddit job loads.
+   */
+  x_scan: async (job) => {
+    if (!job.projectId) {
+      throw new Error("An X scan needs a project");
+    }
+    const { runXScan } = await import("@/lib/x/run");
+    await runXScan(job.projectId, job.id);
   },
 };
 
@@ -224,6 +241,11 @@ export async function nextRunAt(job: Job): Promise<Date | null> {
   // a failed one looks again tomorrow rather than never.
   if (job.kind === "retention" || (job.kind === "seo_refresh" && job.projectId)) {
     return new Date(now + DAY_MS);
+  }
+  // A failed X scan is due again at the fastest X cadence, and carries on from
+  // what it already bought and judged.
+  if (job.kind === "x_scan") {
+    return new Date(now + HOUR_MS);
   }
   if (job.kind === "digest" || job.kind === "alert_invites") {
     return new Date(now + CADENCE_MS.hourly);

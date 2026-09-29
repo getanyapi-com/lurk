@@ -10,15 +10,21 @@ import { countMentions } from "@/lib/competitors/read";
 import { newLeadCount } from "@/lib/leads";
 import { activeProject, listProjects } from "@/lib/projects";
 import { countOpportunities } from "@/lib/seo/read";
+import { xEnabledFor } from "@/lib/x/enabled";
+import { newXLeadCount } from "@/lib/x/read";
 import { URL_HEADER } from "@/proxy";
 
-type RailCounts = { newLeads: number; rankingThreads: number; mentions: number };
+/** `newXLeads` is null when X leads is off for this user, which also hides its item. */
+type RailCounts = { newLeads: number; rankingThreads: number; mentions: number; newXLeads: number | null };
 
 const groupsFor = (counts: RailCounts): RailGroup[] => [
   {
     label: "Engage",
     items: [
       { href: "/app/leads", label: "Leads", icon: "radar", count: counts.newLeads },
+      ...(counts.newXLeads === null
+        ? []
+        : [{ href: "/app/x", label: "X leads", icon: "x" as const, count: counts.newXLeads }]),
       { href: "/app/seo", label: "Reddit SEO", icon: "search", count: counts.rankingThreads },
     ],
   },
@@ -46,19 +52,20 @@ const groupsFor = (counts: RailCounts): RailGroup[] => [
   },
 ];
 
-const EMPTY_COUNTS: RailCounts = { newLeads: 0, rankingThreads: 0, mentions: 0 };
+const EMPTY_COUNTS: RailCounts = { newLeads: 0, rankingThreads: 0, mentions: 0, newXLeads: null };
 
 /**
  * What the rail's pills count for the project on screen: leads waiting, threads
  * Google ranks, and competitor mentions inside the mention window.
  */
-async function countsFor(projectId: string): Promise<RailCounts> {
-  const [newLeads, rankingThreads, mentions] = await Promise.all([
+async function countsFor(projectId: string, showX: boolean): Promise<RailCounts> {
+  const [newLeads, rankingThreads, mentions, newXLeads] = await Promise.all([
     newLeadCount(projectId),
     countOpportunities(projectId),
     countMentions(projectId),
+    showX ? newXLeadCount(projectId) : null,
   ]);
-  return { newLeads, rankingThreads, mentions };
+  return { newLeads, rankingThreads, mentions, newXLeads };
 }
 
 /** The project the page below is showing, which the rail has to count for. */
@@ -75,7 +82,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     activeProject(user.id, requested),
   ]);
   const [counts, busy] = project
-    ? await Promise.all([countsFor(project.id), hasWorkInFlight(project.id)])
+    ? await Promise.all([countsFor(project.id, xEnabledFor(user.id)), hasWorkInFlight(project.id)])
     : [EMPTY_COUNTS, false];
   return (
     <div className="flex min-h-dvh flex-col">

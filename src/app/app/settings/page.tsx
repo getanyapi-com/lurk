@@ -1,9 +1,11 @@
-import { Clock, KeyRound } from "lucide-react";
+import { Bell, KeyRound } from "lucide-react";
 import { SettingsLinkCard } from "@/components/SettingsLinkCard";
+import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { WalletPanel } from "@/components/WalletPanel";
 import { requireLocalUser } from "@/lib/auth";
 import { walletConnection } from "@/lib/anyapi";
 import { config } from "@/lib/config";
+import { xEnabledFor } from "@/lib/x/enabled";
 
 type SettingsPageProps = { searchParams: Promise<{ project?: string }> };
 
@@ -18,15 +20,16 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <h1 className="text-h2" style={{ fontWeight: 500 }}>
         Settings
       </h1>
+      <SettingsTabs active="general" showX={xEnabledFor(user.id)} project={project} />
       <WalletPanel
         connectedAt={connection?.connectedAt ?? null}
         selfHosted={config().SELF_HOSTED}
       />
       <SettingsLinkCard
-        href={`/app/settings/scanning${query}`}
-        icon={Clock}
-        title="Scanning"
-        sentence="How often each project is scanned, and which threads a scan opens."
+        href={`/app/settings/alerts${query}`}
+        icon={Bell}
+        title="Alerts"
+        sentence="Where each project's new leads land: email, Slack, Discord or a webhook, shared by every platform."
       />
       <SettingsLinkCard
         href={`/app/settings/api${query}`}

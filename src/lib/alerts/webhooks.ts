@@ -1,7 +1,8 @@
 import { shortAge } from "@/lib/format";
 import { postJson } from "./outbound";
+import { handleOf, PLATFORM_NAME, repliesPhrase, showsScore, venueOf, X_ASK_LABEL } from "./platform";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
-import { scoreColor } from "./tokens";
+import { EMAIL_COLORS, scoreColor } from "./tokens";
 import type { Digest, DigestLead } from "./types";
 
 function headline(digest: Digest): string {
@@ -27,18 +28,30 @@ function quoted(lead: DigestLead): string | null {
   return lead.matchedPhrase && lead.matchedPhrase !== lead.title ? lead.matchedPhrase : null;
 }
 
-/** Where the lead sits: the subreddit, who wrote it, how old, how busy the thread is. */
+/** Where the lead sits: the subreddit or X, who wrote it, how old, how busy the thread is. */
 function where(lead: DigestLead, now: Date): string[] {
-  const comments =
-    lead.numComments == null
-      ? []
-      : [`${lead.numComments} ${lead.numComments === 1 ? "comment" : "comments"}`];
+  const comments = lead.numComments == null ? [] : [repliesPhrase(lead.numComments, lead.platform)];
   return [
-    `r/${lead.subreddit}`,
-    `${lead.isComment ? "comment by " : ""}u/${lead.author ?? "unknown"}`,
+    venueOf(lead),
+    `${lead.isComment ? "comment by " : ""}${handleOf(lead)}`,
     `${shortAge(lead.createdAt, now)} ago`,
     ...comments,
   ];
+}
+
+/** The score badge's colour, or on X, which has no score to show, the ink's. */
+function stripeColor(lead: DigestLead): string {
+  return showsScore(lead) ? scoreColor(lead.score) : EMAIL_COLORS.fg;
+}
+
+/**
+ * What a Slack byline opens with: the score, then the subreddit. An X ask says
+ * what it is in the score's place, which names X as well.
+ */
+function slackByline(lead: DigestLead, now: Date): string {
+  const [venue, ...rest] = where(lead, now);
+  const head = showsScore(lead) ? [`*Score ${lead.score}*`, venue] : [`*${X_ASK_LABEL}*`];
+  return [...head, ...rest].join("  ·  ");
 }
 
 /**
@@ -51,11 +64,13 @@ function slackLead(lead: DigestLead, now: Date) {
   const quote = quoted(lead);
   const title = `*<${lead.url}|${slackEscape(lead.title)}>*`;
   const face = lead.avatarUrl
-    ? [{ type: "image", image_url: lead.avatarUrl, alt_text: `u/${lead.author ?? "unknown"}` }]
+    ? [{ type: "image", image_url: lead.avatarUrl, alt_text: handleOf(lead) }]
     : [];
   return {
-    color: scoreColor(lead.score),
-    fallback: `${lead.score} r/${lead.subreddit} - ${lead.title}`,
+    color: stripeColor(lead),
+    fallback: showsScore(lead)
+      ? `${lead.score} ${venueOf(lead)} - ${lead.title}`
+      : `${X_ASK_LABEL} - ${lead.title}`,
     blocks: [
       {
         type: "section",
@@ -63,10 +78,7 @@ function slackLead(lead: DigestLead, now: Date) {
       },
       {
         type: "context",
-        elements: [
-          ...face,
-          { type: "mrkdwn", text: [`*Score ${lead.score}*`, ...where(lead, now)].join("  ·  ") },
-        ],
+        elements: [...face, { type: "mrkdwn", text: slackByline(lead, now) }],
       },
     ],
   };
@@ -110,23 +122,25 @@ export function discordPayload(digest: Digest) {
     embeds: [
       ...digest.leads.map((lead) => ({
         author: {
-          name: `${lead.isComment ? "comment by " : ""}u/${lead.author ?? "unknown"}`,
+          name: `${lead.isComment ? "comment by " : ""}${handleOf(lead)}`,
           icon_url: lead.avatarUrl ?? undefined,
         },
         title: lead.title.slice(0, 256),
         url: lead.url,
         description: quoted(lead) ?? undefined,
-        color: parseInt(scoreColor(lead.score).slice(1), 16),
+        color: parseInt(stripeColor(lead).slice(1), 16),
         timestamp: lead.createdAt.toISOString(),
-        fields: [
-          { name: "Score", value: String(lead.score), inline: true },
-          { name: "Subreddit", value: `r/${lead.subreddit}`, inline: true },
-        ],
+        fields: showsScore(lead)
+          ? [
+              { name: "Score", value: String(lead.score), inline: true },
+              { name: "Subreddit", value: `r/${lead.subreddit}`, inline: true },
+            ]
+          : [{ name: "Lead", value: X_ASK_LABEL, inline: true }],
         footer: {
           text:
             lead.numComments == null
-              ? "Reddit"
-              : `${lead.numComments} ${lead.numComments === 1 ? "comment" : "comments"}`,
+              ? PLATFORM_NAME[lead.platform]
+              : repliesPhrase(lead.numComments, lead.platform),
         },
       })),
       {
@@ -136,14 +150,21 @@ export function discordPayload(digest: Digest) {
   };
 }
 
-/** The shape a generic endpoint gets: the digest, unstyled. */
+/**
+ * The shape a generic endpoint gets: the digest, unstyled. `leads` is Reddit's
+ * and keeps the shape it had before X, so a receiver built against it never
+ * meets a lead it cannot read. X asks come in their own `xLeads`, there only
+ * when the message carries one: no subreddit, no comment flag, since an X lead
+ * is always an ask, and no score, which only orders asks.
+ */
 export function genericPayload(digest: Digest) {
+  const asks = digest.leads.filter((lead) => lead.platform === "x");
   return {
     project: digest.projectName,
     generatedAt: digest.generatedAt.toISOString(),
     since: digest.since.toISOString(),
     cadence: digest.cadence,
-    leads: digest.leads.map((lead) => ({
+    leads: digest.leads.filter((lead) => lead.platform === "reddit").map((lead) => ({
       id: lead.id,
       title: lead.title,
       url: lead.url,
@@ -157,6 +178,22 @@ export function genericPayload(digest: Digest) {
       numComments: lead.numComments,
       createdAt: lead.createdAt.toISOString(),
     })),
+    ...(asks.length > 0
+      ? {
+          xLeads: asks.map((lead) => ({
+            id: lead.id,
+            platform: "x" as const,
+            title: lead.title,
+            url: lead.url,
+            author: lead.author,
+            reason: lead.reason,
+            matchedPhrase: lead.matchedPhrase,
+            excerpt: lead.excerpt,
+            numReplies: lead.numComments,
+            createdAt: lead.createdAt.toISOString(),
+          })),
+        }
+      : {}),
   };
 }
 

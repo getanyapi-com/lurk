@@ -25,12 +25,20 @@ export function OpeningPane({ summary }: { summary: OpeningSummary }) {
           </h3>
           <span className="shrink-0 pt-1">{summary.trailing}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <AuthorAvatar name={summary.author} src={summary.avatarUrl} size={24} />
-          <span className="text-small text-fg-muted">u/{summary.author ?? "unknown"}</span>
-          <SubredditChip name={summary.subreddit} iconUrl={summary.subredditIconUrl} />
-          <span className="text-mono text-fg-muted">{relativeAge(summary.createdAt)}</span>
-        </div>
+        {summary.platform === "x" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <AuthorAvatar name={summary.author} src={summary.avatarUrl} size={24} platform="x" />
+            <span className="text-small text-fg-muted">@{summary.author ?? "unknown"}</span>
+            <span className="text-mono text-fg-muted">{relativeAge(summary.createdAt)}</span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <AuthorAvatar name={summary.author} src={summary.avatarUrl} size={24} />
+            <span className="text-small text-fg-muted">u/{summary.author ?? "unknown"}</span>
+            <SubredditChip name={summary.subreddit} iconUrl={summary.subredditIconUrl} />
+            <span className="text-mono text-fg-muted">{relativeAge(summary.createdAt)}</span>
+          </div>
+        )}
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-3 xl:flex-1">

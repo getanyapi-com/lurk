@@ -1,6 +1,7 @@
 import { allChannels, markSent, type ScheduledChannel } from "@/lib/alerts/channels";
 import { config } from "@/lib/config";
-import { newLeadsSince } from "@/lib/alerts/leads";
+import { newLeadsSince, newXLeadsSince } from "@/lib/alerts/leads";
+import { platformsOf } from "@/lib/alerts/platform";
 import {
   CADENCE_MS,
   CHAT_LEAD_CAP,
@@ -16,6 +17,7 @@ import type { Digest } from "@/lib/alerts/types";
 import { inFlight } from "@/lib/scan/constants";
 import { tierForUser } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
+import { xEnabledFor } from "@/lib/x/enabled";
 import { enqueueOnce } from "./enqueue";
 
 /** How many channels are delivered to at once. */
@@ -31,7 +33,8 @@ async function limitsCache(): Promise<(userId: string) => Promise<TierLimits | n
   };
 }
 
-async function digestFor(
+/** What one channel would send now, or null when it is not due or has nothing new. */
+export async function digestFor(
   channel: ScheduledChannel,
   limits: TierLimits | null,
   now: Date,
@@ -41,19 +44,30 @@ async function digestFor(
     return null;
   }
   const since = windowStart(channel.lastSentAt, cadence, now);
-  const rows = await newLeadsSince(channel.projectId, since);
+  // X asks ride the same channels under the same rules, for owners X is on for.
+  const found = [
+    ...(await newLeadsSince(channel.projectId, since)),
+    ...(xEnabledFor(channel.userId) ? await newXLeadsSince(channel.projectId, since) : []),
+  ];
+  // The window ends where the pass began, which is where the next one starts: a
+  // lead a scan writes while channels are still sending waits for that one.
+  const rows = found.filter((row) => row.foundAt.getTime() < now.getTime());
+  // An X ask is held fresh from one cadence back as well, however old the window.
+  const askFloor = new Date(now.getTime() - CADENCE_MS[cadence]);
   const limit = channel.channel === "email" ? EMAIL_LEAD_CAP : CHAT_LEAD_CAP;
-  const leads = selectLeads(rows, since, limit);
+  const leads = selectLeads(rows, since, limit, askFloor);
   if (leads.length === 0) {
     return null;
   }
+  const rest = alertable(rows, since, askFloor).slice(leads.length);
   return {
     projectName: channel.projectName,
     generatedAt: now,
     since,
     cadence,
     leads,
-    more: alertable(rows, since).length - leads.length,
+    more: rest.length,
+    morePlatforms: rest.length > 0 ? platformsOf(rest) : undefined,
     appUrl: config().APP_URL,
   };
 }

@@ -88,6 +88,47 @@ const schema = z.object({
 
   HOUSE_DATA_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(50),
   HOUSE_LLM_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(100),
+
+  /**
+   * The X leads tab, its jobs and its spend exist only while this is true; see
+   * src/lib/x/enabled.ts. Off, the tab is a 404 and an X job books nothing.
+   */
+  X_LEADS: z.preprocess(blankIsAbsent, bool),
+  /**
+   * Comma-separated users.id values X is limited to while X_LEADS is on. Empty
+   * means everyone. It narrows the switch and never opens it.
+   */
+  X_LEADS_USERS: z.preprocess(
+    blankIsAbsent,
+    z
+      .string()
+      .optional()
+      .transform((v) =>
+        (v ?? "")
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+  ),
+  /**
+   * The "Worth a reply" kind inside the X tab: posts nobody is shopping in but
+   * worth answering, checked by Muse. On with X; false turns only this kind off
+   * (Reddit's version, PR #97, polluted every feed it was in).
+   */
+  X_REPLIES: z.preprocess(blankIsAbsent, z.enum(["true", "false"]).default("true").transform((v) => v === "true")),
+  /**
+   * X's own share of the house caps above, so X can never spend Reddit's day.
+   * Five dollars each is about 2x the every-cap load projected for launch
+   * (2026-09-27 plan, 190 X-active projects); past it X work waits pending.
+   */
+  HOUSE_X_DATA_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(5),
+  HOUSE_X_LLM_CAP_USD_PER_DAY: z.coerce.number().nonnegative().default(5),
+  /**
+   * Paid twitter.* calls in flight at once. Unmeasured: the vendor limits
+   * behind twitter.* are not published, and eight is a guess that stays well
+   * under the ten-connection pool. The pilot measures 429s at this value.
+   */
+  X_CALLS_IN_FLIGHT: z.coerce.number().int().positive().default(8),
 });
 
 export type Config = z.infer<typeof schema>;

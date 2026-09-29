@@ -69,12 +69,41 @@ export function refuseSeoEndpoint(url: string): void {
   }
 }
 
+/**
+ * The most one call to each twitter.* endpoint X leads buys may cost, in USD.
+ * twitter.search fails over from its $0.00065 lane to one at up to $0.0154, 24
+ * times the price and 17 s at the median; `max_cost_usd` makes the gateway
+ * refuse such a route at no charge instead (verified 2026-09-27: an
+ * Octopus-only call came back 400 max_cost_exceeded, $0). SDK 0.46.2 has no
+ * option for it, so it is set here, on the URL. 0.001 admits the two flat
+ * lanes ($0.00065, $0.00075) and nothing dearer.
+ */
+const X_PRICE_CAPS: Record<string, string> = {
+  "twitter.search": "0.001",
+  "twitter.tweet": "0.0005",
+  "twitter.profile": "0.0005",
+};
+
+/** The same request with a price cap when it is a capped twitter.* call; anything else is returned untouched. */
+export function withXPriceCap(input: RequestInfo | URL): RequestInfo | URL {
+  const url = input instanceof Request ? input.url : String(input);
+  const slug = /\/v1\/run\/([^/?#]+)/.exec(url)?.[1];
+  const cap = slug ? X_PRICE_CAPS[decodeURIComponent(slug)] : undefined;
+  if (!cap) {
+    return input;
+  }
+  const capped = new URL(url);
+  capped.searchParams.set("max_cost_usd", cap);
+  return input instanceof Request ? new Request(capped, input) : capped.toString();
+}
+
 function clientCapturingRequestId(apiKey: string, baseUrl: string) {
   const client = new AnyAPI({
     apiKey,
     baseUrl,
-    fetch: async (input, init) => {
-      refuseSeoEndpoint(input instanceof Request ? input.url : String(input));
+    fetch: async (original, init) => {
+      refuseSeoEndpoint(original instanceof Request ? original.url : String(original));
+      const input = withXPriceCap(original);
       const response = await fetch(input, init);
       captureRequestId(response);
       return response;

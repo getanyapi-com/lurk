@@ -64,9 +64,13 @@ export function FaceStack({ faces }: { faces: LeadFace[] }) {
           key={face.id}
           className={cn("shrink-0 rounded-full", scoreRing(face.score))}
           style={{ width: side, height: side }}
-          title={`u/${face.author ?? "unknown"} in r/${face.subreddit}`}
+          title={face.label ?? `u/${face.author ?? "unknown"} in r/${face.subreddit}`}
         >
-          <Avatar name={face.author} src={redditAvatar(face.author, face.avatarUrl)} size="fluid" />
+          <Avatar
+            name={face.author}
+            src={face.plainAvatar ? face.avatarUrl : redditAvatar(face.author, face.avatarUrl)}
+            size="fluid"
+          />
         </span>
       ))}
       {over ? (
