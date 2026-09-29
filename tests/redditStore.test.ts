@@ -131,3 +131,33 @@ describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
     expect(stored.isLocked).toBeNull();
   });
 });
+
+describe.skipIf(!process.env.DATABASE_URL)("what a stored comment answers", () => {
+  it("records the post for a top-level comment, the comment for a reply, and keeps it when a later read omits it", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { upsertComments, upsertPosts } = await import("@/lib/reddit/store");
+    const [post] = await upsertPosts([
+      {
+        id: `t3_${randomUUID().slice(0, 8)}`,
+        subreddit: "saas",
+        author: "asker",
+        title: "Need a scraper",
+        permalink: `/r/saas/comments/${randomUUID().slice(0, 6)}/x/`,
+        createdUtc: Math.floor(Date.now() / 1000),
+      },
+    ]);
+    const top = `c${randomUUID().slice(0, 8)}`;
+    const nested = `c${randomUUID().slice(0, 8)}`;
+    const unknown = `c${randomUUID().slice(0, 8)}`;
+    const stored = await upsertComments(post.id, [
+      { id: top, parentId: "", body: "Try X" },
+      { id: nested, parentId: `t1_${top}`, body: "Which X?" },
+      { id: unknown, body: "No parent given" },
+    ]);
+    const parents = Object.fromEntries(stored.map((one) => [one.id, one.parentId]));
+    expect(parents).toEqual({ [top]: post.id, [nested]: top, [unknown]: null });
+
+    const again = await upsertComments(post.id, [{ id: top, body: "Try X, edited" }]);
+    expect(again[0].parentId).toBe(post.id);
+  });
+});

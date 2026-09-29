@@ -211,6 +211,15 @@ export async function clientForUser(userId: string): Promise<FundedClient> {
   if (!ANYAPI_HOUSE_API_KEY) {
     throw new Error("No wallet connected and ANYAPI_HOUSE_API_KEY is not set");
   }
+  return houseClient();
+}
+
+/** The house key's client, for work we owe a user rather than work they asked for. */
+export function houseClient(): FundedClient {
+  const { ANYAPI_BASE_URL, ANYAPI_HOUSE_API_KEY } = config();
+  if (!ANYAPI_HOUSE_API_KEY) {
+    throw new Error("ANYAPI_HOUSE_API_KEY is not set");
+  }
   return {
     ...clientCapturingRequestId(ANYAPI_HOUSE_API_KEY, ANYAPI_BASE_URL),
     funding: "house",

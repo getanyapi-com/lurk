@@ -70,7 +70,7 @@ describe("what a thread is read for", () => {
       body: "text",
       score: 1,
       permalink: null,
-      parentId: null,
+      parentId: "p1",
       raw: null,
       createdAt: new Date(),
       fetchedAt: new Date(),
@@ -88,6 +88,18 @@ describe("what a thread is read for", () => {
       ],
     });
     expect(kept.map((one) => one.id)).toEqual(["c2"]);
+  });
+
+  it("judges only comments that answer the post, not replies to other comments", () => {
+    const kept = representativeComments({
+      post,
+      comments: [
+        comment({ id: "top", author: "asker-one" }),
+        comment({ id: "nested", author: "asker-two", parentId: "top" }),
+        comment({ id: "unknown", author: "asker-three", parentId: null }),
+      ],
+    });
+    expect(kept.map((one) => one.id)).toEqual(["top"]);
   });
 });
 
@@ -130,7 +142,7 @@ describe("judging one comment once", () => {
       body: "I need conditional logic on my own signup form too.",
       score: 1,
       permalink: null,
-      parentId: null,
+      parentId: postId,
       raw: null,
       createdAt: new Date(),
       fetchedAt: new Date(),

@@ -79,14 +79,22 @@ export async function readLeadThreads(
 }
 
 /**
- * One buyer per author per thread. A person who wrote four comments is one
- * opportunity, and the comment carrying the most of their own words is the one
- * with the evidence, so that is the one judged.
+ * One buyer per author per thread, from the comments that answer the post. A
+ * reply to another comment is answering that comment, and read against the
+ * post alone it looks like a need it is not, so it is never judged; nor is a
+ * comment whose parent the response did not give. A person who wrote four
+ * comments is one opportunity, and the comment carrying the most of their own
+ * words is the one with the evidence, so that is the one judged.
  */
 export function representativeComments(thread: ThreadRead): StoredComment[] {
   const best = new Map<string, StoredComment>();
   for (const comment of thread.comments) {
-    if (!comment.author || comment.author === thread.post.author || !comment.body) {
+    if (
+      comment.parentId !== thread.post.id ||
+      !comment.author ||
+      comment.author === thread.post.author ||
+      !comment.body
+    ) {
       continue;
     }
     const held = best.get(comment.author);

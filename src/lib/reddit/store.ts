@@ -28,6 +28,8 @@ export type RawPost = {
 
 export type RawComment = {
   id: string;
+  /** The comment it answers; empty when it answers the post. Absent from older responses. */
+  parentId?: string;
   author?: string;
   body?: string;
   score?: number;
@@ -207,6 +209,9 @@ export async function upsertComments(
       comments.map((comment) => ({
         id: bareId(comment.id),
         postId,
+        // The post's own id for a top-level comment, so "answers the post" is
+        // one comparison; null when the response did not say.
+        parentId: comment.parentId === undefined ? null : comment.parentId ? bareId(comment.parentId) : postId,
         author: comment.author ?? null,
         body: comment.body ?? null,
         score: comment.score ?? null,
@@ -221,6 +226,7 @@ export async function upsertComments(
         body: sql`excluded.body`,
         score: sql`excluded.score`,
         permalink: sql`coalesce(excluded.permalink, ${redditComments.permalink})`,
+        parentId: sql`coalesce(excluded.parent_id, ${redditComments.parentId})`,
       },
     })
     .returning();

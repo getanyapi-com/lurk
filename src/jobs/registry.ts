@@ -15,6 +15,7 @@ import { runBackfill } from "@/lib/scan/backfill";
 import { loadScanProject } from "@/lib/scan/project";
 import { runRescore } from "@/lib/scan/rescore";
 import { runScan } from "@/lib/scan/run";
+import { settleReplyParents } from "@/lib/scan/replies";
 import { widenSearches } from "@/lib/scan/widen";
 import { deleteExpiredXData } from "@/lib/x/retention";
 import type { ScanCadence } from "@/lib/settings";
@@ -140,6 +141,13 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
    * them. It runs once per project and is never held, so a project nobody
    * attends still gets the leads its invite is built from.
    */
+  /** Once per project: learns which reply leads answer another comment, and withdraws them. */
+  reply_parents: async (job) => {
+    if (!job.projectId) {
+      throw new Error("Settling reply parents needs a project");
+    }
+    await settleReplyParents(job.projectId);
+  },
   widen_searches: async (job) => {
     if (!job.projectId) {
       throw new Error("Widening searches needs a project");

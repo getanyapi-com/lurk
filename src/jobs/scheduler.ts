@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
 import { config } from "@/lib/config";
 import { projectsWithStaleEvaluations } from "@/lib/scan/rescore";
+import { projectsOwedReplyParents } from "@/lib/scan/replies";
 import { projectsOwedSearches } from "@/lib/scan/widen";
 import { enqueueOnce, lastRunJob } from "./enqueue";
 import { WATCHED_KINDS, claimNextJob, runClaimedJob } from "./runner";
@@ -120,6 +121,15 @@ export async function seedProjectScans(): Promise<void> {
       }
     }
   }
+  for (const [index, projectId] of (await projectsOwedReplyParents()).entries()) {
+    try {
+      await enqueueOnce("reply_parents", new Date(Date.now() + BRIEF_START_MS + index * REPLY_PARENTS_GAP_MS), projectId);
+    } catch (error) {
+      if (!isMissingProject(error)) {
+        throw error;
+      }
+    }
+  }
   for (const row of rows) {
     try {
       await seedProject(row, stale.has(row.id), reseeded.has(row.id));
@@ -164,6 +174,9 @@ let briefsQueued = 0;
  * house's daily data and model caps rather than landing in one tick.
  */
 const WIDEN_GAP_MS = 60 * 1000;
+
+/** Each re-reads a handful of threads; a few seconds apart keeps Reddit calls level. */
+const REPLY_PARENTS_GAP_MS = 5 * 1000;
 
 type SeedRow = {
   id: string;
