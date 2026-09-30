@@ -30,11 +30,6 @@ export function MarketingPageLayout({ variant }: { variant: Variant }) {
                 get cited by <BrandStack /> AI, and rank on <BrandWord name="Google" />.
               </span>
             </h1>
-            <p className="hero-description">
-              <BrandWord name="Reddit" /> threads are what search and AI answers cite. lurk finds
-              the people asking for what you sell, leaving your competitors, or building their own,
-              scores who is asking, and tells you why. You reply. Free.
-            </p>
             <CtaRow />
             <div className="hero-promises">
               <span>
