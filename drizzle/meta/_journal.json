@@ -232,6 +232,13 @@
       "when": 1790658749356,
       "tag": "0032_x_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790780739023,
+      "tag": "0033_lead_scoring",
+      "breakpoints": true
     }
   ]
 }

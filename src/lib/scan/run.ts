@@ -7,6 +7,7 @@ import { cadenceFor, threadPolicyFor } from "@/lib/settings";
 import { tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { writeThreadMentions } from "@/lib/competitors/threads";
+import { redditScore } from "@/lib/scoring/weights";
 import { judgeThreads, readLeadThreads } from "./comments";
 import { hydrationCap, inFlight } from "./constants";
 import { isSentinel } from "./evidence";
@@ -60,7 +61,10 @@ export function toLead(
     postId,
     commentId,
     kind,
-    score: judgement.score,
+    // The verdict's own score folds the default weights; the lead is ranked
+    // by the ones this project's owner chose.
+    score: redditScore(judgement, project.scoring),
+    quality: judgement.quality,
     fit: judgement.fit,
     intent: judgement.intent,
     engagement: judgement.engagement,

@@ -22,6 +22,7 @@ import { competitorsNamedIn } from "@/lib/competitors/read";
 import { feedPage } from "@/lib/feedPage";
 import { findLead } from "@/lib/leads";
 import { projectForUser } from "@/lib/projects";
+import { projectScoring } from "@/lib/scoring/apply";
 import { isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
 import { sweepShown, sweepStatus } from "@/lib/sweep";
@@ -196,6 +197,7 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
     selection?.kind === "lead" && selection.entry.lead.postId
       ? await competitorsNamedIn(projectId, selection.entry.lead.postId)
       : [];
+  const scoring = selection?.kind === "lead" ? await projectScoring(projectId) : null;
   const selectedId =
     selection === null ? null : selection.kind === "lead" ? selection.entry.id : params.lead ?? null;
   // One sentence, in one of two places: over the list when it has leads to
@@ -298,7 +300,7 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
           }
           pane={
             selection ? (
-              <LeadDetail selection={selection} projectId={projectId} competitors={competitors} />
+              <LeadDetail selection={selection} projectId={projectId} competitors={competitors} scoring={scoring} />
             ) : arriving ? (
               <ArrivingPane />
             ) : null

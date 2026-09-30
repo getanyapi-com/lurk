@@ -15,6 +15,7 @@ function card(id: string, score: number, ageDays: number): CardLead {
     id,
     postId: `post-${id}`,
     score,
+    quality: 0.7,
     fit: 3,
     intent: 2,
     engagement: 1,

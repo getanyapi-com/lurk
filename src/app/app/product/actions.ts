@@ -18,6 +18,8 @@ import type { Destination } from "@/lib/discovery/queries";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { buildProfile } from "@/lib/profile";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
+import { rerankProject } from "@/lib/scoring/apply";
+import { parseScoring, scoringSchema, type ScoringSettings } from "@/lib/scoring/weights";
 import { projectForUser } from "@/lib/projects";
 import { spendAllowance } from "@/lib/throttle";
 import { tierForUser } from "@/lib/tier";
@@ -502,4 +504,32 @@ export async function scanAndOpenLeadsAction(formData: FormData) {
   );
   await scanNowAction(project.id);
   redirect(`/app/leads?project=${project.id}`);
+}
+
+export type ScoringResult = { error: string | null; moved: number };
+
+/**
+ * Saves what counts most when this project's leads are ranked, and re-ranks
+ * the leads it already holds to match. Like the minimum score it is not a fact
+ * a verdict rests on, so nothing is judged again and the profile version
+ * stays. Null puts the project back on the default fold.
+ */
+export async function saveScoringAction(projectId: string, raw: unknown): Promise<ScoringResult> {
+  try {
+    const { project } = await ownedProject(projectId);
+    let scoring: ScoringSettings | null = null;
+    if (raw !== null) {
+      const parsed = scoringSchema.safeParse(raw);
+      if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Those weights could not be read.", moved: 0 };
+      }
+      scoring = parseScoring(parsed.data);
+    }
+    await db().update(projects).set({ scoring }).where(eq(projects.id, project.id));
+    const moved = await rerankProject(project.id, scoring);
+    revalidatePath("/app", "layout");
+    return { error: null, moved };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Nothing was saved.", moved: 0 };
+  }
 }

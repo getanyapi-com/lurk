@@ -6,6 +6,7 @@ import { enqueueOnce, writeProgress } from "@/jobs/enqueue";
 import { projectHasAlertChannel } from "@/lib/alerts/channels";
 import { clientForUser } from "@/lib/anyapi";
 import { config } from "@/lib/config";
+import { parseScoring } from "@/lib/scoring/weights";
 import { LlmCapReachedError } from "@/lib/llm";
 import type { ProductFacts } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
@@ -484,7 +485,7 @@ async function expireStale(projectId: string, now: Date) {
 export async function runXScan(projectId: string, jobId: string | null): Promise<void> {
   const now = new Date();
   const [project] = await db()
-    .select({ id: projects.id, userId: projects.userId, name: projects.name, url: projects.url })
+    .select({ id: projects.id, userId: projects.userId, name: projects.name, url: projects.url, scoring: projects.scoring })
     .from(projects)
     .where(eq(projects.id, projectId));
   if (!project || !xEnabledFor(project.userId)) {
@@ -783,7 +784,7 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
         if (assessment.stage === "lead") {
           // The lead row goes first: a crash before the verdict is stored leaves
           // the post pending, and the next run writes the same lead again.
-          const won = await writeLead(projectId, post, askFrom(assessment));
+          const won = await writeLead(projectId, post, askFrom(assessment, parseScoring(project.scoring)));
           await recordAssessment(evaluation, assessment, won ? "lead" : "merged");
           if (won) {
             counts.leads += 1;

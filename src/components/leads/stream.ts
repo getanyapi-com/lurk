@@ -9,6 +9,8 @@ export type CardLead = {
   /** The thread the lead sits in, its own post or the post its comment answers. */
   postId: string | null;
   score: number;
+  /** The lead model's verdict, which the owner's ranking weights fold with the rest. */
+  quality: number | null;
   fit: number | null;
   intent: number | null;
   engagement: number | null;
@@ -48,6 +50,7 @@ export function toCard(lead: FeedLead): CardLead {
     id: lead.id,
     postId: lead.postId,
     score: lead.score,
+    quality: lead.quality,
     fit: lead.fit,
     intent: lead.intent,
     engagement: lead.engagement,

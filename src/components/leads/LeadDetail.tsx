@@ -10,6 +10,7 @@ import { WorthACommentChip } from "@/components/leads/WorthACommentChip";
 import { verdictFor } from "@/components/leads/verdict";
 import { relativeAge } from "@/lib/format";
 import { intentWord } from "@/lib/scan/words";
+import { rankingSentence, type ScoringSettings } from "@/lib/scoring/weights";
 
 import type { Selection } from "@/components/leads/workspace";
 import { redditAvatar } from "@/lib/redditAvatar";
@@ -19,6 +20,8 @@ type LeadDetailProps = {
   projectId: string;
   /** The project's competitors named in the selected lead's thread. */
   competitors: string[];
+  /** The owner's ranking weights, null for the default, which the ranking line reads. */
+  scoring: ScoringSettings | null;
 };
 
 function Pane({ children }: { children: React.ReactNode }) {
@@ -60,7 +63,7 @@ function ReplyingIn({ title, author, avatarUrl }: { title: string; author: strin
 }
 
 /** The whole post or comment, beside the ledger of facts about who wrote it. */
-export function LeadDetail({ selection, projectId, competitors }: LeadDetailProps) {
+export function LeadDetail({ selection, projectId, competitors, scoring }: LeadDetailProps) {
   if (selection.kind === "held") {
     const item = selection.item;
     const verdict = verdictFor(item);
@@ -144,6 +147,10 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
           <Called label="Why this is a lead" sentence={lead.reason} />
+          {/* A lead kept from before its verdict was stored has no model score to rank from. */}
+          {lead.quality === null ? null : (
+            <Called label="Why it ranks here" sentence={rankingSentence(lead, scoring)} />
+          )}
           {lead.isComment ? (
             <ReplyingIn
               title={lead.title}

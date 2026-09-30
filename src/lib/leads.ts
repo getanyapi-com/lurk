@@ -31,6 +31,7 @@ const postAuthors = aliasedTable(redditAuthors, "post_authors");
 const feedColumns = {
   id: leads.id,
   score: leads.score,
+  quality: leads.quality,
   fit: leads.fit,
   intent: leads.intent,
   engagement: leads.engagement,

@@ -1,0 +1,165 @@
+import { randomUUID } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { foldScore } from "@/lib/scan/constants";
+import { foldScore as xFoldScore } from "@/lib/x/gates";
+import {
+  DEFAULT_SCORING,
+  parseScoring,
+  rankingSentence,
+  redditScore,
+  scoringSchema,
+  xAskScore,
+  type LeadFactors,
+  type ScoringSettings,
+} from "@/lib/scoring/weights";
+
+/**
+ * The owner's ranking weights. Every project that never set any has to keep
+ * the order it had, and two products looking at the same posts have to be
+ * able to rank them differently.
+ */
+
+describe("ranking weights", () => {
+  it("rank exactly as before when nobody chose any", () => {
+    for (let quality = 0; quality <= 1; quality += 0.01) {
+      for (let engagement = 0; engagement <= 4; engagement += 1) {
+        const lead = { quality, intent: 2, engagement, subreddit: "saas" };
+        expect(redditScore(lead, null)).toBe(foldScore(quality, engagement));
+        expect(redditScore(lead, DEFAULT_SCORING)).toBe(foldScore(quality, engagement));
+      }
+    }
+    expect(redditScore({ quality: null, intent: 4, engagement: 4, subreddit: null }, null)).toBe(0);
+  });
+
+  it("keep every qualified lead at 50 or over and every other one under", () => {
+    const heavy: ScoringSettings = {
+      weights: { match: "off", intent: "high", fresh: "off", community: "high" },
+      communities: ["forms"],
+    };
+    expect(redditScore({ quality: 0.5, intent: 0, engagement: 0, subreddit: "other" }, heavy)).toBe(50);
+    expect(redditScore({ quality: 0.49, intent: 4, engagement: 4, subreddit: "forms" }, heavy)).toBeLessThan(50);
+    expect(redditScore({ quality: 0.6, intent: 4, engagement: 0, subreddit: "Forms" }, heavy)).toBe(100);
+  });
+
+  it("let two products rank the same posts in different orders", () => {
+    // One post in the owner's own community, fresh but only looking; one
+    // elsewhere, older, asking outright for a tool. The model likes both alike.
+    const inCommunity: LeadFactors = { quality: 0.75, intent: 2, engagement: 4, subreddit: "shopify" };
+    const outrightAsk: LeadFactors = { quality: 0.75, intent: 4, engagement: 0, subreddit: "smallbusiness" };
+    const communityFirst: ScoringSettings = {
+      weights: { match: "normal", intent: "off", fresh: "low", community: "high" },
+      communities: ["shopify"],
+    };
+    const intentFirst: ScoringSettings = {
+      weights: { match: "normal", intent: "high", fresh: "off", community: "off" },
+      communities: [],
+    };
+    expect(redditScore(inCommunity, communityFirst)).toBeGreaterThan(redditScore(outrightAsk, communityFirst));
+    expect(redditScore(outrightAsk, intentFirst)).toBeGreaterThan(redditScore(inCommunity, intentFirst));
+  });
+
+  it("say in the ranking line what lifted a lead and what held it back, under the weights in force", () => {
+    const lead: LeadFactors = { quality: 0.95, intent: 4, engagement: 0, subreddit: "shopify" };
+    const byDefault = rankingSentence(lead, null);
+    expect(byDefault).toMatch(/^Scores \d+\./);
+    expect(byDefault).toContain("a close match to your product");
+    expect(byDefault).toContain("Held back by an older or crowded thread");
+    expect(byDefault).not.toContain("ready to buy");
+
+    const withIntent = rankingSentence(lead, {
+      weights: { match: "low", intent: "high", fresh: "off", community: "normal" },
+      communities: ["shopify"],
+    });
+    expect(withIntent).toContain("Lifted by being ready to buy, being in a community you favour and a close match");
+    expect(withIntent).not.toContain("thread");
+  });
+
+  it("leave X asks on the judge's fold until the owner chooses, then weigh them the same way", () => {
+    const ask = { fit: 3, intent: 4, engagement: 1 };
+    expect(xAskScore(ask, null)).toBeNull();
+    expect(xAskScore(ask, { weights: { match: "normal", intent: "normal", fresh: "low", community: "off" }, communities: [] })).toBe(
+      xFoldScore(3, 4, 1),
+    );
+    // Only a factor X cannot read is on, so the judge's fold stands.
+    expect(xAskScore(ask, { weights: { match: "off", intent: "off", fresh: "off", community: "high" }, communities: ["x"] })).toBeNull();
+  });
+
+  it("refuse every factor off, and store communities one way", () => {
+    expect(scoringSchema.safeParse({ weights: { match: "off", intent: "off", fresh: "off", community: "off" }, communities: [] }).success).toBe(false);
+    expect(parseScoring({ weights: DEFAULT_SCORING.weights, communities: ["r/Shopify", "shopify", " /r/SaaS "] })?.communities).toEqual([
+      "shopify",
+      "saas",
+    ]);
+    expect(parseScoring({ weights: { match: "loud" }, communities: [] })).toBeNull();
+    expect(parseScoring(null)).toBeNull();
+  });
+});
+
+const hasDatabase = !!process.env.DATABASE_URL;
+
+describe.skipIf(!hasDatabase)("re-ranking a project's stored leads", () => {
+  it("rewrites the scores the new weights move, and puts them back on reset", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { rerankProject, scoringPreview } = await import("@/lib/scoring/apply");
+    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
+    const [project] = await db().insert(schema.projects).values({ userId: user.id, name: "Shopkeep" }).returning();
+    const rows = [
+      { subreddit: "shopify", quality: 0.75, intent: 2, engagement: 4 },
+      { subreddit: "smallbusiness", quality: 0.75, intent: 4, engagement: 0 },
+    ];
+    const ids: string[] = [];
+    for (const row of rows) {
+      const [post] = await db()
+        .insert(schema.redditPosts)
+        .values({
+          id: `p${randomUUID().slice(0, 8)}`,
+          subreddit: row.subreddit,
+          author: "asker",
+          title: `A question in ${row.subreddit}`,
+          url: `https://www.reddit.com/r/${row.subreddit}/comments/${randomUUID().slice(0, 6)}/q/`,
+          createdAt: new Date(),
+        })
+        .returning();
+      const [lead] = await db()
+        .insert(schema.leads)
+        .values({
+          projectId: project.id,
+          postId: post.id,
+          score: foldScore(row.quality, row.engagement),
+          quality: row.quality,
+          fit: 4,
+          intent: row.intent,
+          engagement: row.engagement,
+          stage: "solution_seeking",
+          reason: "r",
+          matchedPhrase: "",
+        })
+        .returning();
+      ids.push(lead.id);
+    }
+    const scores = async () => {
+      const read = await db().select().from(schema.leads).where(eq(schema.leads.projectId, project.id));
+      return ids.map((id) => read.find((row) => row.id === id)!.score);
+    };
+    const before = await scores();
+    expect(before[0]).toBeGreaterThan(before[1]);
+
+    const moved = await rerankProject(project.id, {
+      weights: { match: "normal", intent: "high", fresh: "off", community: "off" },
+      communities: [],
+    });
+    expect(moved).toBe(2);
+    const after = await scores();
+    expect(after[1]).toBeGreaterThan(after[0]);
+
+    const preview = await scoringPreview(project.id);
+    expect([...preview.communities].sort()).toEqual(["shopify", "smallbusiness"]);
+    expect(preview.leads).toHaveLength(2);
+
+    await rerankProject(project.id, null);
+    expect(await scores()).toEqual(before);
+  });
+});

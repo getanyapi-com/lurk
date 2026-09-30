@@ -4,6 +4,7 @@ import { projectCompetitors, projectKeywords, projectSubreddits, projects } from
 import { withoutNegations } from "@/lib/discovery/rank";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts, productText, type ProductFacts } from "@/lib/product";
+import { parseScoring, type ScoringSettings } from "@/lib/scoring/weights";
 import { DEFAULT_SCORE_THRESHOLD } from "./constants";
 import { retrieved, type PlanRow } from "./coverage";
 
@@ -12,6 +13,8 @@ export type ScanProject = {
   userId: string;
   name: string;
   threshold: number;
+  /** How the owner wants leads ranked; null keeps the default fold. */
+  scoring: ScoringSettings | null;
   /** The version of the product facts below; a verdict is only reusable for it. */
   profileVersion: number;
   /** Every query the plan holds, whatever its state, with its watermark. */
@@ -124,6 +127,7 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
     userId: row.userId,
     name: row.name,
     threshold: row.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD,
+    scoring: parseScoring(row.scoring),
     profileVersion: row.profileVersion,
     queries,
     communities,

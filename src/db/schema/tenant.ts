@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -67,6 +68,13 @@ export const projects = pgTable("projects", {
   geography: text("geography"),
   budgetFit: text("budget_fit"),
   scoreThreshold: integer("score_threshold"),
+  /**
+   * What the owner says matters most when leads are ranked: a level per
+   * factor and the communities to favour (lib/scoring/weights.ts). Null means
+   * they never chose, and every scorer keeps its own fold. Like the minimum
+   * score it changes no verdict, so saving it re-ranks stored leads in place.
+   */
+  scoring: jsonb("scoring"),
   /**
    * Bumped on every edit to the facts a judgement is made against. A stored
    * evaluation is only reusable for the version it was made under, so editing
@@ -246,6 +254,11 @@ export const leads = pgTable(
     postId: text("post_id").references(() => redditPosts.id, { onDelete: "cascade" }),
     commentId: text("comment_id").references(() => redditComments.id, { onDelete: "cascade" }),
     score: integer("score").notNull(),
+    /**
+     * The lead model's verdict, 0-1 with its threshold at 0.5, kept so the
+     * owner's ranking weights can re-rank the lead without judging it again.
+     */
+    quality: doublePrecision("quality"),
     fit: integer("fit"),
     intent: integer("intent"),
     engagement: integer("engagement"),

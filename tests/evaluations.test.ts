@@ -109,6 +109,7 @@ describe("judging one comment once", () => {
     userId: "user-1",
     name: "Formcraft",
     threshold: 50,
+    scoring: null,
     profileVersion: 1,
     queries: [],
     communities: [],

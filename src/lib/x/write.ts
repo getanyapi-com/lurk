@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { xEvaluations, xLeads } from "@/db/schema";
+import { xAskScore, type ScoringSettings } from "@/lib/scoring/weights";
 import { X_SCORER_VERSION } from "./constants";
 import type { XAssessment } from "./judge";
 import type { StoredXPost } from "./store";
@@ -159,11 +160,15 @@ export type XLeadWrite = {
   moment?: string | null;
 };
 
-/** A complete-level buyer verdict as the ask it shows. */
-export function askFrom(assessment: XAssessment): XLeadWrite {
+/**
+ * A complete-level buyer verdict as the ask it shows, ranked by the owner's
+ * weights when they chose any (lib/scoring/weights.ts) and by the judge's own
+ * fold when they did not.
+ */
+export function askFrom(assessment: XAssessment, scoring: ScoringSettings | null = null): XLeadWrite {
   return {
     kind: "ask",
-    score: assessment.score,
+    score: xAskScore(assessment, scoring) ?? assessment.score,
     fit: assessment.fit,
     intent: assessment.intent,
     engagement: assessment.engagement,

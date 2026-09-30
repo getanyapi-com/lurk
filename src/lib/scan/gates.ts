@@ -143,5 +143,6 @@ export function judge(item: Assessment, source: ScorableItem): Judgement {
     score: foldScore(item.quality, engagement),
     matchedPhrase: item.needEvidence?.quote ?? "",
     sellerSide: item.relationship === "seller",
+    subreddit: source.subreddit,
   };
 }

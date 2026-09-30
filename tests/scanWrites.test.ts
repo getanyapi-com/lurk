@@ -27,6 +27,7 @@ function judgement(score: number): Judgement {
     score,
     matchedPhrase: "conditional logic",
     sellerSide: false,
+    subreddit: "forms",
   };
 }
 
@@ -96,6 +97,7 @@ describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and lead
     const base = {
       projectId: project.id,
       postId: post.id,
+      quality: 0.7,
       fit: 4,
       intent: 3,
       engagement: 2,
@@ -128,6 +130,7 @@ describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and lead
       postId: post.id,
       commentId: null,
       score: 60,
+      quality: 0.55,
       fit: 3,
       intent: 1,
       engagement: 2,

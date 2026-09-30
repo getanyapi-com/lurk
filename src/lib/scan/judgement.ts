@@ -76,6 +76,8 @@ export type Judgement = Assessment & {
   score: number;
   matchedPhrase: string;
   sellerSide: boolean;
+  /** Where the person posted, which the owner's ranking weights may favour (lib/scoring/weights.ts). */
+  subreddit: string;
 };
 
 /** What the scorer is told about one candidate. */

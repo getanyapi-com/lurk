@@ -13,6 +13,8 @@ export type LeadRow = {
   /** Which lane the feed shows this in: an ask, or a thread worth a comment. */
   kind: LeadKind;
   score: number;
+  /** The lead model's verdict, 0-1, which the owner's weights re-rank from. */
+  quality: number | null;
   /** The model's 0-4 scales. Null when the evidence could not establish one. */
   fit: number | null;
   intent: number | null;
@@ -42,6 +44,7 @@ export function lastPerKey<T>(rows: T[], key: (row: T) => string): T[] {
 const REJUDGED = {
   kind: sql`excluded.kind`,
   score: sql`excluded.score`,
+  quality: sql`excluded.quality`,
   fit: sql`excluded.fit`,
   intent: sql`excluded.intent`,
   engagement: sql`excluded.engagement`,

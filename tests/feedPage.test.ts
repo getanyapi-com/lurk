@@ -144,6 +144,7 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
         commentId: null,
         kind: "buyer",
         score: 60,
+        quality: 0.55,
         fit: 3,
         intent: 3,
         engagement: 2,

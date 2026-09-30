@@ -13,6 +13,7 @@ function card(id: string): CardLead {
     id,
     postId: `post-${id}`,
     score: 70,
+    quality: 0.7,
     fit: 3,
     intent: 2,
     engagement: 1,
