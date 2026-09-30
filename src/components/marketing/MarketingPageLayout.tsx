@@ -23,12 +23,17 @@ export function MarketingPageLayout({ variant }: { variant: Variant }) {
         <section className="hero-layout" aria-labelledby="marketing-title">
           <div className="hero-copy">
             <h1 id="marketing-title">
-              Get your site into <BrandWord name="Google" />
-              <br className="hero-break" /> and <BrandStack /> AI answers. Free.
+              <span className="hero-line">
+                Monitor <BrandWord name="Reddit" /> and <BrandWord name="X" /> to find customers,
+              </span>{" "}
+              <span className="hero-line">
+                get cited by <BrandStack /> AI, and rank on <BrandWord name="Google" />.
+              </span>
             </h1>
             <p className="hero-description">
               <BrandWord name="Reddit" /> threads are what search and AI answers cite. lurk finds
-              the ones about what you sell, scores who is asking, and tells you why. You reply.
+              the people asking for what you sell, leaving your competitors, or building their own,
+              scores who is asking, and tells you why. You reply. Free.
             </p>
             <CtaRow />
             <div className="hero-promises">

@@ -7,7 +7,8 @@ const COLUMNS: { title: string; links: [React.ReactNode, string, string][] }[] =
   {
     title: "Discover",
     links: [
-      ["Leads", "#features", "leads"],
+      [<BrandWord name="Reddit" label="Reddit leads" key="leads" />, "#features", "leads"],
+      [<BrandWord name="X" label="X leads" key="x" />, "#x", "x"],
       [<BrandWord name="Reddit" label="Reddit SEO" key="seo" />, "#seo", "seo"],
       ["Competitors", "#decide", "competitors"],
     ],

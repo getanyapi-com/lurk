@@ -7,7 +7,7 @@ import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { ThemeScript } from "@/components/ThemeScript";
 import { PRODUCT_NAME_WITH_PROVIDER, PRODUCT_URL } from "@/lib/brand";
 
-const DESCRIPTION = "Find Reddit buyer intent and see what every lead's data cost.";
+const DESCRIPTION = "Monitor Reddit and X to find customers, get cited by AI, and rank on Google.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(PRODUCT_URL),

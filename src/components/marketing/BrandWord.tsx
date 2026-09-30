@@ -9,7 +9,8 @@ export const BRAND_MARKS = {
   Claude: "/brands/claude.svg",
   Slack: "/brands/slack-color.svg",
   Discord: "/brands/discord.svg",
-  X: "/brands/x.svg",
+  // Black on a white disc, so it reads on both themes as Reddit's does.
+  X: "/brands/x-disc.svg",
 } as const;
 export type BrandName = keyof typeof BRAND_MARKS;
 

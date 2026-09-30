@@ -135,6 +135,7 @@ export const MOCK_RAIL: {
     label: "Discover",
     items: [
       { name: "Leads", icon: "radar" },
+      { name: "X leads", icon: "x" },
       { name: "Reddit SEO", icon: "search" },
     ],
   },

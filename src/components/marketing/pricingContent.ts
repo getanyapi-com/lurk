@@ -2,7 +2,7 @@
 export const PRICING_OBSERVED = "2026-09-06";
 
 export const MONTHLY_PLANS = [
-  { name: "lurk", domain: "lurk.so", mark: "/icon.svg", usd: 0, note: "Dashboard, AI scoring, competitors, Reddit SEO" },
+  { name: "lurk", domain: "lurk.so", mark: "/icon.svg", usd: 0, note: "Reddit and X leads, AI scoring, competitors, Reddit SEO" },
   {
     name: "F5Bot",
     domain: "f5bot.com",

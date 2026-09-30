@@ -16,23 +16,27 @@ const ICONS: Record<RailIcon, React.ComponentType<{ className?: string }>> = {
   settings: Settings,
   x: XMark,
 };
+const TALLY = { name: "Tally", domain: "tally.so" };
+
 type MockFrameProps = {
   active: string;
+  /** The saved example project the window shows. Tally unless the data came from another. */
+  project?: { name: string; domain: string };
   title: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 };
 
 /** A fitted 16:10 product window. Container units keep the whole screen in frame. */
-export function MockFrame({ active, title, actions, children }: MockFrameProps) {
+export function MockFrame({ active, project = TALLY, title, actions, children }: MockFrameProps) {
   return (
     <div className="mock-frame" aria-label={`${title} product preview`}>
       <div className="mock-screen">
         <aside className="mock-rail">
           <div className="mock-project">
-            <BrandImage name="Tally" domain="tally.so" size={24} />
+            <BrandImage name={project.name} domain={project.domain} size={24} />
             <span>
-              Tally<small>Saved example project</small>
+              {project.name}<small>Saved example project</small>
             </span>
           </div>
           {MOCK_RAIL.map((group) => (

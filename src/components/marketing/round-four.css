@@ -181,7 +181,8 @@
 .collage-actions svg {
   color: var(--fg-muted);
 }
-.seo-tiles {
+.seo-tiles,
+.x-tiles {
   padding-bottom: 80px;
   border-bottom: 1px solid var(--m-rule);
 }
@@ -370,7 +371,7 @@
 }
 .quiet-reason p {
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -547,4 +548,184 @@
   .plan-callout {
     display: none;
   }
+}
+/* X leads: saved posts drawn as X draws them, stacked in each tile. */
+/* Tiles grow to fit both posts whole; the row keeps them one height. */
+.x-tiles .three-up {
+  grid-template-rows: auto auto;
+  row-gap: 0;
+}
+.x-tiles .pastel-tile {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+}
+.x-art {
+  flex: 1;
+  aspect-ratio: auto;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 14px;
+}
+.x-art-product {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--m-glass);
+  box-shadow: inset 0 0 0 1px var(--m-outline);
+  font: 11px var(--font-mono);
+  color: var(--fg-muted);
+}
+/* A post as X's timeline draws it, in X's own colours for each theme. */
+.x-post {
+  --x-bg: #fff;
+  --x-fg: #0f1419;
+  --x-muted: #536471;
+  --x-line: #eff3f4;
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px 10px;
+  border-radius: 16px;
+  background: var(--x-bg);
+  color: var(--x-fg);
+  box-shadow: 0 0 0 1px var(--x-line), var(--m-fragment-shadow);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 19px;
+}
+[data-theme="dark"] .x-post {
+  --x-bg: #000;
+  --x-fg: #e7e9ea;
+  --x-muted: #71767b;
+  --x-line: #2f3336;
+}
+.x-post:nth-child(3) {
+  margin-left: 8%;
+}
+.x-post-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.x-post-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.x-post-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.x-post-head strong {
+  flex-shrink: 0;
+  max-width: 60%;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.x-post-verified {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  fill: #1d9bf0;
+}
+.x-post-head .x-post-muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.x-post-muted {
+  color: var(--x-muted);
+}
+.x-post-logo {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--x-fg);
+}
+.x-post-link {
+  color: #1d9bf0;
+}
+.x-post-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.x-post-more {
+  display: block;
+}
+.x-post-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  color: var(--x-muted);
+  font-size: 13px;
+}
+.x-post-actions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 36px;
+}
+.x-post-actions svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.75;
+}
+.x-post-actions .x-post-share {
+  min-width: 0;
+  gap: 12px;
+}
+.mock-x-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.mock-x-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.mock-x-row:last-child {
+  border-bottom: 0;
+}
+.mock-x-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mock-x-copy strong {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mock-x-copy small {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 10px var(--font-mono);
+  color: var(--fg-muted);
+}
+.mock-x-copy small svg {
+  width: 11px;
+  height: 11px;
 }
