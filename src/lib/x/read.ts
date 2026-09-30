@@ -12,6 +12,7 @@ import {
   FIRST_LOOK_HOURS,
   PENDING_STAGES,
 } from "./constants";
+import { xLeadNotMuted } from "@/lib/mutes";
 import { canonicalUrl, ownWords } from "./map";
 import { xQuiet, type XQuiet } from "./quiet";
 import { reachScore, replyWindowOpen } from "./reach";
@@ -259,7 +260,7 @@ export async function listXLeads(
   now = new Date(),
 ): Promise<XLeadCard[]> {
   const rows = await leadRows()
-    .where(and(eq(xLeads.projectId, projectId), eq(xLeads.status, filter.status), isNull(xPosts.unavailableAt), whenWhere(filter)))
+    .where(and(eq(xLeads.projectId, projectId), eq(xLeads.status, filter.status), isNull(xPosts.unavailableAt), whenWhere(filter), xLeadNotMuted()))
     .orderBy(desc(xPosts.createdAt), desc(xLeads.score))
     .limit(200);
   const cards = rows.map((row) => leadCard(row, now));
@@ -546,6 +547,7 @@ export async function listXFaces(projectId: string, filter: XFeedFilter): Promis
         eq(xLeads.status, filter.status),
         isNull(xPosts.unavailableAt),
         whenWhere(filter),
+        xLeadNotMuted(),
       ),
     )
     .orderBy(desc(xLeads.score))
@@ -575,6 +577,7 @@ export async function newXLeadCount(projectId: string): Promise<number> {
         eq(xLeads.status, "new"),
         isNull(xPosts.unavailableAt),
         gte(xPosts.createdAt, windowStart(FEED_WINDOW_DAYS)),
+        xLeadNotMuted(),
       ),
     );
   return row?.count ?? 0;

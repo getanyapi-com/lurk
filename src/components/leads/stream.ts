@@ -16,6 +16,8 @@ export type CardLead = {
   engagement: number | null;
   stage: string | null;
   kind: string;
+  /** Where the user put it: new, replied, hidden, not_fit, or resolved by the scan. */
+  status: string;
   reason: string | null;
   matchedPhrase: string | null;
   title: string;
@@ -56,6 +58,7 @@ export function toCard(lead: FeedLead): CardLead {
     engagement: lead.engagement,
     stage: lead.stage,
     kind: lead.kind,
+    status: lead.status,
     reason: lead.reason,
     matchedPhrase: lead.matchedPhrase,
     title: lead.title,

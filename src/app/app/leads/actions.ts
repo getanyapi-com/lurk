@@ -5,7 +5,9 @@ import { dismissAlertsOffer, turnOnDiscordAlerts, turnOnEmailAlerts } from "@/li
 import { requireLocalUser } from "@/lib/auth";
 import { toRow } from "@/components/leads/stream";
 import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
+import { markThreadReplied, redditLeadThread, reopenThread } from "@/lib/handled";
 import { leadInSubreddit, listLeads, setLeadStatus } from "@/lib/leads";
+import { addMute } from "@/lib/mutes";
 import { promoPolicyFor } from "@/lib/profile";
 import { projectForUser } from "@/lib/projects";
 import { sweepStatus, sweepThreadDetail, type SweepStatus } from "@/lib/sweep";
@@ -22,6 +24,36 @@ async function ownedProject(projectId: string) {
 export async function hideLeadAction(projectId: string, leadId: string) {
   await ownedProject(projectId);
   await setLeadStatus(projectId, leadId, "hidden", null);
+  revalidatePath("/app", "layout");
+}
+
+/**
+ * The user answered the thread: it and every lead found in it later leave New,
+ * the rail's count and every alert channel, and stay under Replied.
+ */
+export async function repliedLeadAction(projectId: string, leadId: string) {
+  await ownedProject(projectId);
+  const thread = await redditLeadThread(projectId, leadId);
+  if (thread) {
+    await markThreadReplied(projectId, "reddit", thread);
+  }
+  revalidatePath("/app", "layout");
+}
+
+/** Takes Replied back: the thread's leads are new again, and later ones arrive as before. */
+export async function reopenLeadAction(projectId: string, leadId: string) {
+  await ownedProject(projectId);
+  const thread = await redditLeadThread(projectId, leadId);
+  if (thread) {
+    await reopenThread(projectId, "reddit", thread);
+  }
+  revalidatePath("/app", "layout");
+}
+
+/** Nothing from this community again, in the feed or in any alert, until the mute is taken off. */
+export async function muteSubredditAction(projectId: string, subreddit: string) {
+  await ownedProject(projectId);
+  await addMute(projectId, "subreddit", subreddit);
   revalidatePath("/app", "layout");
 }
 

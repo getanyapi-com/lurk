@@ -5,11 +5,13 @@ import type { LeadKind } from "@/lib/scan/gates";
 export type { LeadKind };
 
 /**
+ * `replied` is the owner saying they answered the thread, and it covers the
+ * whole thread, the leads found in it later included (lib/handled.ts).
  * `resolved` is written by the scan, not by the user: the person said in the
  * thread that their need is met, so the lead leaves the feed without pretending
  * the user judged it.
  */
-export type LeadStatus = "new" | "hidden" | "not_fit" | "resolved";
+export type LeadStatus = "new" | "replied" | "hidden" | "not_fit" | "resolved";
 
 /**
  * The date pills over the feed. Days, plus `all`: the first scan reaches back
@@ -50,7 +52,7 @@ export type FeedParams = {
   lead?: string;
 };
 
-const STATUSES: LeadStatus[] = ["new", "hidden", "not_fit", "resolved"];
+const STATUSES: LeadStatus[] = ["new", "replied", "hidden", "not_fit", "resolved"];
 
 function pad(part: number): string {
   return String(part).padStart(2, "0");

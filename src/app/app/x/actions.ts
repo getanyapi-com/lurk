@@ -3,12 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { kickScheduler } from "@/jobs/scheduler";
 import { requireLocalUser } from "@/lib/auth";
+import { markThreadReplied } from "@/lib/handled";
 import { projectForUser } from "@/lib/projects";
 import { pressForJob } from "@/lib/throttle";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { openX } from "@/lib/x/open";
 import { markLanesDue } from "@/lib/x/run";
-import { setXLeadStatus } from "@/lib/x/write";
+import { setXLeadStatus, xLeadConversation } from "@/lib/x/write";
 
 /** The caller's user, once the project is theirs and X is on for them. */
 async function ownedXProject(projectId: string) {
@@ -47,10 +48,17 @@ export async function scanXNowAction(projectId: string) {
   revalidatePath("/app/x");
 }
 
-/** The user answered it on X: it leaves New and the rail's count, and stays under Replied. */
+/**
+ * The user answered it on X: its conversation leaves New and the rail's count
+ * and stays under Replied, and no alert channel carries an ask from it again.
+ */
 export async function repliedXLeadAction(projectId: string, leadId: string) {
   await ownedXProject(projectId);
-  await setXLeadStatus(projectId, leadId, "replied", null);
+  // The whole conversation: other asks in it, and later ones, are the same thread answered.
+  const conversation = await xLeadConversation(projectId, leadId);
+  if (conversation) {
+    await markThreadReplied(projectId, "x", conversation);
+  }
   revalidatePath("/app", "layout");
 }
 

@@ -47,3 +47,18 @@ export function platformsOf(leads: Pick<DigestLead, "platform">[]): LeadPlatform
   );
   return carried.length > 0 ? carried : ["reddit"];
 }
+
+/** What each of an alert's two links says. */
+export const REPLIED_LABEL = "Mark replied";
+
+export function muteLabel(lead: Pick<DigestLead, "subreddit">): string {
+  return `Mute r/${lead.subreddit}`;
+}
+
+/** An alert's links for one lead, as label and address, in the order they are shown. */
+export function actLinksOf(lead: Pick<DigestLead, "subreddit" | "repliedUrl" | "muteUrl">): { label: string; url: string }[] {
+  return [
+    ...(lead.repliedUrl ? [{ label: REPLIED_LABEL, url: lead.repliedUrl }] : []),
+    ...(lead.muteUrl ? [{ label: muteLabel(lead), url: lead.muteUrl }] : []),
+  ];
+}

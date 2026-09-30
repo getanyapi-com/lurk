@@ -1,6 +1,7 @@
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditAuthors, redditComments, redditPosts, xLeads, xPosts, xProjects } from "@/db/schema";
+import { redditLeadNotMuted, xLeadNotMuted } from "@/lib/mutes";
 import { canonicalUrl, ownWords } from "@/lib/x/map";
 import { headlineOf } from "@/lib/x/read";
 import type { SelectableLead } from "./select";
@@ -46,6 +47,7 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
         eq(leads.projectId, projectId),
         eq(leads.status, "new"),
         gte(leads.foundAt, since),
+        redditLeadNotMuted(),
       ),
     );
   return rows.map((row) => ({
@@ -107,6 +109,7 @@ export async function newXLeadsSince(projectId: string, since: Date): Promise<Se
         or(isNull(xProjects.alerts), eq(xProjects.alerts, true)),
         gte(xLeads.foundAt, since),
         isNull(xPosts.unavailableAt),
+        xLeadNotMuted(),
       ),
     );
   return rows.map(({ lead, post }) => xAskLead(lead, post));

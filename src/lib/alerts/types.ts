@@ -43,6 +43,10 @@ export type DigestLead = {
   threadId?: string;
   numComments: number | null;
   createdAt: Date;
+  /** One click that marks the thread replied, so nothing in it is sent again. Absent in the invite. */
+  repliedUrl?: string;
+  /** One click that mutes the lead's subreddit. Absent on X and in the invite. */
+  muteUrl?: string;
 };
 
 /** One message: which project, what window, and the leads inside it. */

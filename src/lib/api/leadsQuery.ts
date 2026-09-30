@@ -6,7 +6,7 @@ import { ApiError } from "./responses";
 
 export type LeadStatusFilter = LeadStatus | "all";
 
-const STATUSES: LeadStatusFilter[] = ["new", "hidden", "not_fit", "resolved", "all"];
+const STATUSES: LeadStatusFilter[] = ["new", "replied", "hidden", "not_fit", "resolved", "all"];
 
 /** Page size, and the cap the reference products in this category publish. */
 export const DEFAULT_LIMIT = 50;
