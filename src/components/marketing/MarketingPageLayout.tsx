@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { MarketingNav } from "./MarketingNav";
 import { MarketingFooter } from "./MarketingFooter";
 import { MarketingShowcase } from "./MarketingShowcase";
@@ -8,6 +8,7 @@ import { MotionPanel } from "./MotionPanel";
 import { CtaRow } from "./CtaRow";
 import { BrandStack, BrandWord } from "./BrandWord";
 import type { Variant } from "./VariantSwitcher";
+import { REPO_URL } from "./researchContent";
 import "./marketing.css";
 import "./below-fold.css";
 import "./round-three.css";
@@ -30,6 +31,13 @@ export function MarketingPageLayout({ variant }: { variant: Variant }) {
                 get cited by <BrandStack /> AI, and rank on <BrandWord name="Google" />.
               </span>
             </h1>
+            <p className="hero-description hero-open">
+              Free.{" "}
+              <a href={REPO_URL} target="_blank" rel="noopener">
+                Open source
+                <ArrowUpRight aria-hidden="true" />
+              </a>
+            </p>
             <CtaRow />
             <div className="hero-promises">
               <span>
@@ -43,7 +51,6 @@ export function MarketingPageLayout({ variant }: { variant: Variant }) {
             </div>
           </div>
           <div className="hero-product">
-            <p className="preview-caption">Preview built from real saved threads.</p>
             <MarketingShowcase />
           </div>
         </section>
