@@ -1,7 +1,7 @@
 # lurk
 
 <p align="center">
-  <img src=".github/banner.png" alt="lurk on a MacBook and an iPhone, showing a scored feed of Reddit leads. Powered by AnyAPI." width="900">
+  <img src=".github/banner.png" alt="lurk on a MacBook showing X leads for Cal.com and an iPhone showing Reddit leads. Monitor Reddit and X to find customers, get cited by AI, and rank on Google. Powered by AnyAPI." width="900">
 </p>
 
 lurk is a Reddit buyer-intent finder you can self-host for free, hosted at
