@@ -82,19 +82,22 @@ function XPostCard({ post }: { post: MockXPost }) {
   );
 }
 
-const TILES: { title: string; tone: string; posts: MockXPost[] }[] = [
+const TILES: { title: string; caption: string; tone: string; posts: MockXPost[] }[] = [
   {
     title: "Asking for what you sell",
+    caption: "Someone wants a tool like yours and says what it has to do.",
     tone: "pastel-pink",
     posts: [X_ROUND_ROBIN, X_SELF_HOST],
   },
   {
     title: "Leaving a competitor",
+    caption: "A license ran out or the price went up, and they are asking what to use instead.",
     tone: "pastel-teal",
     posts: [X_LICENSE_RAN_OUT, X_TOO_EXPENSIVE],
   },
   {
     title: "Building their own",
+    caption: "They built or vibe coded their own. Big posts are ranked by reach, so a reply gets seen.",
     tone: "pastel-mint",
     posts: [X_CALENDLY_PLUS, X_OWN_RECORDER],
   },
@@ -129,7 +132,7 @@ export function MarketingXTiles() {
               ))}
             </div>
             <figcaption>
-              <strong>{tile.title}</strong>
+              <strong>{tile.title}</strong> {tile.caption}
             </figcaption>
           </figure>
         ))}
