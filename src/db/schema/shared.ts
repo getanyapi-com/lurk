@@ -77,21 +77,25 @@ export const postReadings = pgTable("post_readings", {
   readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const redditComments = pgTable("reddit_comments", {
-  id: text("id").primaryKey(),
-  postId: text("post_id")
-    .notNull()
-    .references(() => redditPosts.id, { onDelete: "cascade" }),
-  parentId: text("parent_id"),
-  author: text("author"),
-  body: text("body"),
-  score: integer("score"),
-  /** The comment's own Reddit link, so a lead card opens on the comment. */
-  permalink: text("permalink"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
-  raw: jsonb("raw"),
-});
+export const redditComments = pgTable(
+  "reddit_comments",
+  {
+    id: text("id").primaryKey(),
+    postId: text("post_id")
+      .notNull()
+      .references(() => redditPosts.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    author: text("author"),
+    body: text("body"),
+    score: integer("score"),
+    /** The comment's own Reddit link, so a lead card opens on the comment. */
+    permalink: text("permalink"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    raw: jsonb("raw"),
+  },
+  (t) => [index("reddit_comments_post_idx").on(t.postId)],
+);
 
 export const subreddits = pgTable("subreddits", {
   name: text("name").primaryKey(),
@@ -174,5 +178,8 @@ export const searchRunPosts = pgTable(
       .references(() => redditPosts.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.searchRunId, t.postId] })],
+  (t) => [
+    primaryKey({ columns: [t.searchRunId, t.postId] }),
+    index("search_run_posts_post_idx").on(t.postId),
+  ],
 );

@@ -247,6 +247,7 @@ export const candidateSources = pgTable(
       t.sourceKind,
       t.sourceKey,
     ),
+    index("candidate_sources_post_idx").on(t.postId),
   ],
 );
 
@@ -296,6 +297,8 @@ export const leads = pgTable(
   (t) => [
     index("leads_project_score_idx").on(t.projectId, t.score.desc()),
     index("leads_project_kind_idx").on(t.projectId, t.kind),
+    index("leads_post_idx").on(t.postId),
+    index("leads_comment_idx").on(t.commentId),
     uniqueIndex("leads_project_post_idx")
       .on(t.projectId, t.postId)
       .where(sql`${t.commentId} is null`),
@@ -347,20 +350,26 @@ export const leadEvaluations = pgTable(
       .on(t.projectId, t.commentId)
       .where(sql`${t.commentId} is not null`),
     index("lead_evaluations_project_decision_idx").on(t.projectId, t.decision),
+    index("lead_evaluations_post_idx").on(t.postId),
+    index("lead_evaluations_comment_idx").on(t.commentId),
   ],
 );
 
-export const seoOpportunities = pgTable("seo_opportunities", {
-  id: id(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  keyword: text("keyword").notNull(),
-  postId: text("post_id").references(() => redditPosts.id, { onDelete: "set null" }),
-  position: integer("position"),
-  competitorPresent: boolean("competitor_present").notNull().default(false),
-  refreshedAt: timestamp("refreshed_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const seoOpportunities = pgTable(
+  "seo_opportunities",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    keyword: text("keyword").notNull(),
+    postId: text("post_id").references(() => redditPosts.id, { onDelete: "set null" }),
+    position: integer("position"),
+    competitorPresent: boolean("competitor_present").notNull().default(false),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("seo_opportunities_post_idx").on(t.postId)],
+);
 
 export const painThemes = pgTable("pain_themes", {
   id: id(),

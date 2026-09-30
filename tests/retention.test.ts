@@ -60,6 +60,32 @@ describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
     expect(left.map((row) => row.id).sort()).toEqual([led.id, ranked.id].sort());
   });
 
+  it("works through more expired posts than one batch holds", async () => {
+    const { db, schema, deleteExpiredPosts, inArray, led, ranked, loose } = await fixture();
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const longAgo = Math.floor(Date.now() / 1000) - 600 * 24 * 3600;
+    const more = await upsertPosts(
+      [1, 2, 3, 4].map((n) => ({
+        id: `p${randomUUID().slice(0, 8)}`,
+        subreddit: "philly",
+        author: "asker",
+        title: `Another old thread ${n}`,
+        body: "Still nobody takes under 21.",
+        permalink: `/r/philly/comments/more${n}/old/`,
+        createdUtc: longAgo,
+      })),
+    );
+
+    await deleteExpiredPosts(new Date(), 2);
+
+    const ids = [led.id, ranked.id, loose.id, ...more.map((post) => post.id)];
+    const left = await db()
+      .select({ id: schema.redditPosts.id })
+      .from(schema.redditPosts)
+      .where(inArray(schema.redditPosts.id, ids));
+    expect(left.map((row) => row.id).sort()).toEqual([led.id, ranked.id].sort());
+  });
+
   /**
    * The scorer report is read months after the calls it reports on, so it only
    * works if retention cannot take its rows away. llm_usage points at a project

@@ -35,6 +35,8 @@ export const competitorMentions = pgTable(
   },
   (t) => [
     index("competitor_mentions_project_found_at_idx").on(t.projectId, t.foundAt),
+    index("competitor_mentions_post_idx").on(t.postId),
+    index("competitor_mentions_comment_idx").on(t.commentId),
     uniqueIndex("competitor_mentions_project_competitor_post_idx")
       .on(t.projectId, t.competitor, t.postId)
       .where(sql`comment_id is null`),
