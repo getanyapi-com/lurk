@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/brand";
 import { shortAge } from "@/lib/format";
 import { postJson } from "./outbound";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
@@ -106,6 +107,9 @@ export function slackPayload(digest: Digest) {
  */
 export function discordPayload(digest: Digest) {
   return {
+    // A webhook posts under whatever name it was made with; this keeps it lurk.
+    username: PRODUCT_NAME,
+    avatar_url: `${digest.appUrl}/email/lurk-discord.png`,
     content: headline(digest),
     embeds: [
       ...digest.leads.map((lead) => ({

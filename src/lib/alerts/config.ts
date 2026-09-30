@@ -36,3 +36,14 @@ export function slackApp(): SlackApp | null {
   }
   return { clientId: SLACK_CLIENT_ID, clientSecret: SLACK_CLIENT_SECRET };
 }
+
+export type DiscordApp = { clientId: string; clientSecret: string };
+
+/** The Discord app behind Add to Discord, or null when only paste-a-URL is on. */
+export function discordApp(): DiscordApp | null {
+  const { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET } = config();
+  if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
+    return null;
+  }
+  return { clientId: DISCORD_CLIENT_ID, clientSecret: DISCORD_CLIENT_SECRET };
+}

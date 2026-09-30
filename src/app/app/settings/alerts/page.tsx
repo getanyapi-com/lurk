@@ -3,30 +3,30 @@ import { AddChannelForm } from "@/components/alerts/AddChannelForm";
 import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChannelList";
 import { EmptyState } from "@/components/EmptyState";
 import { describeTarget, listChannels } from "@/lib/alerts/channels";
-import { slackApp } from "@/lib/alerts/config";
+import { discordApp, slackApp } from "@/lib/alerts/config";
 import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
 import { activeProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
-type AlertsPageProps = { searchParams: Promise<{ project?: string; slack?: string }> };
+type AlertsPageProps = { searchParams: Promise<{ project?: string; slack?: string; discord?: string }> };
 
-/** What the page says after Add to Slack sends the person back. */
-function slackOutcome(status: string | undefined): { ok: boolean; text: string } | null {
+/** What the page says after Add to Slack or Add to Discord sends the person back. */
+function installOutcome(service: string, status: string | undefined): { ok: boolean; text: string } | null {
   if (!status) {
     return null;
   }
   if (status === "connected") {
-    return { ok: true, text: "Slack is connected. The next digest lands in that channel." };
+    return { ok: true, text: `${service} is connected. The next digest lands in that channel.` };
   }
   const reason = status.startsWith("failed:") ? status.slice("failed:".length) : null;
-  return { ok: false, text: reason ? `Slack did not connect: ${reason}` : "Slack did not connect." };
+  return { ok: false, text: reason ? `${service} did not connect: ${reason}` : `${service} did not connect.` };
 }
 
 export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const user = await requireLocalUser();
-  const { project: requested, slack } = await searchParams;
-  const outcome = slackOutcome(slack);
+  const { project: requested, slack, discord } = await searchParams;
+  const outcome = installOutcome("Slack", slack) ?? installOutcome("Discord", discord);
   const project = await activeProject(user.id, requested);
   if (!project) {
     return (
@@ -84,6 +84,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
         customWebhooksAtCap={allowance.atCap}
         hourlyAllowed={limits?.alertCadence !== "daily"}
         slackInstall={slackApp() !== null}
+        discordInstall={discordApp() !== null}
       />
     </div>
   );

@@ -21,7 +21,8 @@ vi.mock("nodemailer", () => ({
 }));
 import { digestSubject, leadAge, renderDigestHtml, renderDigestText } from "@/lib/alerts/digest";
 import { payloadFor, sendToChannel } from "@/lib/alerts/send";
-import { emailSender, slackApp } from "@/lib/alerts/config";
+import { discordApp, emailSender, slackApp } from "@/lib/alerts/config";
+import { discordInstallUrl, exchangeDiscordCode } from "@/lib/alerts/discord";
 import {
   exchangeSlackCode,
   slackInstallUrl,
@@ -614,5 +615,64 @@ describe("add to Slack", () => {
     vi.stubEnv("SLACK_CLIENT_SECRET", "shh");
     vi.stubGlobal("fetch", async () => Response.json({ ok: false, error: "invalid_code" }));
     await expect(exchangeSlackCode("stale")).rejects.toThrow("invalid_code");
+  });
+});
+
+describe("add to Discord", () => {
+  beforeEach(() => {
+    vi.stubEnv("DATABASE_URL", "postgres://reddit_leads@localhost:5433/reddit_leads");
+    vi.stubEnv("APP_ENCRYPTION_KEY", Buffer.alloc(32).toString("base64"));
+    vi.stubEnv("APP_URL", "https://lurk.so/");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("is off until both halves of the app are set", () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "123");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "");
+    expect(discordApp()).toBeNull();
+    expect(() => discordInstallUrl("s")).toThrow("DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET");
+  });
+
+  it("sends the person to Discord asking only for a webhook, back to this instance", () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "123");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "shh");
+    const url = new URL(discordInstallUrl("state-1"));
+    expect(url.origin + url.pathname).toBe("https://discord.com/oauth2/authorize");
+    expect(url.searchParams.get("scope")).toBe("webhook.incoming");
+    expect(url.searchParams.get("response_type")).toBe("code");
+    expect(url.searchParams.get("client_id")).toBe("123");
+    expect(url.searchParams.get("state")).toBe("state-1");
+    expect(url.searchParams.get("redirect_uri")).toBe("https://lurk.so/connect/discord/callback");
+  });
+
+  it("swaps the code for the webhook, building its URL when Discord leaves it out", async () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "123");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "shh");
+    const seen: { url: string; body: string }[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      seen.push({ url: String(input), body: String(init?.body ?? "") });
+      return Response.json({ webhook: { id: "77", token: "tok", channel_id: "5" } });
+    });
+    const install = await exchangeDiscordCode("code-9");
+    expect(seen[0].url).toBe("https://discord.com/api/v10/oauth2/token");
+    const form = new URLSearchParams(seen[0].body);
+    expect(form.get("grant_type")).toBe("authorization_code");
+    expect(form.get("code")).toBe("code-9");
+    expect(form.get("client_secret")).toBe("shh");
+    expect(form.get("redirect_uri")).toBe("https://lurk.so/connect/discord/callback");
+    expect(install).toEqual({ webhookUrl: "https://discord.com/api/webhooks/77/tok", channelId: "5" });
+  });
+
+  it("says why Discord refused", async () => {
+    vi.stubEnv("DISCORD_CLIENT_ID", "123");
+    vi.stubEnv("DISCORD_CLIENT_SECRET", "shh");
+    vi.stubGlobal("fetch", async () =>
+      Response.json({ error: "invalid_grant", error_description: "Invalid \"code\" in request." }, { status: 400 }),
+    );
+    await expect(exchangeDiscordCode("stale")).rejects.toThrow('Invalid "code" in request.');
   });
 });

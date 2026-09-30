@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { dismissAlertsOffer, turnOnDiscordAlerts, turnOnEmailAlerts } from "@/lib/alerts/offer";
 import { requireLocalUser } from "@/lib/auth";
 import { toRow } from "@/components/leads/stream";
 import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
@@ -80,4 +81,25 @@ export async function promoPolicyAction(
     return null;
   }
   return promoPolicyFor(projectId, user.id, subreddit).catch(() => null);
+}
+
+/** The offer's "Email me daily": a daily digest to the person's own address. */
+export async function emailAlertsAction(projectId: string) {
+  const user = await ownedProject(projectId);
+  await turnOnEmailAlerts(user.id, projectId);
+  revalidatePath("/app", "layout");
+}
+
+/** The offer's Discord field: a daily post to the pasted webhook. */
+export async function discordAlertsAction(projectId: string, url: string) {
+  const user = await ownedProject(projectId);
+  await turnOnDiscordAlerts(user.id, projectId, url);
+  revalidatePath("/app", "layout");
+}
+
+/** The offer's "Not now". */
+export async function dismissAlertsOfferAction(projectId: string) {
+  const user = await ownedProject(projectId);
+  await dismissAlertsOffer(user.id, projectId);
+  revalidatePath("/app", "layout");
 }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { enqueueOnce } from "@/jobs/enqueue";
 import { addChannel } from "@/lib/alerts/channels";
-import { exchangeSlackCode, slackLabel, SLACK_COOKIE, type SlackInstallState } from "@/lib/alerts/slack";
+import { DISCORD_COOKIE, exchangeDiscordCode, type DiscordInstallState } from "@/lib/alerts/discord";
 import { safeReturnPath } from "@/lib/alerts/offer";
 import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
@@ -9,7 +9,7 @@ import { projectForUser } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
 function alertsUrl(projectId: string | null, status: string): string {
-  const query = new URLSearchParams({ slack: status });
+  const query = new URLSearchParams({ discord: status });
   if (projectId) {
     query.set("project", projectId);
   }
@@ -17,19 +17,19 @@ function alertsUrl(projectId: string | null, status: string): string {
 }
 
 function clearing(response: NextResponse): NextResponse {
-  response.cookies.set(SLACK_COOKIE, "", { path: "/connect", maxAge: 0 });
+  response.cookies.set(DISCORD_COOKIE, "", { path: "/connect", maxAge: 0 });
   return response;
 }
 
-/** Finishes Add to Slack: check the state, take the webhook, add the channel. */
+/** Finishes Add to Discord: check the state, take the webhook, add the channel. */
 export async function GET(request: NextRequest) {
-  const stashed = request.cookies.get(SLACK_COOKIE)?.value;
+  const stashed = request.cookies.get(DISCORD_COOKIE)?.value;
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
   if (!stashed || !code || !state) {
     return clearing(NextResponse.redirect(alertsUrl(null, "failed")));
   }
-  const stash = JSON.parse(stashed) as SlackInstallState;
+  const stash = JSON.parse(stashed) as DiscordInstallState;
   if (state !== stash.state) {
     return clearing(NextResponse.redirect(alertsUrl(stash.projectId, "failed")));
   }
@@ -39,13 +39,12 @@ export async function GET(request: NextRequest) {
     return clearing(NextResponse.redirect(alertsUrl(null, "failed")));
   }
   try {
-    const install = await exchangeSlackCode(code);
+    const install = await exchangeDiscordCode(code);
     const { limits } = await tierForUser(user.id);
     await addChannel({
       projectId: project.id,
-      channel: "slack",
+      channel: "discord",
       target: install.webhookUrl,
-      label: slackLabel(install),
       cadence: stash.cadence,
       limits,
     });
@@ -54,8 +53,7 @@ export async function GET(request: NextRequest) {
     const reason = error instanceof Error ? error.message : String(error);
     return clearing(NextResponse.redirect(alertsUrl(project.id, `failed:${reason}`)));
   }
-  // The offer on a new project's feed asks for Slack mid-sweep, so the person
-  // goes back to the leads they were watching rather than to settings.
+  // Asked from the offer on a new project's feed, the person goes back to the leads.
   const back = safeReturnPath(stash.back);
   return clearing(
     NextResponse.redirect(

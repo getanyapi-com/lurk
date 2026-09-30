@@ -13,6 +13,8 @@ export type SlackInstallState = {
   state: string;
   projectId: string;
   cadence: AlertCadence;
+  /** A path in the app to land on once Slack is added, when it was asked from somewhere other than settings. */
+  back?: string | null;
 };
 
 export function slackRedirectUri(): string {

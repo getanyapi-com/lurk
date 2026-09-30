@@ -49,6 +49,9 @@ const schema = z.object({
   /** A Slack app with the incoming-webhook scope turns the paste-a-URL step into Add to Slack. */
   SLACK_CLIENT_ID: optional(z.string()),
   SLACK_CLIENT_SECRET: optional(z.string()),
+  /** A Discord app with the webhook.incoming scope does the same for Discord. */
+  DISCORD_CLIENT_ID: optional(z.string()),
+  DISCORD_CLIENT_SECRET: optional(z.string()),
 
   /**
    * How many jobs the scheduler runs at once. Three is a starting hypothesis,

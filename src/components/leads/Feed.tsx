@@ -9,14 +9,19 @@ import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
 import { FirstSweep } from "@/components/leads/FirstSweep";
+import { AlertsOffer } from "@/components/leads/AlertsOffer";
 import { Skeleton } from "@/components/Skeleton";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
+import { discordApp, slackApp } from "@/lib/alerts/config";
+import { alertsOffer, offerPreview } from "@/lib/alerts/offer";
+import { requireLocalUser } from "@/lib/auth";
 import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
 import { competitorsNamedIn } from "@/lib/competitors/read";
 import { feedPage } from "@/lib/feedPage";
 import { findLead } from "@/lib/leads";
+import { projectForUser } from "@/lib/projects";
 import { isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
 import { sweepShown, sweepStatus } from "@/lib/sweep";
@@ -178,6 +183,13 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
   // been found yet, not because there are none: its empty list says so.
   const arriving = isOnboarding(activity) && filter.status === "new";
   const entries = buildStream(page.rows.map(toCard));
+  // While the first leads are found, the page asks once whether to send new
+  // ones on: the person is already watching, and a project with no channel is
+  // only seen when they come back to look.
+  const user = sweep || arriving ? await requireLocalUser() : null;
+  const project = user ? await projectForUser(user.id, projectId) : null;
+  const offer = user && project ? await alertsOffer(user.id, projectId) : null;
+  const preview = offer?.state === "ask" && project ? await offerPreview(projectId, project.name) : null;
   const held = filter.status === "new" ? page.review : [];
   const selection = await openOn(projectId, entries, held, params.lead);
   const competitors =
@@ -200,6 +212,15 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
         {sweep ? null : <ScanStatus activity={activity} />}
       </div>
       {sweep ? <FirstSweep projectId={projectId} first={sweep} /> : null}
+      {offer && project ? (
+        <AlertsOffer
+          projectId={projectId}
+          offer={offer}
+          preview={preview}
+          slackInstall={slackApp() !== null}
+          discordInstall={discordApp() !== null}
+        />
+      ) : null}
       {/* The pills ride in the strip's top line, so the two cost one row between them. */}
       {arriving && total === 0 ? null : (
         <PeopleStrip

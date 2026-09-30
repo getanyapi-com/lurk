@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Slack } from "lucide-react";
+import { Plus } from "lucide-react";
 import { addChannelAction } from "@/app/app/settings/alerts/actions";
 import { ChannelMark } from "@/components/alerts/ChannelMark";
 import { PillTabs } from "@/components/PillTabs";
@@ -17,6 +17,8 @@ type AddChannelFormProps = {
   hourlyAllowed: boolean;
   /** True when this instance has a Slack app, so a channel can be picked instead of pasted. */
   slackInstall: boolean;
+  /** The same for Discord. */
+  discordInstall: boolean;
 };
 
 const PLACEHOLDERS: Record<AlertChannel, string> = {
@@ -35,14 +37,19 @@ export function AddChannelForm({
   customWebhooksAtCap,
   hourlyAllowed,
   slackInstall,
+  discordInstall,
 }: AddChannelFormProps) {
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [cadence, setCadence] = useState<AlertCadence>("daily");
-  const [pasteSlack, setPasteSlack] = useState(false);
+  const [paste, setPaste] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const blocked = customWebhooksAtCap && channel === "webhook";
-  const pickSlack = channel === "slack" && slackInstall && !pasteSlack;
-  const installHref = `/connect/slack?${new URLSearchParams({ project: projectId, cadence })}`;
+  // Slack and Discord each let the person pick a channel on their side when
+  // this instance has their app, rather than paste a webhook URL.
+  const installable = (channel === "slack" && slackInstall) || (channel === "discord" && discordInstall);
+  const service = channel === "slack" ? "Slack" : "Discord";
+  const pick = installable && !paste;
+  const installHref = `/connect/${channel}?${new URLSearchParams({ project: projectId, cadence })}`;
 
   async function submit(formData: FormData) {
     setError(null);
@@ -67,9 +74,9 @@ export function AddChannelForm({
         }))}
       />
       <div className="flex flex-wrap items-center gap-2">
-        {pickSlack ? (
+        {pick ? (
           <span className="min-w-64 flex-1 text-body text-fg-muted">
-            Pick the channel on Slack&apos;s side.
+            Pick the channel on {service}&apos;s side.
           </span>
         ) : (
           <input
@@ -95,14 +102,14 @@ export function AddChannelForm({
             },
           ]}
         />
-        {pickSlack ? (
+        {pick ? (
           <a
             href={blocked ? undefined : installHref}
             aria-disabled={blocked}
             className={cn(buttonVariants({ size: "lg" }), blocked && "pointer-events-none opacity-50")}
           >
-            <Slack className="size-4" aria-hidden="true" />
-            Add to Slack
+            <ChannelMark channel={channel} size={14} />
+            Add to {service}
           </a>
         ) : (
           <Button type="submit" size="lg" disabled={blocked}>
@@ -111,13 +118,13 @@ export function AddChannelForm({
           </Button>
         )}
       </div>
-      {channel === "slack" && slackInstall ? (
+      {installable ? (
         <button
           type="button"
           className="self-start text-small text-fg-muted underline"
-          onClick={() => setPasteSlack((current) => !current)}
+          onClick={() => setPaste((current) => !current)}
         >
-          {pasteSlack ? "Pick a channel on Slack instead" : "Paste a webhook URL instead"}
+          {paste ? `Pick a channel on ${service} instead` : "Paste a webhook URL instead"}
         </button>
       ) : null}
       {blocked ? (
