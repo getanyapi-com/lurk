@@ -367,6 +367,50 @@ export const alerts = pgTable("alerts", {
   lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
 });
 
+/**
+ * A thread the owner has answered. Every lead in it, the ones held now and any
+ * found in it later, is `replied`, so neither the feed nor an alert channel
+ * brings the conversation back. Kept per thread rather than per lead because a
+ * reply found there next week is the conversation the owner already joined.
+ * `thread_id` is the Reddit post id, or the X conversation id.
+ */
+export const handledThreads = pgTable(
+  "handled_threads",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    /** reddit or x. */
+    platform: text("platform").notNull(),
+    threadId: text("thread_id").notNull(),
+    handledAt: timestamp("handled_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("handled_threads_project_thread_idx").on(t.projectId, t.platform, t.threadId)],
+);
+
+/**
+ * A word, a phrase or a whole community the owner does not want leads from.
+ * Applied wherever leads are read (the feed, every alert channel, X) and never
+ * written into the leads, so taking a mute off brings everything back as it was.
+ * `value` is stored the way `muteValue` writes it: a keyword as lowercase words
+ * split by single spaces, a subreddit lowercase without its r/.
+ */
+export const leadMutes = pgTable(
+  "lead_mutes",
+  {
+    id: id(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    /** keyword or subreddit. */
+    kind: text("kind").notNull(),
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("lead_mutes_project_kind_value_idx").on(t.projectId, t.kind, t.value)],
+);
+
 export const apiKeys = pgTable("api_keys", {
   id: id(),
   userId: text("user_id")

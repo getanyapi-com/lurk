@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { AddChannelForm } from "@/components/alerts/AddChannelForm";
 import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChannelList";
+import { MuteList } from "@/components/alerts/MuteList";
 import { EmptyState } from "@/components/EmptyState";
 import { describeTarget, listChannels } from "@/lib/alerts/channels";
 import { discordApp, slackApp } from "@/lib/alerts/config";
 import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
+import { listMutes } from "@/lib/mutes";
 import { activeProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
@@ -37,7 +39,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
     );
   }
   const { limits } = await tierForUser(user.id);
-  const channels = await listChannels(project.id);
+  const [channels, mutes] = await Promise.all([listChannels(project.id), listMutes(project.id)]);
   const kinds = channels.map((one) => one.channel);
   const allowance = customWebhookAllowance(kinds, limits);
   const rows: ChannelRow[] = channels.map((one) => ({
@@ -86,6 +88,16 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
         slackInstall={slackApp() !== null}
         discordInstall={discordApp() !== null}
       />
+      <div className="flex flex-col gap-1">
+        <h2 className="text-h3" style={{ fontWeight: 500 }}>
+          Muted
+        </h2>
+        <p className="text-body text-fg-muted">
+          Leads that mention a muted word, or sit in a muted subreddit, stay out of the feed and
+          every channel. A thread you mark replied stops coming back on its own.
+        </p>
+      </div>
+      <MuteList projectId={project.id} mutes={mutes} />
     </div>
   );
 }

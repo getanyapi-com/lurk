@@ -1,3 +1,4 @@
+import { withActLinks } from "@/lib/alerts/act";
 import { allChannels, markSent, type ScheduledChannel } from "@/lib/alerts/channels";
 import { config } from "@/lib/config";
 import { newLeadsSince, newXLeadsSince } from "@/lib/alerts/leads";
@@ -60,15 +61,16 @@ export async function digestFor(
     return null;
   }
   const rest = alertable(rows, since, askFloor).slice(leads.length);
+  const appUrl = config().APP_URL;
   return {
     projectName: channel.projectName,
     generatedAt: now,
     since,
     cadence,
-    leads,
+    leads: withActLinks(leads, channel.projectId, appUrl),
     more: rest.length,
     morePlatforms: rest.length > 0 ? platformsOf(rest) : undefined,
-    appUrl: config().APP_URL,
+    appUrl,
   };
 }
 

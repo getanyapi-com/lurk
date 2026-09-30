@@ -1,8 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, EyeOff, ThumbsDown } from "lucide-react";
-import { hideLeadAction, markNotFitAction } from "@/app/app/leads/actions";
+import { BellOff, Check, ExternalLink, EyeOff, RotateCcw, ThumbsDown } from "lucide-react";
+import {
+  hideLeadAction,
+  markNotFitAction,
+  muteSubredditAction,
+  reopenLeadAction,
+  repliedLeadAction,
+} from "@/app/app/leads/actions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 
@@ -18,14 +24,18 @@ type LeadActionsProps = {
   projectId: string;
   leadId: string;
   url: string;
+  subreddit: string;
+  /** The thread is already marked replied, so the button takes that back instead. */
+  replied: boolean;
 };
 
 /**
  * The foot of the detail pane. Reading the thread on Reddit is the one thing
  * this page leads to, so it is the only filled button; the rest take the lead
- * out of the feed or record why it was wrong.
+ * out of the feed or record why it was wrong. Replied covers the whole thread,
+ * and mute the whole community, in the feed and every alert channel alike.
  */
-export function LeadActions({ projectId, leadId, url }: LeadActionsProps) {
+export function LeadActions({ projectId, leadId, url, subreddit, replied }: LeadActionsProps) {
   const [picking, setPicking] = useState(false);
   const iconClass = "size-3.5 text-fg-muted";
 
@@ -42,6 +52,21 @@ export function LeadActions({ projectId, leadId, url }: LeadActionsProps) {
             </a>
           }
         />
+        {replied ? (
+          <form action={reopenLeadAction.bind(null, projectId, leadId)}>
+            <Button type="submit" variant="ghost" size="sm">
+              <RotateCcw className={iconClass} aria-hidden="true" />
+              Not replied
+            </Button>
+          </form>
+        ) : (
+          <form action={repliedLeadAction.bind(null, projectId, leadId)}>
+            <Button type="submit" variant="ghost" size="sm">
+              <Check className={iconClass} aria-hidden="true" />
+              Replied
+            </Button>
+          </form>
+        )}
         <form action={hideLeadAction.bind(null, projectId, leadId)}>
           <Button type="submit" variant="ghost" size="sm">
             <EyeOff className={iconClass} aria-hidden="true" />
@@ -71,6 +96,12 @@ export function LeadActions({ projectId, leadId, url }: LeadActionsProps) {
             Not a fit
           </Button>
         )}
+        <form action={muteSubredditAction.bind(null, projectId, subreddit)}>
+          <Button type="submit" variant="ghost" size="sm">
+            <BellOff className={iconClass} aria-hidden="true" />
+            Mute r/{subreddit}
+          </Button>
+        </form>
       </div>
     </div>
   );

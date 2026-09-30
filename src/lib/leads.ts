@@ -12,6 +12,7 @@ import {
   subreddits,
   usageLedger,
 } from "@/db/schema";
+import { redditLeadNotMuted } from "./mutes";
 import { forgetProjectFeed } from "./projectFeedCache";
 import { DEFAULT_SCORE_THRESHOLD } from "./scan/constants";
 import { atBounds } from "./feed";
@@ -164,6 +165,7 @@ function feedWhere(projectId: string, filter: FeedFilter) {
     filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
     filter.stage ? eq(leads.stage, filter.stage) : undefined,
     filter.theme ? inArray(leads.id, leadIdsOfTheme(projectId, filter.theme)) : undefined,
+    redditLeadNotMuted(),
   );
 }
 
@@ -342,7 +344,9 @@ export async function newLeadCount(projectId: string): Promise<number> {
   const rows = await db()
     .select({ total: count() })
     .from(leads)
-    .where(and(eq(leads.projectId, projectId), eq(leads.status, "new")));
+    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
+    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
+    .where(and(eq(leads.projectId, projectId), eq(leads.status, "new"), redditLeadNotMuted()));
   return rows[0]?.total ?? 0;
 }
 

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { xEvaluations, xLeads } from "@/db/schema";
+import { handledThreads, xEvaluations, xLeads } from "@/db/schema";
 import { X_SCORER_VERSION } from "./constants";
 import type { XAssessment } from "./judge";
 import type { StoredXPost } from "./store";
@@ -236,9 +236,22 @@ export async function writeLead(projectId: string, post: StoredXPost, lead: XLea
           .where(and(eq(xEvaluations.projectId, projectId), eq(xEvaluations.tweetId, rival.tweetId)));
       }
     }
+    // A conversation the owner already answered takes its new asks as answered too.
+    const [handled] = await tx
+      .select({ id: handledThreads.id })
+      .from(handledThreads)
+      .where(
+        and(
+          eq(handledThreads.projectId, projectId),
+          eq(handledThreads.platform, "x"),
+          eq(handledThreads.threadId, conversation),
+        ),
+      )
+      .limit(1);
     const values = {
       projectId,
       tweetId: post.id,
+      ...(handled ? { status: "replied" } : {}),
       kind: lead.kind,
       score: lead.score,
       fit: lead.fit,
@@ -292,4 +305,14 @@ export async function setXLeadStatus(
     .update(xLeads)
     .set({ status, notFitReason })
     .where(and(eq(xLeads.projectId, projectId), eq(xLeads.id, leadId)));
+}
+
+/** The conversation a lead sits in, which is what Replied marks. Null when it is not this project's. */
+export async function xLeadConversation(projectId: string, leadId: string): Promise<string | null> {
+  const [row] = await db()
+    .select({ conversationId: xLeads.conversationId, tweetId: xLeads.tweetId })
+    .from(xLeads)
+    .where(and(eq(xLeads.projectId, projectId), eq(xLeads.id, leadId)))
+    .limit(1);
+  return row ? (row.conversationId ?? row.tweetId) : null;
 }

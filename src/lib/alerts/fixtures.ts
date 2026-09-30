@@ -62,15 +62,21 @@ const SAMPLES: Array<Omit<DigestLead, "createdAt"> & { hoursAgo: number }> = [
  * from a real digest at a glance.
  */
 export function sampleDigest(projectName: string, now = new Date()): Digest {
+  const appUrl = config().APP_URL;
+  // The links are drawn as a real digest draws them, but land on a page that
+  // says it was a sample, so testing a channel never mutes a real community.
+  const sampleAct = `${appUrl.replace(/\/$/, "")}/alerts/act?sample=1`;
   return {
     projectName,
     generatedAt: now,
     since: new Date(now.getTime() - 24 * HOUR_MS),
     cadence: "daily",
-    appUrl: config().APP_URL,
+    appUrl,
     leads: SAMPLES.map(({ hoursAgo, ...lead }) => ({
       ...lead,
       createdAt: new Date(now.getTime() - hoursAgo * HOUR_MS),
+      repliedUrl: sampleAct,
+      muteUrl: lead.subreddit ? sampleAct : undefined,
     })),
   };
 }

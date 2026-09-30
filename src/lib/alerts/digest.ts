@@ -11,6 +11,7 @@ import {
   startOfDay,
 } from "./tokens";
 import {
+  actLinksOf,
   FEED_PATH,
   handleOf,
   PLATFORM_ICON,
@@ -153,6 +154,24 @@ ${wordsOf(lead, 13)}</td></tr></table>`;
 }
 
 /**
+ * The thread's own links under its card: Mark replied, so nothing in it is sent
+ * again, and a mute for its community. Quiet, since reading is the point.
+ */
+function actsRow(lead: DigestLead): string {
+  const links = actLinksOf(lead);
+  if (links.length === 0) {
+    return "";
+  }
+  const anchors = links
+    .map(
+      (link) =>
+        `<a href="${escapeHtml(link.url)}" style="color:${C.fgMuted};text-decoration:underline">${escapeHtml(link.label)}</a>`,
+    )
+    .join(" &middot; ");
+  return `<div style="margin-top:12px;font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">${anchors}</div>`;
+}
+
+/**
  * One thread as a card: the post when it is a lead itself, and every reply
  * that is a lead beneath it, so a busy thread reads as one conversation. Two
  * X asks in one conversation are both posts, so the second is set beneath the
@@ -179,7 +198,7 @@ ${face}
 <td valign="top" style="padding:16px 12px">
 <div style="font-family:${EMAIL_FONT};font-size:12px;color:${C.fgMuted}">${meta}</div>
 <div style="margin-top:4px;font-family:${EMAIL_FONT};font-size:15px;line-height:1.4;color:${C.fg}">${escapeHtml(first.title)}</div>
-${post ? wordsOf(post, 13) : ""}${replies.map((reply) => replyBlock(reply, digest)).join("")}</td>
+${post ? wordsOf(post, 13) : ""}${replies.map((reply) => replyBlock(reply, digest)).join("")}${actsRow(first)}</td>
 <td valign="top" align="right" width="72" style="padding:16px 16px 16px 0">
 ${showsScore(first) ? `<div style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${scoreColor(best)}">${best}</div>\n` : ""}<a href="${escapeHtml(first.url)}" style="display:inline-block;margin-top:8px;font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted};text-decoration:underline">Source</a></td>
 </tr></table></td></tr>`;
@@ -281,7 +300,9 @@ ${headerRow(digest)}${headlineRow(digest)}${body}${anyapiRow()}${footerRow(diges
 export function renderDigestText(digest: Digest): string {
   const lines = digest.leads.map(
     (lead) =>
-      `${showsScore(lead) ? `${lead.score} - ` : ""}${lead.isComment ? "Reply in: " : ""}${lead.title} (${venueOf(lead)}, ${handleOf(lead)}, ${leadAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}`,
+      `${showsScore(lead) ? `${lead.score} - ` : ""}${lead.isComment ? "Reply in: " : ""}${lead.title} (${venueOf(lead)}, ${handleOf(lead)}, ${leadAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}${actLinksOf(lead)
+        .map((link) => `\n${link.label}: ${link.url}`)
+        .join("")}`,
   );
   return [
     `${totalOf(digest)} new leads for ${digest.projectName}, found ${windowPhrase(digest)}.`,

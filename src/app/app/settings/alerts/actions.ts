@@ -8,6 +8,7 @@ import { CHAT_LEAD_CAP } from "@/lib/alerts/select";
 import { sendToChannel } from "@/lib/alerts/send";
 import { CHANNEL_LABELS, isAlertChannel } from "@/lib/alerts/types";
 import { requireLocalUser } from "@/lib/auth";
+import { addMute, isMuteKind, removeMute } from "@/lib/mutes";
 import { projectForUser } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
@@ -69,4 +70,21 @@ export async function sendTestAction(
   } catch (error) {
     return { ok: false, message: String(error instanceof Error ? error.message : error) };
   }
+}
+
+/** Mutes a keyword or a subreddit for the project, in the feed and every channel. */
+export async function addMuteAction(projectId: string, formData: FormData) {
+  await ownedProject(projectId);
+  const kind = String(formData.get("kind") ?? "");
+  if (!isMuteKind(kind)) {
+    throw new Error("Pick a keyword or a subreddit");
+  }
+  await addMute(projectId, kind, String(formData.get("value") ?? ""));
+  revalidatePath("/app", "layout");
+}
+
+export async function removeMuteAction(projectId: string, muteId: string) {
+  await ownedProject(projectId);
+  await removeMute(projectId, muteId);
+  revalidatePath("/app", "layout");
 }

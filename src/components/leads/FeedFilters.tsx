@@ -30,6 +30,7 @@ const WINDOW_LABELS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   new: "New",
+  replied: "Replied",
   hidden: "Hidden",
   not_fit: "Not a fit",
   resolved: "Resolved",

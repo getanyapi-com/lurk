@@ -18,6 +18,7 @@ function card(id: string): CardLead {
     engagement: 1,
     stage: "solution_seeking",
     kind: "buyer",
+    status: "new",
     reason: "They asked for a recommendation.",
     matchedPhrase: null,
     title: id,

@@ -20,6 +20,7 @@ function card(id: string, score: number, ageDays: number): CardLead {
     engagement: 1,
     stage: "solution_seeking",
     kind: "buyer",
+    status: "new",
     reason: "",
     matchedPhrase: "",
     title: id,

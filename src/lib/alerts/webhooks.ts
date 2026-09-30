@@ -1,7 +1,7 @@
 import { PRODUCT_NAME } from "@/lib/brand";
 import { shortAge } from "@/lib/format";
 import { postJson } from "./outbound";
-import { handleOf, PLATFORM_NAME, repliesPhrase, showsScore, venueOf, X_ASK_LABEL } from "./platform";
+import { actLinksOf, handleOf, PLATFORM_NAME, repliesPhrase, showsScore, venueOf, X_ASK_LABEL } from "./platform";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
 import { EMAIL_COLORS, scoreColor } from "./tokens";
 import type { Digest, DigestLead } from "./types";
@@ -52,7 +52,18 @@ function stripeColor(lead: DigestLead): string {
 function slackByline(lead: DigestLead, now: Date): string {
   const [venue, ...rest] = where(lead, now);
   const head = showsScore(lead) ? [`*Score ${lead.score}*`, venue] : [`*${X_ASK_LABEL}*`];
-  return [...head, ...rest].join("  ·  ");
+  const acts = actLinksOf(lead).map((link) => `<${link.url}|${link.label}>`);
+  return [...head, ...rest, ...acts].join("  ·  ");
+}
+
+/** Mark replied and the mute as Discord markdown, under the author's words. */
+function discordDescription(lead: DigestLead): string | undefined {
+  const acts = actLinksOf(lead)
+    .map((link) => `[${link.label}](${link.url})`)
+    .join(" · ");
+  const quote = quoted(lead);
+  const text = [quote, acts].filter((part): part is string => !!part).join("\n\n");
+  return text || undefined;
 }
 
 /**
@@ -131,7 +142,7 @@ export function discordPayload(digest: Digest) {
         },
         title: lead.title.slice(0, 256),
         url: lead.url,
-        description: quoted(lead) ?? undefined,
+        description: discordDescription(lead),
         color: parseInt(stripeColor(lead).slice(1), 16),
         timestamp: lead.createdAt.toISOString(),
         fields: showsScore(lead)
@@ -181,6 +192,8 @@ export function genericPayload(digest: Digest) {
       isComment: lead.isComment,
       numComments: lead.numComments,
       createdAt: lead.createdAt.toISOString(),
+      repliedUrl: lead.repliedUrl,
+      muteUrl: lead.muteUrl,
     })),
     ...(asks.length > 0
       ? {
@@ -195,6 +208,7 @@ export function genericPayload(digest: Digest) {
             excerpt: lead.excerpt,
             numReplies: lead.numComments,
             createdAt: lead.createdAt.toISOString(),
+            repliedUrl: lead.repliedUrl,
           })),
         }
       : {}),

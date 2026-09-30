@@ -181,6 +181,8 @@ export function LeadDetail({ selection, projectId, competitors }: LeadDetailProp
         projectId={projectId}
         leadId={lead.id}
         url={lead.url}
+        subreddit={lead.subreddit}
+        replied={lead.status === "replied"}
       />
     </Pane>
   );

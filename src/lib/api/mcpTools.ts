@@ -41,7 +41,7 @@ export const TOOLS: McpTool[] = [
         projectId: { type: "string", description: "Project id from list_projects." },
         status: {
           type: "string",
-          enum: ["new", "hidden", "not_fit", "all"],
+          enum: ["new", "replied", "hidden", "not_fit", "all"],
           description: "Defaults to new, which is the untriaged queue.",
         },
         minScore: { type: "integer", minimum: 0, maximum: 100 },

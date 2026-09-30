@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditPosts } from "@/db/schema";
+import { settleRepliedThreads } from "@/lib/handled";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import type { StoredPost } from "@/lib/reddit/store";
 import type { ThreadPolicy } from "@/lib/settings/types";
@@ -78,7 +79,10 @@ export async function writeLeads(input: LeadRow[]): Promise<number> {
       .returning({ id: leads.id });
     written += done.length;
   }
-  forgetProjectFeed(new Set(rows.map((row) => row.projectId)));
+  const projectIds = new Set(rows.map((row) => row.projectId));
+  // A lead in a thread the owner already answered is theirs, not the feed's.
+  await settleRepliedThreads(projectIds);
+  forgetProjectFeed(projectIds);
   return written;
 }
 
