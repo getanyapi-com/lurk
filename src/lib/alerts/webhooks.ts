@@ -51,7 +51,7 @@ function slackByline(lead: DigestLead, now: Date): string {
   return [...head, ...rest, ...acts].join("  ·  ");
 }
 
-/** Mark replied and the mute as Discord markdown, under the author's words. */
+/** The lead's quote (`quoteOf`), then Mark replied and the mute as Discord markdown under it. */
 function discordDescription(lead: DigestLead): string | undefined {
   const acts = actLinksOf(lead)
     .map((link) => `[${link.label}](${link.url})`)
@@ -95,7 +95,8 @@ function slackLead(lead: DigestLead, now: Date) {
 
 /**
  * Slack: a headline counting every lead the window held, then one attachment
- * per lead it lists with the linked title over the author's own words and a
+ * per lead it lists with the linked title over the lead's quote (`quoteOf`: the
+ * matched phrase, or the excerpt when the phrase only repeats the title) and a
  * quiet byline saying where it is, then where the rest are.
  */
 export function slackPayload(digest: Digest) {

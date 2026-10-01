@@ -260,7 +260,7 @@ describe("chat payloads", () => {
     expect(text.split("\n\n")[0]).toBe("1 new lead for Acme, found in the last 24 hours.");
   });
 
-  it("shows a Slack lead as its linked title over the author's words, not the rubric", () => {
+  it("shows a Slack lead as its linked title over the lead's quote, not the rubric", () => {
     const one = lead({ id: "a", title: "Scraper <help> & advice" });
     const payload = payloadFor("slack", digestOf(messageLeads([one], SINCE, EMAIL_LEAD_CAP).leads));
     const [first] = (
