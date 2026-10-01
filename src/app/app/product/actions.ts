@@ -541,7 +541,7 @@ export async function rebuildProfileAction(formData: FormData) {
     throw new Error("This project has no product URL to read.");
   }
   await spendAllowance(user.id, "rebuild_profile");
-  await buildProfile(project.id, user.id, project.url, { rejudge: true });
+  await buildProfile(project.id, user.id, project.url);
   await enqueueJob("discovery_initial", project.id);
   revalidatePath("/app", "layout");
 }

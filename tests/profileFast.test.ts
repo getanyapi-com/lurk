@@ -277,7 +277,7 @@ describe.skipIf(!process.env.DATABASE_URL)("rebuilding a profile", () => {
       { name: "Other", domain: "other.test" },
     ] });
     generateStructured.mockImplementation(reading.answer);
-    const build = buildProfile(project.id, user.id, project.url!, { rejudge: true });
+    const build = buildProfile(project.id, user.id, project.url!);
     try {
       await vi.waitFor(() => {
         // The reading and the competitors' own reading, side by side.

@@ -316,14 +316,17 @@ export function pageCompetitors(
 }
 
 /**
- * Replaces the competitors the last reading of the page named with this one's.
- * They are rows of their own source, which a discovery plan leaves standing
- * (see publishDiscoveryPlan), and a name a person already typed in is theirs.
+ * Replaces the competitors the last reading of the page named with this one's,
+ * as many as the tier's cap allows. They are rows of their own source, which a
+ * discovery plan leaves standing (see publishDiscoveryPlan), and a name a
+ * person already typed in is theirs.
  */
 async function writePageCompetitors(
   projectId: string,
-  rows: { name: string; domain: string | null }[],
+  reading: SiteReading,
+  cap: number | null | undefined,
 ): Promise<void> {
+  const rows = capped(pageCompetitors(reading.name, reading.competitors), cap);
   await db().transaction(async (tx) => {
     await tx
       .delete(projectCompetitors)
@@ -352,15 +355,18 @@ async function writePageCompetitors(
   });
 }
 
-export type ProfileOptions = {
-  /**
-   * Whether the facts written here invalidate every verdict made against the
-   * old ones. A rebuild does; the first build of a brand new project has no
-   * verdicts to invalidate. The bump is written in the same statement as the
-   * facts, so no job can ever read the new facts under the old version.
-   */
-  rejudge?: boolean;
-};
+/** A page as readSite returns it, which is what every reading of the site is asked about. */
+type SitePage = { url: string; title?: string | null; description?: string | null; markdown?: string | null };
+
+/** What the model is shown of the site: where it is, its title and description, and its pages. */
+function pagePrompt(page: SitePage): string {
+  return [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", page.markdown ?? ""].join("\n");
+}
+
+/** The site's own words, which a limit's quote has to be found in (groundedLimits). */
+function siteText(page: SitePage): string {
+  return `${page.title ?? ""}\n${page.description ?? ""}\n${page.markdown ?? ""}`;
+}
 
 const competitorsSchema = z.object({
   job: z.string(),
@@ -375,31 +381,27 @@ const competitorsSchema = z.object({
  */
 export async function competitorsFromPage(
   projectId: string,
-  page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
+  page: SitePage,
 ): Promise<{ name: string; domain: string }[]> {
   const answer = await generateStructured({
     purpose: "competitors",
     projectId,
     schema: competitorsSchema,
     system: COMPETITORS_SYSTEM,
-    prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", page.markdown ?? ""].join("\n"),
+    prompt: pagePrompt(page),
   });
   return answer.competitors.map(({ name, domain }) => ({ name, domain }));
 }
 
 /** What the site's pages say the product is. Reads them and writes nothing. */
-export async function profileFromPage(
-  projectId: string,
-  page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
-): Promise<SiteReading> {
-  const markdown = page.markdown ?? "";
+export async function profileFromPage(projectId: string, page: SitePage): Promise<SiteReading> {
   const [reading, rivals] = await Promise.all([
     generateStructured({
       purpose: "profile",
       projectId,
       schema: readingSchema,
       system: READING_SYSTEM,
-      prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", markdown].join("\n"),
+      prompt: pagePrompt(page),
     }),
     // The reading still names competitors of its own, kept for when this fails.
     competitorsFromPage(projectId, page).catch((error: unknown) => {
@@ -407,12 +409,11 @@ export async function profileFromPage(
       return [];
     }),
   ]);
-  const siteText = `${page.title ?? ""}\n${page.description ?? ""}\n${markdown}`;
   return {
     ...reading,
     competitors: rivals.length > 0 ? rivals : reading.competitors,
-    exclusions: groundedLimits(reading.exclusions, siteText),
-    notBuyers: groundedLimits(reading.notBuyers, siteText),
+    exclusions: groundedLimits(reading.exclusions, siteText(page)),
+    notBuyers: groundedLimits(reading.notBuyers, siteText(page)),
   };
 }
 
@@ -420,20 +421,15 @@ export async function profileFromPage(
  * The fast reading of the same pages (FAST_READING_SYSTEM), as a SiteReading
  * with the fields it does not ask for left empty.
  */
-export async function fastProfileFromPage(
-  projectId: string,
-  page: { url: string; title?: string | null; description?: string | null; markdown?: string | null },
-): Promise<SiteReading> {
-  const markdown = page.markdown ?? "";
+export async function fastProfileFromPage(projectId: string, page: SitePage): Promise<SiteReading> {
   const reading = await generateStructured({
     purpose: "profile_fast",
     projectId,
     schema: fastReadingSchema,
     system: FAST_READING_SYSTEM,
     effort: "minimal",
-    prompt: [`Website: ${page.url}`, `Title: ${page.title}`, `Description: ${page.description}`, "", markdown].join("\n"),
+    prompt: pagePrompt(page),
   });
-  const siteText = `${page.title ?? ""}\n${page.description ?? ""}\n${markdown}`;
   return {
     name: reading.name,
     pain: reading.pain,
@@ -442,8 +438,8 @@ export async function fastProfileFromPage(
     budgetFit: reading.budgetFit,
     capabilities: reading.capabilities.slice(0, 10),
     problemPhrasings: reading.problemPhrasings,
-    exclusions: groundedLimits(reading.exclusions, siteText),
-    notBuyers: groundedLimits(reading.notBuyers, siteText),
+    exclusions: groundedLimits(reading.exclusions, siteText(page)),
+    notBuyers: groundedLimits(reading.notBuyers, siteText(page)),
     serviceGeography: "",
     destinations: [],
     platforms: [],
@@ -454,22 +450,15 @@ export async function fastProfileFromPage(
 }
 
 /**
- * Reads the product's own page and writes what the page says the product is.
- * That is all it does: where and how the buyers ask is learned by the initial
- * discovery job, which the caller queues, because reading Google takes minutes
- * and nobody should hold a browser open for it.
+ * Reads the product's own page again and writes what the page now says the
+ * product is, over a profile that already has verdicts made against it, so
+ * those are all judged again. That is all it does: where and how the buyers
+ * ask is learned by the initial discovery job, which the caller queues,
+ * because reading Google takes minutes and nobody should hold a browser open
+ * for it.
  */
-export async function buildProfile(
-  projectId: string,
-  userId: string,
-  url: string,
-  options: ProfileOptions = {},
-  onStep?: (step: ProfileStep) => Promise<void> | void,
-): Promise<SiteReading> {
-  await onStep?.("scrape");
+export async function buildProfile(projectId: string, userId: string, url: string): Promise<SiteReading> {
   const page = await readSite(projectId, userId, url);
-
-  await onStep?.("profile");
   // The tier only caps the competitors written below; it supplies nothing to
   // the model. Read it during the profile call, measured at about 30 seconds
   // on 2026-09-25, instead of adding its database reads after that call.
@@ -477,10 +466,7 @@ export async function buildProfile(
     profileFromPage(projectId, page),
     tierForUser(userId),
   ]);
-  const written = await writeReading(projectId, profile, limits?.competitors, options);
-
-  await onStep?.("done");
-  return written;
+  return writeReading(projectId, profile, limits?.competitors, true);
 }
 
 /** The profile a reading gives, with the searches built for its platforms added. */
@@ -494,43 +480,53 @@ function withPlatformPhrasings(profile: SiteReading): SiteReading {
   };
 }
 
-/** Writes a reading over the project's profile, its brief and its competitors. */
+/** The project's columns a reading of the site fills: the facts, the plan's phrasings and the brief. */
+function profileColumns(profile: SiteReading) {
+  return {
+    name: profile.name || undefined,
+    pain: profile.pain,
+    solution: profile.solution,
+    targetUsers: profile.targetUsers,
+    geography: profile.serviceGeography || null,
+    budgetFit: profile.budgetFit,
+    capabilities: profile.capabilities,
+    exclusions: profile.exclusions,
+    notBuyers: profile.notBuyers,
+    destinations: profile.destinations,
+    problemPhrasings: profile.problemPhrasings,
+    brief: usableBrief(profile.brief),
+  };
+}
+
+/**
+ * Writes a reading over the project's profile, its brief and its competitors.
+ * `rejudge` says whether the facts written here invalidate every verdict made
+ * against the old ones. A rebuild does; the first build of a brand new project
+ * has no verdicts to invalidate. The bump is written in the same statement as
+ * the facts, so no job can ever read the new facts under the old version.
+ */
 async function writeReading(
   projectId: string,
   reading: SiteReading,
   competitorCap: number | null | undefined,
-  options: ProfileOptions = {},
+  rejudge: boolean,
 ): Promise<SiteReading & { profileVersion: number }> {
   const profile = withPlatformPhrasings(reading);
   const [row] = await db()
     .update(projects)
     .set({
-      name: profile.name || undefined,
-      pain: profile.pain,
-      solution: profile.solution,
-      targetUsers: profile.targetUsers,
-      geography: profile.serviceGeography || null,
-      budgetFit: profile.budgetFit,
-      capabilities: profile.capabilities,
-      exclusions: profile.exclusions,
-      notBuyers: profile.notBuyers,
-      destinations: profile.destinations,
-      problemPhrasings: profile.problemPhrasings,
-      brief: usableBrief(profile.brief),
+      ...profileColumns(profile),
       // Postgres reads the old row on the right, so this is the version being written.
-      briefProfileVersion: options.rejudge
+      briefProfileVersion: rejudge
         ? sql`${projects.profileVersion} + 1`
         : sql`${projects.profileVersion}`,
-      ...(options.rejudge
+      ...(rejudge
         ? { profileVersion: sql`${projects.profileVersion} + 1` }
         : {}),
     })
     .where(eq(projects.id, projectId))
     .returning({ profileVersion: projects.profileVersion });
-  await writePageCompetitors(
-    projectId,
-    capped(pageCompetitors(profile.name, profile.competitors), competitorCap),
-  );
+  await writePageCompetitors(projectId, profile, competitorCap);
   return { ...profile, profileVersion: row?.profileVersion ?? 1 };
 }
 
@@ -584,7 +580,7 @@ export async function buildProfileFast(
   const { limits } = await tier;
 
   if (first && "fast" in first) {
-    const written = await writeReading(projectId, first.fast, limits?.competitors);
+    const written = await writeReading(projectId, first.fast, limits?.competitors, false);
     await onStep?.("done");
     return {
       reading: written,
@@ -610,7 +606,7 @@ export async function buildProfileFast(
     }
     reading = fast;
   }
-  const written = await writeReading(projectId, reading, limits?.competitors);
+  const written = await writeReading(projectId, reading, limits?.competitors, false);
   await onStep?.("done");
   return { reading: written, full: Promise.resolve(false) };
 }
@@ -628,20 +624,7 @@ async function replaceFastReading(
   const profile = withPlatformPhrasings(reading);
   const replaced = await db()
     .update(projects)
-    .set({
-      name: profile.name || undefined,
-      pain: profile.pain,
-      solution: profile.solution,
-      targetUsers: profile.targetUsers,
-      geography: profile.serviceGeography || null,
-      budgetFit: profile.budgetFit,
-      capabilities: profile.capabilities,
-      exclusions: profile.exclusions,
-      notBuyers: profile.notBuyers,
-      destinations: profile.destinations,
-      problemPhrasings: profile.problemPhrasings,
-      brief: usableBrief(profile.brief),
-    })
+    .set(profileColumns(profile))
     .where(
       and(
         eq(projects.id, projectId),
@@ -655,10 +638,7 @@ async function replaceFastReading(
   if (replaced.length === 0) {
     return false;
   }
-  await writePageCompetitors(
-    projectId,
-    capped(pageCompetitors(profile.name, profile.competitors), competitorCap),
-  );
+  await writePageCompetitors(projectId, profile, competitorCap);
   return true;
 }
 
