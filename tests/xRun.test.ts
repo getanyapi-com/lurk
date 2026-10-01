@@ -153,7 +153,6 @@ describe.skipIf(!hasDatabase)("the X pipeline against a database", () => {
   beforeEach(async () => {
     process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     process.env.X_LEADS = "true";
-    process.env.X_LEADS_USERS = "";
     // The local .env is self-hosted, which has no caps; these tests are about the hosted tiers.
     process.env.SELF_HOSTED = "false";
     // Replies need a model key; tests that want them set it (the model itself is mocked).

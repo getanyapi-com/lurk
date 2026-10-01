@@ -105,7 +105,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
   });
 
   it("starts X's first look beside the sweep when X is on, and not when it is off", async () => {
-    const saved = { on: process.env.X_LEADS, users: process.env.X_LEADS_USERS };
+    const saved = process.env.X_LEADS;
     try {
       const { eq, and } = await import("drizzle-orm");
       const { JOB_HANDLERS } = await import("@/jobs/registry");
@@ -121,7 +121,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
       expect(await xScans(off.project.id, off.db, off.schema)).toHaveLength(0);
 
       process.env.X_LEADS = "true";
-      process.env.X_LEADS_USERS = "";
       const on = await fixture();
       await JOB_HANDLERS.discovery_initial({ id: undefined, projectId: on.project.id } as never);
       const [scan] = await xScans(on.project.id, on.db, on.schema);
@@ -131,12 +130,10 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
       await JOB_HANDLERS.discovery_initial({ id: undefined, projectId: on.project.id } as never);
       expect(await xScans(on.project.id, on.db, on.schema)).toHaveLength(1);
     } finally {
-      for (const [key, value] of [["X_LEADS", saved.on], ["X_LEADS_USERS", saved.users]] as const) {
-        if (value === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = value;
-        }
+      if (saved === undefined) {
+        delete process.env.X_LEADS;
+      } else {
+        process.env.X_LEADS = saved;
       }
     }
   });

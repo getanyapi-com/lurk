@@ -2,6 +2,7 @@ import { Cron } from "croner";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects } from "@/db/schema";
+import { alertInvitesOn } from "@/lib/alerts/config";
 import { config } from "@/lib/config";
 import { projectsWithStaleEvaluations } from "@/lib/scan/rescore";
 import { projectsOwedReplyParents } from "@/lib/scan/replies";
@@ -253,7 +254,9 @@ export function startScheduler(): Cron {
     void enqueueOnce("retention");
     void enqueueOnce("digest");
     // After the outgoing revision is gone, which has no handler for it yet.
-    void enqueueOnce("alert_invites", new Date(Date.now() + BRIEF_START_MS));
+    if (alertInvitesOn()) {
+      void enqueueOnce("alert_invites", new Date(Date.now() + BRIEF_START_MS));
+    }
     if (config().SCHEDULER_SEED) {
       void seedProjectScans();
     }

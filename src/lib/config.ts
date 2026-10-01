@@ -97,22 +97,6 @@ const schema = z.object({
    */
   X_LEADS: z.preprocess(blankIsAbsent, bool),
   /**
-   * Comma-separated users.id values X is limited to while X_LEADS is on. Empty
-   * means everyone. It narrows the switch and never opens it.
-   */
-  X_LEADS_USERS: z.preprocess(
-    blankIsAbsent,
-    z
-      .string()
-      .optional()
-      .transform((v) =>
-        (v ?? "")
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean),
-      ),
-  ),
-  /**
    * The "Worth a reply" kind inside the X tab: posts nobody is shopping in but
    * worth answering, checked by Muse. On with X; false turns only this kind off
    * (Reddit's version, PR #97, polluted every feed it was in).

@@ -21,7 +21,7 @@ vi.mock("nodemailer", () => ({
 }));
 import { digestSubject, leadAge, renderDigestHtml, renderDigestText } from "@/lib/alerts/digest";
 import { payloadFor, sendToChannel } from "@/lib/alerts/send";
-import { discordApp, emailSender, slackApp } from "@/lib/alerts/config";
+import { alertInvitesOn, discordApp, emailSender, slackApp } from "@/lib/alerts/config";
 import { discordInstallUrl, exchangeDiscordCode } from "@/lib/alerts/discord";
 import {
   exchangeSlackCode,
@@ -556,6 +556,19 @@ describe("delivery", () => {
     vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "endpoint=https://x/;accesskey=k");
     vi.stubEnv("ALERTS_FROM_EMAIL", "");
     expect(emailSender()).toBeNull();
+  });
+
+  /** A pass marks each person asked before it sends, so with no way to send it must not run. */
+  it("asks people to turn alerts on only with ALERT_INVITES on and an email service to send through", () => {
+    vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@lurk.so");
+    vi.stubEnv("SMTP_URL", "smtp://localhost:25");
+    vi.stubEnv("ALERT_INVITES", "false");
+    expect(alertInvitesOn()).toBe(false);
+    vi.stubEnv("ALERT_INVITES", "true");
+    expect(alertInvitesOn()).toBe(true);
+    vi.stubEnv("SMTP_URL", "");
+    vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "");
+    expect(alertInvitesOn()).toBe(false);
   });
 });
 

@@ -2,28 +2,22 @@ import { afterEach, describe, expect, it } from "vitest";
 import { xEnabledFor } from "@/lib/x/enabled";
 
 /**
- * The X switch. X_LEADS is the kill switch, for everyone including the
- * allowlist; X_LEADS_USERS only narrows it. And while X is off for a caller,
- * the public API shows none of X's limits: a feature that ships dark stays dark.
+ * The X switch. X_LEADS is the kill switch, for everyone, and nobody who is not
+ * signed in has X. And while X is off for a caller, the public API shows none
+ * of X's limits: a feature that ships dark stays dark.
  */
 describe("the X leads switch", () => {
-  const saved = { on: process.env.X_LEADS, users: process.env.X_LEADS_USERS };
+  const saved = { on: process.env.X_LEADS };
   afterEach(() => {
     process.env.X_LEADS = saved.on;
-    process.env.X_LEADS_USERS = saved.users;
   });
 
   it.each([
-    ["false", "", "u1", false],
-    ["false", "u1", "u1", false],
-    ["true", "", "u1", true],
-    ["true", "u1,u2", "u1", true],
-    ["true", "u1,u2", "u3", false],
-    ["true", " u1 , u2 ", "u2", true],
-    ["true", "", null, false],
-  ] as const)("X_LEADS=%s X_LEADS_USERS=%j for %s is %s", (on, users, user, expected) => {
+    ["false", "u1", false],
+    ["true", "u1", true],
+    ["true", null, false],
+  ] as const)("X_LEADS=%s for %s is %s", (on, user, expected) => {
     process.env.X_LEADS = on;
-    process.env.X_LEADS_USERS = users;
     expect(xEnabledFor(user)).toBe(expected);
   });
 
@@ -51,7 +45,6 @@ describe("the X leads switch", () => {
     expect(TIERS.free.x).toBeDefined();
 
     process.env.X_LEADS = "true";
-    process.env.X_LEADS_USERS = "u1";
     const on = (await me(caller)).limits as Shown;
     expect(on).toHaveProperty("x");
   });

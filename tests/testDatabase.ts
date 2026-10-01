@@ -28,7 +28,7 @@ export function testDatabaseUrl(env: NodeJS.ProcessEnv): string | undefined {
 export const PAID_KEYS = [
   "OPENROUTER_API_KEY",
   "ANYAPI_HOUSE_API_KEY",
-  // askJev prefers the Gateway key, and the free Jev offer on it ended
-  // 2026-09-26 (src/lib/jev.ts), so a test that reached the judge would bill.
+  // askJev prefers the Gateway key, so a test that reached the judge would
+  // bill it.
   "AI_GATEWAY_API_KEY",
 ] as const;

@@ -26,6 +26,15 @@ export function emailSender(): EmailSender | null {
   return null;
 }
 
+/**
+ * Whether the one-time ask to turn alerts on goes out: ALERT_INVITES is on and
+ * there is an email service to carry it. A pass marks each person asked before
+ * it sends, so one with nothing to send through would spend everybody's ask.
+ */
+export function alertInvitesOn(): boolean {
+  return config().ALERT_INVITES && emailSender() !== null;
+}
+
 export type SlackApp = { clientId: string; clientSecret: string };
 
 /** The Slack app behind Add to Slack, or null when only paste-a-URL is on. */

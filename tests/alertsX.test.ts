@@ -347,7 +347,7 @@ describe("a digest carrying X asks beside Reddit leads", () => {
 
 /** The query and the switch are the claim, so they are proven against a real database. */
 describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => {
-  const saved = { X_LEADS: process.env.X_LEADS, X_LEADS_USERS: process.env.X_LEADS_USERS };
+  const saved = { X_LEADS: process.env.X_LEADS };
   afterEach(() => {
     // Assigning undefined to process.env stores the string "undefined".
     for (const [key, value] of Object.entries(saved)) {
@@ -373,7 +373,6 @@ describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => 
   /** A channel as `allChannels` hands it to the digest, with X on for its owner. */
   function channelOf({ user, project }: Owned, overrides: Partial<ScheduledChannel> = {}): ScheduledChannel {
     process.env.X_LEADS = "true";
-    process.env.X_LEADS_USERS = user.id;
     return {
       id: randomUUID(),
       projectId: project.id,
@@ -499,10 +498,6 @@ describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => 
     expect(await digestFor(channel, null, later)).toBeNull();
 
     process.env.X_LEADS = "true";
-    process.env.X_LEADS_USERS = "someone-else";
-    expect(await digestFor(channel, null, later)).toBeNull();
-
-    process.env.X_LEADS_USERS = user.id;
     const digest = await digestFor(channel, null, later);
     expect(digest?.leads.map((one) => [one.platform, one.author, one.score])).toEqual([["x", "clinic", 40]]);
   });

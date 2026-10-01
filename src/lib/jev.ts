@@ -9,19 +9,15 @@ import { assertUnderLlmCap, withCallTimeout } from "./llm";
 /**
  * TypeSafe's Jev: one state in, typed answers with probabilities out, no
  * generated text. Every scan judgement goes through here. It is asked through
- * Vercel's AI Gateway first when AI_GATEWAY_API_KEY is set, where Jev is free
- * until 2026-09-25 (@vercel_dev, 2026-09-19), and through OpenRouter's
- * Decisions endpoint, on the same key as every muse call, when the Gateway is
- * not configured or fails. The three question types and the answer shapes are
+ * Vercel's AI Gateway first when AI_GATEWAY_API_KEY is set, and through
+ * OpenRouter's Decisions endpoint, on the same key as every muse call, when
+ * the Gateway is not configured or fails. The three question types and the answer shapes are
  * the ones in https://docs.typesafe.ai/api.md. Each route bills what it says
  * it billed; the price below, read from Jev's listing on both on 2026-09-18
  * ($0.042 per million input tokens, output free), only covers an answer that
  * leaves the cost out.
  */
 export const JEV_PRICE_USD_PER_MILLION_INPUT = 0.042;
-
-/** The last moment of the Gateway's free Jev offer: the end of Sept 25, Pacific time. */
-export const GATEWAY_FREE_UNTIL = new Date("2026-09-26T07:00:00Z");
 
 /**
  * How long the Gateway gets before the call moves to OpenRouter. Jev answered
@@ -346,18 +342,13 @@ function fromGatewayAnswers(
   return Object.fromEntries(parsed);
 }
 
-/**
- * What the Gateway billed, when it says. When it does not, the call is free
- * inside the offer window and priced at the list price after it.
- */
+/** What the Gateway billed, when it says, and the list price when it does not. */
 function gatewayCost(metadata: GatewayResult["providerMetadata"], inputTokens: number): number {
   const reported = Number((metadata?.gateway as { cost?: unknown } | undefined)?.cost);
   if (Number.isFinite(reported)) {
     return reported;
   }
-  return Date.now() < GATEWAY_FREE_UNTIL.getTime()
-    ? 0
-    : (inputTokens * JEV_PRICE_USD_PER_MILLION_INPUT) / 1_000_000;
+  return (inputTokens * JEV_PRICE_USD_PER_MILLION_INPUT) / 1_000_000;
 }
 
 /** Whether a Gateway refusal names the same too-large error OpenRouter passes through. */

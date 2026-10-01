@@ -100,12 +100,12 @@ npm run anyapi:register
 | `ALERTS_FROM_EMAIL` | no | - | The From address on a digest. Email needs this and one of the two below. |
 | `AZURE_EMAIL_CONNECTION_STRING` | no | - | Sends the digest through Azure Communication Services. Wins when both are set. |
 | `SMTP_URL` | no | - | Sends the digest through any SMTP server, as `smtps://user:pass@host:465`. |
+| `ALERT_INVITES` | no | `false` | `true` emails each person who has leads and no alert channel, once, asking whether they want new leads by email. Needs email set up as above. |
 | `SLACK_CLIENT_ID` | no | - | With the secret, turns the Slack channel into an Add to Slack button. |
 | `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
 | `HOUSE_DATA_CAP_USD_PER_DAY` | no | `50` | Daily ceiling on data spend from the house key. |
 | `HOUSE_LLM_CAP_USD_PER_DAY` | no | `100` (`10` under the Compose file) | Daily ceiling on language model spend. |
 | `X_LEADS` | no | `false` | Turns on the X leads tab and its jobs (beta, off by default). |
-| `X_LEADS_USERS` | no | empty | Comma-separated `users.id` values X is limited to while `X_LEADS` is on. Empty means everyone. |
 | `X_REPLIES` | no | `true` | Shows X posts worth a reply beside the asks. `false` turns off only that kind. |
 | `HOUSE_X_DATA_CAP_USD_PER_DAY` | no | `5` | X's share of the house data ceiling. |
 | `HOUSE_X_LLM_CAP_USD_PER_DAY` | no | `5` | X's share of the house language model ceiling. |
