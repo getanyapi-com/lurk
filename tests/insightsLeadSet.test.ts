@@ -90,7 +90,7 @@ describe("the leads Insights groups and counts", () => {
 
     // Triaged after the grouping, it leaves the card as it leaves the feed.
     // With nothing in the 30 days the feed opens on all time, and so does
-    // the card; with nothing there either, the card counts none.
+    // the card; with nothing there either, there is no card.
     await db().update(schema.leads).set({ status: "replied" }).where(eq(schema.leads.id, ids.shown));
     const [fallen] = await listThemes(projectId);
     const allTime = await listLeads(projectId, { status: "new", days: "all", theme: theme.id });
@@ -99,8 +99,6 @@ describe("the leads Insights groups and counts", () => {
     expect(fallen.faces.map((face) => face.name)).toEqual([allTime[0].postAuthor]);
 
     await db().update(schema.leads).set({ status: "hidden" }).where(eq(schema.leads.id, ids.old));
-    const [emptied] = await listThemes(projectId);
-    expect(emptied.count).toBe(0);
-    expect(emptied.faces).toEqual([]);
+    expect(await listThemes(projectId)).toEqual([]);
   });
 });

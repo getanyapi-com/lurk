@@ -127,8 +127,11 @@ function communitiesOf(leadIds: string[], facts: Map<string, LeadFact>): ThemeCo
  * A theme keeps the leads it was grouped from, and a card describes only those
  * its link opens the feed on: one triaged, muted or filtered out since the
  * grouping leaves the count, the faces, the quotes and the communities, so the
- * number on the card is the number of rows the link shows. The theme itself
- * stays until the next grouping, which decides what the leads have in common.
+ * number on the card is the number of rows the link shows. A theme whose link
+ * opens nothing, because the grouping drew it from hidden leads alone or every
+ * lead in it has been triaged, has no card at all rather than one that says
+ * "0 leads" over an empty feed. It is stored until the next grouping, which
+ * decides again what the leads have in common.
  */
 export async function listThemes(projectId: string): Promise<ThemeView[]> {
   const rows = await db()
@@ -163,6 +166,7 @@ export async function listThemes(projectId: string): Promise<ThemeView[]> {
       communities: communitiesOf(theme.leadIds, facts),
       generatedAt: theme.generatedAt,
     }))
+    .filter((theme) => theme.count > 0)
     .sort((a, b) => b.count - a.count);
 }
 
