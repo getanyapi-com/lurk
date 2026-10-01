@@ -22,7 +22,7 @@
 .marketing-button:active { transform: scale(0.96); }
 .marketing-button.secondary { background: var(--m-glass); color: var(--fg); box-shadow: inset 0 0 0 1px var(--m-outline); }
 .cta-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.hero-layout { padding: 30px 40px 30px; }
+.hero-layout { padding: 18px 40px 30px; }
 .hero-copy { max-width: 830px; margin-inline: auto; text-align: center; }
 .brand-word { display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; vertical-align: baseline; }
 .brand-word .brand-image { width: 0.8em; height: 0.8em; }
@@ -38,17 +38,16 @@
 .brand-stack-item + .brand-stack-item { margin-left: -0.22em; }
 .brand-stack .brand-image { width: 0.46em; height: 0.46em; }
 .hero-layout h1 .brand-word .brand-image { width: 0.75em; height: 0.75em; }
-.hero-description { max-width: 560px; margin: 20px auto; font-size: 15px; line-height: 1.55; color: var(--fg-muted); }
+.hero-description { max-width: 560px; margin-inline: auto; line-height: 1.55; color: var(--fg-muted); }
 .hero-copy .cta-row { justify-content: center; }
-.hero-promises { display: flex; gap: 20px; justify-content: center; margin-top: 12px; font-size: 11px; color: var(--fg-muted); }
+.hero-promises { display: flex; gap: 20px; justify-content: center; margin-top: 8px; font-size: 11px; color: var(--fg-muted); }
 .hero-promises span { display: inline-flex; gap: 5px; align-items: center; }
 .hero-promises svg { width: 12px; height: 12px; }
-.hero-product { max-width: 860px; margin: 28px auto 0; }
+.hero-product { max-width: 1120px; margin: 48px auto 0; }
 .marketing-showcase { display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .marketing-showcase > [role="tablist"] { background: var(--m-glass); box-shadow: inset 0 0 0 1px var(--m-outline); border-radius: var(--m-radius-pill); }
 .marketing-showcase [role="tab"] { min-height: 36px; border-radius: var(--m-radius-pill); padding: 6px 20px; font-size: 12px; }
 .product-mat { width: 100%; padding: 7px; border-radius: calc(var(--radius-frame) + 7px); background: var(--m-glass); box-shadow: var(--m-shadow); border: 1px solid var(--m-outline); }
-.preview-caption { text-align: center; font-size: 10px; color: var(--fg-muted); margin-top: 12px; }
 /* Product preview styles: fixed design canvas, scaled to its 16:10 container. */
 .mock-frame { position: relative; aspect-ratio: 16 / 10; container-type: inline-size; overflow: hidden; border-radius: var(--radius-frame); background: var(--surface); box-shadow: 0 0 0 1px var(--m-outline); }
 .mock-screen { position: absolute; width: 1000px; height: 625px; display: flex; transform-origin: top left; transform: scale(calc(100cqw / 1000px)); font-size: 13px; }
@@ -87,7 +86,6 @@
 .mock-policy { display: flex; align-items: center; gap: 6px; color: var(--fg-muted); font-size: 10px; }
 .mock-policy svg { width: 13px; height: 13px; }
 .mock-cost { display: flex; align-items: center; gap: 6px; color: var(--fg-muted); font-size: 9px; }
-.mock-cost .text-mono { font-size: 10px; }
 .mock-comment { display: flex; flex-direction: column; gap: 8px; }
 .mock-comment .mock-lead { gap: 10px; padding: 14px 18px; }
 .mock-comment .mock-lead-title, .mock-comment .mock-meta, .mock-comment .mock-reason, .mock-comment .mock-policy, .mock-comment .mock-cost { display: none; }
@@ -104,22 +102,18 @@
 .mock-competitor-row small { margin-left: auto; color: var(--fg-muted); font: 11px var(--font-mono); }
 .mock-competitor-foot { color: var(--fg-muted); font: 11px var(--font-mono); }
 /* Every landscape window deliberately runs through the sky panel's bottom. */
-.marketing-hero { height: 820px; overflow: hidden; }
-.hero-product { max-width: 1120px; }
+.marketing-hero { height: 1064px; overflow: hidden; }
 @media (max-width: 760px) {
   .marketing { padding: 8px; }
   .marketing-nav { padding: 16px; gap: 10px; }
   .marketing-nav > .wordmark { font-size: 12px; }
   .marketing-nav nav { display: none; }
   .marketing-nav .marketing-button { padding: 8px 12px; min-height: 40px; font-size: 12px; }
-  .hero-layout { padding: 28px 16px; }
-  .hero-description { font-size: 14px; }
-  .hero-break { display: none; }
+  .hero-layout { padding-inline: 16px; padding-bottom: 28px; }
   .marketing-button { padding: 10px 14px; font-size: 12px; }
   .marketing-showcase [role="tab"] { padding-inline: 12px; }
   .hero-product { width: 100%; max-width: none; transform: none; }
   .hero-product .product-mat { width: 580px; align-self: flex-start; }
-  .marketing-hero { height: 760px; }
 }
 @media (prefers-reduced-motion: reduce) { .marketing a, .marketing button { transition: none; }
 }

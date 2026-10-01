@@ -1,13 +1,4 @@
 /* Round four: the Aside section sequence. Benchmark, memory collage, product tiles, dark panel, quiet four-up. */
-.marketing-hero {
-  height: 1064px;
-}
-.hero-layout {
-  padding-top: 18px;
-}
-.hero-product {
-  margin-top: 48px;
-}
 .left-heading {
   max-width: 760px;
   padding: 96px 0 56px 144px;
@@ -22,22 +13,7 @@
   letter-spacing: -0.025em;
   margin-bottom: 16px;
 }
-.left-heading h2 span {
-  color: var(--m-lead-word);
-}
-.left-heading p {
-  font-size: 18px;
-  line-height: 28px;
-  color: var(--fg-muted);
-}
-.left-heading a {
-  color: var(--m-link);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-style: dotted;
-}
 .free-section .narrow-heading {
-  max-width: none;
   padding: 96px 144px 48px;
 }
 .scan-collage {

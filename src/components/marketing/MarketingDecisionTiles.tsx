@@ -9,7 +9,7 @@ import { ThreadIdentity } from "./ThreadIdentity";
 /** Four quiet tiles: what lurk puts in front of you before you decide to reply. */
 export function MarketingDecisionTiles() {
   return (
-    <section className="decision-section" id="decide" data-proof="reply">
+    <section className="decision-section" id="decide">
       <header className="centered-heading">
         <EyebrowLink href="#costs">Your reply, your decision</EyebrowLink>
         <h2>Context first. Nothing sends.</h2>

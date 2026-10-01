@@ -23,7 +23,7 @@ export function MarketingScanCollage() {
   });
   const [before, after] = SCAN_LEAD.body.split(SCAN_LEAD.matchedPhrase);
   return (
-    <section id="features" className="scan-collage" data-proof="scan">
+    <section id="features" className="scan-collage">
       <header className="left-heading">
         <h2>
           <span>Scans</span> that read the whole thread.

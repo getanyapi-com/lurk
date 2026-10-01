@@ -106,7 +106,7 @@ const TILES: { title: string; caption: string; tone: string; posts: MockXPost[] 
 /** X leads as three product tiles, one per kind of post the X scan keeps. */
 export function MarketingXTiles() {
   return (
-    <section id="x" className="x-tiles" data-proof="x">
+    <section id="x" className="x-tiles">
       <header className="left-heading">
         <EyebrowLink href="#features">
           <BrandWord name="X" label="X leads" />

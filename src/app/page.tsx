@@ -69,7 +69,7 @@ export default function MarketingPage() {
         <OpenSourcePanel />
         <MarketingDecisionTiles />
         <MarketingAnyapi />
-        <section className="closing-cta" data-proof="closing">
+        <section className="closing-cta">
           <span className="closing-eyebrow">
             Good conversations start with listening
           </span>

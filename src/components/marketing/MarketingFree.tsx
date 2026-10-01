@@ -50,7 +50,7 @@ export function MarketingFree() {
     ["API reads / day", count(limits?.apiRequestsPerDay)],
   ];
   return (
-    <section className="free-section" id="costs" data-proof="costs">
+    <section className="free-section" id="costs">
       <header className="narrow-heading">
         <h2>
           <span>Free.</span> No card, no subscription.

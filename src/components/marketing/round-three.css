@@ -32,17 +32,6 @@
 .thread-identity .text-mono {
   font-size: 10px;
 }
-.google-query {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--m-rule);
-  font-size: 14px;
-}
-.google-query > span {
-  flex: 1;
-}
 @media (prefers-reduced-motion: reduce) {
   .marketing-hero::before,
   .marketing-hero::after {

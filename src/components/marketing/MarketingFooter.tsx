@@ -42,7 +42,7 @@ const COLUMNS: { title: string; links: [React.ReactNode, string, string][] }[] =
 
 export function MarketingFooter() {
   return (
-    <footer className="marketing-footer" data-proof="footer">
+    <footer className="marketing-footer">
       <nav className="footer-columns" aria-label="Footer">
         {COLUMNS.map((column) => (
           <div key={column.title}>

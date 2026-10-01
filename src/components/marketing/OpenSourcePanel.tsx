@@ -15,7 +15,7 @@ const LINES = [
 /** Open source, self-host and the read-only API in the one dark panel. */
 export function OpenSourcePanel() {
   return (
-    <section className="dark-api-panel" id="self-host" data-proof="source">
+    <section className="dark-api-panel" id="self-host">
       <div className="api-panel-copy">
         <h2>
           lurk is open source.

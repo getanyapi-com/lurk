@@ -11,7 +11,7 @@ const named = (name: string) => ANYAPI_PLATFORMS.find((platform) => platform.nam
 /** The data under lurk, sold as three product tiles in the same cut as Reddit SEO. */
 export function MarketingAnyapi() {
   return (
-    <section id="anyapi" className="anyapi-tiles" data-proof="anyapi">
+    <section id="anyapi" className="anyapi-tiles">
       <header className="left-heading">
         <EyebrowLink href={ANYAPI_URL} external>
           <AnyapiMark size={16} />

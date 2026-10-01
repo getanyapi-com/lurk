@@ -18,7 +18,7 @@ const LEDGER: LedgerRow[] = [...SEO_THREADS, ...MOCK_SEO];
 /** Reddit SEO as three product tiles, each cropped a different way. */
 export function MarketingSeoTiles() {
   return (
-    <section id="seo" className="seo-tiles" data-proof="seo">
+    <section id="seo" className="seo-tiles">
       <header className="left-heading">
         <EyebrowLink href="#decide">
           <BrandWord name="Reddit" /> SEO

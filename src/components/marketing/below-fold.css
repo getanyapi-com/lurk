@@ -6,7 +6,6 @@
 .marketing strong { font-weight: 500; color: var(--fg); }
 .eyebrow-link { display: inline-flex; align-items: center; gap: 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--m-link); width: fit-content; }
 .eyebrow-link svg { width: 14px; height: 14px; }
-.eyebrow-pill { padding: 4px 10px; border-radius: var(--m-radius-pill); background: var(--m-wash); }
 .centered-heading { text-align: center; padding: 88px 80px 64px; }
 .centered-heading h2 { font-size: 44px; line-height: 48px; font-weight: 450; letter-spacing: -0.025em; margin: 24px 0; }
 .centered-heading p { color: var(--fg-muted); font-size: 18px; line-height: 28px; max-width: 720px; margin: 0 auto; }
@@ -19,11 +18,10 @@
 .pastel-mint { --tile-first: var(--m-mint); --tile-second: var(--m-teal); }
 .pastel-tile figcaption, .four-up figcaption { padding: 20px 16px; color: var(--fg-muted); font-size: 16px; line-height: 24px; }
 .fragment-subject { font-size: 17px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.35; }
-.narrow-heading { max-width: 720px; margin: 0 auto; padding: 64px 0 48px; }
 .marketing .narrow-heading h2 { font-size: 30px; line-height: 40px; font-weight: 500; letter-spacing: -0.025em; margin-bottom: 12px; }
-.narrow-heading h2 span { color: var(--m-lead-word); }
-.narrow-heading p { font-size: 18px; line-height: 28px; color: var(--fg-muted); }
-.narrow-heading a { color: var(--m-link); text-decoration: underline; text-underline-offset: 3px; text-decoration-style: dotted; }
+.left-heading h2 span, .narrow-heading h2 span { color: var(--m-lead-word); }
+.left-heading p, .narrow-heading p { font-size: 18px; line-height: 28px; color: var(--fg-muted); }
+.left-heading a, .narrow-heading a { color: var(--m-link); text-decoration: underline; text-underline-offset: 3px; text-decoration-style: dotted; }
 .free-section { padding-bottom: 64px; border-bottom: 1px solid var(--m-rule); }
 .tier-selector { display: flex; width: fit-content; margin: 40px auto 28px; gap: 2px; padding: 4px; border-radius: var(--radius-control); background: var(--surface-2); }
 .tier-selector button { min-height: 40px; padding: 6px 14px; border-radius: var(--radius-control); font-size: 14px; color: var(--fg-muted); cursor: pointer; }
@@ -66,16 +64,8 @@
 .footer-columns > div > span { color: var(--fg-muted); margin-bottom: 8px; }
 /* Padding, not margin, keeps the rule running frame to frame while the words sit off it. */
 .footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid var(--m-rule); padding: 28px 32px 0; font-size: 12px; color: var(--fg-muted); }
-/* Keep the caption visible before the intentionally cropped hero window. */
-.preview-caption { margin: 0 0 8px; }
-.hero-layout { padding-top: 20px; }
-.hero-description { margin-block: 12px; }
-.hero-product { margin-top: 20px; }
-.hero-promises { margin-top: 8px; }
-.marketing-hero { height: 840px; }
 @media (max-width: 1100px) {
-  .narrow-heading { padding-inline: 32px; }
-  .price-bars, .tier-limits { margin-inline: 32px; }
+  .tier-limits { margin-inline: 32px; }
   .three-up, .four-up { gap: 16px; padding-inline: 16px; }
   .pastel-art { padding: 16px; }
   .api-panel-copy { padding: 36px; }
@@ -91,7 +81,6 @@
   .three-up { grid-template-columns: 1fr; gap: 28px; padding-inline: 24px; }
   .pastel-art { max-height: 360px; padding: 32px; }
   .pastel-tile figcaption { padding-inline: 8px; }
-  .narrow-heading { padding: 48px 24px 32px; }
   .marketing .narrow-heading h2 { font-size: 28px; line-height: 34px; }
   .narrow-heading p { font-size: 16px; line-height: 25px; }
   .tier-selector { gap: 0; }
@@ -104,10 +93,8 @@
   .api-art { padding: 36px 24px; }
   .code-window { padding: 18px; }
   .code-window code { font-size: 10px; }
-  .four-up { grid-template-columns: 1fr 1fr; gap: 16px; }
   .four-up figcaption { font-size: 13px; line-height: 20px; padding: 16px 0; }
   .closing-cta { margin: 56px 16px; padding: 70px 16px; }
   .footer-columns { grid-template-columns: repeat(2,1fr); gap: 36px; padding-bottom: 48px; }
   .footer-bottom { flex-direction: column; align-items: flex-start; }
-  .marketing-hero { height: 780px; }
 }

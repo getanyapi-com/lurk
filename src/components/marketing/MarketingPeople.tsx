@@ -11,7 +11,7 @@ const SHOTS = { leads: AppMockLeads, seo: AppMockSeo, competitors: AppMockCompet
 /** The people behind the leads, then three small windows into the product. */
 export function MarketingPeople() {
   return (
-    <section className="people-section" id="people" data-proof="people">
+    <section className="people-section" id="people">
       <header className="centered-heading">
         <EyebrowLink href="#features">Every lead is a person</EyebrowLink>
         <h2>
