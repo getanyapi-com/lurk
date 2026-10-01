@@ -18,7 +18,7 @@ const PLAN: DiscoveryPlan = {
   ],
   keywords: [{ keyword: "(hotel OR hotels) AND (18 OR 19)", evidence: 4 }],
   competitors: [
-    { name: "hotelages.com", role: "direct_substitute", evidence: 2, domain: "hotelages.com" },
+    { name: "hotelages.com", evidence: 2, domain: "hotelages.com" },
   ],
 };
 
@@ -138,9 +138,11 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
       "Typed by hand",
       "hotelages.com",
     ]);
-    expect(competitors.find((row) => row.name === "hotelages.com")?.role).toBe(
-      "direct_substitute",
-    );
+    expect(competitors.find((row) => row.name === "hotelages.com")).toMatchObject({
+      domain: "hotelages.com",
+      evidence: 2,
+      source: "serp",
+    });
 
     const [after] = await db()
       .select()
@@ -176,9 +178,9 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
       subreddits: [],
       keywords: [],
       competitors: [
-        { name: "Robin", role: "direct_substitute", evidence: 5, domain: null },
-        { name: "skedda.com", role: "direct_substitute", evidence: 3, domain: "skedda.com" },
-        { name: "deskbird.com", role: "direct_substitute", evidence: 2, domain: "deskbird.com" },
+        { name: "Robin", evidence: 5, domain: null },
+        { name: "skedda.com", evidence: 3, domain: "skedda.com" },
+        { name: "deskbird.com", evidence: 2, domain: "deskbird.com" },
       ],
       competitorLimit: 3,
     });

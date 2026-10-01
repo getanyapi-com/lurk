@@ -10,14 +10,9 @@ import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { allowanceFor } from "@/lib/throttle";
 import { PaidButton } from "@/components/PaidButton";
+import { watchedCompetitors } from "@/lib/competitors/read";
 import { requireActiveProject } from "@/lib/projects";
-import {
-  listOpportunities,
-  NO_PHRASINGS_PROGRESS,
-  seoFacets,
-  toThread,
-  watchedCompetitors,
-} from "@/lib/seo/read";
+import { listOpportunities, NO_PHRASINGS_PROGRESS, seoFacets, toThread } from "@/lib/seo/read";
 import { scoreThreads } from "@/lib/seo/score";
 import { orderThreads, seoOrder, seoView, worthReplying, type SeoOrder } from "@/lib/seo/views";
 import { withParams } from "@/lib/url";
@@ -67,7 +62,7 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
     competitor: params.competitor,
     closed: params.closed,
   };
-  const [rows, facets, last, next, competitors, allowance] = await Promise.all([
+  const [rows, facets, last, next, watched, allowance] = await Promise.all([
     listOpportunities(project.id, filter),
     seoFacets(project.id, filter),
     lastRunJob("seo_refresh", project.id),
@@ -75,6 +70,11 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
     watchedCompetitors(project.id),
     allowanceFor(user.id, "seo_refresh"),
   ]);
+  // For naming the competitors a thread mentions. A refresh stores only that
+  // some competitor was named, which is the fact worth indexing; which one it
+  // was is a plain match on text the page already holds, so it is done here
+  // rather than stored twice.
+  const competitors = watched.map((row) => row.name);
   const nothingToLookUp = Boolean(last?.finishedAt) && last?.progress === NO_PHRASINGS_PROGRESS;
   // The order is decided here, over the rows in hand, because three of the four
   // orders fold a score the database does not hold. The read's own order is the

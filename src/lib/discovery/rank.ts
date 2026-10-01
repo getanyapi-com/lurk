@@ -1,5 +1,5 @@
 import { competitorHost, matchCompetitorDomain } from "@/lib/competitors/host";
-import type { EntityRole, Relevance, ThreadLabel } from "./label";
+import type { Relevance, ThreadLabel } from "./label";
 import type { Coverage } from "./queries";
 import {
   cityPart,
@@ -455,7 +455,6 @@ export function scopedBooleanQuery(query: string, subreddit: string): string {
 
 export type CompetitorRank = {
   name: string;
-  role: EntityRole;
   evidence: number;
   /** The site it sells from, when the same evidence named one. */
   domain: string | null;
@@ -500,7 +499,6 @@ export function competitorsFrom(labels: ThreadLabel[]): CompetitorRank[] {
   return [...counts.entries()]
     .map(([name, evidence]) => ({
       name,
-      role: "direct_substitute" as EntityRole,
       evidence,
       domain: matchCompetitorDomain(name, domains),
     }))
@@ -534,7 +532,6 @@ export function mergeCompetitors(
     const current = merged.get(item.name);
     merged.set(item.name, {
       name: item.name,
-      role: item.role,
       evidence: (current?.evidence ?? 0) + item.evidence,
       // A domain already standing is kept: a delta reads a handful of threads,
       // and none of them naming the site is not news that the site changed.

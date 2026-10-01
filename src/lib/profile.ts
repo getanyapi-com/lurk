@@ -302,7 +302,6 @@ async function writePageCompetitors(
             projectId,
             name: row.name,
             domain: row.domain,
-            role: "direct_substitute",
             source: "page",
             state: "active",
           })),

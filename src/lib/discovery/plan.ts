@@ -17,7 +17,6 @@ export type PlannedSubreddit = { name: string; state: "active" | "candidate"; ev
 export type PlannedKeyword = { keyword: string; evidence: number };
 export type PlannedCompetitor = {
   name: string;
-  role: string;
   evidence: number;
   domain: string | null;
 };
@@ -120,7 +119,6 @@ export function planFromRanks(input: PlanInput): DiscoveryPlan {
     competitors: capped(
       input.competitors.map((item) => ({
         name: item.name,
-        role: item.role,
         evidence: item.evidence,
         domain: item.domain,
       })),
@@ -229,7 +227,6 @@ export async function publishDiscoveryPlan(projectId: string, plan: DiscoveryPla
           projectId,
           name: row.name,
           domain: row.domain,
-          role: row.role,
           source: "serp",
           state: "active",
           evidence: row.evidence,

@@ -11,10 +11,10 @@ import { allowanceFor } from "@/lib/throttle";
 import { PaidButton } from "@/components/PaidButton";
 import {
   domainsByName,
-  listCompetitors,
   listMentions,
   mentionSeries,
   topCompetitors,
+  watchedCompetitors,
 } from "@/lib/competitors/read";
 import { requireActiveProject } from "@/lib/projects";
 
@@ -57,7 +57,7 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
   const project = await requireActiveProject(user.id, params.project);
 
   const [competitors, mentions, last, next, allowance] = await Promise.all([
-    listCompetitors(project.id),
+    watchedCompetitors(project.id),
     listMentions(project.id),
     lastRunJob("competitor_scan", project.id),
     nextQueuedJob("competitor_scan", project.id),

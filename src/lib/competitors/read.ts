@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { competitorMentions } from "@/db/schema/competitors";
 import {
@@ -9,6 +9,7 @@ import {
   subreddits,
 } from "@/db/schema";
 import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN, LEAD_URL, NEED_AT } from "@/lib/leadSql";
+import { RETRIEVED_STATES } from "@/lib/scan/planStates";
 import { DAY_MS, daysAgo } from "@/lib/time";
 import { SENTIMENTS, type Sentiment } from "./classify";
 
@@ -39,18 +40,29 @@ export type MentionView = {
 /** A competitor as the screen draws it: a name, and the site its logo comes from. */
 export type CompetitorRow = { name: string; domain: string | null };
 
-/** The competitors this project watches, in the order they were added. */
-export async function listCompetitors(projectId: string): Promise<CompetitorRow[]> {
-  return await db()
-    .select({ name: projectCompetitors.name, domain: projectCompetitors.domain })
-    .from(projectCompetitors)
-    .where(eq(projectCompetitors.projectId, projectId));
-}
+/** A watched competitor, with the evidence discovery has counted for it. */
+export type WatchedCompetitor = CompetitorRow & { evidence: number };
 
-/** The same competitors as bare names, for the judgements that read prose. */
-export async function listCompetitorNames(projectId: string): Promise<string[]> {
-  const rows = await listCompetitors(projectId);
-  return rows.map((row) => row.name);
+/**
+ * The competitors this project watches: the active and pinned ones, the same
+ * states a scan retrieves. One a person excluded on the Product page is not
+ * one of theirs, so no screen names or counts it and discovery's labeller is
+ * not told about it. Read here for every surface, so they cannot disagree.
+ */
+export async function watchedCompetitors(projectId: string): Promise<WatchedCompetitor[]> {
+  return await db()
+    .select({
+      name: projectCompetitors.name,
+      domain: projectCompetitors.domain,
+      evidence: projectCompetitors.evidence,
+    })
+    .from(projectCompetitors)
+    .where(
+      and(
+        eq(projectCompetitors.projectId, projectId),
+        inArray(projectCompetitors.state, [...RETRIEVED_STATES]),
+      ),
+    );
 }
 
 /**
@@ -143,8 +155,8 @@ export async function competitorsNamedIn(projectId: string, postId: string): Pro
       and(eq(competitorMentions.projectId, projectId), eq(competitorMentions.postId, postId)),
     );
   const named = new Set(rows.map((row) => row.competitor));
-  const listed = await listCompetitorNames(projectId);
-  return listed.filter((name) => named.has(name));
+  const watched = await watchedCompetitors(projectId);
+  return watched.map((row) => row.name).filter((name) => named.has(name));
 }
 
 export type MentionSeries = { competitor: string; days: number[]; total: number };

@@ -3,14 +3,12 @@ import { db } from "@/db";
 import {
   discoveryEvidence,
   leadEvaluations,
-  projectCompetitors,
   redditAuthors,
   redditPosts,
   seoOpportunities,
   subreddits,
 } from "@/db/schema";
 import type { Relevance } from "@/lib/discovery/label";
-import { isRetrieved } from "@/lib/scan/planStates";
 import type { RankingThread } from "./thread";
 
 /**
@@ -231,25 +229,6 @@ export async function seoFacets(projectId: string, filter: SeoFilter = {}): Prom
     keywords: [...new Set(rows.map((row) => row.keyword))].sort(),
     subreddits: [...new Set(rows.map((row) => row.subreddit))].sort(),
   };
-}
-
-/**
- * The competitors this project watches, for naming the ones a thread mentions.
- * A refresh stores only that some competitor was named, which is the fact worth
- * indexing; which one it was is a plain match on text the page already holds,
- * so it is done here rather than stored twice.
- *
- * It reads the same states a scan retrieves, so a competitor excluded on the
- * Product page is not named on this page either.
- */
-export async function watchedCompetitors(projectId: string): Promise<string[]> {
-  const rows = await db()
-    .select({ name: projectCompetitors.name, state: projectCompetitors.state })
-    .from(projectCompetitors)
-    .where(eq(projectCompetitors.projectId, projectId));
-  return rows
-    .filter((row) => isRetrieved(row.state))
-    .map((row) => row.name);
 }
 
 /**

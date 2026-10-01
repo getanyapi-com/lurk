@@ -583,7 +583,8 @@ describe.skipIf(!process.env.DATABASE_URL)("the facts a thread arrives with", ()
   it("takes the snippet Google showed for this phrasing, not for another one", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const { listOpportunities, toThread, watchedCompetitors } = await import("@/lib/seo/read");
+    const { listOpportunities, toThread } = await import("@/lib/seo/read");
+    const { watchedCompetitors } = await import("@/lib/competitors/read");
 
     const [user] = await db()
       .insert(schema.users)
@@ -680,7 +681,10 @@ describe.skipIf(!process.env.DATABASE_URL)("the facts a thread arrives with", ()
         { projectId: project.id, name: "Bright Data", state: "pinned" },
         { projectId: project.id, name: "Dropped", state: "excluded" },
       ]);
-    expect((await watchedCompetitors(project.id)).sort()).toEqual(["Apify", "Bright Data"]);
+    expect((await watchedCompetitors(project.id)).map((row) => row.name).sort()).toEqual([
+      "Apify",
+      "Bright Data",
+    ]);
 
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
     await db().delete(schema.redditPosts).where(eq(schema.redditPosts.id, postId));

@@ -706,7 +706,7 @@ describe("competitors", () => {
 
   it("keeps only what does the same job for the same person", () => {
     expect(competitorsFrom(labels)).toEqual([
-      { name: "hotelages.com", role: "direct_substitute", evidence: 2, domain: "hotelages.com" },
+      { name: "hotelages.com", evidence: 2, domain: "hotelages.com" },
     ]);
   });
 
@@ -723,7 +723,7 @@ describe("competitors", () => {
       },
     ];
     expect(competitorsFrom(named)).toEqual([
-      { name: "Hotel Ages", role: "direct_substitute", evidence: 1, domain: "hotelages.com" },
+      { name: "Hotel Ages", evidence: 1, domain: "hotelages.com" },
     ]);
   });
 
@@ -770,7 +770,6 @@ describe("competitors", () => {
         [
           {
             name: "hotelages.com",
-            role: "direct_substitute",
             evidence: 2,
             domain: "hotelages.com",
           },
@@ -778,7 +777,7 @@ describe("competitors", () => {
         competitorsFrom(labels),
       ),
     ).toEqual([
-      { name: "hotelages.com", role: "direct_substitute", evidence: 4, domain: "hotelages.com" },
+      { name: "hotelages.com", evidence: 4, domain: "hotelages.com" },
     ]);
   });
 
@@ -793,11 +792,11 @@ describe("competitors", () => {
     ];
     expect(
       mergeCompetitors(
-        [{ name: "Hotel Ages", role: "direct_substitute", evidence: 2, domain: "hotelages.com" }],
+        [{ name: "Hotel Ages", evidence: 2, domain: "hotelages.com" }],
         competitorsFrom(delta),
       ),
     ).toEqual([
-      { name: "Hotel Ages", role: "direct_substitute", evidence: 3, domain: "hotelages.com" },
+      { name: "Hotel Ages", evidence: 3, domain: "hotelages.com" },
     ]);
   });
 });
@@ -807,7 +806,7 @@ describe("the plan the ranking publishes", () => {
     communities: rankCommunities(EVIDENCE, DESTINATION_NAMES),
     families: rankFamilies(EVIDENCE, DESTINATION_NAMES, PHRASINGS),
     competitors: [
-      { name: "hotelages.com", role: "direct_substitute", evidence: 2, domain: "hotelages.com" },
+      { name: "hotelages.com", evidence: 2, domain: "hotelages.com" },
     ],
     scopedCommunities: ["vegas"],
     productNumbers: PRODUCT_NUMBERS,

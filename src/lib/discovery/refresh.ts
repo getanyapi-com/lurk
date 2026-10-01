@@ -1,19 +1,14 @@
 import { eq } from "drizzle-orm";
 import { enqueueJob, writeProgress } from "@/jobs/enqueue";
 import { db } from "@/db";
-import { projectCompetitors, projects } from "@/db/schema";
+import { projects } from "@/db/schema";
 import { clientForUser } from "@/lib/anyapi";
+import { watchedCompetitors } from "@/lib/competitors/read";
 import { productFacts, productText } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { limitsForUser } from "@/lib/tier";
 import { expandDiscoveryQueries, type DiscoveryQuery } from "./queries";
-import {
-  competitorsFrom,
-  coverageFrom,
-  isDestinationQuery,
-  mergeCompetitors,
-  type CompetitorRank,
-} from "./rank";
+import { competitorsFrom, coverageFrom, isDestinationQuery, mergeCompetitors } from "./rank";
 import { loadEvidence, parseDestinations, parseTextList } from "./store";
 import { discoveryBudget, publishFromEvidence, runRound } from "./run";
 
@@ -46,22 +41,6 @@ export function askedQueries(
     });
   }
   return [...byQuery.values()];
-}
-
-/** The competitors already standing, so a delta adds to them. */
-async function existingCompetitors(projectId: string): Promise<CompetitorRank[]> {
-  const rows = await db()
-    .select()
-    .from(projectCompetitors)
-    .where(eq(projectCompetitors.projectId, projectId));
-  return rows
-    .filter((row) => row.role === "direct_substitute")
-    .map((row) => ({
-      name: row.name,
-      role: "direct_substitute" as const,
-      evidence: row.evidence,
-      domain: row.domain,
-    }));
 }
 
 /**
@@ -106,7 +85,9 @@ export async function runDiscoveryRefresh(
   await writeProgress(jobId, `Asking Google ${queries.length} more questions`);
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs };
-  const standing = await existingCompetitors(projectId);
+  // The competitors already standing, so the labeller is told about them and
+  // the delta adds to them: every one the project watches, whoever named it.
+  const standing = await watchedCompetitors(projectId);
   const facts = productFacts(
     project,
     standing.map((row) => row.name),
