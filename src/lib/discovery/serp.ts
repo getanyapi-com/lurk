@@ -1,5 +1,5 @@
 import type { FetchContext } from "@/lib/reddit/fetch";
-import { fetchGoogleThreads } from "@/lib/seo/fetch";
+import { googleSearch } from "@/lib/seo/fetch";
 import { redditThread } from "@/lib/seo/links";
 import type { DiscoveryQuery } from "./queries";
 import { writeObservations, type Observation } from "./store";
@@ -49,13 +49,12 @@ export type SerpOutcome = { observations: Observation[]; costUsd: number };
 export async function runDiscoveryQueries(
   ctx: FetchContext,
   queries: DiscoveryQuery[],
-  maxAgeMs: number,
 ): Promise<SerpOutcome> {
   // No query of a round reads another's answer, so the round takes as long as
   // its slowest search. One at a time, five of them took 42 of the 73 seconds
   // a new project waited on 2026-09-17.
   const found = await Promise.all(
-    queries.map((query) => fetchGoogleThreads(ctx, query.query, maxAgeMs)),
+    queries.map((query) => googleSearch(ctx, query.query, { preferLatency: true })),
   );
   const observations = queries.flatMap((query, index) => observationsOf(query, found[index].value));
   const costUsd = found.reduce((sum, result) => sum + result.costUsd, 0);

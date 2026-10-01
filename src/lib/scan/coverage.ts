@@ -120,6 +120,14 @@ export function scopedQuery(community: string, query: string): string {
 }
 
 /**
+ * What the Google feed asks Google to restrict its answer to: the last week.
+ * The feed asks what is new, which is a different question from the one the
+ * SEO refresh and discovery ask, so it is its own run and the two never serve
+ * each other's answer.
+ */
+export const FEED_TIMEFRAME = "7d";
+
+/**
  * What a Google feed query says. The plan's Reddit queries are Boolean and
  * Google is not, so the operators and the community scope come out and what is
  * left is asked as the one Google question this app has.

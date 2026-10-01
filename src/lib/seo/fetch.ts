@@ -5,19 +5,16 @@ import { serpResults } from "@/db/schema";
 import {
   fetchShared,
   normalizeQuery,
+  variantOf,
   type FetchContext,
-  type FetchKind,
   type SharedResult,
 } from "@/lib/reddit/fetch";
 import { redditResults, type GoogleResult } from "./links";
 
 export type StoredResult = typeof serpResults.$inferSelect;
 
-/** The search_runs kind for a Google search. */
-const GOOGLE_KIND: FetchKind = "serp";
-
 /** Every Google search this app makes asks for United States results. */
-export const SEO_GEO = "us";
+const GEO = "us";
 
 /**
  * The response time Google is asked for. AnyAPI serves the cheapest source
@@ -29,7 +26,7 @@ export const SEO_GEO = "us";
 const GOOGLE_LATENCY_MS = 1000;
 
 /** And asks for them in English, which is also Google's own default. */
-export const SEO_LANGUAGE = "en";
+const LANGUAGE = "en";
 
 /**
  * What we actually send Google, wherever the question comes from: the words a
@@ -49,7 +46,12 @@ export function googleQuery(keyword: string): string {
   return `${keyword.trim()} reddit`;
 }
 
-async function storeResults(data: unknown, runId: string): Promise<StoredResult[]> {
+/**
+ * Keeps the Reddit threads among a page of results, each under its canonical
+ * URL. Non-Reddit results are dropped before they are stored, so the whole app
+ * only ever holds the links it can open through reddit.post.
+ */
+async function storeSerp(data: unknown, runId: string): Promise<StoredResult[]> {
   const results = ((data as { results?: GoogleResult[] } | null)?.results ?? []) as GoogleResult[];
   const threads = redditResults(results);
   if (threads.length === 0) {
@@ -58,19 +60,19 @@ async function storeResults(data: unknown, runId: string): Promise<StoredResult[
   return db()
     .insert(serpResults)
     .values(
-      threads.map((thread) => ({
+      threads.map(({ result, thread }) => ({
         id: randomUUID(),
         searchRunId: runId,
-        position: thread.position,
-        url: thread.link,
-        title: thread.title ?? null,
-        snippet: thread.snippet ?? null,
+        position: result.position,
+        url: thread.canonicalUrl,
+        title: result.title ?? null,
+        snippet: result.snippet ?? null,
       })),
     )
     .returning();
 }
 
-function loadResults(runId: string): Promise<StoredResult[]> {
+function loadSerp(runId: string): Promise<StoredResult[]> {
   return db()
     .select()
     .from(serpResults)
@@ -80,41 +82,45 @@ function loadResults(runId: string): Promise<StoredResult[]> {
 
 /**
  * The one Google search this app makes, wherever it is asked from. Every call
- * asks for the same market - United States results in English, no city and no
- * time restriction - so two callers asking the same question share one run and
- * pay once. Non-Reddit results are dropped before they are stored, so the whole
- * app only ever holds the links it can open through reddit.post.
+ * asks for the same market, United States results in English, so two callers
+ * asking the same question the same way share one run and pay once.
+ *
+ * It is asked two ways. The scan's feed asks what is new: it passes the
+ * timeframe Google restricts its answer to, so its runs are their own and
+ * never serve a caller asking about all time, nor are served by one. Discovery
+ * and the SEO refresh ask what Google ranks at all, and a new project waits on
+ * their answer, so they prefer a fast source.
+ *
+ * Each way keeps the run key it has always been stored under, so the runs
+ * already held go on serving: the feed's key names its market in the variant
+ * and the other's never has. A stored URL may still be the link Google gave,
+ * which is how the SEO refresh once stored them, so a reader parses it with
+ * `redditThread` rather than trusting it to be canonical.
  */
-export async function fetchGoogleThreads(
+export async function googleSearch(
   ctx: FetchContext,
   query: string,
-  maxAgeMs: number,
+  options: { timeframe?: string; preferLatency?: boolean } = {},
 ): Promise<SharedResult<StoredResult[]>> {
+  const { timeframe, preferLatency } = options;
   return fetchShared<StoredResult[]>({
     ctx,
-    kind: GOOGLE_KIND,
+    kind: "serp",
     sku: "google.search",
     normalizedQuery: normalizeQuery(query),
-    maxAgeMs,
+    timeframe,
+    variant: timeframe ? variantOf({ gl: GEO, hl: LANGUAGE }) : "",
     run: async () => {
       const res = await ctx.funded.client.google.search({
         query,
-        gl: SEO_GEO,
-        hl: SEO_LANGUAGE,
-        preferLatencyUnderMs: GOOGLE_LATENCY_MS,
+        gl: GEO,
+        hl: LANGUAGE,
+        ...(timeframe ? { timeframe } : {}),
+        ...(preferLatency ? { preferLatencyUnderMs: GOOGLE_LATENCY_MS } : {}),
       });
       return { data: res.output.found ? res.output.data : null, costUsd: res.costUsd };
     },
-    store: storeResults,
-    load: loadResults,
+    store: storeSerp,
+    load: loadSerp,
   });
-}
-
-/** The Reddit threads Google ranks for one of this project's SEO keywords. */
-export async function fetchRankingThreads(
-  ctx: FetchContext,
-  keyword: string,
-  maxAgeMs: number,
-): Promise<SharedResult<StoredResult[]>> {
-  return fetchGoogleThreads(ctx, googleQuery(keyword), maxAgeMs);
 }

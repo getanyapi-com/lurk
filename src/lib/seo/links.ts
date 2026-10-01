@@ -42,7 +42,12 @@ export function redditThread(raw: string): RedditThread | null {
   };
 }
 
-/** The Reddit threads among a page of Google results, in Google's order. */
-export function redditResults(results: GoogleResult[]): GoogleResult[] {
-  return results.filter((result) => redditThread(result.link ?? "") !== null);
+/** The Reddit threads among a page of Google results, in Google's order, each with its result. */
+export function redditResults(
+  results: GoogleResult[],
+): { result: GoogleResult; thread: RedditThread }[] {
+  return results.flatMap((result) => {
+    const thread = redditThread(result.link ?? "");
+    return thread ? [{ result, thread }] : [];
+  });
 }

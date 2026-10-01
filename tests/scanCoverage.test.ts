@@ -15,14 +15,17 @@ import { TIERS } from "@/lib/tiers";
 const fetchSearch = vi.fn();
 const fetchSubredditPosts = vi.fn();
 const fetchPost = vi.fn();
-const fetchFeedThreads = vi.fn();
+const googleSearch = vi.fn();
 const markCovered = vi.fn();
 const recordSources = vi.fn();
 const lastWideSweeps = vi.fn();
 const serpCallsToday = vi.fn();
 
 vi.mock("@/lib/reddit/skus", () => ({ fetchSearch, fetchSubredditPosts, fetchPost }));
-vi.mock("@/lib/scan/serp", () => ({ fetchFeedThreads, FEED_TIMEFRAME: "7d" }));
+vi.mock("@/lib/seo/fetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/seo/fetch")>()),
+  googleSearch,
+}));
 vi.mock("@/lib/scan/sources", () => ({ markCovered, recordSources, lastWideSweeps }));
 vi.mock("@/lib/usage", () => ({ serpCallsToday }));
 
@@ -61,7 +64,7 @@ const project = {
 
 describe("the watermark a scan's retrieval has earned", () => {
   beforeEach(() => {
-    for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchFeedThreads]) {
+    for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, googleSearch]) {
       mock.mockReset();
     }
     markCovered.mockReset();
@@ -98,7 +101,7 @@ describe("the watermark a scan's retrieval has earned", () => {
  */
 describe("which rows a scan's budget buys", () => {
   beforeEach(() => {
-    for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchFeedThreads]) {
+    for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, googleSearch]) {
       mock.mockReset();
     }
     markCovered.mockReset();

@@ -54,6 +54,62 @@ function recordingContext() {
   return { ctx: ctx as never, asked };
 }
 
+/**
+ * Google is asked two ways, and production already holds runs under each
+ * way's key: the feed's, with its week and its market in the key, and the one
+ * discovery and the SEO refresh share, with neither. Both must stay exactly as
+ * stored or every run in the reuse window is bought again.
+ */
+describe("google.search's run keys", () => {
+  it("keys the feed's search on its week and its market, and asks Google for the week", async () => {
+    const { googleSearch } = await import("@/lib/seo/fetch");
+    const { FEED_TIMEFRAME } = await import("@/lib/scan/coverage");
+    const { ctx, asked } = recordingContext();
+    keys.length = 0;
+    await googleSearch(ctx, "  Typeform Alternative reddit ", { timeframe: FEED_TIMEFRAME });
+    expect(FEED_TIMEFRAME).toBe("7d");
+    expect(keys[0]).toMatchObject({
+      kind: "serp",
+      sku: "google.search",
+      normalizedQuery: "typeform alternative reddit",
+      timeframe: "7d",
+      variant: "gl=us&hl=en",
+    });
+    expect(keys[0].sort ?? null).toBeNull();
+    expect(keys[0].maxAgeMs).toBeUndefined();
+    expect(asked).toEqual([
+      {
+        method: "google.search",
+        input: { query: "  Typeform Alternative reddit ", gl: "us", hl: "en", timeframe: "7d" },
+      },
+    ]);
+  });
+
+  it("keys discovery's search with no timeframe and no variant, and asks for a fast source", async () => {
+    const { runDiscoveryQueries } = await import("@/lib/discovery/serp");
+    const { ctx, asked } = recordingContext();
+    keys.length = 0;
+    await runDiscoveryQueries(ctx, [
+      { query: "Typeform Alternative reddit", family: "f", destination: null, kind: "problem" },
+    ]);
+    expect(keys[0]).toMatchObject({
+      kind: "serp",
+      sku: "google.search",
+      normalizedQuery: "typeform alternative reddit",
+    });
+    expect(keys[0].timeframe ?? null).toBeNull();
+    expect(keys[0].variant ?? "").toBe("");
+    expect(keys[0].sort ?? null).toBeNull();
+    expect(keys[0].maxAgeMs).toBeUndefined();
+    expect(asked).toEqual([
+      {
+        method: "google.search",
+        input: { query: "Typeform Alternative reddit", gl: "us", hl: "en", preferLatencyUnderMs: 1000 },
+      },
+    ]);
+  });
+});
+
 describe("reddit.post's run key", () => {
   it("is the post id however the thread's URL is spelled, and Reddit gets the URL as given", async () => {
     const { fetchPost } = await import("@/lib/reddit/skus");

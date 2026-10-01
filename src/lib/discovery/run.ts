@@ -56,10 +56,9 @@ async function runRound(
   product: ProductFacts,
   destinations: Destination[],
   queries: DiscoveryQuery[],
-  maxAgeMs: number,
   labelled: Set<string>,
 ): Promise<RoundOutcome> {
-  const { observations, costUsd } = await runDiscoveryQueries(ctx, queries, maxAgeMs);
+  const { observations, costUsd } = await runDiscoveryQueries(ctx, queries);
   const seen = observations.map((row) => ({ ...row, relevance: UNLABELED }));
   const fresh = dedupeThreads(seen).filter((thread) => !labelled.has(thread.postId));
   const labels = await labelThreads({
@@ -178,7 +177,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutc
         ? `Asking Google ${queries.length} ${queries.length === 1 ? "question" : "questions"} about where your buyers ask`
         : `Asking Google ${queries.length} more, where the first answers were thin`,
     );
-    const round_ = await runRound(ctx, input.facts, input.destinations, queries, maxAgeMs, labelled);
+    const round_ = await runRound(ctx, input.facts, input.destinations, queries, labelled);
     used.push(...queries);
     labels.push(...round_.labels);
     costUsd += round_.costUsd;

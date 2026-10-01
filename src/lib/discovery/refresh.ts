@@ -115,7 +115,7 @@ export async function runDiscoveryRefresh(
   await writeProgress(jobId, `Asking Google ${queries.length} more questions`);
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs };
-  const found = await runDiscoveryQueries(ctx, queries, maxAgeMs);
+  const found = await runDiscoveryQueries(ctx, queries);
   const known = new Set(evidence.map((row) => row.postId));
   const fresh = dedupeThreads(found.observations.map((row) => ({ ...row, relevance: UNLABELED })))
     .filter((thread) => !known.has(thread.postId));

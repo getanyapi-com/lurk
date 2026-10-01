@@ -18,7 +18,7 @@ const fetchPost = vi.fn();
 const fetchPostComments = vi.fn();
 const fetchAuthorProfile = vi.fn();
 const fetchSubredditDetails = vi.fn();
-const fetchFeedThreads = vi.fn();
+const googleSearch = vi.fn();
 
 vi.mock("@/lib/jev", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/jev")>()),
@@ -32,7 +32,10 @@ vi.mock("@/lib/reddit/skus", () => ({
   fetchAuthorProfile,
   fetchSubredditDetails,
 }));
-vi.mock("@/lib/scan/serp", () => ({ fetchFeedThreads, FEED_TIMEFRAME: "7d" }));
+vi.mock("@/lib/seo/fetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/seo/fetch")>()),
+  googleSearch,
+}));
 vi.mock("@/lib/anyapi", () => ({
   clientForUser: async () => ({
     client: {},
@@ -76,8 +79,8 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     for (const mock of [fetchSearch, fetchSubredditPosts, fetchPost, fetchPostComments]) {
       mock.mockReset();
     }
-    fetchFeedThreads.mockReset();
-    fetchFeedThreads.mockResolvedValue({ value: [], reused: true, costUsd: 0 });
+    googleSearch.mockReset();
+    googleSearch.mockResolvedValue({ value: [], reused: true, costUsd: 0 });
     fetchSubredditPosts.mockResolvedValue({ value: { posts: [], nextCursor: null }, reused: true, costUsd: 0 });
     fetchAuthorProfile.mockResolvedValue({ value: null, reused: true, costUsd: 0 });
     fetchPostComments.mockResolvedValue({ value: [], reused: true, costUsd: 0 });
@@ -608,12 +611,13 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
       },
     ]);
     fetchSearch.mockResolvedValue({ value: { posts: [], nextCursor: null }, reused: true, costUsd: 0 });
-    fetchFeedThreads.mockResolvedValue({
+    googleSearch.mockResolvedValue({
       value: [
         {
-          subreddit: "SaaS",
-          postId: stale.id,
-          canonicalUrl: `https://www.reddit.com/r/SaaS/comments/${stale.id}/`,
+          url: `https://www.reddit.com/r/SaaS/comments/${stale.id}/`,
+          position: 1,
+          title: stale.title,
+          snippet: null,
         },
       ],
       reused: false,
@@ -623,7 +627,10 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
     model();
 
     const outcome = await runScan(row.id, randomUUID());
+    // The feed's own question: the last week, under the run key it has always had.
+    expect(googleSearch.mock.calls[0][2]).toEqual({ timeframe: "7d" });
     expect(fetchPost).toHaveBeenCalledTimes(1);
+    expect(fetchPost.mock.calls[0][1]).toBe(`https://www.reddit.com/r/SaaS/comments/${stale.id}/`);
     expect(outcome.candidates).toBe(0);
     expect(await sourcesOf(row.id)).toHaveLength(0);
   });

@@ -32,14 +32,18 @@ describe("Reddit thread links", () => {
     expect(redditThread("/r/SaaS/comments/abc123/")).toBeNull();
   });
 
-  it("keeps Google's own order and positions", () => {
+  it("keeps Google's own order and positions, each thread under its canonical URL", () => {
     const kept = redditResults([
       { link: "https://example.com/a", position: 1 },
       { link: "https://www.reddit.com/r/SaaS/comments/a/", position: 2 },
-      { link: "https://old.reddit.com/r/nocode/comments/b/", position: 3 },
+      { link: "https://old.reddit.com/r/nocode/comments/b/some_title/?share=1", position: 3 },
       { link: "https://www.reddit.com/r/SaaS/", position: 4 },
     ]);
-    expect(kept.map((result) => result.position)).toEqual([2, 3]);
+    expect(kept.map((entry) => entry.result.position)).toEqual([2, 3]);
+    expect(kept.map((entry) => entry.thread.canonicalUrl)).toEqual([
+      "https://www.reddit.com/r/SaaS/comments/a/",
+      "https://www.reddit.com/r/nocode/comments/b/",
+    ]);
   });
 });
 

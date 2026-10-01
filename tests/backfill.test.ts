@@ -19,7 +19,7 @@ const fetchPost = vi.fn();
 const fetchPostComments = vi.fn();
 const fetchAuthorProfile = vi.fn();
 const fetchSubredditDetails = vi.fn();
-const fetchFeedThreads = vi.fn();
+const googleSearch = vi.fn();
 
 vi.mock("@/lib/jev", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/jev")>()),
@@ -37,7 +37,10 @@ vi.mock("@/lib/reddit/skus", () => ({
   fetchAuthorProfile,
   fetchSubredditDetails,
 }));
-vi.mock("@/lib/scan/serp", () => ({ fetchFeedThreads, FEED_TIMEFRAME: "7d" }));
+vi.mock("@/lib/seo/fetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/seo/fetch")>()),
+  googleSearch,
+}));
 vi.mock("@/lib/anyapi", () => ({
   clientForUser: async () => ({
     client: {},

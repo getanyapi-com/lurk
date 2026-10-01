@@ -1,7 +1,8 @@
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost, fetchSearch, fetchSubredditPosts } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
-import type { RedditThread } from "@/lib/seo/links";
+import { googleSearch } from "@/lib/seo/fetch";
+import { redditThread, type RedditThread } from "@/lib/seo/links";
 import type { TierLimits } from "@/lib/tiers";
 import { serpCallsToday } from "@/lib/usage";
 import { inFlight } from "@/lib/inFlight";
@@ -10,6 +11,7 @@ import {
   byWorth,
   coverageTimeframe,
   explorationPick,
+  FEED_TIMEFRAME,
   googleFeedQuery,
   listingStop,
   needsWideSweep,
@@ -18,7 +20,6 @@ import {
   type PlanRow,
 } from "./coverage";
 import type { ScanProject } from "./project";
-import { fetchFeedThreads } from "./serp";
 import { lastWideSweeps, recordSources, type CandidateSource } from "./sources";
 
 /**
@@ -160,8 +161,10 @@ async function runSerp(loop: Loop, row: PlanRow, budget: number): Promise<number
   const query = googleFeedQuery(row.key);
   let threads: RedditThread[];
   try {
-    const result = await fetchFeedThreads(loop.ctx, query);
-    threads = result.value;
+    const result = await googleSearch(loop.ctx, query, { timeframe: FEED_TIMEFRAME });
+    threads = result.value
+      .map((row) => redditThread(row.url))
+      .filter((thread): thread is RedditThread => thread !== null);
   } catch {
     loop.gaps.push(`The Google search for "${row.key}" failed.`);
     return 0;

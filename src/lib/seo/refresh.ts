@@ -20,7 +20,8 @@ import { readPosts, splitByReading } from "@/lib/scan/reading";
 import { evaluationsFor, postItem, unjudged } from "@/lib/scan/run";
 import { judgeItems } from "@/lib/scan/score";
 import { tierForUser } from "@/lib/tier";
-import { fetchRankingThreads, googleQuery } from "./fetch";
+import { googleQuery, googleSearch } from "./fetch";
+import { redditThread } from "./links";
 import { seoSettings } from "./limits";
 import { writeOpportunities, type OpportunityRow } from "./opportunities";
 import { NO_PHRASINGS_PROGRESS } from "./read";
@@ -41,10 +42,9 @@ export type SeoRefreshOutcome = {
 async function readThread(
   ctx: FetchContext,
   url: string,
-  maxAgeMs: number,
 ): Promise<{ post: StoredPost | null; costUsd: number }> {
   try {
-    const result = await fetchPost(ctx, url, maxAgeMs);
+    const result = await fetchPost(ctx, url, ctx.maxAgeMs);
     return { post: result.value[0] ?? null, costUsd: result.costUsd };
   } catch {
     return { post: null, costUsd: 0 };
@@ -99,15 +99,14 @@ async function refreshPhrasing(
   ctx: FetchContext,
   policy: ThreadPolicy,
   phrasing: string,
-  maxAgeMs: number,
 ): Promise<{ threads: number; costUsd: number; seen: Seen[]; opened: StoredPost[] }> {
-  const ranked = await fetchRankingThreads(ctx, phrasing, maxAgeMs);
+  const ranked = await googleSearch(ctx, googleQuery(phrasing), { preferLatency: true });
   let costUsd = ranked.costUsd;
   const seen: Seen[] = [];
   const opened: StoredPost[] = [];
   const positions = new Map<string, number>();
   for (const result of ranked.value) {
-    const thread = await readThread(ctx, result.url, maxAgeMs);
+    const thread = await readThread(ctx, result.url);
     costUsd += thread.costUsd;
     if (!thread.post) {
       continue;
@@ -116,7 +115,7 @@ async function refreshPhrasing(
     positions.set(thread.post.id, result.position);
     seen.push({
       postId: thread.post.id,
-      canonicalUrl: result.url,
+      canonicalUrl: redditThread(result.url)?.canonicalUrl ?? result.url,
       subreddit: thread.post.subreddit.toLowerCase(),
       query: googleQuery(phrasing),
       position: result.position,
@@ -259,7 +258,7 @@ export async function runSeoRefresh(
       jobId,
       `Searching ${index + 1} of ${settings.phrasings.length}: ${phrasing}`,
     );
-    const done = await refreshPhrasing(project, ctx, policy, phrasing, maxAgeMs);
+    const done = await refreshPhrasing(project, ctx, policy, phrasing);
     threads += done.threads;
     costUsd += done.costUsd;
     seen.push(...done.seen);

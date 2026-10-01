@@ -180,3 +180,97 @@ describe.skipIf(!process.env.DATABASE_URL)("the house data cap", () => {
       .where(and(eq(searchRuns.kind, "keyword"), eq(searchRuns.normalizedQuery, walletQuery)));
   });
 });
+
+/**
+ * One Google fetcher serves the feed, discovery and the SEO refresh. What it
+ * stores is a thread's canonical URL, and what it reuses includes the runs the
+ * SEO refresh stored before that, under the same key with the link Google gave.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("google.search's stored runs", () => {
+  it("stores canonical thread URLs, and still serves a run stored with Google's own link", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { db } = await import("@/db");
+    const { projects, searchRuns, serpResults, users } = await import("@/db/schema");
+    const { googleSearch } = await import("@/lib/seo/fetch");
+    const { eq } = await import("drizzle-orm");
+
+    const [user] = await db()
+      .insert(users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(projects)
+      .values({ userId: user.id, name: "Google test" })
+      .returning();
+    const query = `google test ${randomUUID()} reddit`;
+    const asked: Record<string, unknown>[] = [];
+    const funded = {
+      funding: `wallet:${user.id}` as const,
+      call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
+      client: {
+        google: {
+          search: async (input: Record<string, unknown>) => {
+            asked.push(input);
+            return {
+              output: {
+                found: true as const,
+                data: {
+                  results: [
+                    { link: "https://example.com/a", position: 1, title: "Not Reddit" },
+                    {
+                      link: "https://old.reddit.com/r/SaaS/comments/abc123/form_builders/?share=1",
+                      position: 2,
+                      title: "Form builders?",
+                      snippet: "Which one",
+                    },
+                  ],
+                },
+              },
+              costUsd: 0.0005,
+            };
+          },
+        },
+      },
+    };
+    const ctx = {
+      projectId: project.id,
+      funded: funded as unknown as Parameters<typeof googleSearch>[0]["funded"],
+      maxAgeMs: 60 * 60 * 1000,
+    };
+
+    // A run the SEO refresh stored before the two fetchers were one.
+    const oldRun = randomUUID();
+    const rawLink = "https://www.reddit.com/r/SaaS/comments/old123/a_title/";
+    await db().insert(searchRuns).values({
+      id: oldRun,
+      kind: "serp",
+      sku: "google.search",
+      normalizedQuery: query,
+      completedAt: new Date(),
+      fundedBy: "house",
+    });
+    await db()
+      .insert(serpResults)
+      .values({ id: randomUUID(), searchRunId: oldRun, position: 1, url: rawLink });
+
+    const ranked = await googleSearch(ctx, query, { preferLatency: true });
+    expect(ranked.reused).toBe(true);
+    expect(ranked.value.map((row) => row.url)).toEqual([rawLink]);
+    expect(asked).toHaveLength(0);
+
+    const feed = await googleSearch(ctx, query, { timeframe: "7d" });
+    expect(feed.reused).toBe(false);
+    expect(asked).toHaveLength(1);
+    expect(feed.value.map((row) => [row.position, row.url, row.title])).toEqual([
+      [2, "https://www.reddit.com/r/SaaS/comments/abc123/", "Form builders?"],
+    ]);
+    const again = await googleSearch(ctx, query, { timeframe: "7d" });
+    expect(again.reused).toBe(true);
+    expect(again.value.map((row) => row.url)).toEqual([
+      "https://www.reddit.com/r/SaaS/comments/abc123/",
+    ]);
+
+    await db().delete(users).where(eq(users.id, user.id));
+    await db().delete(searchRuns).where(eq(searchRuns.normalizedQuery, query));
+  });
+});
