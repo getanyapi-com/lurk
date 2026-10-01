@@ -103,6 +103,41 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
     expect(first.total).toBe(1);
   });
 
+  /**
+   * A first sweep's leads are mostly older than the month the feed opens on.
+   * The page opening on all time instead has to be one held entry under the
+   * URL asked for: two entries, the window's and all time's, evicted each
+   * other and every refresh read twice.
+   */
+  it("opens an empty window nobody picked on all time, and answers its repeat from one entry", async () => {
+    const { db, schema, project } = await fixture();
+    const { feedPage } = await import("@/lib/feedPage");
+    const [old] = await db()
+      .insert(schema.redditPosts)
+      .values({
+        id: `p${randomUUID().slice(0, 8)}`,
+        subreddit: "SaaS",
+        author: "asker",
+        title: "An old form question",
+        url: "https://www.reddit.com/r/SaaS/comments/z/form/",
+        createdAt: new Date(Date.now() - 90 * DAY_MS),
+      })
+      .returning();
+    await db()
+      .insert(schema.leads)
+      .values({ projectId: project.id, postId: old.id, score: 60, stage: "comparing" });
+
+    const opened = await feedPage(project.id, FILTER, true);
+    expect(opened.widened).toBe(true);
+    expect(opened.total).toBe(1);
+    expect(await feedPage(project.id, FILTER, true)).toBe(opened);
+    // The same thirty days picked by hand stay thirty days.
+    const picked = await feedPage(project.id, FILTER);
+    expect(picked.widened).toBe(false);
+    expect(picked.total).toBe(0);
+    expect(picked.elsewhere).toBe(1);
+  });
+
   it("reads again when the filter moves", async () => {
     const { db, schema, project, post } = await fixture();
     const { feedPage } = await import("@/lib/feedPage");

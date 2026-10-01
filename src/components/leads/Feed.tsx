@@ -156,18 +156,11 @@ async function openOn(
  */
 export async function Feed({ user, project, activity, params: asked }: FeedProps) {
   const projectId = project.id;
-  let params = asked;
-  let filter = feedFilter(params);
-  let page = await feedPage(projectId, filter);
-  // Nobody picked the 30 days the feed opens on. A first sweep reads a year, and
-  // its leads are mostly older than a month, so a new project opened on an
-  // empty window with its leads one pill away. When the window nobody chose is
-  // empty and the year is not, the feed opens on the year.
-  if (!asked.days && !asked.at && page.total === 0 && page.elsewhere > 0) {
-    params = { ...asked, days: "all" };
-    filter = feedFilter(params);
-    page = await feedPage(projectId, filter);
-  }
+  const page = await feedPage(projectId, feedFilter(asked), !asked.days && !asked.at);
+  // An empty window nobody picked opened on the whole of time (see feedPage),
+  // and the pills and links say so.
+  const params = page.widened ? { ...asked, days: "all" } : asked;
+  const filter = feedFilter(params);
   const { total, faces, facets, elsewhere } = page;
   // The first sweep is reported while it runs and for a moment after, over the
   // feed it fills, so the page a new project lands on says what is being read
