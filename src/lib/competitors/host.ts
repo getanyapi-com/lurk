@@ -1,3 +1,5 @@
+import { slug } from "@/lib/x/words";
+
 /**
  * Competitors are stored as names, and a name is only sometimes a domain. We
  * ask Google for a favicon only when the name really looks like a host, so a
@@ -39,10 +41,6 @@ export function domainRoot(host: string): string {
   const suffix = labels.slice(-2).join(".");
   const take = TWO_LABEL_SUFFIX.has(suffix) ? 3 : 2;
   return labels.length >= take ? labels[labels.length - take] : labels[0];
-}
-
-function slug(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 /**

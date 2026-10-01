@@ -1,19 +1,15 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { projectCompetitors, projects, subreddits } from "@/db/schema";
+import { projectCompetitors, projects } from "@/db/schema";
 import { clientForUser } from "./anyapi";
 import { competitorHost } from "./competitors/host";
 import { generateStructured } from "./llm";
 import { BRIEF_INSTRUCTIONS, briefSchema, usableBrief, type ProductBrief } from "./brief";
-import { COMPETITORS_SYSTEM, FAST_READING_SYSTEM, PROFILE_SYSTEM, PROMO_POLICY_SYSTEM } from "./prompts";
-import { normalizeQuery, recordUsage } from "./reddit/fetch";
+import { COMPETITORS_SYSTEM, FAST_READING_SYSTEM, PROFILE_SYSTEM } from "./prompts";
+import { recordUsage } from "./reddit/fetch";
 import { capped, tierForUser } from "./tier";
-import { fetchSubredditDetails } from "./reddit/skus";
 import { assertHouseDataUnderCap } from "./usage";
-
-/** How long a subreddit sidebar is reused before we buy it again. */
-const SUBREDDIT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * What one product page can tell us. Communities and searches are absent on
@@ -251,45 +247,6 @@ export async function readSite(projectId: string, userId: string, url: string) {
     ),
   ].join("");
   return { ...home, markdown };
-}
-
-/**
- * A community's self-promotion rule in one sentence, read the first time
- * anybody needs it and kept on the shared row for everyone after. It is one
- * person's call on one reply, so it is bought when a lead in that community is
- * opened and never while a new project waits on its first sweep.
- */
-export async function promoPolicyFor(
-  projectId: string,
-  userId: string,
-  name: string,
-): Promise<string | null> {
-  const key = normalizeQuery(name);
-  const known = await db().select().from(subreddits).where(eq(subreddits.name, key));
-  if (known[0]?.promoPolicy) {
-    return known[0].promoPolicy;
-  }
-  const funded = await clientForUser(userId);
-  const result = await fetchSubredditDetails(
-    { projectId, funded, maxAgeMs: SUBREDDIT_MAX_AGE_MS },
-    name,
-    SUBREDDIT_MAX_AGE_MS,
-  );
-  if (!result.value) {
-    return null;
-  }
-  const summary = await generateStructured({
-    purpose: "promo_policy",
-    projectId,
-    schema: z.object({ policy: z.string() }),
-    system: PROMO_POLICY_SYSTEM,
-    prompt: `Subreddit r/${name} sidebar:\n\n${result.value.description}`,
-  });
-  await db()
-    .update(subreddits)
-    .set({ promoPolicy: summary.policy })
-    .where(eq(subreddits.name, key));
-  return summary.policy;
 }
 
 /** How many competitors one reading of the page may name. */

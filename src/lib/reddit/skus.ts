@@ -1,6 +1,10 @@
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db";
 import { redditAuthors, subreddits } from "@/db/schema";
+import { clientForUser } from "@/lib/anyapi";
+import { generateStructured } from "@/lib/llm";
+import { PROMO_POLICY_SYSTEM } from "@/lib/prompts";
 import {
   fetchShared,
   normalizeQuery,
@@ -180,18 +184,19 @@ export type SubredditFacts = {
   iconUrl?: string;
 } | null;
 
-/** Subreddit metadata, kept for a week because a sidebar rarely changes. */
+/** How long a subreddit sidebar is reused before we buy it again. */
+const SUBREDDIT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Subreddit metadata, reused for as long as the context allows (a week for promoPolicyFor). */
 export async function fetchSubredditDetails(
   ctx: FetchContext,
   subreddit: string,
-  maxAgeMs: number,
 ): Promise<SharedResult<SubredditFacts>> {
   return fetchShared<SubredditFacts>({
     ctx,
     kind: "subreddit",
     sku: "reddit.subreddit_details",
     normalizedQuery: normalizeQuery(subreddit),
-    maxAgeMs,
     run: async () => {
       const res = await ctx.funded.client.reddit.subredditDetails({ subreddit });
       return { data: res.output.found ? res.output.data : null, costUsd: res.costUsd };
@@ -237,6 +242,41 @@ export async function fetchSubredditDetails(
         : null;
     },
   });
+}
+
+/**
+ * A community's self-promotion rule in one sentence, read the first time
+ * anybody needs it and kept on the shared row for everyone after. It is one
+ * person's call on one reply, so it is bought when a lead in that community is
+ * opened and never while a new project waits on its first sweep.
+ */
+export async function promoPolicyFor(
+  projectId: string,
+  userId: string,
+  name: string,
+): Promise<string | null> {
+  const key = normalizeQuery(name);
+  const known = await db().select().from(subreddits).where(eq(subreddits.name, key));
+  if (known[0]?.promoPolicy) {
+    return known[0].promoPolicy;
+  }
+  const funded = await clientForUser(userId);
+  const result = await fetchSubredditDetails({ projectId, funded, maxAgeMs: SUBREDDIT_MAX_AGE_MS }, name);
+  if (!result.value) {
+    return null;
+  }
+  const summary = await generateStructured({
+    purpose: "promo_policy",
+    projectId,
+    schema: z.object({ policy: z.string() }),
+    system: PROMO_POLICY_SYSTEM,
+    prompt: `Subreddit r/${name} sidebar:\n\n${result.value.description}`,
+  });
+  await db()
+    .update(subreddits)
+    .set({ promoPolicy: summary.policy })
+    .where(eq(subreddits.name, key));
+  return summary.policy;
 }
 
 export type AuthorFace = {

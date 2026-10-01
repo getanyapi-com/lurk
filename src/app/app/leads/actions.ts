@@ -8,7 +8,7 @@ import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
 import { markThreadReplied, redditLeadThread, reopenThread } from "@/lib/handled";
 import { leadInSubreddit, listLeads, setLeadStatus } from "@/lib/leads";
 import { addMute } from "@/lib/mutes";
-import { promoPolicyFor } from "@/lib/profile";
+import { promoPolicyFor } from "@/lib/reddit/skus";
 import { projectForUser } from "@/lib/projects";
 import { sweepStatus, type SweepStatus } from "@/lib/sweep";
 
