@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { compactCount, fullCount } from "@/lib/format";
 
 /**
- * The detail panes, the SEO tab and Insights each wrote their own copy of the
- * full-count formatter, and X's thread wrote its own short one. These pin the
- * shared ones to what every copy printed.
+ * The detail panes, the SEO tab and Insights write a count out in full, and
+ * X's thread writes the short one X prints under a post.
  */
 describe("counts", () => {
   it("writes a count in full, and a dash for one the platform never gave", () => {
