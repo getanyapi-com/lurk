@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { X_LANES_VERSION } from "@/lib/x/constants";
+import type { ProductFacts } from "@/lib/product";
+import { X_LANES_VERSION, X_SEEDS_VERSION } from "@/lib/x/constants";
 import { assertLane } from "@/lib/x/grammar";
 import {
   DIY_WORDS,
@@ -21,6 +22,7 @@ import {
   rivalSeeds,
   type SeedSlots,
 } from "@/lib/x/lanes";
+import { seedsKey, seedsPrompt } from "@/lib/x/seeds";
 import { isAmbiguous, normalizeEntity } from "@/lib/x/words";
 
 /**
@@ -213,7 +215,7 @@ describe("X build-vs-buy and workflow lanes", () => {
 });
 
 describe("X lane order and inputs", () => {
-  it("puts the first rival lane, build-vs-buy and workflow first, so a three-lane plan gets one of each", () => {
+  it("puts the first rival lane, build-vs-buy and workflow first, so a run capped to its first few lanes gets one of each", () => {
     const slots: SeedSlots = { artifacts: ["scraping api"], topics: ["scraping", "scraper"] };
     const rivals = ["apify", "bright data", "firecrawl", "oxylabs", "proxycurl", "rapidapi", "scraperapi", "loom"];
     const lanes = compileLanes({ rivals, slots, ownNames: ["AnyAPI"] });
@@ -240,5 +242,33 @@ describe("X lane order and inputs", () => {
     const slots: SeedSlots = { artifacts: ["booking page"], topics: ["scheduling"] };
     const stored = JSON.stringify({ v: X_LANES_VERSION, lang: "en", seeds: ["calendly"], slots, ownNames: ["Cal.com"] });
     expect(lanesInputHash(["calendly"], slots, ["Cal.com"])).toBe(createHash("sha256").update(stored).digest("hex"));
+  });
+
+  it("asks for seed words with the same prompt every cached key was made from, so no project buys them again", () => {
+    const product: ProductFacts = {
+      name: "Cal.com",
+      url: null,
+      pain: "",
+      solution: "",
+      targetUsers: "",
+      serviceGeography: "",
+      budgetFit: "",
+      capabilities: [],
+      exclusions: [],
+      notBuyers: [],
+      competitors: [],
+    };
+    const prompt = seedsPrompt(product, ["book a meeting", "google calendar api"], ["savvycal", "calendly"]);
+    const stored = JSON.stringify({
+      product: { name: "Cal.com", competitors: ["calendly", "savvycal"] },
+      how_buyers_say_it: ["book a meeting"],
+      platforms_it_gets_data_from: ["google calendar"],
+      language: "en",
+    });
+    expect(prompt).toBe(stored);
+    // The language stays in the prompt, last, though it never varies: the cached key is a hash of this text.
+    expect(JSON.parse(prompt).language).toBe("en");
+    expect(Object.keys(JSON.parse(prompt)).at(-1)).toBe("language");
+    expect(seedsKey(prompt)).toBe(createHash("sha256").update(JSON.stringify({ v: X_SEEDS_VERSION, prompt: stored })).digest("hex"));
   });
 });
