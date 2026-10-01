@@ -96,7 +96,11 @@
             "name": "status",
             "in": "query",
             "description": "Defaults to new.",
-            "schema": { "type": "string", "enum": ["new", "hidden", "not_fit", "all"], "default": "new" }
+            "schema": {
+              "type": "string",
+              "enum": ["new", "replied", "hidden", "not_fit", "resolved", "all"],
+              "default": "new"
+            }
           },
           {
             "name": "minScore",
@@ -342,26 +346,141 @@
       },
       "TierLimits": {
         "type": "object",
-        "description": "What this tier allows. Null in any field means no limit.",
+        "description": "What this tier allows. Null in any field means no limit. discoveryQueries through discoveryRefreshDays are what one project's discovery and scans may buy.",
+        "required": [
+          "projects",
+          "keywordsPerProject",
+          "subredditsPerProject",
+          "feedWindowDays",
+          "customWebhooks",
+          "alertCadence",
+          "seoKeywords",
+          "seoRefreshDays",
+          "competitors",
+          "apiRequestsPerDay",
+          "actions",
+          "discoveryQueries",
+          "discoveryQueriesMax",
+          "searchesPerScan",
+          "scopedSearchesPerScan",
+          "listingPilotsPerScan",
+          "serpQueriesPerDay",
+          "searchPagesPerQuery",
+          "hydrationPerScan",
+          "discoveryRefreshDays"
+        ],
         "properties": {
           "projects": { "type": ["integer", "null"] },
           "keywordsPerProject": { "type": ["integer", "null"] },
           "subredditsPerProject": { "type": ["integer", "null"] },
-          "scanIntervalHours": { "type": "integer" },
-          "commentThreadsPerScan": { "type": ["integer", "null"] },
-          "feedWindowDays": { "type": "integer" },
-          "alertWebhooks": { "type": ["integer", "null"] },
-          "alertCadence": { "type": "string", "enum": ["daily", "hourly"] },
+          "feedWindowDays": {
+            "type": "integer",
+            "description": "How many days back the feed and the leads endpoint read."
+          },
+          "customWebhooks": {
+            "type": ["integer", "null"],
+            "description": "Custom webhook alert channels per project. Slack and Discord are not capped."
+          },
+          "alertCadence": {
+            "type": "string",
+            "enum": ["daily", "hourly"],
+            "description": "The most often an alert channel may send."
+          },
           "seoKeywords": { "type": ["integer", "null"] },
           "seoRefreshDays": { "type": "integer" },
-          "seoSearchVolume": { "type": "boolean" },
           "competitors": { "type": ["integer", "null"] },
-          "apiRequestsPerDay": { "type": "integer" }
+          "apiRequestsPerDay": {
+            "type": ["integer", "null"],
+            "description": "Requests a key may make per UTC day. Null means no daily cap."
+          },
+          "actions": {
+            "type": "object",
+            "description": "How many times the account may press each paid button, across all its projects: in any 24 hours (day) or ever. Zero means the button is off.",
+            "required": ["window", "presses"],
+            "properties": {
+              "window": { "type": "string", "enum": ["day", "ever"] },
+              "presses": {
+                "type": "object",
+                "required": ["scan_now", "rebuild_profile", "seo_refresh", "competitor_scan", "insights"],
+                "properties": {
+                  "scan_now": { "type": "integer" },
+                  "rebuild_profile": { "type": "integer" },
+                  "seo_refresh": { "type": "integer" },
+                  "competitor_scan": { "type": "integer" },
+                  "insights": { "type": "integer" },
+                  "x_scan_now": {
+                    "type": "integer",
+                    "description": "Present only when X leads are on for this account."
+                  }
+                }
+              }
+            }
+          },
+          "discoveryQueries": { "type": "integer" },
+          "discoveryQueriesMax": { "type": "integer" },
+          "searchesPerScan": { "type": "integer" },
+          "scopedSearchesPerScan": { "type": "integer" },
+          "listingPilotsPerScan": { "type": "integer" },
+          "serpQueriesPerDay": { "type": "integer", "description": "Google queries one project's scans may buy a day." },
+          "searchPagesPerQuery": { "type": "integer" },
+          "hydrationPerScan": { "type": "integer", "description": "Posts one scan may open in full." },
+          "discoveryRefreshDays": { "type": "integer", "description": "Days between one project's discovery passes." },
+          "x": {
+            "$ref": "#/components/schemas/XLimits",
+            "description": "Present only when X leads are on for this account."
+          }
+        }
+      },
+      "XLimits": {
+        "type": "object",
+        "description": "What X leads may buy for one project. Null in any field means no limit.",
+        "required": [
+          "lanes",
+          "cadenceHours",
+          "maxBackoffHours",
+          "pagesPerLane",
+          "pagesPerDay",
+          "parentHops",
+          "parentsPerDay",
+          "judgedPerDay",
+          "profilesPerDay",
+          "replyChecksPerDay"
+        ],
+        "properties": {
+          "lanes": {
+            "type": ["integer", "null"],
+            "description": "Searches the project runs. Null is every one lurk writes for it."
+          },
+          "cadenceHours": { "type": "integer", "description": "How often an X scan runs." },
+          "maxBackoffHours": { "type": "integer", "description": "The longest a quiet search may back off to." },
+          "pagesPerLane": { "type": "integer" },
+          "pagesPerDay": { "type": ["integer", "null"] },
+          "parentHops": {
+            "type": "integer",
+            "description": "How far a reply is walked up to what it answers."
+          },
+          "parentsPerDay": { "type": ["integer", "null"] },
+          "judgedPerDay": { "type": ["integer", "null"] },
+          "profilesPerDay": { "type": ["integer", "null"] },
+          "replyChecksPerDay": { "type": ["integer", "null"] }
         }
       },
       "Project": {
         "type": "object",
-        "required": ["id", "name", "createdAt", "newLeads"],
+        "required": [
+          "id",
+          "name",
+          "url",
+          "pain",
+          "solution",
+          "targetUsers",
+          "geography",
+          "budgetFit",
+          "scoreThreshold",
+          "leadFilters",
+          "createdAt",
+          "newLeads"
+        ],
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
@@ -371,9 +490,37 @@
           "targetUsers": { "type": ["string", "null"] },
           "geography": { "type": ["string", "null"] },
           "budgetFit": { "type": ["string", "null"] },
-          "scoreThreshold": { "type": ["integer", "null"] },
+          "scoreThreshold": {
+            "type": ["integer", "null"],
+            "description": "The least score the app's feed shows. Null is the default. The leads endpoint does not apply it."
+          },
+          "leadFilters": { "$ref": "#/components/schemas/LeadFilters" },
           "createdAt": { "type": "string", "format": "date-time" },
           "newLeads": { "type": "integer", "description": "Leads still waiting to be triaged." }
+        }
+      },
+      "LeadFilters": {
+        "type": "object",
+        "description": "The owner's own rules for which leads they want. Like scoreThreshold, the app's feed and alerts apply them and the leads endpoint does not.",
+        "required": ["mustMention", "alertMinScore", "xMinScore"],
+        "properties": {
+          "mustMention": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "A lead must mention one of these, when there are any."
+          },
+          "alertMinScore": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The least score a Reddit lead needs to be alerted. Null is the house floor."
+          },
+          "xMinScore": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The least score an X ask needs to be shown or alerted. Null is none."
+          }
         }
       },
       "ProjectDetail": {
@@ -429,7 +576,7 @@
           },
           "stage": {
             "type": ["string", "null"],
-            "description": "problem-aware, solution-seeking, comparing or purchase-ready."
+            "description": "none, problem_aware, solution_seeking, comparing or purchase_ready."
           },
           "reason": { "type": ["string", "null"], "description": "One line on why this was scored so." },
           "matchedPhrase": { "type": ["string", "null"] },
@@ -437,7 +584,11 @@
             "type": "boolean",
             "description": "True when the poster is selling rather than buying."
           },
-          "status": { "type": "string", "enum": ["new", "hidden", "not_fit"] },
+          "status": {
+            "type": "string",
+            "enum": ["new", "replied", "hidden", "not_fit", "resolved"],
+            "description": "replied is the owner saying they answered the thread. resolved is the scan seeing the person say their need is met."
+          },
           "postedAt": { "type": "string", "format": "date-time" },
           "scoredAt": { "type": "string", "format": "date-time" },
           "costUsd": {

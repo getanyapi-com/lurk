@@ -8,7 +8,12 @@ import { ApiError } from "./responses";
 
 export type LeadStatusFilter = LeadStatus | "all";
 
-const STATUSES: LeadStatusFilter[] = ["new", "replied", "hidden", "not_fit", "resolved", "all"];
+/**
+ * Every status a leads call may ask for: each one a lead can hold, and `all`.
+ * MCP's list_leads schema is built from this, and tests/apiContract.test.ts
+ * holds public/openapi.json to it.
+ */
+export const STATUSES: readonly LeadStatusFilter[] = ["new", "replied", "hidden", "not_fit", "resolved", "all"];
 
 /** Page size, and the cap the reference products in this category publish. */
 export const DEFAULT_LIMIT = 50;

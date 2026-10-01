@@ -26,8 +26,9 @@ function feedWindowDays(caller: ApiCaller): number {
 /**
  * The tier limits as the API has always shown them. X leads' limits are shown
  * only to a caller X is on for, so a feature that ships dark stays dark here.
+ * public/openapi.json's TierLimits is held to this by tests/apiContract.test.ts.
  */
-function publicLimits(caller: ApiCaller) {
+export function publicLimits(caller: ApiCaller) {
   if (!caller.limits || xEnabledFor(caller.user.id)) {
     return caller.limits;
   }
