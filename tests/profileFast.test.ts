@@ -253,3 +253,49 @@ describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () =>
     warn.mockRestore();
   });
 });
+
+/**
+ * A rebuild of an existing project's profile reads the site once, with no fast
+ * reading, and invalidates the verdicts made against the old facts.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("rebuilding a profile", () => {
+  beforeEach(() => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    generateStructured.mockReset();
+  });
+
+  it("reads the tier during a new profile's model call and still caps its competitors", async () => {
+    const { user, project, row, competitors } = await fixture();
+    const tier = await import("@/lib/tier");
+    const { buildProfile } = await import("@/lib/profile");
+    const current = await tier.tierForUser(user.id);
+    const lookup = vi.spyOn(tier, "tierForUser").mockResolvedValue({
+      ...current, limits: { ...(await import("@/lib/tiers")).TIERS.free, competitors: 1 },
+    });
+    const reading = held({ ...fullReading, competitors: [
+      { name: "Typeform", domain: "typeform.com" },
+      { name: "Other", domain: "other.test" },
+    ] });
+    generateStructured.mockImplementation(reading.answer);
+    const build = buildProfile(project.id, user.id, project.url!, { rejudge: true });
+    try {
+      await vi.waitFor(() => {
+        // The reading and the competitors' own reading, side by side.
+        expect(generateStructured).toHaveBeenCalledTimes(2);
+        expect(lookup).toHaveBeenCalledWith(user.id);
+      });
+      reading.release();
+      const result = await build;
+      expect(result.problemPhrasings).toEqual(fullReading.problemPhrasings);
+      expect(await competitors()).toEqual(["Typeform"]);
+      const written = await row();
+      expect(written.profileVersion).toBe(2);
+      expect(written.briefProfileVersion).toBe(2);
+      expect(written.pain).toBe(fullReading.pain);
+    } finally {
+      reading.release();
+      await build;
+      lookup.mockRestore();
+    }
+  });
+});

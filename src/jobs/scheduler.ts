@@ -1,7 +1,6 @@
 import { Cron } from "croner";
-import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { jobs, projects } from "@/db/schema";
+import { projects } from "@/db/schema";
 import { alertInvitesOn } from "@/lib/alerts/config";
 import { config } from "@/lib/config";
 import { projectsWithStaleEvaluations } from "@/lib/scan/rescore";
@@ -95,23 +94,11 @@ export async function seedProjectScans(): Promise<void> {
     .select({
       id: projects.id,
       discoveredAt: projects.discoveredAt,
-      createdAt: projects.createdAt,
-      url: projects.url,
       profileVersion: projects.profileVersion,
       briefProfileVersion: projects.briefProfileVersion,
     })
     .from(projects);
   const stale = await projectsWithStaleEvaluations();
-  const reseeded = new Set(
-    (
-      await db()
-        .selectDistinct({ projectId: jobs.projectId })
-        .from(jobs)
-        // A reseed that failed is still owed: the first one queued was claimed
-        // by the revision on its way out, which had no handler for it.
-        .where(and(eq(jobs.kind, "profile_reseed"), isNull(jobs.error)))
-    ).map((row) => row.projectId),
-  );
   const owedSearches = await projectsOwedSearches(new Date());
   for (const [index, projectId] of owedSearches.entries()) {
     try {
@@ -133,7 +120,7 @@ export async function seedProjectScans(): Promise<void> {
   }
   for (const row of rows) {
     try {
-      await seedProject(row, stale.has(row.id), reseeded.has(row.id));
+      await seedProject(row, stale.has(row.id));
     } catch (error) {
       /** The project was deleted between the read above and its insert. Nothing to seed. */
       if (!isMissingProject(error)) {
@@ -148,16 +135,6 @@ function isMissingProject(error: unknown): boolean {
   const cause = error instanceof Error && error.cause ? error.cause : error;
   return (cause as { code?: string } | null)?.code === "23503";
 }
-
-/**
- * Profiles made before this were read from the homepage alone, by a prompt that
- * asked for a product's limits only where the page spelled them out. Each gets
- * one new reading, spread over a few hours so the scrapes and the rescores
- * behind them never crowd a signup's first sweep.
- */
-const PROFILES_READ_WHOLE_SINCE = new Date("2026-09-20T00:00:00Z");
-const RESEED_GAP_MS = 2 * 60 * 1000;
-let reseedsQueued = 0;
 
 /**
  * Briefs owed at boot start after the outgoing revision is gone, since a job it
@@ -182,13 +159,11 @@ const REPLY_PARENTS_GAP_MS = 5 * 1000;
 type SeedRow = {
   id: string;
   discoveredAt: Date | null;
-  createdAt: Date;
-  url: string | null;
   profileVersion: number;
   briefProfileVersion: number | null;
 };
 
-async function seedProject(row: SeedRow, stale: boolean, reseeded: boolean): Promise<void> {
+async function seedProject(row: SeedRow, stale: boolean): Promise<void> {
   if (!row.discoveredAt) {
     /**
      * A project whose first discovery never finished has no plan at all, so
@@ -217,10 +192,6 @@ async function seedProject(row: SeedRow, stale: boolean, reseeded: boolean): Pro
     // After the outgoing revision is gone too: its scorer would judge the
     // verdicts the old way and mark them current.
     await enqueueOnce("rescore", new Date(Date.now() + BRIEF_START_MS), row.id);
-  }
-  if (row.url && row.createdAt < PROFILES_READ_WHOLE_SINCE && !reseeded) {
-    await enqueueOnce("profile_reseed", new Date(Date.now() + reseedsQueued * RESEED_GAP_MS), row.id);
-    reseedsQueued += 1;
   }
 }
 
