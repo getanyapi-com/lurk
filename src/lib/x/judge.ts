@@ -1,7 +1,7 @@
 import { askJev, choice, noul, score, type Answers } from "@/lib/jev";
+import { LlmCapReachedError } from "@/lib/llm";
 import type { ProductFacts } from "@/lib/product";
 import { productState } from "@/lib/product";
-import { askInBatches, stateTokens } from "@/lib/scan/batches";
 import { engagementScore } from "@/lib/scan/constants";
 import { plainTypography, truncateBody } from "@/lib/scan/evidence";
 import { NO_QUOTE } from "@/lib/scan/questions";
@@ -250,21 +250,16 @@ export async function judgeX(
     complete: level === "complete",
     brief: product.brief,
   });
-  const [result] = await askInBatches<XCandidate, XAssessment | null>(
-    [candidate],
-    1,
-    async () => {
-      await assertXLlmUnderCap();
-      const answers = await askJev({
-        purpose,
-        projectId,
-        state,
-        questions,
-      });
-      return [assess(answers, candidate, sentences, level, new Date(), replies)];
-    },
-    () => [null],
-    () => stateTokens(state),
-  );
-  return result ?? null;
+  try {
+    await assertXLlmUnderCap();
+    const answers = await askJev({ purpose, projectId, state, questions });
+    return assess(answers, candidate, sentences, level, new Date(), replies);
+  } catch (error) {
+    if (error instanceof LlmCapReachedError) {
+      throw error;
+    }
+    // A dropped call, a refused request or an answer missing a question the
+    // gates read: unanswered, never rejected.
+    return null;
+  }
 }

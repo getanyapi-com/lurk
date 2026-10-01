@@ -24,8 +24,8 @@ export class XHouseDataCapError extends HouseDataCapReachedError {
 
 /**
  * X has spent its share of today's house model budget. A LlmCapReachedError,
- * because askInBatches rethrows only that class; anything else would be read as
- * an unanswered batch and the run would go on asking.
+ * because judgeX and checkReply rethrow only that class; anything else would be
+ * read as an unanswered call and the run would go on asking.
  */
 export class XLlmCapReachedError extends LlmCapReachedError {
   constructor(capUsd: number) {

@@ -67,10 +67,15 @@ export type ReplyVerdict = {
   raw: Record<string, unknown>;
 };
 
-function schemaFor(sentenceIds: string[]) {
+/**
+ * What either check answers: its kind of post (the need check's shape, the
+ * venue check's moment), each of its checks, the model's own worth_reply, a
+ * sentence for the card, and the id of the author's sentence it rests on.
+ */
+function checkSchema<K extends string>(kindField: K, kinds: readonly [string, ...string[]], checks: readonly string[], sentenceIds: string[]) {
   return z.object({
-    shape: z.enum(REPLY_SHAPES),
-    checks: z.object(Object.fromEntries(CHECKS.map((check) => [check, z.boolean()])) as Record<(typeof CHECKS)[number], z.ZodBoolean>),
+    ...({ [kindField]: z.enum(kinds) } as Record<K, z.ZodEnum<Record<string, string>>>),
+    checks: z.object(Object.fromEntries(checks.map((check) => [check, z.boolean()])) as Record<string, z.ZodBoolean>),
     worth_reply: z.boolean(),
     why: z.string().min(8).max(220),
     quote: z.enum([NO_QUOTE, ...sentenceIds] as [string, ...string[]]),
@@ -135,18 +140,6 @@ const VENUE_MOMENTS = ["workflow", "building_their_own", "price_gripe", "open_qu
 
 const VENUE_CHECKS = ["on_the_job", "readers_buy", "reply_adds_value", "not_a_rival", "genuine", "not_vulnerable"] as const;
 
-function venueSchemaFor(sentenceIds: string[]) {
-  return z.object({
-    moment: z.enum(VENUE_MOMENTS),
-    checks: z.object(
-      Object.fromEntries(VENUE_CHECKS.map((check) => [check, z.boolean()])) as Record<(typeof VENUE_CHECKS)[number], z.ZodBoolean>,
-    ),
-    worth_reply: z.boolean(),
-    why: z.string().min(8).max(220),
-    quote: z.enum([NO_QUOTE, ...sentenceIds] as [string, ...string[]]),
-  });
-}
-
 /**
  * The venue check: a post from a build-vs-buy or workflow lane, where nobody
  * has to be shopping. Its examples are the posts one founder actually chose to
@@ -181,43 +174,51 @@ Answer with:
 - why: one sentence of at most 25 words, shown to the founder: what the post is about and what a reply could add. Plain words, no quotes from the post, never "the user".
 - quote: the id of the author's own sentence that best shows the job or the tool, or "${NO_QUOTE}".`;
 
-/** The verdict from the venue check's answer, decided in code: a moment, every check, and a verbatim quote of the author's own. */
-export function venueVerdict(
-  answer: { moment: string; checks: Record<string, boolean>; worth_reply: boolean; why: string; quote: string },
-  candidate: Pick<XCandidate, "text" | "rawText">,
-  sentences: Record<string, string>,
-): ReplyVerdict {
-  const picked = answer.quote === NO_QUOTE ? null : (sentences[answer.quote] ?? null);
-  const quote = picked && isVerbatim(picked, [candidate.text, candidate.rawText].map(plainTypography)) ? picked : null;
-  const worth =
-    answer.worth_reply &&
-    answer.moment !== "none" &&
-    VENUE_CHECKS.every((check) => answer.checks[check] === true) &&
-    quote !== null;
-  const moment = (REPLY_MOMENTS as readonly string[]).includes(answer.moment) ? (answer.moment as ReplyMoment) : "workflow";
-  return { worth, moment, why: answer.why.trim(), quote, raw: { ...answer, check: "venue", version: X_REPLY_VERSION } };
+type CheckAnswer = { checks: Record<string, boolean>; worth_reply: boolean; why: string; quote: string };
+
+/** The sentence the model pointed at, when it is the author's own words verbatim; otherwise null. */
+function verbatimQuote(id: string, candidate: Pick<XCandidate, "text" | "rawText">, sentences: Record<string, string>): string | null {
+  const picked = id === NO_QUOTE ? null : (sentences[id] ?? null);
+  return picked && isVerbatim(picked, [candidate.text, candidate.rawText].map(plainTypography)) ? picked : null;
 }
 
-/** The verdict from the model's answer, decided in code: every check, a shape, and a verbatim quote of the author's own. */
-export function replyVerdict(
-  answer: {
-    shape: string;
-    checks: Record<string, boolean>;
-    worth_reply: boolean;
-    why: string;
-    quote: string;
-  },
+/**
+ * A verdict decided in code, from either check's answer: worth a reply only
+ * when the model said so, named a kind of post other than none, held every
+ * check, and pointed at a sentence that is the author's own, verbatim.
+ */
+function verdictFrom(
+  answer: CheckAnswer & Record<string, unknown>,
+  candidate: Pick<XCandidate, "text" | "rawText">,
+  sentences: Record<string, string>,
+  rule: { kindField: "shape" | "moment"; checks: readonly string[]; moment: ReplyMoment; check: "need" | "venue" },
+): ReplyVerdict {
+  const quote = verbatimQuote(answer.quote, candidate, sentences);
+  const worth =
+    answer.worth_reply &&
+    answer[rule.kindField] !== "none" &&
+    rule.checks.every((check) => answer.checks[check] === true) &&
+    quote !== null;
+  return { worth, moment: rule.moment, why: answer.why.trim(), quote, raw: { ...answer, check: rule.check, version: X_REPLY_VERSION } };
+}
+
+/** The verdict from the venue check's answer: its moment, read as a card's kind of place, or a workflow when it names none. */
+export function venueVerdict(
+  answer: CheckAnswer & { moment: string },
   candidate: Pick<XCandidate, "text" | "rawText">,
   sentences: Record<string, string>,
 ): ReplyVerdict {
-  const picked = answer.quote === NO_QUOTE ? null : (sentences[answer.quote] ?? null);
-  const quote = picked && isVerbatim(picked, [candidate.text, candidate.rawText].map(plainTypography)) ? picked : null;
-  const worth =
-    answer.worth_reply &&
-    answer.shape !== "none" &&
-    CHECKS.every((check) => answer.checks[check] === true) &&
-    quote !== null;
-  return { worth, moment: "has_the_problem", why: answer.why.trim(), quote, raw: { ...answer, check: "need", version: X_REPLY_VERSION } };
+  const moment = (REPLY_MOMENTS as readonly string[]).includes(answer.moment) ? (answer.moment as ReplyMoment) : "workflow";
+  return verdictFrom(answer, candidate, sentences, { kindField: "moment", checks: VENUE_CHECKS, moment, check: "venue" });
+}
+
+/** The verdict from the need check's answer: always someone with the problem. */
+export function replyVerdict(
+  answer: CheckAnswer & { shape: string },
+  candidate: Pick<XCandidate, "text" | "rawText">,
+  sentences: Record<string, string>,
+): ReplyVerdict {
+  return verdictFrom(answer, candidate, sentences, { kindField: "shape", checks: CHECKS, moment: "has_the_problem", check: "need" });
 }
 
 /**
@@ -230,12 +231,13 @@ export async function checkReply(projectId: string, product: ProductFacts, candi
   await assertXLlmUnderCap();
   const call = { purpose: "x_reply" as const, projectId, effort: "low" as const, itemsAsked: 1, itemsAnswered: () => 1, timeoutMs: 60_000, prompt };
   try {
+    const ids = Object.keys(sentences);
     if (candidate.venue) {
-      const answer = await generateStructured({ ...call, schema: venueSchemaFor(Object.keys(sentences)), system: VENUE_SYSTEM });
-      return venueVerdict(answer, candidate, sentences);
+      const schema = checkSchema("moment", VENUE_MOMENTS, VENUE_CHECKS, ids);
+      return venueVerdict(await generateStructured({ ...call, schema, system: VENUE_SYSTEM }), candidate, sentences);
     }
-    const answer = await generateStructured({ ...call, schema: schemaFor(Object.keys(sentences)), system: REPLY_SYSTEM });
-    return replyVerdict(answer, candidate, sentences);
+    const schema = checkSchema("shape", REPLY_SHAPES, CHECKS, ids);
+    return replyVerdict(await generateStructured({ ...call, schema, system: REPLY_SYSTEM }), candidate, sentences);
   } catch (error) {
     if (error instanceof LlmCapReachedError) throw error;
     return null;
