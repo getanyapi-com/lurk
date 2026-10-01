@@ -1,11 +1,8 @@
 import { SubredditChip } from "@/components/SubredditChip";
+import { fullCount } from "@/lib/format";
 import type { CommunityRow } from "@/lib/insights/read";
 
 type CommunitiesTableProps = { rows: CommunityRow[] };
-
-function activeUsers(value: number | null): string {
-  return value == null ? "-" : value.toLocaleString("en-US");
-}
 
 /** Where the leads come from, and what each community allows you to say. */
 export function CommunitiesTable({ rows }: CommunitiesTableProps) {
@@ -49,7 +46,7 @@ export function CommunitiesTable({ rows }: CommunitiesTableProps) {
                 <td className="p-4 text-small text-fg-muted">
                   {row.promoPolicy ?? "No rule stored yet"}
                 </td>
-                <td className="p-4 tabular-nums">{activeUsers(row.weeklyActiveUsers)}</td>
+                <td className="p-4 tabular-nums">{fullCount(row.weeklyActiveUsers)}</td>
               </tr>
             ))
           )}

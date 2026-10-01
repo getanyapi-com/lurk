@@ -1,14 +1,12 @@
 import { ChartNoAxesColumn, Heart, MessageCircle, Repeat2, Search } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { XBody } from "@/components/x/XBody";
+import { compactCount } from "@/lib/format";
 import type { XThread as XThreadData, XThreadPost } from "@/lib/x/read";
 
 /** A count the way X shows one under a post: 950, 1.2K, 38K, 1.4M; nothing when X never gave it. */
 function count(value: number | null): string {
-  if (value === null || value === 0) return "";
-  if (value < 1000) return String(value);
-  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0).replace(/\.0$/u, "")}K`;
-  return `${(value / 1_000_000).toFixed(1).replace(/\.0$/u, "")}M`;
+  return value === null || value === 0 ? "" : compactCount(value, { upper: true });
 }
 
 /** A post's age as X heads it: 12m and 3h inside a day, then its date. */

@@ -4,12 +4,13 @@ import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { LeadActions } from "@/components/leads/LeadActions";
 import { Meter } from "@/components/leads/Meter";
+import { Block, Called, Pane, Title } from "@/components/leads/pane";
 import { accountAge } from "@/components/leads/workspace";
 import { XBody } from "@/components/x/XBody";
 import { XReplyChip } from "@/components/x/XReplyChip";
 import { XThread } from "@/components/x/XThread";
 import { filteredSentence } from "@/components/x/filtered";
-import { relativeAge, shortAge } from "@/lib/format";
+import { fullCount, relativeAge, shortAge } from "@/lib/format";
 import { intentWord, judgementSentence } from "@/lib/scan/words";
 import { STALE_BADGE_HOURS } from "@/lib/x/constants";
 import type { XFilteredCard, XHeldCard, XLeadCard, XThread as XThreadData } from "@/lib/x/read";
@@ -19,43 +20,8 @@ export type XSelection =
   | { kind: "held"; item: XHeldCard }
   | { kind: "filtered"; item: XFilteredCard };
 
-/** Nothing here is estimated, so a fact X never gave reads as a dash. */
-const MISSING = "-";
-
 /** Why a post worth a reply was a miss. "No active need" is true of every reply by construction. */
 const REPLY_NOT_FIT_REASONS = ["can't help them", "not worth replying", "seller side", "other"];
-
-function tally(value: number | null): string {
-  return value === null ? MISSING : value.toLocaleString("en-US");
-}
-
-function Pane({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
-}
-
-function Title({ text, badge }: { text: string; badge: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <h3 className="text-h3 text-fg" style={{ fontWeight: 500 }}>
-        {text}
-      </h3>
-      <span className="shrink-0 pt-1">{badge}</span>
-    </div>
-  );
-}
-
-/** One labelled line of plain words: why the scan called this what it called it. */
-function Called({ label, sentence }: { label: string; sentence: string | null }) {
-  if (!sentence) {
-    return null;
-  }
-  return (
-    <section className="flex flex-col gap-1 rounded-card bg-surface-2 p-3">
-      <span className="text-mono tracking-wide text-fg-muted uppercase">{label}</span>
-      <p className="text-small text-fg">{sentence}</p>
-    </section>
-  );
-}
 
 /** The posts a reply answers, so it is read with them. Never tinted: their need is not the author's. */
 function ReplyingTo({ parents }: { parents: string[] }) {
@@ -69,15 +35,6 @@ function ReplyingTo({ parents }: { parents: string[] }) {
           <span className="line-clamp-2">Replying to {parent}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function Block({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5 border-b p-3 last:border-b-0">
-      <span className="text-mono tracking-wide text-fg-muted uppercase">{label}</span>
-      {children}
     </div>
   );
 }
@@ -107,7 +64,7 @@ function XDetailRail({ card, engagement, reply = false, unscored = false, moment
           <span className="min-w-0 truncate text-small text-fg">@{card.authorUsername}</span>
         </span>
         <span className="text-mono tabular-nums text-fg-muted">
-          {tally(card.authorFollowers)} followers{card.authorVerified ? " · verified" : ""}
+          {fullCount(card.authorFollowers)} followers{card.authorVerified ? " · verified" : ""}
         </span>
         {card.authorLocation ? <span className="text-small truncate text-fg-muted">{card.authorLocation}</span> : null}
         <span className="text-mono text-fg-muted">{accountAge(card.authorCreatedAt)}</span>
@@ -118,15 +75,15 @@ function XDetailRail({ card, engagement, reply = false, unscored = false, moment
         <span className="text-mono flex items-center gap-3 tabular-nums text-fg-muted">
           <span className="inline-flex items-center gap-1">
             <Heart className="size-3.5" aria-hidden="true" />
-            {tally(card.likeCount)}
+            {fullCount(card.likeCount)}
           </span>
           <span className="inline-flex items-center gap-1">
             <MessageCircle className="size-3.5" aria-hidden="true" />
-            {tally(card.replyCount)}
+            {fullCount(card.replyCount)}
           </span>
           <span className="inline-flex items-center gap-1">
             <Eye className="size-3.5" aria-hidden="true" />
-            {tally(card.viewCount)}
+            {fullCount(card.viewCount)}
           </span>
         </span>
         <span className="text-mono text-fg-muted">counted {relativeAge(card.fetchedAt)}</span>

@@ -52,9 +52,20 @@ export function errorSentence(error: string): string {
   return line.endsWith(".") ? line : `${line}.`;
 }
 
-/** A count as a short mono figure: 950, 1.2k, 18k, 2.4M. */
-export function compactCount(value: number): string {
+/**
+ * A count as a short mono figure: 950, 1.2k, 18k, 2.4M. `upper` writes the
+ * thousands as X does under a post, 1.2K.
+ */
+export function compactCount(value: number, { upper = false }: { upper?: boolean } = {}): string {
   if (value < 1000) return String(value);
-  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0).replace(/\.0$/u, "")}k`;
+  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0).replace(/\.0$/u, "")}${upper ? "K" : "k"}`;
   return `${(value / 1_000_000).toFixed(1).replace(/\.0$/u, "")}M`;
+}
+
+/** Nothing a detail pane shows is estimated, so a fact the platform never gave reads as a dash. */
+export const MISSING = "-";
+
+/** A count written out in full, 12,345, or `missing` when there is none. */
+export function fullCount(value: number | null | undefined, missing = MISSING): string {
+  return value == null ? missing : value.toLocaleString("en-US");
 }

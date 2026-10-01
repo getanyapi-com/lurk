@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDown } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
+import { SUBREDDIT_FALLBACK_ICON } from "@/components/SubredditChip";
 import { ExpandableRow } from "@/components/seo/ExpandableRow";
 import { InlineScore } from "@/components/seo/OpportunityScore";
 import { RankPill } from "@/components/seo/RankPill";
@@ -161,7 +162,7 @@ export function ThreadTable({
                     <span className="inline-flex min-w-0 items-center gap-1.5 text-small text-fg-muted">
                       <Avatar
                         name={thread.subreddit}
-                        src={thread.subredditIconUrl || "/brands/reddit.svg"}
+                        src={thread.subredditIconUrl || SUBREDDIT_FALLBACK_ICON}
                         size={16}
                       />
                       <span className="truncate">{thread.subreddit}</span>

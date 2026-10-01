@@ -3,7 +3,9 @@ import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { SubredditChip } from "@/components/SubredditChip";
 import { PromoPolicyLine } from "@/components/leads/PromoPolicyBadge";
 import { Meter } from "@/components/leads/Meter";
+import { Block } from "@/components/leads/pane";
 import { accountAge } from "@/components/leads/workspace";
+import { fullCount, MISSING } from "@/lib/format";
 import { judgementSentence } from "@/lib/scan/words";
 
 export type DetailRailProps = {
@@ -28,22 +30,6 @@ export type DetailRailProps = {
   competitors: string[];
 };
 
-/** Nothing here is estimated, so a fact Reddit never gave reads as a dash. */
-const MISSING = "-";
-
-function tally(value: number | null): string {
-  return value === null ? MISSING : value.toLocaleString("en-US");
-}
-
-function Block({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5 border-b p-3 last:border-b-0">
-      <span className="text-mono tracking-wide text-fg-muted uppercase">{label}</span>
-      {children}
-    </div>
-  );
-}
-
 /**
  * The ledger beside the post: who is asking, where they asked, what the thread
  * did, and how the scan scored it. The judgement bars sit here rather than on
@@ -61,14 +47,14 @@ export function DetailRail(props: DetailRailProps) {
           <AuthorAvatar name={props.author} src={props.avatarUrl} size={24} />
           <span className="truncate text-small text-fg">u/{props.author ?? MISSING}</span>
         </span>
-        <span className="text-mono tabular-nums text-fg-muted">{tally(props.authorKarma)} karma</span>
+        <span className="text-mono tabular-nums text-fg-muted">{fullCount(props.authorKarma)} karma</span>
         <span className="text-mono text-fg-muted">{accountAge(props.authorCreatedAt)}</span>
       </Block>
 
       <Block label="Community">
         <SubredditChip name={props.subreddit} iconUrl={props.subredditIconUrl} />
         <span className="text-mono tabular-nums text-fg-muted">
-          {tally(props.weeklyActive)} weekly active
+          {fullCount(props.weeklyActive)} weekly active
         </span>
         <PromoPolicyLine
           projectId={props.projectId}
@@ -82,11 +68,11 @@ export function DetailRail(props: DetailRailProps) {
         <span className="text-mono flex items-center gap-3 tabular-nums text-fg-muted">
           <span className="inline-flex items-center gap-1">
             <ArrowUp className="size-3.5" aria-hidden="true" />
-            {tally(props.points)}
+            {fullCount(props.points)}
           </span>
           <span className="inline-flex items-center gap-1">
             <MessageCircle className="size-3.5" aria-hidden="true" />
-            {tally(props.numComments)}
+            {fullCount(props.numComments)}
           </span>
         </span>
         <a

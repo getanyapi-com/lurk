@@ -1,6 +1,8 @@
 import { ArrowUp, ArrowUpRight, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
-import { relativeAge, shortAge } from "@/lib/format";
+import { SUBREDDIT_FALLBACK_ICON } from "@/components/SubredditChip";
+import { Block } from "@/components/leads/pane";
+import { fullCount, MISSING, relativeAge, shortAge } from "@/lib/format";
 import { fitWord, intentWord, judgementSentence } from "@/lib/scan/words";
 import { competitorsNamed } from "@/lib/competitors/match";
 import {
@@ -15,14 +17,7 @@ import {
 } from "@/lib/seo/score";
 import { cn } from "@/lib/utils";
 
-/** Nothing here is estimated, so a fact Reddit never gave reads as a dash. */
-const MISSING = "-";
-
 const STEPS = [1, 2, 3, 4];
-
-function tally(value: number | null): string {
-  return value === null ? MISSING : value.toLocaleString("en-US");
-}
 
 /** One part of the fold: what it measures, then how far it reached. */
 function Part({ label, value, fill }: { label: string; value: number; fill: string }) {
@@ -38,15 +33,6 @@ function Part({ label, value, fill }: { label: string; value: number; fill: stri
         ))}
       </span>
     </span>
-  );
-}
-
-function Block({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5 border-b p-3 last:border-b-0">
-      <span className="text-mono tracking-wide text-fg-muted uppercase">{label}</span>
-      {children}
-    </div>
   );
 }
 
@@ -92,7 +78,7 @@ export function ThreadFacts({
           <header className="flex flex-wrap items-center gap-x-2 gap-y-1 text-mono text-fg-muted">
             <Avatar
               name={thread.subreddit}
-              src={thread.subredditIconUrl || "/brands/reddit.svg"}
+              src={thread.subredditIconUrl || SUBREDDIT_FALLBACK_ICON}
               size={20}
             />
             <span className="text-fg" style={{ fontWeight: 500 }}>
@@ -120,11 +106,11 @@ export function ThreadFacts({
           <footer className="mt-1 flex flex-wrap items-center gap-4 border-t pt-2.5 text-mono text-fg-muted">
             <span className="inline-flex items-center gap-1 tabular-nums">
               <ArrowUp className="size-3.5" aria-hidden="true" />
-              {tally(thread.score)}
+              {fullCount(thread.score)}
             </span>
             <span className="inline-flex items-center gap-1 tabular-nums">
               <MessageCircle className="size-3.5" aria-hidden="true" />
-              {tally(thread.numComments)} comments
+              {fullCount(thread.numComments)} comments
             </span>
             <a
               href={thread.url}
@@ -179,14 +165,14 @@ export function ThreadFacts({
             {judgement || "Nobody has judged them"}
           </span>
           <span className="text-mono tabular-nums text-fg-muted">
-            {tally(thread.authorKarma)} karma
+            {fullCount(thread.authorKarma)} karma
             {thread.authorCreatedAt ? `, ${shortAge(thread.authorCreatedAt)} old` : ""}
           </span>
         </Block>
 
         <Block label="Can you post here">
           <span className="text-mono tabular-nums text-fg-muted">
-            {tally(thread.subredditSubscribers)} members
+            {fullCount(thread.subredditSubscribers)} members
           </span>
           {/* The rules the sentence came from, so a promo policy can be checked. */}
           <span className="text-mono text-fg-muted" title={thread.rulesText ?? undefined}>

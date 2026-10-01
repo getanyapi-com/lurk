@@ -12,6 +12,7 @@ import { SubredditChip } from "@/components/SubredditChip";
 import { DetailRail } from "@/components/leads/DetailRail";
 import { HighlightedBody } from "@/components/leads/HighlightedBody";
 import { LeadActions } from "@/components/leads/LeadActions";
+import { Called, Pane, Title } from "@/components/leads/pane";
 import { PromoPolicyBadge } from "@/components/leads/PromoPolicyBadge";
 import { WorthACommentChip } from "@/components/leads/WorthACommentChip";
 import { verdictFor } from "@/components/leads/verdict";
@@ -30,34 +31,6 @@ type LeadDetailProps = {
   /** The owner's ranking weights, null for the default, which the ranking line reads. */
   scoring: ScoringSettings | null;
 };
-
-function Pane({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
-}
-
-function Title({ text, badge }: { text: string; badge: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <h3 className="text-h3 text-fg" style={{ fontWeight: 500 }}>
-        {text}
-      </h3>
-      <span className="shrink-0 pt-1">{badge}</span>
-    </div>
-  );
-}
-
-/** One labelled line of plain words: why the scan called this what it called it. */
-function Called({ label, sentence }: { label: string; sentence: string | null }) {
-  if (!sentence) {
-    return null;
-  }
-  return (
-    <section className="flex flex-col gap-1 rounded-card bg-surface-2 p-3">
-      <span className="text-mono tracking-wide text-fg-muted uppercase">{label}</span>
-      <p className="text-small text-fg">{sentence}</p>
-    </section>
-  );
-}
 
 /** The thread a comment lead was found under, so the reply has its context. */
 function ReplyingIn({ title, author, avatarUrl }: { title: string; author: string | null; avatarUrl: string | null }) {
