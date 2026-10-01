@@ -15,7 +15,7 @@ import {
 } from "@/lib/alerts/select";
 import { sendToChannel } from "@/lib/alerts/send";
 import type { Digest } from "@/lib/alerts/types";
-import { inFlight } from "@/lib/scan/constants";
+import { inFlight } from "@/lib/inFlight";
 import { tierForUser } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
 import { xEnabledFor } from "@/lib/x/enabled";

@@ -9,8 +9,9 @@ import { tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { writeThreadMentions } from "@/lib/competitors/threads";
 import { redditScore } from "@/lib/scoring/weights";
+import { inFlight } from "@/lib/inFlight";
 import { judgeThreads, readLeadThreads } from "./comments";
-import { hydrationCap, inFlight } from "./constants";
+import { retrievalBudgets } from "./constants";
 import { isSentinel } from "./evidence";
 import {
   alreadyJudged,
@@ -165,7 +166,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
     maxAgeMs: cadence.intervalHours() * HOUR_MS,
   };
   const windowMs = (limits?.feedWindowDays ?? RETENTION_DAYS) * 24 * HOUR_MS;
-  const hydration = hydrationCap(limits);
+  const hydration = retrievalBudgets(limits).hydration;
 
   await writeProgress(jobId, "Looking for new posts");
   const stored = await loadEvaluations(projectId);

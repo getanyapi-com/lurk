@@ -4,7 +4,8 @@ import type { StoredPost } from "@/lib/reddit/store";
 import type { RedditThread } from "@/lib/seo/links";
 import type { TierLimits } from "@/lib/tiers";
 import { serpCallsToday } from "@/lib/usage";
-import { inFlight, retrievalBudgets } from "./constants";
+import { inFlight } from "@/lib/inFlight";
+import { retrievalBudgets } from "./constants";
 import {
   byWorth,
   coverageTimeframe,

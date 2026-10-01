@@ -1,6 +1,7 @@
 import { JevRequestTooLargeError } from "@/lib/jev";
 import { LlmCapReachedError } from "@/lib/llm";
-import { MODEL_CONCURRENCY, inFlight } from "./constants";
+import { inFlight } from "@/lib/inFlight";
+import { MODEL_CONCURRENCY } from "./constants";
 
 /**
  * How much state one Jev request carries, in tokens. Jev refuses a request

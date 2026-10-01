@@ -4,6 +4,7 @@ import { redditPosts } from "@/db/schema";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPostComments } from "@/lib/reddit/skus";
 import { commentsOfPost, type StoredComment, type StoredPost } from "@/lib/reddit/store";
+import { inFlight } from "@/lib/inFlight";
 import {
   alreadyJudged,
   contentHash,
@@ -12,7 +13,6 @@ import {
 } from "./evaluations";
 import type { Judgement, ScorableItem } from "./judgement";
 import { leadKey } from "./leads";
-import { inFlight } from "./constants";
 import type { ScanProject } from "./project";
 import { judgeItems } from "./score";
 

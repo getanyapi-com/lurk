@@ -26,15 +26,8 @@ export const SCORE_BATCH_SIZE = 1;
 export const READING_BATCH_SIZE = 10;
 
 /**
- * How many Reddit calls one job has in flight at once, whether it is opening
- * posts or walking a search. The measured run read 540 posts ten at a time
- * without a failure, so ten is what the evidence covers.
- */
-export const CALL_CONCURRENCY = 10;
-
-/**
  * How many model calls one job has in flight at once. Separate from the Reddit
- * budget because it is a different provider with a different limit, and sharing
+ * budget (lib/inFlight.ts CALL_CONCURRENCY) because it is a different provider with a different limit, and sharing
  * one number made every model phase run at Reddit's.
  *
  * Measured against OpenRouter on 2026-09-10 with the real triage prompt and
@@ -51,28 +44,6 @@ export const CALL_CONCURRENCY = 10;
  */
 export const MODEL_CONCURRENCY = 60;
 
-/** Runs `work` over `items`, `limit` at a time, in the input order. */
-export async function inFlight<T, R>(
-  items: T[],
-  work: (item: T) => Promise<R>,
-  limit: number = CALL_CONCURRENCY,
-): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    for (;;) {
-      const index = next;
-      if (index >= items.length) {
-        return;
-      }
-      next += 1;
-      out[index] = await work(items[index]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return out;
-}
-
 /**
  * How many titles one triage call reads at a time. The saved runs in
  * .context/reddit-leads-proof/scorer-pass.md and scorer-pass-2.md triaged 70,
@@ -83,16 +54,6 @@ export async function inFlight<T, R>(
  */
 export const TRIAGE_BATCH_SIZE = 70;
 
-/**
- * How many posts one scan may open in full, whatever it opens them for. Both
- * hydrating a Google result and reading a shortlisted candidate buy the same
- * reddit.post call, so they spend one budget: the tier's `hydrationPerScan`,
- * which replaces the old postReadCap because it caps exactly the same calls.
- */
-export function hydrationCap(limits: TierLimits | null): number | null {
-  return limits ? limits.hydrationPerScan : null;
-}
-
 /** What one scan may buy of each kind. A self-hosted instance has no tier of
  * its own, so it retrieves like a connected one and caps nothing. */
 export function retrievalBudgets(limits: TierLimits | null): {
@@ -101,6 +62,13 @@ export function retrievalBudgets(limits: TierLimits | null): {
   listings: number;
   serpPerDay: number;
   pages: number;
+  /**
+   * How many posts one scan may open in full, whatever it opens them for, or
+   * null for no cap. Both hydrating a Google result and reading a shortlisted
+   * candidate buy the same reddit.post call, so they spend one budget: the
+   * tier's `hydrationPerScan`.
+   */
+  hydration: number | null;
 } {
   const source = limits ?? TIERS.connected;
   return {
@@ -109,6 +77,7 @@ export function retrievalBudgets(limits: TierLimits | null): {
     listings: source.listingPilotsPerScan,
     serpPerDay: source.serpQueriesPerDay,
     pages: source.searchPagesPerQuery,
+    hydration: limits ? limits.hydrationPerScan : null,
   };
 }
 

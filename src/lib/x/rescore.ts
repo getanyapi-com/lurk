@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { xEvaluations, xPosts } from "@/db/schema";
+import { inFlight } from "@/lib/inFlight";
 import type { ProductFacts } from "@/lib/product";
 import { X_SCORER_VERSION } from "./constants";
 import { judgeX } from "./judge";
@@ -42,11 +43,9 @@ export async function scoreScreened(projectId: string, product: ProductFacts, li
     .orderBy(desc(xPosts.createdAt))
     .limit(limit);
   let scored = 0;
-  let next = 0;
-  const worker = async () => {
-    while (next < rows.length) {
-      const { evaluation, post } = rows[next];
-      next += 1;
+  await inFlight(
+    rows,
+    async ({ evaluation, post }) => {
       const context = evaluation.context as { text?: string; replyingTo?: string[] } | null;
       const assessment = await judgeX(
         projectId,
@@ -68,7 +67,7 @@ export async function scoreScreened(projectId: string, product: ProductFacts, li
         "search",
         false,
       );
-      if (!assessment) continue;
+      if (!assessment) return;
       await updateEvaluation(evaluation.id, {
         fit: assessment.fit,
         intent: assessment.intent,
@@ -79,8 +78,8 @@ export async function scoreScreened(projectId: string, product: ProductFacts, li
         scorerVersion: X_SCORER_VERSION,
       });
       scored += 1;
-    }
-  };
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    },
+    CONCURRENCY,
+  );
   return scored;
 }

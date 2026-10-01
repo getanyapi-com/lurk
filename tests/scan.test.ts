@@ -3,7 +3,6 @@ import { JevRequestTooLargeError } from "@/lib/jev";
 import {
   TRIAGE_BATCH_SIZE,
   engagementScore,
-  hydrationCap,
   retrievalBudgets,
 } from "@/lib/scan/constants";
 import { BODY_CHAR_BUDGET, truncateBody } from "@/lib/scan/evidence";
@@ -475,13 +474,12 @@ describe("triage", () => {
 
 describe("what one scan may buy", () => {
   it("opens no more posts than the tier's hydration budget", () => {
-    expect(hydrationCap(TIERS.free)).toBe(TIERS.free.hydrationPerScan);
-    expect(hydrationCap(TIERS.connected)).toBe(TIERS.connected.hydrationPerScan);
+    expect(retrievalBudgets(TIERS.free).hydration).toBe(TIERS.free.hydrationPerScan);
+    expect(retrievalBudgets(TIERS.connected).hydration).toBe(TIERS.connected.hydrationPerScan);
   });
 
   it("caps nothing for a self-hosted instance, which retrieves like a connected one", () => {
-    expect(hydrationCap(null)).toBeNull();
-    expect(retrievalBudgets(null)).toEqual(retrievalBudgets(TIERS.connected));
+    expect(retrievalBudgets(null)).toEqual({ ...retrievalBudgets(TIERS.connected), hydration: null });
   });
 
   it("reads every budget from the tier", () => {
@@ -491,6 +489,7 @@ describe("what one scan may buy", () => {
       listings: TIERS.free.listingPilotsPerScan,
       serpPerDay: TIERS.free.serpQueriesPerDay,
       pages: TIERS.free.searchPagesPerQuery,
+      hydration: TIERS.free.hydrationPerScan,
     });
   });
 });

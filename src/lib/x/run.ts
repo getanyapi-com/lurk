@@ -6,6 +6,7 @@ import { enqueueOnce, writeProgress } from "@/jobs/enqueue";
 import { projectHasAlertChannel } from "@/lib/alerts/channels";
 import { clientForUser } from "@/lib/anyapi";
 import { config } from "@/lib/config";
+import { inFlight } from "@/lib/inFlight";
 import { parseScoring } from "@/lib/scoring/weights";
 import { LlmCapReachedError } from "@/lib/llm";
 import type { ProductFacts } from "@/lib/product";
@@ -40,6 +41,7 @@ import { judgeX, storedRoute, type XCandidate } from "./judge";
 import { XLaneRefusedError } from "./grammar";
 import { compileLanes, lanesInputHash, rivalSeeds, VENUE_FAMILIES, type SeedSlots } from "./lanes";
 import { ownWords } from "./map";
+import { semaphore } from "./pace";
 import { checkReply } from "./reply";
 import { emptyCounts, finishXRun, markFirstLead, startXRun, type XRunCounts } from "./report";
 import { freeScreen, isListicle, isOwnOrRivalAccount, isVendorHook, matchedLaneTerms, PITCH_REASONS } from "./screen";
@@ -577,22 +579,7 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
   };
 
   // Posts move through context and judging POST_CONCURRENCY at a time.
-  let active = 0;
-  const queue: Array<() => void> = [];
-  const slot = async <T>(fn: () => Promise<T>): Promise<T> => {
-    if (active >= POST_CONCURRENCY) {
-      await new Promise<void>((resolve) => queue.push(resolve));
-    } else {
-      active += 1;
-    }
-    try {
-      return await fn();
-    } finally {
-      const next = queue.shift();
-      if (next) next();
-      else active -= 1;
-    }
-  };
+  const slot = semaphore(() => POST_CONCURRENCY);
 
   /** One paid lookup failed for this post: it keeps its stage and loses one attempt. */
   const lookupFailed = async (evaluation: XEvaluation, error: unknown) => {
@@ -1157,19 +1144,19 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
   // The tab puts "Searching X now:" before this line.
   const searches = `${due.length} ${due.length === 1 ? "search" : "searches"}`;
   await progress(due.length === 0 ? "checking posts found earlier" : firstLook ? `the last 30 days, ${searches}` : searches);
-  await Promise.all(
-    Array.from({ length: Math.min(LANE_CONCURRENCY, due.length) }, async (_, worker) => {
-      for (let index = worker; index < due.length; index += LANE_CONCURRENCY) {
-        // An unexpected error in one lane stops the run the way a post's does:
-        // the posts already moving are drained and the run is finished first.
-        try {
-          await searchLane(due[index]);
-        } catch (error) {
-          failure ??= error;
-          stopped ??= "An X search could not be processed.";
-        }
+  await inFlight(
+    due,
+    async (lane) => {
+      // An unexpected error in one lane stops the run the way a post's does:
+      // the posts already moving are drained and the run is finished first.
+      try {
+        await searchLane(lane);
+      } catch (error) {
+        failure ??= error;
+        stopped ??= "An X search could not be processed.";
       }
-    }),
+    },
+    LANE_CONCURRENCY,
   );
   await drain();
 
@@ -1225,23 +1212,22 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
     // 30 s, so one after another a first look's twenty-odd kept its replies
     // back for over ten minutes (AnyAPI, 2026-09-28).
     let unanswered = 0;
-    let next = 0;
-    const worker = async () => {
-      while (!stopped && !failure && next < candidates.length) {
-        const row = candidates[next];
-        next += 1;
+    await inFlight(
+      candidates,
+      async (row) => {
+        if (stopped || failure) return;
         const post = byId.get(row.tweetId);
-        if (!post) continue;
+        if (!post) return;
         const known = (row.context as StoredContext | null) ?? null;
         try {
           const refusal = replies ? unpaidRefusal(row, post, known) : "replies_off";
           if (refusal) {
             await settleCandidate(row, post, { code: refusal });
-            continue;
+            return;
           }
           // A scan kept alive only by an alert channel sends asks: a reply
           // candidate waits for the tab to be opened, or settles for free.
-          if (!openedRecently || pools.replyChecks.spent || unanswered >= MAX_UNANSWERED_REPLIES) continue;
+          if (!openedRecently || pools.replyChecks.spent || unanswered >= MAX_UNANSWERED_REPLIES) return;
           unanswered = (await checkWorthReply(row, post, known)) ? 0 : unanswered + 1;
         } catch (error) {
           if (isStopError(error)) {
@@ -1249,11 +1235,10 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
             return;
           }
           failure ??= error;
-          return;
         }
-      }
-    };
-    await Promise.all(Array.from({ length: REPLY_CONCURRENCY }, worker));
+      },
+      REPLY_CONCURRENCY,
+    );
   }
   // Last, and only for a tab someone reads: a score for what the free screen
   // set aside, so Filtered out ranks it. Nothing waits on it and nothing is
