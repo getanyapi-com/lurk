@@ -474,8 +474,8 @@ export const usageLedger = pgTable(
 /**
  * Every language model call this instance made: what it cost, how long it took,
  * who served it, and whether it answered. The daily cap reads the cost, and the
- * scorer report reads the rest, so a question about a bad verdict is answered
- * from a table instead of by running the scan again.
+ * rest is kept so a question about a bad verdict is answered from a table
+ * instead of by running the scan again.
  *
  * The columns after `cost_usd` are null on a row written before 2026-09-13,
  * because those calls really did record nothing else. `schema_failed` is the
@@ -502,7 +502,7 @@ export const llmUsage = pgTable(
     finishReason: text("finish_reason"),
     /** True when the answer could not be read as the shape that was asked for. */
     schemaFailed: boolean("schema_failed").notNull().default(false),
-    /** 1 for the first call, 2 for the one that asks again for skipped ids. */
+    /** Unused: no call asks a second time for the ids it skipped, so new rows leave it null. */
     attempt: integer("attempt"),
     /** Reasoning tokens, where the provider reports them. Billed as output. */
     reasoningTokens: integer("reasoning_tokens"),

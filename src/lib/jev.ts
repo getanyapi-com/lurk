@@ -177,16 +177,15 @@ async function record(
       itemsAnswered: made.answered,
       finishReason: made.finishReason,
       schemaFailed: false,
-      attempt: 1,
     });
 }
 
 /**
  * One Jev request, billed to the house and recorded in llm_usage beside every
- * muse call, so the daily cap, the Data usage screen and the scorer report
- * read one table. A refused request writes a row too: what a scan spent and
- * whether it was answered is a query, never a rerun. A Gateway failure writes
- * its own row before the call moves to OpenRouter.
+ * muse call, so the daily cap and the Data usage screen read one table. A
+ * refused request writes a row too: what a scan spent and whether it was
+ * answered is a query, never a rerun. A Gateway failure writes its own row
+ * before the call moves to OpenRouter.
  */
 export async function askJev(call: JevCall): Promise<Answers> {
   const { AI_GATEWAY_API_KEY, OPENROUTER_API_KEY } = config();

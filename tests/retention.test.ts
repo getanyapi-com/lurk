@@ -87,8 +87,8 @@ describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
   });
 
   /**
-   * The scorer report is read months after the calls it reports on, so it only
-   * works if retention cannot take its rows away. llm_usage points at a project
+   * What a model call cost is read long after the post it judged has expired,
+   * so retention must not take llm_usage rows away. llm_usage points at a project
    * and never at a post, so deleting an expired post cannot cascade into it;
    * this is that fact, stated as a test rather than as a claim.
    */

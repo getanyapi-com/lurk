@@ -118,7 +118,6 @@ describe("what the language model boundary records", () => {
       schemaFailed: false,
       itemsAsked: null,
       itemsAnswered: null,
-      attempt: null,
     });
     expect(recorded[0].latencyMs).toBeTypeOf("number");
   });

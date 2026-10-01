@@ -161,8 +161,6 @@ export type LlmCall<T> = {
   itemsAsked?: number;
   /** How many of them the answer carried, read off the value that came back. */
   itemsAnswered?: (value: T) => number;
-  /** 1 for the first call, 2 for the one asking again for the ids it skipped. */
-  attempt?: number;
   /** How hard to think, when a call has measured a different answer to REASONING_EFFORT. */
   effort?: ReasoningEffort;
   /** How long to wait before giving up, when a caller cannot hold a job for the default. */
@@ -209,7 +207,6 @@ async function record(call: LlmCall<unknown>, made: CallRecord): Promise<void> {
       itemsAnswered: made.itemsAnswered,
       finishReason: made.finishReason,
       schemaFailed: made.schemaFailed,
-      attempt: call.attempt ?? null,
     });
 }
 
@@ -235,9 +232,9 @@ function isSchemaFailure(error: unknown): boolean {
 
 /**
  * One structured language model call, billed to the house and recorded in
- * llm_usage: the daily cap, the Data usage screen and the scorer report all
- * read that one table. Every call writes a row, the failures included, so
- * "what did this scan cost and did it answer" is a query and never a rerun.
+ * llm_usage: the daily cap and the Data usage screen both read that one table.
+ * Every call writes a row, the failures included, so "what did this scan cost
+ * and did it answer" is a query and never a rerun.
  */
 export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
   const { OPENROUTER_API_KEY, OPENROUTER_MODEL } = config();
