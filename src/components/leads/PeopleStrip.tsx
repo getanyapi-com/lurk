@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FaceStack } from "@/components/leads/FaceStack";
 import { timeline } from "@/components/leads/stream";
 import { atSentence } from "@/lib/feed";
+import { withParams } from "@/lib/url";
 import { cn } from "@/lib/utils";
 import type { FeedParams, FeedWindow, Grain, LeadFace } from "@/lib/feed";
 
@@ -33,20 +34,13 @@ const GRAIN: Record<Grain, string> = {
   hour: "hour",
 };
 
-/** The same page, with one slice picked or given back. */
+/**
+ * The same page, with one slice picked or given back. The open thread is
+ * dropped: it is one lead out of the old window, and the pane would keep
+ * showing it from outside the slice just chosen.
+ */
 function href(params: FeedParams, at: string | null): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params)) {
-    // The open thread is dropped: it is one lead out of the old window, and
-    // the pane would keep showing it from outside the slice just chosen.
-    if (value && name !== "lead" && name !== "at") {
-      query.set(name, value);
-    }
-  }
-  if (at) {
-    query.set("at", at);
-  }
-  return `?${query.toString()}`;
+  return `?${withParams(params, { lead: undefined, at })}`;
 }
 
 function counted(column: StreamColumn): string {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, Filter, Hash, Target, X } from "lucide-react";
 import { FilterPills, type FilterSpec } from "@/components/FilterPills";
 import { atLabel, FEED_WINDOWS, type FeedFacets, type FeedParams } from "@/lib/feed";
+import { withParams } from "@/lib/url";
 
 type FeedFiltersProps = {
   facets: FeedFacets;
@@ -12,13 +13,7 @@ type FeedFiltersProps = {
 
 /** The same page without the slice, keeping every other filter. */
 function clearedHref(params: FeedParams): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params)) {
-    if (value && name !== "at" && name !== "lead") {
-      query.set(name, value);
-    }
-  }
-  return `?${query.toString()}`;
+  return `?${withParams(params, { at: undefined, lead: undefined })}`;
 }
 
 const WINDOW_LABELS: Record<string, string> = {

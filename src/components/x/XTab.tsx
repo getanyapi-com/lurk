@@ -22,6 +22,7 @@ import { compactCount, relativeAge, relativeUntil } from "@/lib/format";
 import { limitsForUser } from "@/lib/tier";
 import { QUIET_RECHECK_DAYS } from "@/lib/x/constants";
 import { allowanceFor } from "@/lib/throttle";
+import { withParams } from "@/lib/url";
 import {
   X_STATUSES,
   listXFaces,
@@ -121,13 +122,7 @@ function validAt(at: string | undefined): string | undefined {
 
 /** The filters the list is on, without the open post. */
 function listSearch(params: XParams): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params)) {
-    if (value && name !== "lead") {
-      query.set(name, value);
-    }
-  }
-  return query.toString();
+  return withParams(params, { lead: undefined });
 }
 
 /**

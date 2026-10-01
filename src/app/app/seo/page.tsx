@@ -20,6 +20,7 @@ import {
 } from "@/lib/seo/read";
 import { scoreThreads } from "@/lib/seo/score";
 import { orderThreads, seoOrder, seoView, worthReplying, type SeoOrder } from "@/lib/seo/views";
+import { withParams } from "@/lib/url";
 
 type SeoParams = {
   project?: string;
@@ -40,15 +41,8 @@ const EMPTY_SENTENCE =
 
 /** The same URL with one parameter changed, so a column head or a row is a link. */
 function linker(params: SeoParams) {
-  return (changes: Partial<Record<string, string | undefined>>): string => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries({ ...params, ...changes })) {
-      if (value) {
-        next.set(key, value);
-      }
-    }
-    return `?${next.toString()}`;
-  };
+  return (changes: Partial<Record<string, string | undefined>>): string =>
+    `?${withParams(params, changes)}`;
 }
 
 /** What the whole tab holds, before any of it is read. */

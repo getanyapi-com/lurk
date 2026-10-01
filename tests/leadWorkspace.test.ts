@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildStream, type CardLead } from "@/components/leads/stream";
 import { entryHref, heldEntryId, requestedEntry, selectEntry } from "@/components/leads/workspace";
 import type { ReviewItem } from "@/lib/feed";
+import { withParams } from "@/lib/url";
 
 /**
  * The workspace always has something in its right pane. It opens on the row the
@@ -123,5 +124,20 @@ describe("entryHref", () => {
     const href = entryHref({ days: "7", subreddit: "hotels", stage: undefined, lead: "lead-old" }, "lead-new");
 
     expect(href).toBe("?days=7&subreddit=hotels&lead=lead-new");
+  });
+});
+
+describe("withParams", () => {
+  const params = { project: "p1", days: "7", at: "2026-09", stage: "", lead: "lead-1" };
+
+  it("keeps what is set, drops what is empty or changed to nothing, and puts the changes last", () => {
+    expect(withParams(params)).toBe("project=p1&days=7&at=2026-09&lead=lead-1");
+    expect(withParams(params, { lead: undefined })).toBe("project=p1&days=7&at=2026-09");
+    expect(withParams(params, { days: "all", at: undefined })).toBe("project=p1&lead=lead-1&days=all");
+    expect(withParams(params, { lead: undefined, at: null })).toBe("project=p1&days=7");
+  });
+
+  it("reads only the changes it was given, whatever a parameter is called", () => {
+    expect(withParams({ constructor: "x", toString: "y" })).toBe("constructor=x&toString=y");
   });
 });

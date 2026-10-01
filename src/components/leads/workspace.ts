@@ -1,4 +1,5 @@
 import { shortAge } from "@/lib/format";
+import { withParams } from "@/lib/url";
 
 import type { StreamEntry } from "@/components/leads/stream";
 import type { ReviewItem } from "@/lib/feed";
@@ -65,14 +66,7 @@ export function entryHref(
   params: Record<string, string | undefined>,
   entryId: string,
 ): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params)) {
-    if (name !== "lead" && value) {
-      query.set(name, value);
-    }
-  }
-  query.set("lead", entryId);
-  return `?${query.toString()}`;
+  return `?${withParams(params, { lead: entryId })}`;
 }
 
 /** How long an account has been open, or a dash when Reddit did not say. */

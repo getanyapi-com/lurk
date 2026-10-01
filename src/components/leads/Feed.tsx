@@ -26,6 +26,7 @@ import { parseScoring } from "@/lib/scoring/weights";
 import { isOnboarding, type ProjectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
 import { sweepShown, sweepStatus } from "@/lib/sweep";
+import { withParams } from "@/lib/url";
 
 import type { StreamEntry } from "@/components/leads/stream";
 
@@ -87,29 +88,17 @@ function ArrivingPane() {
 /** The prefix a lead's entry id carries, so a held item can never be one. */
 const LEAD_PREFIX = "lead-";
 
-/** The same page over the whole of time, keeping every other filter pill. */
+/**
+ * The same page over the whole of time, keeping every other filter pill. The
+ * slice a strip column picked goes with the window it narrowed.
+ */
 function allTimeHref(params: Record<string, string | undefined>): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params)) {
-    if (value) {
-      query.set(name, value);
-    }
-  }
-  query.set("days", "all");
-  // The slice a strip column picked goes with the window it narrowed.
-  query.delete("at");
-  return `?${query.toString()}`;
+  return `?${withParams(params, { days: "all", at: undefined })}`;
 }
 
 /** The filters the list is on, which is what the next page is asked for by. */
 function feedSearch(params: FeedParams): string {
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(params)) {
-    if (value && name !== "lead") {
-      query.set(name, value);
-    }
-  }
-  return query.toString();
+  return withParams(params, { lead: undefined });
 }
 
 /**
