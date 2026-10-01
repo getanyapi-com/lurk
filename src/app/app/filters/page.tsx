@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { EmptyState } from "@/components/EmptyState";
 import { LeadFiltersForm } from "@/components/product/LeadFiltersForm";
 import { ScoringPanel } from "@/components/product/ScoringPanel";
-import { Button } from "@/components/ui/button";
 import { requireLocalUser } from "@/lib/auth";
 import { ALERT_SCORE_FLOOR, parseLeadFilters } from "@/lib/leadFilters";
 import { wordsHidden } from "@/lib/leads";
 import { listMutes } from "@/lib/mutes";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
 import { scoringPreview } from "@/lib/scoring/apply";
 import { parseScoring } from "@/lib/scoring/weights";
@@ -22,24 +20,8 @@ type FiltersPageProps = { searchParams: Promise<{ project?: string }> };
  */
 export default async function FiltersPage({ searchParams }: FiltersPageProps) {
   const user = await requireLocalUser();
-  const project = await activeProject(user.id, (await searchParams).project);
+  const project = await requireActiveProject(user.id, (await searchParams).project);
 
-  if (!project) {
-    return (
-      <div className="flex max-w-2xl flex-col gap-4">
-        <EmptyState
-          title="Filters"
-          sentence="Which leads you see and get alerts for appears here once a project has been analysed."
-        />
-        <Button
-          size="lg"
-          nativeButton={false}
-          className="self-start"
-          render={<Link href="/app/projects/new">New project</Link>}
-        />
-      </div>
-    );
-  }
 
   const [preview, hidden, mutes] = await Promise.all([
     scoringPreview(project.id),

@@ -16,7 +16,7 @@ import {
   mentionSeries,
   topCompetitors,
 } from "@/lib/competitors/read";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 
 type CompetitorsPageProps = { searchParams: Promise<{ project?: string }> };
 
@@ -54,15 +54,7 @@ function statusLine(last: Job, next: Job): string {
 export default async function CompetitorsPage({ searchParams }: CompetitorsPageProps) {
   const user = await requireLocalUser();
   const params = await searchParams;
-  const project = await activeProject(user.id, params.project);
-  if (!project) {
-    return (
-      <EmptyState
-        title="Competitors"
-        sentence="Create a project first, then we can watch what Reddit says about the products you compete with."
-      />
-    );
-  }
+  const project = await requireActiveProject(user.id, params.project);
 
   const [competitors, mentions, last, next, allowance] = await Promise.all([
     listCompetitors(project.id),

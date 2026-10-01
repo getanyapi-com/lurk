@@ -1,16 +1,14 @@
 import Link from "next/link";
-import { EmptyState } from "@/components/EmptyState";
 import { ListEditor } from "@/components/product/ListEditor";
 import { ProfileForm } from "@/components/product/ProfileForm";
 import { PaidButton } from "@/components/PaidButton";
-import { Button } from "@/components/ui/button";
 import {
   rebuildProfileAction,
   scanAndOpenLeadsAction,
 } from "@/app/app/product/actions";
 import { requireLocalUser } from "@/lib/auth";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 import { activitySentence, isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { allowanceFor } from "@/lib/throttle";
 
@@ -18,24 +16,8 @@ type ProductPageProps = { searchParams: Promise<{ project?: string }> };
 
 export default async function ProductPage({ searchParams }: ProductPageProps) {
   const user = await requireLocalUser();
-  const project = await activeProject(user.id, (await searchParams).project);
+  const project = await requireActiveProject(user.id, (await searchParams).project);
 
-  if (!project) {
-    return (
-      <div className="flex max-w-2xl flex-col gap-4">
-        <EmptyState
-          title="Product"
-          sentence="Your product profile appears here once a project has been analysed."
-        />
-        <Button
-          size="lg"
-          nativeButton={false}
-          className="self-start"
-          render={<Link href="/app/projects/new">New project</Link>}
-        />
-      </div>
-    );
-  }
 
   const [activity, scanNow, rebuild] = await Promise.all([
     projectActivity(project.id),

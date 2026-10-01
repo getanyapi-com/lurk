@@ -11,7 +11,7 @@ import { requireLocalUser } from "@/lib/auth";
 import { allowanceFor } from "@/lib/throttle";
 import { PaidButton } from "@/components/PaidButton";
 import { listCommunities, listThemes } from "@/lib/insights/read";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 
 type InsightsPageProps = { searchParams: Promise<{ project?: string; tab?: string }> };
 
@@ -31,15 +31,7 @@ function lastRunSentence(job: Awaited<ReturnType<typeof lastRunJob>>): string {
 export default async function InsightsPage({ searchParams }: InsightsPageProps) {
   const user = await requireLocalUser();
   const params = await searchParams;
-  const project = await activeProject(user.id, params.project);
-  if (!project) {
-    return (
-      <EmptyState
-        title="Insights"
-        sentence="Create a project and run a scan first, then the leads it finds can be grouped here."
-      />
-    );
-  }
+  const project = await requireActiveProject(user.id, params.project);
 
   const tab: InsightsTab = params.tab === "communities" ? "communities" : "themes";
   const [themes, communities, job, allowance] = await Promise.all([

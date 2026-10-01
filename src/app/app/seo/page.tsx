@@ -10,7 +10,7 @@ import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { allowanceFor } from "@/lib/throttle";
 import { PaidButton } from "@/components/PaidButton";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 import {
   listOpportunities,
   NO_PHRASINGS_PROGRESS,
@@ -63,15 +63,7 @@ function tally(phrasings: number, threads: number, strong: number): string {
 export default async function SeoPage({ searchParams }: SeoPageProps) {
   const user = await requireLocalUser();
   const params = await searchParams;
-  const project = await activeProject(user.id, params.project);
-  if (!project) {
-    return (
-      <EmptyState
-        title="Reddit SEO"
-        sentence="Create a project first, then a refresh can find the Reddit threads ranking for the way your buyers say the problem."
-      />
-    );
-  }
+  const project = await requireActiveProject(user.id, params.project);
 
   const view = seoView(params.view);
   const order = seoOrder(params.order);

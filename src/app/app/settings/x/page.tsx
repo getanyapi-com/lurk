@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { setXAlertsAction } from "@/app/app/settings/x/actions";
-import { EmptyState } from "@/components/EmptyState";
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { WalletPanel } from "@/components/WalletPanel";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import { walletConnection } from "@/lib/anyapi";
 import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { relativeAge } from "@/lib/format";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { listXLanes, projectedWalletCostPerDay, xSettingsOf } from "@/lib/x/read";
@@ -34,10 +33,7 @@ export default async function XSettingsPage({ searchParams }: XSettingsPageProps
     notFound();
   }
   const { project: requested } = await searchParams;
-  const project = await activeProject(user.id, requested);
-  if (!project) {
-    return <EmptyState title="Settings" sentence="Create a project first, then lurk can watch X for it." />;
-  }
+  const project = await requireActiveProject(user.id, requested);
   const [tier, view, channels, lanes, connection] = await Promise.all([
     tierForUser(user.id),
     xSettingsOf(project.id),

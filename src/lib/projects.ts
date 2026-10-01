@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { projects, users } from "@/db/schema";
 import { limitsFor } from "./tiers";
@@ -48,4 +49,18 @@ export async function projectForUser(userId: string, projectId: string): Promise
 export async function activeProject(userId: string, requested?: string): Promise<Project | null> {
   const all = await listProjects(userId);
   return all.find((project) => project.id === requested) ?? all[0] ?? null;
+}
+
+/**
+ * The project a page about one project shows. An account with no project has
+ * one thing to do, so every such page takes it there: this is where a new
+ * signup lands, and an empty page telling them to go and find the button was
+ * the whole of their welcome.
+ */
+export async function requireActiveProject(userId: string, requested?: string): Promise<Project> {
+  const project = await activeProject(userId, requested);
+  if (!project) {
+    redirect("/app/projects/new");
+  }
+  return project;
 }

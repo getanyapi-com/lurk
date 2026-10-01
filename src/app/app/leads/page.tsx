@@ -1,12 +1,11 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { Feed } from "@/components/leads/Feed";
 import { ListSkeleton, PillsSkeleton, Skeleton } from "@/components/Skeleton";
 import { PaidButton } from "@/components/PaidButton";
 import { scanNowAction } from "@/app/app/scan";
 import { requireLocalUser } from "@/lib/auth";
 import type { FeedParams } from "@/lib/feed";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 import { isOnboarding, projectActivity } from "@/lib/projectActivity";
 import { allowanceFor } from "@/lib/throttle";
 
@@ -41,13 +40,7 @@ function FeedSkeleton() {
 export default async function LeadsPage({ searchParams }: LeadsPageProps) {
   const user = await requireLocalUser();
   const params = await searchParams;
-  const project = await activeProject(user.id, params.project);
-  // An account with no project has one thing to do, so it is taken there. This
-  // is where a new signup lands, and an empty leads page telling them to go and
-  // find the button was the whole of their welcome.
-  if (!project) {
-    redirect("/app/projects/new");
-  }
+  const project = await requireActiveProject(user.id, params.project);
   const [scanNow, activity] = await Promise.all([
     allowanceFor(user.id, "scan_now"),
     projectActivity(project.id),

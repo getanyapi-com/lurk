@@ -2,13 +2,12 @@ import Link from "next/link";
 import { AddChannelForm } from "@/components/alerts/AddChannelForm";
 import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChannelList";
 import { MuteList } from "@/components/alerts/MuteList";
-import { EmptyState } from "@/components/EmptyState";
 import { describeTarget, listChannels } from "@/lib/alerts/channels";
 import { discordApp, slackApp } from "@/lib/alerts/config";
 import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
 import { listMutes } from "@/lib/mutes";
-import { activeProject } from "@/lib/projects";
+import { requireActiveProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
 
 type AlertsPageProps = { searchParams: Promise<{ project?: string; slack?: string; discord?: string }> };
@@ -29,15 +28,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const user = await requireLocalUser();
   const { project: requested, slack, discord } = await searchParams;
   const outcome = installOutcome("Slack", slack) ?? installOutcome("Discord", discord);
-  const project = await activeProject(user.id, requested);
-  if (!project) {
-    return (
-      <EmptyState
-        title="Alerts"
-        sentence="Create a project first, then pick where its new leads should land."
-      />
-    );
-  }
+  const project = await requireActiveProject(user.id, requested);
   const { limits } = await tierForUser(user.id);
   const [channels, mutes] = await Promise.all([listChannels(project.id), listMutes(project.id)]);
   const kinds = channels.map((one) => one.channel);
