@@ -28,6 +28,7 @@ vi.mock("@/lib/anyapi", () => ({
     call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
   }),
   walletConnection: async () => null,
+  tierNameFor: async () => "free" as const,
 }));
 vi.mock("@/jobs/enqueue", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/jobs/enqueue")>()),
