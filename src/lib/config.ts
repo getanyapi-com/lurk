@@ -13,6 +13,11 @@ const optional = <T extends z.ZodType>(inner: T) => z.preprocess(blankIsAbsent, 
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
   APP_URL: z.preprocess(blankIsAbsent, z.url().default("http://localhost:3000")),
+  /**
+   * Webhooks may only reach public addresses. A self-hosted instance that
+   * delivers to its own network says so here.
+   */
+  ALERTS_ALLOW_PRIVATE_WEBHOOKS: z.preprocess(blankIsAbsent, bool),
   APP_ENCRYPTION_KEY: z.string().min(1),
   SELF_HOSTED: z.preprocess(blankIsAbsent, bool),
 

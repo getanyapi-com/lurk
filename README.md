@@ -103,6 +103,8 @@ npm run anyapi:register
 | `ALERT_INVITES` | no | `false` | `true` emails each person who has leads and no alert channel, once, asking whether they want new leads by email. Needs email set up as above. |
 | `SLACK_CLIENT_ID` | no | - | With the secret, turns the Slack channel into an Add to Slack button. |
 | `SLACK_CLIENT_SECRET` | no | - | The other half of the Slack app. |
+| `DISCORD_CLIENT_ID` | no | - | With the secret, turns the Discord channel into an Add to Discord button. |
+| `DISCORD_CLIENT_SECRET` | no | - | The other half of the Discord app. |
 | `HOUSE_DATA_CAP_USD_PER_DAY` | no | `50` | Daily ceiling on data spend from the house key. |
 | `HOUSE_LLM_CAP_USD_PER_DAY` | no | `100` (`10` under the Compose file) | Daily ceiling on language model spend. |
 | `X_LEADS` | no | `false` | Turns on the X leads tab and its jobs (beta, off by default). |

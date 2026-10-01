@@ -2,6 +2,7 @@ import { lookup as dnsLookup } from "node:dns";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
+import { config } from "@/lib/config";
 
 /** Long enough for a slow receiver, short enough that one cannot hold up the rest. */
 const TIMEOUT_MS = 10_000;
@@ -54,7 +55,7 @@ export function isPublicAddress(address: string): boolean {
 
 /** A self-hosted instance can point webhooks at its own network by saying so. */
 function privateAllowed(): boolean {
-  return process.env.ALERTS_ALLOW_PRIVATE_WEBHOOKS === "true";
+  return config().ALERTS_ALLOW_PRIVATE_WEBHOOKS;
 }
 
 const REFUSED = "Webhook address is not on the public internet";
