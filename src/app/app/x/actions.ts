@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { kickScheduler } from "@/jobs/scheduler";
+import type { ActionResult } from "@/lib/actionResult";
 import { markThreadReplied, reopenThread } from "@/lib/handled";
 import { requireXProject } from "@/lib/owned";
 import { pressForJob } from "@/lib/throttle";
@@ -64,12 +65,13 @@ export async function hideXLeadAction(projectId: string, leadId: string) {
   revalidatePath("/app", "layout");
 }
 
-export async function notFitXLeadAction(projectId: string, leadId: string, formData: FormData) {
+export async function notFitXLeadAction(projectId: string, leadId: string, formData: FormData): Promise<ActionResult> {
   await requireXProject(projectId);
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 80);
   if (!reason) {
-    throw new Error("Pick a reason before marking a lead as not a fit");
+    return { error: "Pick a reason before marking a lead as not a fit" };
   }
   await setXLeadStatus(projectId, leadId, "not_fit", reason);
   revalidatePath("/app", "layout");
+  return { error: null };
 }

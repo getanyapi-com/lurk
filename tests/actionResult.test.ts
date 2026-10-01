@@ -78,7 +78,7 @@ describe("what a form shows from an action", () => {
   });
 });
 
-describe.skipIf(!process.env.DATABASE_URL)("alert settings actions against a database", () => {
+describe.skipIf(!process.env.DATABASE_URL)("actions that refuse, against a database", () => {
   async function owned() {
     process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
@@ -117,6 +117,15 @@ describe.skipIf(!process.env.DATABASE_URL)("alert settings actions against a dat
     expect(
       await addChannelAction(project.id, form({ channel: "email", target: "you@company.com" })),
     ).toEqual({ error: "That channel is already on this project" });
+  });
+
+  it("asks for a reason before it marks a lead not a fit", async () => {
+    const { markNotFitAction } = await import("@/app/app/leads/actions");
+    const project = await owned();
+
+    expect(await markNotFitAction(project.id, randomUUID(), form({ reason: " " }))).toEqual({
+      error: "Pick a reason before marking a lead as not a fit",
+    });
   });
 
   it("returns why a mute was refused", async () => {

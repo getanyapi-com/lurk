@@ -4,6 +4,8 @@ import { useState } from "react";
 import { BellOff, Check, ExternalLink, EyeOff, RotateCcw, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { errorFrom } from "@/lib/actionError";
+import type { ActionResult } from "@/lib/actionResult";
 
 /** Why a lead someone was asking in was a miss, unless the pane offers its own list. */
 const NOT_FIT_REASONS = [
@@ -19,7 +21,8 @@ export type LeadActionHandlers = {
   replied: () => Promise<void>;
   reopen: () => Promise<void>;
   hide: () => Promise<void>;
-  notFit: (formData: FormData) => Promise<void>;
+  /** Comes back with a sentence when it refused, which shows under the picker. */
+  notFit: (formData: FormData) => Promise<ActionResult>;
   /** Mutes where the lead was found, with the button's words ("Mute r/saas"). */
   mute?: { label: string; action: () => Promise<void> };
 };
@@ -44,6 +47,7 @@ type LeadActionsProps = {
  */
 export function LeadActions({ openLabel, url, actions, replied = false, reasons = NOT_FIT_REASONS }: LeadActionsProps) {
   const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const iconClass = "size-3.5 text-fg-muted";
 
   return (
@@ -83,7 +87,10 @@ export function LeadActions({ openLabel, url, actions, replied = false, reasons 
               </Button>
             </form>
             {picking ? (
-              <form action={actions.notFit} className="flex items-center gap-1.5">
+              <form
+                action={async (formData) => setError(await errorFrom(() => actions.notFit(formData)))}
+                className="flex items-center gap-1.5"
+              >
                 <Select
                   name="reason"
                   required
@@ -113,6 +120,7 @@ export function LeadActions({ openLabel, url, actions, replied = false, reasons 
           </>
         ) : null}
       </div>
+      {error ? <p className="text-small text-reddit">{error}</p> : null}
     </div>
   );
 }
