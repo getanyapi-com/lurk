@@ -1,7 +1,8 @@
 /**
- * How a filter word is compared, with nothing server-side in it, so the form
- * that edits the lists and the queries that apply them agree on what counts as
- * the same word (lib/leadFilters.ts).
+ * How a filter word or a muted community is compared, with nothing
+ * server-side in it, so the form that edits the lists and the queries that
+ * apply them agree on what counts as the same word (lib/leadFilters.ts,
+ * lib/mutes.ts).
  */
 
 /** How many words each list may hold; past this it is a search plan, not a filter. */
@@ -33,5 +34,17 @@ export function termsOf(raw: string): string[] {
     }
   }
   return terms;
+}
+
+/**
+ * A subreddit as it is typed, pasted or linked - SaaS, r/SaaS, /R/saas/,
+ * reddit.com/r/SaaS - the way every list of them stores it: lowercase, with no
+ * r/, no link and no trailing slash. The scoring list, the plan's chips and
+ * the mutes all key a community by this, so one typed any way is one name.
+ */
+export function subredditKey(text: string): string {
+  const trimmed = text.trim();
+  const linked = trimmed.match(/(?:^|\/)r\/([^/]*)\/*$/i);
+  return (linked ? linked[1] : trimmed.replace(/\/+$/, "")).toLowerCase();
 }
 

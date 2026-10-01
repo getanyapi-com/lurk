@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { ALERT_SCORE_FLOOR, mentions, passesWords, termsOf, wordsOf, type LeadFilters } from "@/lib/leadFilters";
+import { subredditKey, termsOf, wordsOf } from "@/lib/filterWords";
+import { ALERT_SCORE_FLOOR, mentions, passesWords, type LeadFilters } from "@/lib/leadFilters";
+import { foldQuotes } from "@/lib/scan/evidence";
 
 /**
  * A project's own filters on top of the judge: words a lead must or must not
@@ -40,6 +42,20 @@ describe("word matching", () => {
     expect(passesWords("Hiring: invoice clerk", filters)).toBe(false);
     expect(passesWords("Any CRM?", filters)).toBe(false);
     expect(passesWords("Any CRM?", { mustMention: [], muted: [] })).toBe(true);
+  });
+
+  it("keys a subreddit the same however it was typed, pasted or linked", () => {
+    for (const typed of ["SaaS", " r/SaaS ", "/R/saas/", "SaaS/", "https://www.reddit.com/r/SaaS/"]) {
+      expect(subredditKey(typed)).toBe("saas");
+    }
+    expect(subredditKey("r/")).toBe("");
+    expect(subredditKey("https://www.reddit.com/r/SaaS/comments/abc")).toBe("https://www.reddit.com/r/saas/comments/abc");
+  });
+
+  it("folds curly quotes and long dashes one character for one", () => {
+    const curly = "“Wouldn’t” — it’s fine";
+    expect(foldQuotes(curly)).toBe("\"Wouldn't\" - it's fine");
+    expect(foldQuotes(curly)).toHaveLength(curly.length);
   });
 });
 

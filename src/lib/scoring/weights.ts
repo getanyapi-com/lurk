@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { subredditKey } from "@/lib/filterWords";
 
 /**
  * What a project's owner says matters most when leads are ranked. The gates
@@ -64,9 +65,9 @@ export const scoringSchema = z
     message: "Turn at least one factor on.",
   });
 
-/** A subreddit the way the list stores it: lowercase, no r/. */
+/** A subreddit the way the list stores it: lowercase, no r/, no link. */
 export function communityKey(name: string): string {
-  return name.trim().replace(/^\/?r\//i, "").toLowerCase();
+  return subredditKey(name);
 }
 
 /**

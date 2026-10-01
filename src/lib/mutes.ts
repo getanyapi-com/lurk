@@ -1,7 +1,8 @@
 import { and, asc, eq, notInArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { leadMutes, leads, redditPosts, xLeads, xPosts } from "@/db/schema";
-import { formsSql, redditLeadWords } from "@/lib/leadFilters";
+import { subredditKey, wordsOf } from "@/lib/filterWords";
+import { formsSql, redditLeadWords, wordsSql } from "@/lib/leadFilters";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
 
 export type MuteKind = "keyword" | "subreddit";
@@ -16,30 +17,20 @@ export function isMuteKind(value: string): value is MuteKind {
 const MAX_KEYWORD_LENGTH = 80;
 
 /**
- * A keyword as whole words: lowercase, every run of anything but letters and
+ * What is stored for what the person typed, or null when there is nothing to
+ * mute. A subreddit is its bare name, however it was typed, pasted or linked.
+ * A keyword is whole words: lowercase, every run of anything but letters and
  * digits one space. The text it is matched against is folded the same way in
- * SQL (`WORDS_OF`), so "Zapier" mutes "zapier's" and "zapier," but not
- * "zapierlike", and "no code" mutes "no-code". A plural is the same word, so
- * "proxy" mutes "proxies" (lib/leadFilters.ts `formsOf`).
+ * SQL (lib/leadFilters.ts `wordsSql`), so "Zapier" mutes "zapier's" and
+ * "zapier," but not "zapierlike", and "no code" mutes "no-code". A plural is
+ * the same word, so "proxy" mutes "proxies" (lib/leadFilters.ts `formsOf`).
  */
-export function keywordWords(text: string): string {
-  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-}
-
-/** A subreddit as it is typed, pasted or linked: r/SaaS, /r/saas/, reddit.com/r/SaaS. */
-export function subredditName(text: string): string {
-  const trimmed = text.trim().replace(/\/+$/, "");
-  const linked = trimmed.match(/(?:^|\/)r\/([A-Za-z0-9_]+)$/);
-  return (linked ? linked[1] : trimmed).toLowerCase();
-}
-
-/** What is stored for what the person typed, or null when there is nothing to mute. */
 export function muteValue(kind: MuteKind, text: string): string | null {
   if (kind === "subreddit") {
-    const name = subredditName(text);
+    const name = subredditKey(text);
     return /^[a-z0-9_]{2,21}$/.test(name) ? name : null;
   }
-  const words = keywordWords(text);
+  const words = wordsOf(text);
   return words.length > 0 && words.length <= MAX_KEYWORD_LENGTH ? words : null;
 }
 
@@ -108,14 +99,10 @@ export async function removeMuteValue(projectId: string, kind: MuteKind, value: 
   forgetProjectFeed(projectId);
 }
 
-/** Text folded into words between spaces, the SQL twin of `keywordWords`, padded so a keyword matches whole. */
-function wordsOf(text: SQL): SQL {
-  return sql`(' ' || regexp_replace(lower(${text}), '[^[:alnum:]]+', ' ', 'g') || ' ')`;
-}
-
 /**
  * True when no mute of the project touches the lead: its subreddit is not
- * muted and none of the muted keywords appears in its words. The folding only
+ * muted and none of the muted keywords appears in its words, which are folded
+ * the way a keyword is and padded so a keyword matches whole. The folding only
  * runs when the project has a keyword mute, so a project with none pays for
  * one empty index lookup per row.
  */
@@ -129,7 +116,7 @@ export function notMuted(projectId: SQL, words: SQL, subreddit: SQL | null): SQL
       and (${bySubreddit}
         or (m.kind = 'keyword' and exists (
           select 1 from ${formsSql(sql`m.value`)} as form
-          where strpos(${wordsOf(words)}, ' ' || form || ' ') > 0
+          where strpos(' ' || ${wordsSql(words)} || ' ', ' ' || form || ' ') > 0
         )))
   )`;
 }

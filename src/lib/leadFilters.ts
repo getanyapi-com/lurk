@@ -2,9 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { projects, redditComments, redditPosts, xLeads, xPosts } from "@/db/schema";
 import { DEFAULT_SCORE_THRESHOLD } from "@/lib/scan/constants";
-import { FILTER_TERM_CAP, termsOf, wordsOf } from "./filterWords";
-
-export { FILTER_TERM_CAP, termsOf, wordsOf };
+import { FILTER_TERM_CAP, wordsOf } from "./filterWords";
 
 /**
  * A project's own rules for which judged leads it wants, on top of the judge.
@@ -79,11 +77,12 @@ export function passesWords(text: string, lists: { mustMention: string[]; muted:
 }
 
 /**
- * Postgres's `wordsOf`. `[^[:alnum:]]` is `[^\p{L}\p{N}]` in a UTF-8 database,
+ * Postgres's `wordsOf`, for the required words here and the muted ones
+ * (lib/mutes.ts). `[^[:alnum:]]` is `[^\p{L}\p{N}]` in a UTF-8 database,
  * and a normalised term holds only letters, digits and single spaces, so it
  * can sit inside a LIKE pattern with nothing to escape.
  */
-function wordsSql(text: SQL): SQL {
+export function wordsSql(text: SQL): SQL {
   return sql`btrim(regexp_replace(lower(${text}), '[^[:alnum:]]+', ' ', 'g'))`;
 }
 

@@ -1,4 +1,4 @@
-import { ownTexts } from "./evidence";
+import { foldQuotes, ownTexts } from "./evidence";
 import { downgradeToReview } from "./gates";
 import type { Judgement, ScorableItem } from "./judgement";
 
@@ -15,11 +15,7 @@ import type { Judgement, ScorableItem } from "./judgement";
  * plain characters. Whitespace runs collapse for the same reason.
  */
 function normalize(text: string): string {
-  return text
-    .replace(/\\([^\p{L}\p{N}\s])/gu, "$1")
-    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u00AB\u00BB]/g, '"')
-    .replace(/[\u2010-\u2015\u2212]/g, "-")
+  return foldQuotes(text.replace(/\\([^\p{L}\p{N}\s])/gu, "$1"))
     .replace(/\s+/g, " ")
     .trim();
 }

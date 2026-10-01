@@ -1,3 +1,4 @@
+import { wordsOf } from "@/lib/filterWords";
 import { ALERT_SCORE_FLOOR } from "@/lib/leadFilters";
 import type { TierLimits } from "@/lib/tiers";
 import { excerptOf } from "./excerpt";
@@ -80,8 +81,7 @@ export type SelectableLead = Omit<DigestLead, "excerpt"> & {
 };
 
 export function sameWords(a: string, b: string): boolean {
-  const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  return words(a) === words(b);
+  return wordsOf(a) === wordsOf(b);
 }
 
 /**

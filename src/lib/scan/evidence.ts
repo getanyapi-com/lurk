@@ -21,6 +21,20 @@ export const PARENT_CHAR_BUDGET = 1200;
 const ELISION = "\n[...]\n";
 
 /**
+ * Curly quotes and typographic dashes as their plain characters, one character
+ * for one character. The text the model reads is written with it, the quote
+ * it returns is checked with it (validate.ts), and the feed finds that quote
+ * in Reddit's own text with it (HighlightedBody), so the three agree on which
+ * characters are the same.
+ */
+export function foldQuotes(text: string): string {
+  return text
+    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033\u00AB\u00BB]/g, '"')
+    .replace(/[\u2010-\u2015\u2212]/g, "-");
+}
+
+/**
  * Reddit text in the plain characters a model quotes back reliably. Curly
  * quotes, typographic dashes and stray control characters are what the model
  * garbled on a perfect lead: it returned "wouldn\u00191" for a curly
@@ -28,10 +42,7 @@ const ELISION = "\n[...]\n";
  * list. The model never sees the curly forms now, so it cannot mangle them.
  */
 export function plainTypography(text: string): string {
-  return text
-    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u00AB\u00BB]/g, '"')
-    .replace(/[\u2010-\u2015\u2212]/g, "-")
+  return foldQuotes(text)
     .replace(/\u2026/g, "...")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
 }

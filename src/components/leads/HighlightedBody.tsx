@@ -1,3 +1,5 @@
+import { foldQuotes } from "@/lib/scan/evidence";
+
 type HighlightedBodyProps = { text: string; phrase: string | null };
 
 /**
@@ -6,11 +8,7 @@ type HighlightedBodyProps = { text: string; phrase: string | null };
  * while Reddit's text keeps its curly quotes and long dashes.
  */
 function fold(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
-    .replace(/[\u201C\u201D\u201E\u201F\u2033\u00AB\u00BB]/g, '"')
-    .replace(/[\u2010-\u2015\u2212]/g, "-");
+  return foldQuotes(text.toLowerCase());
 }
 
 /** Post or comment text with the phrase that won the match tinted. */

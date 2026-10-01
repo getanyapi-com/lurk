@@ -14,7 +14,8 @@ import { enqueueJob } from "@/jobs/enqueue";
 import { competitorHost } from "@/lib/competitors/host";
 import type { Destination } from "@/lib/discovery/queries";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
-import { FILTER_TERM_CAP, parseLeadFilters, termsOf, type LeadFilters } from "@/lib/leadFilters";
+import { FILTER_TERM_CAP, subredditKey, termsOf } from "@/lib/filterWords";
+import { parseLeadFilters, type LeadFilters } from "@/lib/leadFilters";
 import { buildProfile } from "@/lib/profile";
 import { setKeywordMutes } from "@/lib/mutes";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
@@ -161,10 +162,7 @@ export async function saveLeadFiltersAction(
 }
 
 function clean(kind: ChipKind, value: string): string {
-  const trimmed = value.trim();
-  return kind === "subreddit"
-    ? trimmed.replace(/^\/?r\//i, "").toLowerCase()
-    : trimmed;
+  return kind === "subreddit" ? subredditKey(value) : value.trim();
 }
 
 async function chipLimit(
