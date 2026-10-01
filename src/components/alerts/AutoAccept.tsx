@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Presses the button for the person as the page opens, so the link in the
- * invite is one click. The button stays for a browser that runs no script.
+ * Presses the button for the person as the page opens, so a link in an
+ * email is one click. The button stays for a browser that runs no script.
  */
 export function AutoAccept({
   action,

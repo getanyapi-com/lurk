@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
-import { AutoAccept } from "@/app/alerts/on/AutoAccept";
-import { Wordmark } from "@/components/Wordmark";
+import { AutoAccept } from "@/components/alerts/AutoAccept";
+import { LinkLanding } from "@/components/alerts/LinkLanding";
 import { Button } from "@/components/ui/button";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
@@ -34,20 +34,6 @@ function wordsFor(act: AlertAct, projectName: string) {
   };
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-8">
-      <Wordmark homeHref="/" />
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-card border bg-surface p-8">
-        <h1 className="text-h3" style={{ fontWeight: 500 }}>
-          {title}
-        </h1>
-        {children}
-      </div>
-    </main>
-  );
-}
-
 /**
  * Where an alert's Mark replied and Mute links land. As with the invite, the
  * visit does nothing, since mail scanners fetch every link in a message; the
@@ -57,12 +43,12 @@ export default async function ActPage({ searchParams }: ActPageProps) {
   const { t = "", done, undone, sample } = await searchParams;
   if (sample) {
     return (
-      <Card title="That was a sample">
+      <LinkLanding title="That was a sample">
         <p className="text-body text-fg-muted">
           In a real alert this link marks the thread replied, or mutes the subreddit, so it stops
           coming back. Nothing was changed.
         </p>
-      </Card>
+      </LinkLanding>
     );
   }
   const act = done === "invalid" ? null : actForToken(t);
@@ -71,7 +57,7 @@ export default async function ActPage({ searchParams }: ActPageProps) {
     : [];
   if (!act || !project) {
     return (
-      <Card title="That link does not work">
+      <LinkLanding title="That link does not work">
         <p className="text-body text-fg-muted">
           Mark the thread replied from{" "}
           <Link href="/app/leads" className="underline">
@@ -79,20 +65,20 @@ export default async function ActPage({ searchParams }: ActPageProps) {
           </Link>{" "}
           instead.
         </p>
-      </Card>
+      </LinkLanding>
     );
   }
   const words = wordsFor(act, project.name);
   if (undone) {
     return (
-      <Card title={words.undone}>
+      <LinkLanding title={words.undone}>
         <p className="text-body text-fg-muted">{words.undoneSentence}</p>
-      </Card>
+      </LinkLanding>
     );
   }
   if (done) {
     return (
-      <Card title={words.done}>
+      <LinkLanding title={words.done}>
         <p className="text-body text-fg-muted">{words.sentence}</p>
         <div className="flex items-center gap-3">
           <form action={undoActAction.bind(null, t)}>
@@ -104,12 +90,12 @@ export default async function ActPage({ searchParams }: ActPageProps) {
             Alert settings
           </Link>
         </div>
-      </Card>
+      </LinkLanding>
     );
   }
   return (
-    <Card title={words.doing}>
+    <LinkLanding title={words.doing}>
       <AutoAccept action={doActAction.bind(null, t)} label={words.button} />
-    </Card>
+    </LinkLanding>
   );
 }

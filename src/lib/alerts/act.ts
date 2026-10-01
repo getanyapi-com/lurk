@@ -1,6 +1,5 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { config } from "@/lib/config";
 import { isThreadPlatform, type ThreadPlatform } from "@/lib/handled";
+import { signToken, verifyToken } from "./signedLink";
 import type { DigestLead } from "./types";
 
 /**
@@ -11,18 +10,13 @@ export type AlertAct =
   | { act: "replied"; projectId: string; platform: ThreadPlatform; threadId: string }
   | { act: "mute"; projectId: string; subreddit: string };
 
-function signingKey(): Buffer {
-  return Buffer.from(config().APP_ENCRYPTION_KEY, "base64");
-}
+/** What an act's link is signed for; its payload is the act's fields, a line each, in base64url. */
+const ACT_PURPOSE = "alert-act";
 
 function fieldsOf(act: AlertAct): string[] {
   return act.act === "replied"
     ? [act.act, act.projectId, act.platform, act.threadId]
     : [act.act, act.projectId, act.subreddit];
-}
-
-function signatureFor(payload: string): string {
-  return createHmac("sha256", signingKey()).update(`alert-act:${payload}`).digest("base64url");
 }
 
 /**
@@ -31,20 +25,13 @@ function signatureFor(payload: string): string {
  * and all it can do is take leads out of that one project's alerts.
  */
 export function actToken(act: AlertAct): string {
-  const payload = Buffer.from(fieldsOf(act).join("\n")).toString("base64url");
-  return `${payload}.${signatureFor(payload)}`;
+  return signToken(ACT_PURPOSE, Buffer.from(fieldsOf(act).join("\n")).toString("base64url"));
 }
 
 /** The act a token names, or null when it was altered or never issued. */
 export function actForToken(token: string): AlertAct | null {
-  const dot = token.lastIndexOf(".");
-  if (dot <= 0) {
-    return null;
-  }
-  const payload = token.slice(0, dot);
-  const given = Buffer.from(token.slice(dot + 1));
-  const expected = Buffer.from(signatureFor(payload));
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+  const payload = verifyToken(ACT_PURPOSE, token);
+  if (payload === null) {
     return null;
   }
   const [act, projectId, ...rest] = Buffer.from(payload, "base64url").toString().split("\n");

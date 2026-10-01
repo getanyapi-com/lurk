@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { alerts, projects, userActions, users } from "@/db/schema";
@@ -8,9 +7,10 @@ import { enqueueOnce } from "@/jobs/enqueue";
 import { hasActiveSearch } from "@/lib/scan/widen";
 import { addChannel } from "./channels";
 import { sendEmail, type EmailMessage } from "./email";
-import { leadRow } from "./digest";
+import { brandRow, emailDocument, threadRow } from "./digest";
 import { newLeadsSince } from "./leads";
 import { ALERT_SCORE_FLOOR, alertable, digestLead, type SelectableLead } from "./select";
+import { signToken, verifyToken } from "./signedLink";
 import { EMAIL_COLORS as C, EMAIL_FONT, EMAIL_RADIUS, escapeHtml } from "./tokens";
 import type { DigestLead } from "./types";
 
@@ -37,29 +37,17 @@ const SETTLE_MS = DAY_MS;
 const SAMPLE_RECENT_MS = 7 * DAY_MS;
 const SAMPLE_WINDOW_MS = 30 * DAY_MS;
 
-function signingKey(): Buffer {
-  return Buffer.from(config().APP_ENCRYPTION_KEY, "base64");
-}
-
-function signatureFor(userId: string): string {
-  return createHmac("sha256", signingKey()).update(`alert-invite:${userId}`).digest("base64url");
-}
+/** What an invite's link is signed for; its payload is the user id as it is. */
+const INVITE_PURPOSE = "alert-invite";
 
 /** A link token that names one person and cannot be forged without the app key. */
 export function inviteToken(userId: string): string {
-  return `${userId}.${signatureFor(userId)}`;
+  return signToken(INVITE_PURPOSE, userId);
 }
 
 /** The person a token names, or null when it was altered or never issued. */
 export function userForToken(token: string): string | null {
-  const dot = token.lastIndexOf(".");
-  if (dot <= 0) {
-    return null;
-  }
-  const userId = token.slice(0, dot);
-  const given = Buffer.from(token.slice(dot + 1));
-  const expected = Buffer.from(signatureFor(userId));
-  return given.length === expected.length && timingSafeEqual(given, expected) ? userId : null;
+  return verifyToken(INVITE_PURPOSE, token);
 }
 
 export type Invitee = {
@@ -188,15 +176,10 @@ export function renderInvite(invitee: Invitee, leads: DigestLead[], appUrl: stri
   const links = inviteLinks(invitee, appUrl);
   const name = escapeHtml(invitee.projectName);
   const generatedAt = new Date();
-  const cards = leads.map((lead) => leadRow(lead, { appUrl, generatedAt })).join("");
-  const html = `<!doctype html>
-<html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>${escapeHtml(inviteSubject(invitee))}</title></head>
-<body style="margin:0;padding:0;background:${C.bg}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg}">
-<tr><td align="center" style="padding:24px 8px">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:100%;background:${C.bg};border:1px solid ${C.border};border-radius:20px">
-<tr><td style="padding:20px 24px;border-bottom:1px solid ${C.border};${text(15, C.fg, 500)}">
-<img src="${escapeHtml(appUrl)}/email/lurk.png" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:8px" />${escapeHtml(PRODUCT_NAME)}</td></tr>
+  const cards = leads.map((lead) => threadRow([lead], { appUrl, generatedAt })).join("");
+  const html = emailDocument(
+    inviteSubject(invitee),
+    `${brandRow(appUrl)}
 <tr><td align="center" style="padding:32px 32px 4px">
 <div style="display:inline-block;padding:4px 12px;border-radius:999px;background:${C.surface2};${text(13, C.fgMuted, 500)}">
 <img src="${escapeHtml(appUrl)}/email/reddit.png" width="14" height="14" alt="" style="vertical-align:-2px;margin-right:6px" />${leadsPhrase(invitee.recentCount)} for ${name}</div></td></tr>
@@ -211,8 +194,8 @@ ${cards}
 <td style="padding:0 6px 0 0;${text(13, C.fgMuted)}">or send them to</td>
 ${chatPill(appUrl, links.chat, "slack", "Slack")}${chatPill(appUrl, links.chat, "discord", "Discord")}
 </tr></table></td></tr>
-<tr><td align="center" style="padding:16px 32px 24px;border-top:1px solid ${C.border};${text(12, C.fgMuted)}">You signed up for ${escapeHtml(PRODUCT_NAME)} with this address.<br />${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>
-</table></td></tr></table></body></html>`;
+<tr><td align="center" style="padding:16px 32px 24px;border-top:1px solid ${C.border};${text(12, C.fgMuted)}">You signed up for ${escapeHtml(PRODUCT_NAME)} with this address.<br />${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>`,
+  );
   const lines = leads.map((lead) => `- ${lead.title} (r/${lead.subreddit})\n  ${lead.url}`);
   const plain = [
     `${leadsPhrase(invitee.recentCount)} for ${invitee.projectName}. The newest ones worth a look:`,

@@ -42,18 +42,40 @@ export function digestSubject(digest: Digest): string {
   return `${count} new ${count === 1 ? "lead" : "leads"} for ${digest.projectName}`;
 }
 
+/**
+ * Every email the app sends, around its rows: table layout and inline styles,
+ * with no stylesheet for a mail client to strip, 600 pixels at most.
+ */
+export function emailDocument(title: string, rows: string): string {
+  return `<!doctype html>
+<html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>${escapeHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:${C.bg}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg}">
+<tr><td align="center" style="padding:24px 8px">
+<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:${WIDTH}px;max-width:100%;background:${C.bg};border:1px solid ${C.border};border-radius:20px">
+${rows}
+</table></td></tr></table></body></html>`;
+}
+
+/** The mark and the name across the top of an email, and on the right whatever the email dates itself by. */
+export function brandRow(appUrl: string, right?: string): string {
+  const aside = right
+    ? `<td align="right" style="font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted}">${escapeHtml(right)}</td>\n`
+    : "";
+  return `<tr><td style="padding:20px 24px;border-bottom:1px solid ${C.border}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+<td align="left" style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${C.fg}">
+<img src="${escapeHtml(appUrl)}/email/lurk.png" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:8px" />${escapeHtml(PRODUCT_NAME)}</td>
+${aside}</tr></table></td></tr>`;
+}
+
 function headerRow(digest: Digest): string {
   const date = digest.generatedAt.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  return `<tr><td style="padding:20px 24px;border-bottom:1px solid ${C.border}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-<td align="left" style="font-family:${EMAIL_FONT};font-size:15px;font-weight:500;color:${C.fg}">
-<img src="${escapeHtml(digest.appUrl)}/email/lurk.png" width="20" height="20" alt="" style="vertical-align:-4px;margin-right:8px" />${escapeHtml(PRODUCT_NAME)}</td>
-<td align="right" style="font-family:${EMAIL_FONT};font-size:13px;color:${C.fgMuted}">${escapeHtml(date)}</td>
-</tr></table></td></tr>`;
+  return brandRow(digest.appUrl, date);
 }
 
 function headlineRow(digest: Digest): string {
@@ -204,11 +226,6 @@ ${showsScore(first) ? `<div style="font-family:${EMAIL_FONT};font-size:15px;font
 </tr></table></td></tr>`;
 }
 
-/** One lead on its own card. */
-export function leadRow(lead: DigestLead, digest: Pick<Digest, "appUrl" | "generatedAt">): string {
-  return threadRow([lead], digest);
-}
-
 /** Leads grouped by thread, in the order each thread's best lead came. */
 export function byThread(leads: DigestLead[]): DigestLead[][] {
   const groups = new Map<string, DigestLead[]>();
@@ -281,19 +298,15 @@ function emptyRow(digest: Digest): string {
   return `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:15px;color:${C.fgMuted}">Nothing new ${windowPhrase(digest)}. The next scan runs on your schedule.</td></tr>`;
 }
 
-/** The whole email: table layout, inline styles, no stylesheet to strip. */
+/** The whole email. */
 export function renderDigestHtml(digest: Digest): string {
   const body = digest.leads.length
     ? `${timelineRow(digest)}${byThread(digest.leads).map((group) => threadRow(group, digest)).join("")}${moreRow(digest)}`
     : emptyRow(digest);
-  return `<!doctype html>
-<html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>${escapeHtml(digestSubject(digest))}</title></head>
-<body style="margin:0;padding:0;background:${C.bg}">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg}">
-<tr><td align="center" style="padding:24px 8px">
-<table role="presentation" width="${WIDTH}" cellpadding="0" cellspacing="0" border="0" style="width:${WIDTH}px;max-width:100%;background:${C.bg};border:1px solid ${C.border};border-radius:20px">
-${headerRow(digest)}${headlineRow(digest)}${body}${anyapiRow()}${footerRow(digest)}
-</table></td></tr></table></body></html>`;
+  return emailDocument(
+    digestSubject(digest),
+    `${headerRow(digest)}${headlineRow(digest)}${body}${anyapiRow()}${footerRow(digest)}`,
+  );
 }
 
 /** The same digest as plain text, for clients that refuse HTML. */
