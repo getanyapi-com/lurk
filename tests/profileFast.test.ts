@@ -151,7 +151,8 @@ describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () =>
     expect(first.pain).toBe(fastReading.pain);
     expect(first.problemPhrasings).toEqual(fastReading.problemPhrasings);
     expect(first.notBuyers).toEqual(["students wanting a free plan"]);
-    expect(first.brief).toEqual(brief);
+    // Stored with the two keys an older revision still requires (brief.ts storedBrief).
+    expect(first.brief).toEqual({ ...brief, freePlan: null, limits: [] });
     expect(first.geography).toBeNull();
     expect(await competitors()).toEqual([]);
 

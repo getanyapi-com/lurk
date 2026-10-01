@@ -64,6 +64,19 @@ export function usableBrief(value: unknown): ProductBrief | null {
   return parsed.data;
 }
 
+/**
+ * A usable brief in the shape it is stored. Revisions before 2026-10-01 asked
+ * for freePlan and limits and read a brief without them as no brief at all, so
+ * a scan the outgoing revision claims mid-deploy, or a rollback, would judge
+ * the project without its brief questions and keep those verdicts. Storing the
+ * two keys empty keeps it readable there; usableBrief strips them here. Drop
+ * them once no such revision can run.
+ */
+export function storedBrief(value: unknown) {
+  const brief = usableBrief(value);
+  return brief && { ...brief, freePlan: null, limits: [] };
+}
+
 /** The brief for a project that already has a profile, read from its site and that profile. */
 export async function briefFromPage(
   projectId: string,
@@ -89,6 +102,6 @@ export async function briefFromPage(
 export async function writeBrief(projectId: string, brief: ProductBrief | null, profileVersion: number) {
   await db()
     .update(projects)
-    .set({ brief: usableBrief(brief), briefProfileVersion: profileVersion })
+    .set({ brief: storedBrief(brief), briefProfileVersion: profileVersion })
     .where(eq(projects.id, projectId));
 }

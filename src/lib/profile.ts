@@ -5,7 +5,7 @@ import { projectCompetitors, projects } from "@/db/schema";
 import { clientForUser } from "./anyapi";
 import { competitorHost } from "./competitors/host";
 import { generateStructured } from "./llm";
-import { BRIEF_INSTRUCTIONS, briefSchema, usableBrief, type ProductBrief } from "./brief";
+import { BRIEF_INSTRUCTIONS, briefSchema, storedBrief, type ProductBrief } from "./brief";
 import { COMPETITORS_SYSTEM, FAST_READING_SYSTEM, PROFILE_SYSTEM } from "./prompts";
 import { recordUsage } from "./reddit/fetch";
 import { capped, tierForUser } from "./tier";
@@ -451,7 +451,7 @@ function profileColumns(profile: SiteReading) {
     notBuyers: profile.notBuyers,
     destinations: profile.destinations,
     problemPhrasings: profile.problemPhrasings,
-    brief: usableBrief(profile.brief),
+    brief: storedBrief(profile.brief),
   };
 }
 
