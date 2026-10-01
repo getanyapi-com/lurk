@@ -57,6 +57,11 @@ let counter = 0;
  * Two files can write in the same millisecond, and each counts from one, so
  * the prefix is what keeps them apart: each file passes one no other file
  * uses. Taken so far: 6 xRetention, 7 xRescore, 8 xFiltered, 9 xRun.
+ *
+ * alertsX and handledAndMutes also build ids under 6 to 9, by hand: the digit
+ * and the time with at most one digit after, 14 or 15 digits in all. Only the
+ * length keeps those apart from these, which are 19. A new file picks a digit
+ * no file uses, or moves those two onto newId with digits of their own.
  */
 export function newId(prefix: string): string {
   counter += 1;

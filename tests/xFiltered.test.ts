@@ -12,6 +12,7 @@ import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
  */
 
 const HOUR = 3_600_000;
+
 describe("the filtered-out words", () => {
   it("names a screened post by its rule, a judged one by the gates' code, and an unfinished one as such", () => {
     expect(filteredWord({ kind: "screened", code: "listicle" })).toBe("list");
