@@ -50,8 +50,6 @@ export const walletConnections = pgTable("wallet_connections", {
   accessToken: text("access_token"),
   accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
   scope: text("scope"),
-  capUsd: numeric("cap_usd", { precision: 12, scale: 6 }),
-  capPeriod: text("cap_period"),
   connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -87,12 +85,6 @@ export const projects = pgTable("projects", {
    * the product makes the next scan judge everything again.
    */
   profileVersion: integer("profile_version").notNull().default(1),
-  /**
-   * Bumped every time discovery republishes the retrieval plan. Separate from
-   * `profileVersion` because learning where buyers ask changes no judgement,
-   * so a new plan must not throw away verdicts the old plan's candidates got.
-   */
-  discoveryVersion: integer("discovery_version").notNull().default(1),
   /** What the product can actually do, one short phrase each. */
   capabilities: jsonb("capabilities"),
   /** What it cannot do, does not cover, or refuses, one short phrase each. */
@@ -113,7 +105,6 @@ export const projects = pgTable("projects", {
   brief: jsonb("brief"),
   /** The profile version the brief was written against. Behind the profile means it is owed again. */
   briefProfileVersion: integer("brief_profile_version"),
-  tierSnapshot: text("tier_snapshot"),
   /**
    * When the first discovery finished and the project's own jobs were queued.
    * Null means the project has been read but not yet set up, so the initial
@@ -277,7 +268,6 @@ export const leads = pgTable(
      * does, `context` is a thread where nobody asks but a comment belongs.
      */
     kind: text("kind").notNull().default("buyer"),
-    sellerSide: boolean("seller_side").notNull().default(false),
     status: text("status").notNull().default("new"),
     notFitReason: text("not_fit_reason"),
     /**
@@ -332,8 +322,6 @@ export const leadEvaluations = pgTable(
     engagement: integer("engagement").notNull(),
     score: integer("score").notNull(),
     reasonCodes: text("reason_codes").array().notNull(),
-    requirements: jsonb("requirements").notNull(),
-    answerCoverage: text("answer_coverage").notNull(),
     evidenceQuote: text("evidence_quote"),
     reason: text("reason").notNull(),
     /** The project profile version and the text hash this verdict was made on. */
@@ -510,8 +498,6 @@ export const llmUsage = pgTable(
     finishReason: text("finish_reason"),
     /** True when the answer could not be read as the shape that was asked for. */
     schemaFailed: boolean("schema_failed").notNull().default(false),
-    /** Unused: no call asks a second time for the ids it skipped, so new rows leave it null. */
-    attempt: integer("attempt"),
     /** Reasoning tokens, where the provider reports them. Billed as output. */
     reasoningTokens: integer("reasoning_tokens"),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),

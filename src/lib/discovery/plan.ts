@@ -1,6 +1,6 @@
-import { and, eq, inArray, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, notInArray, or } from "drizzle-orm";
 import { db } from "@/db";
-import { projectCompetitors, projectKeywords, projectSubreddits, projects } from "@/db/schema";
+import { projectCompetitors, projectKeywords, projectSubreddits } from "@/db/schema";
 import { capped } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
 import type { CommunityRank, CompetitorRank, FamilyRank } from "./rank";
@@ -233,10 +233,5 @@ export async function publishDiscoveryPlan(projectId: string, plan: DiscoveryPla
         })),
       );
     }
-
-    await tx
-      .update(projects)
-      .set({ discoveryVersion: sql`${projects.discoveryVersion} + 1` })
-      .where(eq(projects.id, projectId));
   });
 }

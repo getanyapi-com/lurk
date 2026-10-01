@@ -104,7 +104,6 @@ export const LEAD_COLUMNS = {
   stage: leads.stage,
   reason: leads.reason,
   matchedPhrase: leads.matchedPhrase,
-  sellerSide: leads.sellerSide,
   status: leads.status,
   postedAt: NEED_AT,
   scoredAt: leads.scoredAt,

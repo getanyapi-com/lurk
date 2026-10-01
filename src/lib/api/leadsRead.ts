@@ -16,6 +16,7 @@ export type ApiLead = {
   stage: string | null;
   reason: string | null;
   matchedPhrase: string | null;
+  /** Always false: no lead is written seller-side any more. Kept so the API's shape holds. */
   sellerSide: boolean;
   status: string;
   postedAt: string;
@@ -39,7 +40,7 @@ function shape(row: Row, costUsd: number | null, includeBody: boolean): ApiLead 
     stage: row.stage,
     reason: row.reason,
     matchedPhrase: row.matchedPhrase,
-    sellerSide: row.sellerSide,
+    sellerSide: false,
     status: row.status,
     postedAt: new Date(row.postedAt).toISOString(),
     scoredAt: new Date(row.scoredAt).toISOString(),

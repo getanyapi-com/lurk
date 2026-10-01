@@ -69,7 +69,6 @@ function xLead(overrides: Partial<typeof xLeads.$inferSelect> = {}): typeof xLea
     engagement: 3,
     reason: "Wants what this product does, in their own words.",
     matchedPhrase: "Is there a Calendly alternative that doesn't cost $12 a seat?",
-    priority: "p1",
     authorUsername: "Asker_Jo",
     conversationId: null,
     status: "new",

@@ -144,12 +144,6 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
       source: "serp",
     });
 
-    const [after] = await db()
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.id, project.id));
-    expect(after.discoveryVersion).toBe(project.discoveryVersion + 1);
-
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 

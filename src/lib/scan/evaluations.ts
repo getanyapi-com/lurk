@@ -108,17 +108,9 @@ export function alreadyJudged(
   return found?.profileVersion === profileVersion && found.contentHash === hash;
 }
 
-/**
- * The two columns the model no longer answers. Both are NOT NULL with no
- * default and nothing reads either of them, so the write seam fills them and
- * dropping the columns is a separate piece of work.
- */
-const DROPPED_BY_THE_SLIM_SCORER = { requirements: [], answerCoverage: "unknown" };
-
 function values(record: EvaluationRecord) {
   const { judgement } = record;
   return {
-    ...DROPPED_BY_THE_SLIM_SCORER,
     projectId: record.projectId,
     postId: record.postId,
     commentId: record.commentId,

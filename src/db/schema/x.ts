@@ -112,7 +112,6 @@ export const xProjects = pgTable("x_projects", {
   projectId: text("project_id")
     .primaryKey()
     .references(() => projects.id, { onDelete: "cascade" }),
-  lang: text("lang").notNull().default("en"),
   enabledAt: timestamp("enabled_at", { withTimezone: true }).notNull().defaultNow(),
   /** A scan stops booking its successor once nobody has opened the tab for a week. */
   lastOpenedAt: timestamp("last_opened_at", { withTimezone: true }),
@@ -218,15 +217,11 @@ export const xEvaluations = pgTable(
     intent: integer("intent"),
     engagement: integer("engagement"),
     score: integer("score"),
-    priority: text("priority"),
     needQuote: text("need_quote"),
     /** The parents and bio the verdict was made with, kept so parents can age out. */
     context: jsonb("context"),
     llmAttempts: integer("llm_attempts").notNull().default(0),
-    contentHash: text("content_hash"),
-    profileVersion: integer("profile_version"),
     scorerVersion: text("scorer_version"),
-    judgedAt: timestamp("judged_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -266,7 +261,6 @@ export const xLeads = pgTable(
     reason: text("reason"),
     /** The verbatim sentence the verdict rests on. */
     matchedPhrase: text("matched_phrase"),
-    priority: text("priority"),
     authorUsername: text("author_username").notNull(),
     conversationId: text("conversation_id"),
     status: text("status").notNull().default("new"),

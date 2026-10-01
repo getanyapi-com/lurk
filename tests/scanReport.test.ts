@@ -84,8 +84,6 @@ describe.skipIf(!hasDatabase)("counting one window of scanning", () => {
           engagement: 1,
           score: 60,
           reasonCodes: [],
-          requirements: [],
-          answerCoverage: "unknown",
           reason: "test",
           profileVersion: 1,
           contentHash: randomUUID(),

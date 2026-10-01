@@ -267,6 +267,13 @@
       "when": 1790879873809,
       "tag": "0037_queue_and_house_cap_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790894918877,
+      "tag": "0038_stop_using_dead_columns",
+      "breakpoints": true
     }
   ]
 }

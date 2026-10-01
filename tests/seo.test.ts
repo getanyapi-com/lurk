@@ -532,8 +532,6 @@ describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer int
         engagement: 0,
         score: 0,
         reasonCodes: ["supported_open_need"],
-        requirements: [],
-        answerCoverage: "complete",
         reason: "Judged for this test.",
         profileVersion: 1,
         contentHash: postId,
