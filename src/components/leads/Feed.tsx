@@ -16,14 +16,14 @@ import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
 import { chatAppConfigured } from "@/lib/alerts/config";
 import { alertsOffer, offerPreview } from "@/lib/alerts/offer";
-import { requireLocalUser } from "@/lib/auth";
+import type { LocalUser } from "@/lib/auth";
 import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
 import { competitorsNamedIn } from "@/lib/competitors/read";
 import { feedPage } from "@/lib/feedPage";
 import { findLead } from "@/lib/leads";
-import { projectForUser } from "@/lib/projects";
-import { projectScoring } from "@/lib/scoring/apply";
-import { isOnboarding, projectActivity } from "@/lib/projectActivity";
+import type { Project } from "@/lib/projects";
+import { parseScoring } from "@/lib/scoring/weights";
+import { isOnboarding, type ProjectActivity } from "@/lib/projectActivity";
 import { verdictSentence } from "@/lib/scan/report";
 import { sweepShown, sweepStatus } from "@/lib/sweep";
 
@@ -31,8 +31,11 @@ import type { StreamEntry } from "@/components/leads/stream";
 
 export type { FeedParams };
 
+/** What the page above has already read, handed down rather than read again. */
 type FeedProps = {
-  projectId: string;
+  user: LocalUser;
+  project: Project;
+  activity: ProjectActivity;
   params: FeedParams;
 };
 
@@ -146,19 +149,16 @@ async function openOn(
  * Everything one set of filter pills decides is read through lib/feedPage,
  * which answers a project's repeat of the same filter from what it already
  * read, so selecting a lead - which changes only `?lead=` - reads nothing
- * again. The two things a selection does move are read here: what the project
- * is doing, because a running scan writes a progress line every few seconds
- * and ActivityPoll re-renders this to show it, and the thread the pane opens
- * on.
+ * again. The two things a selection does move are read on every render: what
+ * the project is doing, which the page reads and hands down because a running
+ * scan writes a progress line every few seconds and ActivityPoll re-renders
+ * this to show it, and the thread the pane opens on.
  */
-export async function Feed({ projectId, params: asked }: FeedProps) {
+export async function Feed({ user, project, activity, params: asked }: FeedProps) {
+  const projectId = project.id;
   let params = asked;
   let filter = feedFilter(params);
-  const [opened, activity] = await Promise.all([
-    feedPage(projectId, filter),
-    projectActivity(projectId),
-  ]);
-  let page = opened;
+  let page = await feedPage(projectId, filter);
   // Nobody picked the 30 days the feed opens on. A first sweep reads a year, and
   // its leads are mostly older than a month, so a new project opened on an
   // empty window with its leads one pill away. When the window nobody chose is
@@ -172,25 +172,29 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
   // The first sweep is reported while it runs and for a moment after, over the
   // feed it fills, so the page a new project lands on says what is being read
   // and draws each lead as it is judged.
-  const sweep = sweepShown(activity) ? await sweepStatus(projectId) : null;
+  const shown = sweepShown(activity);
   // A project still being set up or swept has no leads yet because none have
   // been found yet, not because there are none: its empty list says so.
   const arriving = isOnboarding(activity) && filter.status === "new";
   const entries = buildStream(page.rows.map(toCard));
+  const held = filter.status === "new" ? page.review : [];
   // While the first leads are found, the page asks once whether to send new
   // ones on: the person is already watching, and a project with no channel is
   // only seen when they come back to look.
-  const user = sweep || arriving ? await requireLocalUser() : null;
-  const project = user ? await projectForUser(user.id, projectId) : null;
-  const offer = user && project ? await alertsOffer(user.id, projectId) : null;
-  const preview = offer?.state === "ask" && project ? await offerPreview(projectId, project.name) : null;
-  const held = filter.status === "new" ? page.review : [];
-  const selection = await openOn(projectId, entries, held, params.lead);
-  const competitors =
+  const [sweep, offered, selection] = await Promise.all([
+    shown ? sweepStatus(projectId) : null,
+    shown || arriving ? alertsOffer(user.id, projectId, user.email) : null,
+    openOn(projectId, entries, held, params.lead),
+  ]);
+  // Read beside the sweep, so a sweep that turned out to be gone asks nothing.
+  const offer = sweep || arriving ? offered : null;
+  const [preview, competitors] = await Promise.all([
+    offer?.state === "ask" ? offerPreview(projectId, project.name) : null,
     selection?.kind === "lead" && selection.entry.lead.postId
-      ? await competitorsNamedIn(projectId, selection.entry.lead.postId)
-      : [];
-  const scoring = selection?.kind === "lead" ? await projectScoring(projectId) : null;
+      ? competitorsNamedIn(projectId, selection.entry.lead.postId)
+      : [],
+  ]);
+  const scoring = selection?.kind === "lead" ? parseScoring(project.scoring) : null;
   const selectedId =
     selection === null ? null : selection.kind === "lead" ? selection.entry.id : params.lead ?? null;
   // One sentence, in one of two places: over the list when it has leads to
@@ -207,7 +211,7 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
         {sweep ? null : <ScanStatus activity={activity} />}
       </div>
       {sweep ? <FirstSweep projectId={projectId} first={sweep} /> : null}
-      {offer && project ? (
+      {offer ? (
         <AlertsOffer
           projectId={projectId}
           offer={offer}

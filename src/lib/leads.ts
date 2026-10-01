@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { aliasedTable, and, asc, count, desc, eq, inArray, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -425,8 +426,12 @@ export async function wordsHidden(
   };
 }
 
-/** New leads the feed would show, whatever their age, for the rail's badge. */
-export async function newLeadCount(projectId: string): Promise<number> {
+/**
+ * New leads the feed would show, whatever their age, for the rail's badge.
+ * Read once per server render (see currentLocalUser): the first sweep's line
+ * over the feed counts the same thing.
+ */
+export const newLeadCount = cache(async (projectId: string): Promise<number> => {
   const rows = await db()
     .select({ total: count() })
     .from(leads)
@@ -435,7 +440,7 @@ export async function newLeadCount(projectId: string): Promise<number> {
     .innerJoin(projects, eq(projects.id, leads.projectId))
     .where(and(eq(leads.projectId, projectId), eq(leads.status, "new"), OVER_THRESHOLD, redditLeadNotMuted()));
   return rows[0]?.total ?? 0;
-}
+});
 
 /**
  * What this project paid to have each post in front of it: the first ledger

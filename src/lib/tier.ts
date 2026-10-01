@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { tierNameFor } from "./anyapi";
 import { config } from "./config";
 import { presetFor, settingsForPreset } from "./settings/resolve";
@@ -17,12 +18,13 @@ export type UserTier = TierWithLimits & {
 
 /**
  * Which tier a user is on and the limits that go with it, for the many callers
- * that need nothing else: every allowance check and cap.
+ * that need nothing else: every allowance check and cap. Read once per server
+ * render, since a page can check two allowances (see currentLocalUser).
  */
-export async function limitsForUser(userId: string): Promise<TierWithLimits> {
+export const limitsForUser = cache(async (userId: string): Promise<TierWithLimits> => {
   const name = await tierNameFor(userId);
   return { name, limits: limitsFor(name, config().SELF_HOSTED) };
-}
+});
 
 /** Which tier a user is on, the limits that go with it, and their settings. */
 export async function tierForUser(userId: string): Promise<UserTier> {

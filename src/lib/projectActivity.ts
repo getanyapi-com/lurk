@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, eq, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
@@ -60,14 +61,18 @@ export function activityFrom(rows: JobRow[], now = new Date()): ProjectActivity 
   return { active, last: finished[0] ?? null, nextScan: scans[0] ?? null };
 }
 
-/** Everything this project has queued or run of the kinds a person waits on. */
-export async function projectActivity(projectId: string): Promise<ProjectActivity> {
+/**
+ * Everything this project has queued or run of the kinds a person waits on.
+ * Read once per server render (see currentLocalUser), since the leads page
+ * and the feed under it both draw it.
+ */
+export const projectActivity = cache(async (projectId: string): Promise<ProjectActivity> => {
   const rows = await db()
     .select()
     .from(jobs)
     .where(and(eq(jobs.projectId, projectId), inArray(jobs.kind, [...ACTIVITY_KINDS])));
   return activityFrom(rows);
-}
+});
 
 /**
  * Whether any job of this project is running or due, whatever its kind. The

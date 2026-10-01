@@ -44,4 +44,15 @@ describe("localUserFor", () => {
     const second = await localUserFor({ clerkUserId, email, emailVerified: true });
     expect(second?.id).toBe(first?.id);
   });
+
+  it("follows an address changed in Clerk on a row it already knows", async () => {
+    const clerkUserId = `known_${randomUUID()}`;
+    const first = await localUserFor({ clerkUserId, email: address(), emailVerified: true });
+    const moved = address();
+    const second = await localUserFor({ clerkUserId, email: moved, emailVerified: true });
+    expect(second?.id).toBe(first?.id);
+    expect(second?.email).toBe(moved);
+    const rows = await db().select().from(users).where(eq(users.id, first!.id));
+    expect(rows[0].email).toBe(moved);
+  });
 });

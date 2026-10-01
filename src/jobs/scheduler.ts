@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { Cron } from "croner";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
@@ -219,7 +220,14 @@ export function startScheduler(): Cron {
     if (config().SCHEDULER_SEED) {
       void seedProjectScans();
     }
-    (globalThis as Kickable)[KICK] = () => void pump(workers, watchedWorkers);
+    // A kick comes from inside a request, and the pump it starts would carry
+    // that request's async context into every job it claims, and every job
+    // those claim in turn. React's per-render cache is found through that
+    // context, so a job could be answered from a render that ended long
+    // before. The kick runs the pump in the context the scheduler started in,
+    // the same one the minute tick runs it from.
+    const outsideAnyRequest = AsyncLocalStorage.snapshot();
+    (globalThis as Kickable)[KICK] = () => outsideAnyRequest(() => void pump(workers, watchedWorkers));
     started = new Cron("* * * * *", async () => {
       await pump(workers, watchedWorkers);
     });

@@ -39,12 +39,12 @@ describe.skipIf(!process.env.DATABASE_URL)("alerts offer", () => {
     const { alertsOffer, turnOnEmailAlerts } = await import("@/lib/alerts/offer");
     const { listChannels } = await import("@/lib/alerts/channels");
     const { user, first, email } = await person();
-    expect(await alertsOffer(user.id, first.id)).toEqual({ state: "ask", email });
+    expect(await alertsOffer(user.id, first.id, user.email)).toEqual({ state: "ask", email });
     await turnOnEmailAlerts(user.id, first.id);
     await turnOnEmailAlerts(user.id, first.id);
     const channels = await listChannels(first.id);
     expect(channels.map((one) => [one.channel, one.target, one.cadence])).toEqual([["email", email, "daily"]]);
-    expect(await alertsOffer(user.id, first.id)).toEqual({
+    expect(await alertsOffer(user.id, first.id, user.email)).toEqual({
       state: "on",
       channels: [{ channel: "email", where: email }],
     });
@@ -106,7 +106,7 @@ describe.skipIf(!process.env.DATABASE_URL)("alerts offer", () => {
     const { alertsOffer, dismissAlertsOffer } = await import("@/lib/alerts/offer");
     const { user, first, second } = await person();
     await dismissAlertsOffer(user.id, first.id);
-    expect((await alertsOffer(user.id, first.id)).state).toBe("dismissed");
-    expect((await alertsOffer(user.id, second.id)).state).toBe("ask");
+    expect((await alertsOffer(user.id, first.id, user.email)).state).toBe("dismissed");
+    expect((await alertsOffer(user.id, second.id, user.email)).state).toBe("ask");
   });
 });

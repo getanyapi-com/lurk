@@ -32,8 +32,11 @@ export type AlertsOffer =
   | { state: "on"; channels: OfferedChannel[] }
   | { state: "dismissed" };
 
-/** What the offer says on one project: ask, say where alerts go, or nothing. */
-export async function alertsOffer(userId: string, projectId: string): Promise<AlertsOffer> {
+/**
+ * What the offer says on one project: ask, say where alerts go, or nothing.
+ * `email` is the address on the caller's row, which the page already holds.
+ */
+export async function alertsOffer(userId: string, projectId: string, email: string | null): Promise<AlertsOffer> {
   const channels = await listChannels(projectId);
   if (channels.length > 0) {
     return {
@@ -53,8 +56,7 @@ export async function alertsOffer(userId: string, projectId: string): Promise<Al
   if (dismissed.length > 0) {
     return { state: "dismissed" };
   }
-  const [user] = await db().select({ email: users.email }).from(users).where(eq(users.id, userId));
-  return { state: "ask", email: user?.email || null };
+  return { state: "ask", email: email || null };
 }
 
 /** Turns on a daily email to the person's own address. Pressing it twice adds nothing. */

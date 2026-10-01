@@ -5,7 +5,7 @@ import { redditWordsWhere } from "@/lib/leadFilters";
 import { redditLeadNotMuted } from "@/lib/mutes";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import { foldScore } from "@/lib/x/gates";
-import { communityKey, parseScoring, redditScore, xAskScore, type LeadFactors, type ScoringSettings } from "./weights";
+import { communityKey, redditScore, xAskScore, type LeadFactors, type ScoringSettings } from "./weights";
 
 /**
  * Re-ranking a project's stored leads under new weights. No verdict changes
@@ -25,12 +25,6 @@ function moved<T extends { id: string; score: number }>(rows: T[], next: (row: T
     out.set(score, [...(out.get(score) ?? []), row.id]);
   }
   return out;
-}
-
-/** The project's stored weights, or null when the owner never chose any. */
-export async function projectScoring(projectId: string): Promise<ScoringSettings | null> {
-  const rows = await db().select({ scoring: projects.scoring }).from(projects).where(eq(projects.id, projectId));
-  return rows[0] ? parseScoring(rows[0].scoring) : null;
 }
 
 /** Every buyer lead the project holds, with the factors its score folds. */

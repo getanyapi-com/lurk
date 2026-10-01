@@ -69,7 +69,7 @@ export default async function LeadsPage({ searchParams }: LeadsPageProps) {
         feed you can read with a skeleton is the worse of the two.
       */}
       <Suspense fallback={<FeedSkeleton />}>
-        <Feed projectId={project.id} params={params} />
+        <Feed user={user} project={project} activity={activity} params={params} />
       </Suspense>
     </div>
   );

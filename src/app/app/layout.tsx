@@ -8,7 +8,7 @@ import { Rail, type RailGroup } from "@/components/Rail";
 import { requireLocalUser } from "@/lib/auth";
 import { countMentions } from "@/lib/competitors/read";
 import { newLeadCount } from "@/lib/leads";
-import { activeProject, listProjects } from "@/lib/projects";
+import { listProjects, pickProject } from "@/lib/projects";
 import { countOpportunities } from "@/lib/seo/read";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { newXLeadCount } from "@/lib/x/read";
@@ -77,11 +77,8 @@ async function requestedProject(): Promise<string | undefined> {
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireLocalUser();
-  const requested = await requestedProject();
-  const [projects, project] = await Promise.all([
-    listProjects(user.id),
-    activeProject(user.id, requested),
-  ]);
+  const [requested, projects] = await Promise.all([requestedProject(), listProjects(user.id)]);
+  const project = pickProject(projects, requested);
   const showX = xEnabledFor(user.id);
   const [counts, busy] = project
     ? await Promise.all([countsFor(project.id, showX), hasWorkInFlight(project.id)])
