@@ -1,7 +1,8 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { candidateSources, leads, llmUsage, searchRuns, usageLedger } from "@/db/schema";
+import { candidateSources, leads, searchRuns, usageLedger } from "@/db/schema";
 import { config } from "./config";
+import { assertUnderCap, houseDataSpend, ledgerCalls, llmSpend } from "./spend";
 import { utcDayStart } from "./time";
 
 export type SkuUsage = { sku: string; calls: number; costUsd: number; reused: number };
@@ -56,35 +57,15 @@ export class HouseDataCapReachedError extends Error {
 }
 
 /**
- * What the house key has spent on AnyAPI since midnight UTC, across every
- * project: the shared runs, plus the calls that produce no shared run at all,
- * which is the product page read. A reused run
- * costs nothing and is stored as no new run, so nothing is counted twice.
+ * Throws before a house-funded call that today's budget can no longer cover:
+ * what the house key has spent on AnyAPI since midnight UTC, every SKU.
  */
-export async function houseDataSpendToday(): Promise<number> {
-  const runs = await db()
-    .select({ total: sql<string>`coalesce(sum(${searchRuns.costUsd}), 0)` })
-    .from(searchRuns)
-    .where(and(eq(searchRuns.fundedBy, "house"), gte(searchRuns.fetchedAt, utcDayStart())));
-  const unshared = await db()
-    .select({ total: sql<string>`coalesce(sum(${usageLedger.costUsd}), 0)` })
-    .from(usageLedger)
-    .where(
-      and(
-        eq(usageLedger.fundedBy, "house"),
-        sql`${usageLedger.searchRunId} is null`,
-        gte(usageLedger.at, utcDayStart()),
-      ),
-    );
-  return Number(runs[0]?.total ?? 0) + Number(unshared[0]?.total ?? 0);
-}
-
-/** Throws before a house-funded call that today's budget can no longer cover. */
 export async function assertHouseDataUnderCap(): Promise<void> {
-  const cap = config().HOUSE_DATA_CAP_USD_PER_DAY;
-  if ((await houseDataSpendToday()) >= cap) {
-    throw new HouseDataCapReachedError(cap);
-  }
+  await assertUnderCap(
+    config().HOUSE_DATA_CAP_USD_PER_DAY,
+    houseDataSpend(),
+    HouseDataCapReachedError,
+  );
 }
 
 export type ScanUsage = { calls: number; costUsd: number; reused: number; llmCostUsd: number };
@@ -102,31 +83,22 @@ export async function usageSince(projectId: string, since: Date): Promise<ScanUs
     })
     .from(usageLedger)
     .where(and(eq(usageLedger.projectId, projectId), gte(usageLedger.at, since)));
-  const [llm] = await db()
-    .select({ costUsd: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)` })
-    .from(llmUsage)
-    .where(and(eq(llmUsage.projectId, projectId), gte(llmUsage.at, since)));
+  const llmCostUsd = await llmSpend({ projectId, since });
   return {
     calls: data?.calls ?? 0,
     costUsd: Number(data?.costUsd ?? 0),
     reused: data?.reused ?? 0,
-    llmCostUsd: Number(llm?.costUsd ?? 0),
+    llmCostUsd,
   };
 }
 
-/** How many Google searches this project has already bought today. */
+/**
+ * How many Google searches this project has run today, reuses included. A
+ * reused search still hands the scan its threads to open, the same as a bought
+ * one, so the tier's serpQueriesPerDay counts searches run, not searches bought.
+ */
 export async function serpCallsToday(projectId: string): Promise<number> {
-  const [row] = await db()
-    .select({ calls: sql<number>`count(*)::int` })
-    .from(usageLedger)
-    .where(
-      and(
-        eq(usageLedger.projectId, projectId),
-        eq(usageLedger.sku, "google.search"),
-        gte(usageLedger.at, utcDayStart()),
-      ),
-    );
-  return row?.calls ?? 0;
+  return ledgerCalls({ projectId, sku: "google.search", since: utcDayStart(), boughtOnly: false });
 }
 
 export type SourceYield = {

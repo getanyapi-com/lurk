@@ -1,6 +1,7 @@
-import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { llmUsage, usageLedger, xRuns } from "@/db/schema";
+import { xRuns } from "@/db/schema";
+import { llmSpend, projectLedgerSpend } from "@/lib/spend";
 import { X_PURPOSES, X_SKUS } from "./constants";
 
 /** The funnel of one X scan, so the tab can say what happened and what it cost. */
@@ -58,15 +59,11 @@ export async function markFirstLead(runId: string) {
 
 /** What X spent for this project since a moment: its twitter.* lines and its X model calls. */
 export async function xSpendSince(projectId: string, since: Date): Promise<{ dataUsd: number; llmUsd: number }> {
-  const [data] = await db()
-    .select({ total: sql<string>`coalesce(sum(${usageLedger.costUsd}), 0)` })
-    .from(usageLedger)
-    .where(and(eq(usageLedger.projectId, projectId), inArray(usageLedger.sku, [...X_SKUS]), gte(usageLedger.at, since)));
-  const [llm] = await db()
-    .select({ total: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)` })
-    .from(llmUsage)
-    .where(and(eq(llmUsage.projectId, projectId), inArray(llmUsage.purpose, [...X_PURPOSES]), gte(llmUsage.at, since)));
-  return { dataUsd: Number(data?.total ?? 0), llmUsd: Number(llm?.total ?? 0) };
+  const [dataUsd, llmUsd] = await Promise.all([
+    projectLedgerSpend({ projectId, since, skus: X_SKUS }),
+    llmSpend({ projectId, since, purposes: X_PURPOSES }),
+  ]);
+  return { dataUsd, llmUsd };
 }
 
 export async function finishXRun(

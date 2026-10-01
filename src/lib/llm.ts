@@ -1,11 +1,11 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { NoObjectGeneratedError, TypeValidationError, generateObject } from "ai";
-import { gte, sql } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/db";
 import { llmUsage } from "@/db/schema";
 import { HEARTBEAT_MS } from "@/jobs/lease";
 import { config } from "./config";
+import { assertUnderCap, llmSpend } from "./spend";
 import { utcDayStart } from "./time";
 
 /**
@@ -103,21 +103,13 @@ export class LlmNotConfiguredError extends Error {
   }
 }
 
-/** What the house has spent on the language model since midnight UTC. */
-export async function llmSpendToday(): Promise<number> {
-  const rows = await db()
-    .select({ total: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)` })
-    .from(llmUsage)
-    .where(gte(llmUsage.at, utcDayStart()));
-  return Number(rows[0]?.total ?? 0);
-}
-
 /** Refuses any model call once today's house spend, muse and Jev together, is at the cap. */
 export async function assertUnderLlmCap() {
-  const cap = config().HOUSE_LLM_CAP_USD_PER_DAY;
-  if ((await llmSpendToday()) >= cap) {
-    throw new LlmCapReachedError(cap);
-  }
+  await assertUnderCap(
+    config().HOUSE_LLM_CAP_USD_PER_DAY,
+    llmSpend({ since: utcDayStart() }),
+    LlmCapReachedError,
+  );
 }
 
 function costOf(inputTokens: number, outputTokens: number): number {
@@ -186,24 +178,36 @@ function providerOf(metadata: unknown): string | null {
   return typeof openrouter?.provider === "string" ? openrouter.provider : null;
 }
 
-async function record(call: LlmCall<unknown>, made: CallRecord): Promise<void> {
+/**
+ * One llm_usage row, for a muse call and a Jev call alike: the daily caps and
+ * the Data usage screen read every model call from that one table. The cost
+ * is in dollars, stored to the millionth. `attempt` is no longer written, so
+ * it cannot be passed.
+ */
+export async function recordLlmUsage(
+  values: Omit<typeof llmUsage.$inferInsert, "costUsd" | "attempt"> & { costUsd: number },
+): Promise<void> {
   await db()
     .insert(llmUsage)
-    .values({
-      projectId: call.projectId,
-      purpose: call.purpose,
-      inputTokens: made.inputTokens,
-      outputTokens: made.outputTokens,
-      reasoningTokens: made.reasoningTokens,
-      costUsd: costOf(made.inputTokens, made.outputTokens).toFixed(6),
-      model: made.model,
-      provider: made.provider,
-      latencyMs: made.latencyMs,
-      itemsAsked: call.itemsAsked ?? null,
-      itemsAnswered: made.itemsAnswered,
-      finishReason: made.finishReason,
-      schemaFailed: made.schemaFailed,
-    });
+    .values({ ...values, costUsd: values.costUsd.toFixed(6) });
+}
+
+async function record(call: LlmCall<unknown>, made: CallRecord): Promise<void> {
+  await recordLlmUsage({
+    projectId: call.projectId,
+    purpose: call.purpose,
+    inputTokens: made.inputTokens,
+    outputTokens: made.outputTokens,
+    reasoningTokens: made.reasoningTokens,
+    costUsd: costOf(made.inputTokens, made.outputTokens),
+    model: made.model,
+    provider: made.provider,
+    latencyMs: made.latencyMs,
+    itemsAsked: call.itemsAsked ?? null,
+    itemsAnswered: made.itemsAnswered,
+    finishReason: made.finishReason,
+    schemaFailed: made.schemaFailed,
+  });
 }
 
 /**

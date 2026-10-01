@@ -1,10 +1,8 @@
 import { GatewayError, createGateway } from "@ai-sdk/gateway";
 import { RetryError, experimental_evaluate as evaluate } from "ai";
 import { z } from "zod";
-import { db } from "@/db";
-import { llmUsage } from "@/db/schema";
 import { config } from "./config";
-import { assertUnderLlmCap, withCallTimeout } from "./llm";
+import { assertUnderLlmCap, recordLlmUsage, withCallTimeout } from "./llm";
 
 /**
  * TypeSafe's Jev: one state in, typed answers with probabilities out, no
@@ -157,23 +155,21 @@ async function record(
     answered: number | null;
   },
 ): Promise<void> {
-  await db()
-    .insert(llmUsage)
-    .values({
-      projectId: call.projectId,
-      purpose: call.purpose,
-      inputTokens: made.inputTokens,
-      outputTokens: made.outputTokens,
-      reasoningTokens: null,
-      costUsd: (made.costUsd ?? (made.inputTokens * JEV_PRICE_USD_PER_MILLION_INPUT) / 1_000_000).toFixed(6),
-      model: made.model,
-      provider: made.provider,
-      latencyMs: made.latencyMs,
-      itemsAsked: call.itemsAsked ?? null,
-      itemsAnswered: made.answered,
-      finishReason: made.finishReason,
-      schemaFailed: false,
-    });
+  await recordLlmUsage({
+    projectId: call.projectId,
+    purpose: call.purpose,
+    inputTokens: made.inputTokens,
+    outputTokens: made.outputTokens,
+    reasoningTokens: null,
+    costUsd: made.costUsd ?? (made.inputTokens * JEV_PRICE_USD_PER_MILLION_INPUT) / 1_000_000,
+    model: made.model,
+    provider: made.provider,
+    latencyMs: made.latencyMs,
+    itemsAsked: call.itemsAsked ?? null,
+    itemsAnswered: made.answered,
+    finishReason: made.finishReason,
+    schemaFailed: false,
+  });
 }
 
 /**

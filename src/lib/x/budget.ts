@@ -1,8 +1,9 @@
-import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { llmUsage, searchRuns, usageLedger } from "@/db/schema";
+import { llmUsage } from "@/db/schema";
 import { config } from "@/lib/config";
 import { LlmCapReachedError } from "@/lib/llm";
+import { assertUnderCap, houseDataSpend, ledgerCalls, llmSpend } from "@/lib/spend";
 import { utcDayStart } from "@/lib/time";
 import { HouseDataCapReachedError } from "@/lib/usage";
 import { X_PURPOSES, X_SKUS } from "./constants";
@@ -36,70 +37,27 @@ export class XLlmCapReachedError extends LlmCapReachedError {
   }
 }
 
-/** What the house key has spent on twitter.* since midnight UTC, across every project. */
-export async function xHouseDataSpendToday(): Promise<number> {
-  const since = utcDayStart();
-  const [runs] = await db()
-    .select({ total: sql<string>`coalesce(sum(${searchRuns.costUsd}), 0)` })
-    .from(searchRuns)
-    .where(
-      and(
-        eq(searchRuns.fundedBy, "house"),
-        inArray(searchRuns.sku, [...X_SKUS]),
-        gte(searchRuns.fetchedAt, since),
-      ),
-    );
-  const [unshared] = await db()
-    .select({ total: sql<string>`coalesce(sum(${usageLedger.costUsd}), 0)` })
-    .from(usageLedger)
-    .where(
-      and(
-        eq(usageLedger.fundedBy, "house"),
-        inArray(usageLedger.sku, [...X_SKUS]),
-        isNull(usageLedger.searchRunId),
-        gte(usageLedger.at, since),
-      ),
-    );
-  return Number(runs?.total ?? 0) + Number(unshared?.total ?? 0);
-}
-
+/** Throws once the house key has spent X's share on twitter.* since midnight UTC, across every project. */
 export async function assertXHouseDataUnderCap(): Promise<void> {
-  const cap = config().HOUSE_X_DATA_CAP_USD_PER_DAY;
-  if ((await xHouseDataSpendToday()) >= cap) {
-    throw new XHouseDataCapError(cap);
-  }
+  await assertUnderCap(
+    config().HOUSE_X_DATA_CAP_USD_PER_DAY,
+    houseDataSpend({ skus: X_SKUS }),
+    XHouseDataCapError,
+  );
 }
 
-/** What X's judge and seed calls have cost since midnight UTC. The house pays every model call. */
-export async function xLlmSpendToday(): Promise<number> {
-  const [row] = await db()
-    .select({ total: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)` })
-    .from(llmUsage)
-    .where(and(inArray(llmUsage.purpose, [...X_PURPOSES]), gte(llmUsage.at, utcDayStart())));
-  return Number(row?.total ?? 0);
-}
-
+/** Throws once X's judge, seed and reply calls have cost its share since midnight UTC. */
 export async function assertXLlmUnderCap(): Promise<void> {
-  const cap = config().HOUSE_X_LLM_CAP_USD_PER_DAY;
-  if ((await xLlmSpendToday()) >= cap) {
-    throw new XLlmCapReachedError(cap);
-  }
+  await assertUnderCap(
+    config().HOUSE_X_LLM_CAP_USD_PER_DAY,
+    llmSpend({ since: utcDayStart(), purposes: X_PURPOSES }),
+    XLlmCapReachedError,
+  );
 }
 
 /** Calls this project actually bought (not reused) from one twitter.* SKU since a moment. */
 export async function xCallsSince(projectId: string, sku: string, since: Date): Promise<number> {
-  const [row] = await db()
-    .select({ calls: sql<number>`count(*)::int` })
-    .from(usageLedger)
-    .where(
-      and(
-        eq(usageLedger.projectId, projectId),
-        eq(usageLedger.sku, sku),
-        eq(usageLedger.reused, false),
-        gte(usageLedger.at, since),
-      ),
-    );
-  return row?.calls ?? 0;
+  return ledgerCalls({ projectId, sku, since, boughtOnly: true });
 }
 
 /**
