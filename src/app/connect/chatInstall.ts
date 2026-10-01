@@ -10,8 +10,9 @@ import { projectForUser } from "@/lib/projects";
 
 /**
  * The two legs of Add to Slack and Add to Discord, which /connect/slack and
- * /connect/discord and their callbacks hand straight here. The paths and the
- * cookie names are what each service's app has registered, so they stay.
+ * /connect/discord and their callbacks hand straight here. The callback paths
+ * are the redirect URIs each service's app has registered, and an install under
+ * way across a deploy still carries the old cookie, so both names stay.
  */
 
 /** Starts the install: remember which project asked, then send the person to the service. */
