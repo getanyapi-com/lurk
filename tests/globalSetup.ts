@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import * as schema from "@/db/schema";
 import { testDatabaseUrl } from "./testDatabase";
 
 /**
@@ -17,6 +18,7 @@ export default async function setup(): Promise<void> {
   if (!url || url === process.env.TEST_DATABASE_URL) {
     if (url) {
       await migrateDatabase(url);
+      await trimDatabase(url);
     }
     return;
   }
@@ -33,6 +35,7 @@ export default async function setup(): Promise<void> {
     await sql.end();
   }
   await migrateDatabase(url);
+  await trimDatabase(url);
 }
 
 async function migrateDatabase(url: string): Promise<void> {
@@ -40,6 +43,34 @@ async function migrateDatabase(url: string): Promise<void> {
   try {
     await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
   } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Runs the retention passes once, on the real clock, before any worker starts.
+ * The retention tests run theirs as of a time long past, so that they take
+ * only their own rows (tests/retention.test.ts), and so nothing else clears
+ * the old posts, finished jobs and X rows every run leaves behind: a local
+ * `_test` database kept for months would only grow. Nothing runs beside this
+ * yet, so the real clock is safe here.
+ *
+ * The passes reach the database through db(), which builds its pool from
+ * DATABASE_URL, the app's own database in this process. The client is handed
+ * to db() before the passes are loaded, so they only ever see `url`.
+ */
+async function trimDatabase(url: string): Promise<void> {
+  const holder = globalThis as typeof globalThis & { __lurkDb?: unknown };
+  const sql = postgres(url, { max: 1 });
+  holder.__lurkDb = drizzle(sql, { schema });
+  try {
+    const { deleteExpiredPosts, pruneFinishedJobs } = await import("@/lib/retention");
+    const { deleteExpiredXData } = await import("@/lib/x/retention");
+    await deleteExpiredPosts();
+    await pruneFinishedJobs();
+    await deleteExpiredXData();
+  } finally {
+    delete holder.__lurkDb;
     await sql.end();
   }
 }
