@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { renderDigestHtml, renderDigestText } from "@/lib/alerts/digest";
 import { xAskLead } from "@/lib/alerts/leads";
 import { payloadFor } from "@/lib/alerts/send";
+import { ALERT_SCORE_FLOOR } from "@/lib/leadFilters";
 import {
-  ALERT_SCORE_FLOOR,
   CADENCE_MS,
   CHAT_LEAD_CAP,
   EMAIL_LEAD_CAP,

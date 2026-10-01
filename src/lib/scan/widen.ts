@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { projectKeywords } from "@/db/schema";
-import { ALERT_SCORE_FLOOR } from "@/lib/alerts/select";
+import { recentAlertableLeadSql } from "@/lib/alerts/leads";
 import { loadScanProject } from "./project";
 import { runScan } from "./run";
 import { KINDS, sweepSearchItems, type SweepSearch } from "./searches";
@@ -72,7 +72,7 @@ export async function widenSearches(projectId: string, jobId: string): Promise<n
  * Anyone else gets theirs when they turn alerts on (lib/alerts/invite.ts).
  */
 export async function projectsOwedSearches(now: Date): Promise<string[]> {
-  const month = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const month = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const rows = await db().execute<{ id: string }>(sql`
     select p.id from projects p
     where p.discovered_at is not null
@@ -81,12 +81,7 @@ export async function projectsOwedSearches(now: Date): Promise<string[]> {
       and not exists (select 1 from alerts a join projects ap on ap.id = a.project_id
         where ap.user_id = p.user_id)
       and not exists (select 1 from jobs j where j.project_id = p.id and j.kind = 'widen_searches')
-      and not exists (select 1 from leads l
-        join reddit_posts rp on rp.id = l.post_id
-        left join reddit_comments rc on rc.id = l.comment_id
-        where l.project_id = p.id and l.kind = 'buyer' and l.status = 'new'
-          and l.score >= ${ALERT_SCORE_FLOOR}
-          and coalesce(rc.created_at, rp.created_at) >= ${month})
+      and not ${recentAlertableLeadSql(sql`p.id`, month)}
     order by p.created_at
   `);
   return [...rows].map((row) => row.id);

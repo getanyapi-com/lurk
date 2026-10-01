@@ -30,7 +30,6 @@ import {
   isDue,
   selectLeads,
   alertable,
-  ALERT_SCORE_FLOOR,
   EMAIL_LEAD_CAP,
   FRESH_SLACK_MS,
   customWebhookAllowance,
@@ -41,6 +40,7 @@ import { describeTarget, normalizeTarget } from "@/lib/alerts/channels";
 import { isPublicAddress } from "@/lib/alerts/outbound";
 import type { Digest, DigestLead } from "@/lib/alerts/types";
 import { excerptOf } from "@/lib/alerts/excerpt";
+import { ALERT_SCORE_FLOOR } from "@/lib/leadFilters";
 import { TIERS } from "@/lib/tiers";
 
 /** Local time on purpose: the timeline axis is drawn in the reader's hours. */

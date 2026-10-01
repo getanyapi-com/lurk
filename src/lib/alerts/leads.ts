@@ -1,19 +1,29 @@
-import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, projects, redditAuthors, redditComments, redditPosts, xLeads, xPosts, xProjects } from "@/db/schema";
-import { ALERT_FLOOR_SQL, redditWordsWhere, X_FLOOR_SQL, xWordsWhere } from "@/lib/leadFilters";
+import {
+  ALERT_FLOOR_SQL,
+  ALERT_SCORE_FLOOR,
+  redditWordsWhere,
+  X_FLOOR_SQL,
+  xWordsWhere,
+} from "@/lib/leadFilters";
 import { redditLeadNotMuted, xLeadNotMuted } from "@/lib/mutes";
 import { canonicalUrl, ownWords } from "@/lib/x/map";
 import { headlineOf } from "@/lib/x/read";
-import type { SelectableLead } from "./select";
+import { FRESH_SLACK_MS, type SelectableLead } from "./select";
 
 /**
  * Leads a project first found since a moment, with the author's face attached,
- * that pass the project's own word lists and carry its alert floor. The
- * ordering, the floor and the cap are `selectLeads`, so the same rules cover a
- * live send and a test.
+ * that pass the project's own word lists. Only what a message could carry is
+ * read: a buyer at the project's alert floor, on a post or comment fresh for
+ * the window. A quiet channel's window grows by the hour, and reading every new
+ * lead in it, bodies and all, to drop most of them here was the cost of every
+ * pass. `alertable` still applies the same rules, with the ordering and the
+ * thread's own title, so a live send and a test agree.
  */
 export async function newLeadsSince(projectId: string, since: Date): Promise<SelectableLead[]> {
+  const freshFrom = new Date(since.getTime() - FRESH_SLACK_MS);
   const rows = await db()
     .select({
       id: leads.id,
@@ -50,7 +60,10 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
       and(
         eq(leads.projectId, projectId),
         eq(leads.status, "new"),
+        eq(leads.kind, "buyer"),
         gte(leads.foundAt, since),
+        sql`${leads.score} >= ${ALERT_FLOOR_SQL}`,
+        sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt}) >= ${freshFrom.toISOString()}::timestamptz`,
         redditLeadNotMuted(),
         redditWordsWhere(),
       ),
@@ -60,6 +73,27 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
     platform: "reddit" as const,
     createdAt: new Date(row.createdAt),
   }));
+}
+
+/**
+ * The new buyer leads at the house floor, on a post or comment from `since` on,
+ * of the project `projectId` names: the "new" an invite counts, and what a
+ * project owed wider searches lacks. A from-and-where to select from; its
+ * tables are unaliased, so it reads the same inside any query that names its
+ * own project row under an alias.
+ */
+export function recentAlertableLeads(projectId: SQL, since: Date): SQL {
+  return sql`leads
+    join reddit_posts on reddit_posts.id = leads.post_id
+    left join reddit_comments on reddit_comments.id = leads.comment_id
+    where leads.project_id = ${projectId} and leads.kind = 'buyer' and leads.status = 'new'
+      and leads.score >= ${ALERT_SCORE_FLOOR}
+      and coalesce(reddit_comments.created_at, reddit_posts.created_at) >= ${since.toISOString()}::timestamptz`;
+}
+
+/** Whether the project holds any of those. */
+export function recentAlertableLeadSql(projectId: SQL, since: Date): SQL {
+  return sql`exists (select 1 from ${recentAlertableLeads(projectId, since)})`;
 }
 
 /**

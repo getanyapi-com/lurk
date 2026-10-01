@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { mentions, passesWords, termsOf, wordsOf, type LeadFilters } from "@/lib/leadFilters";
+import { ALERT_SCORE_FLOOR, mentions, passesWords, termsOf, wordsOf, type LeadFilters } from "@/lib/leadFilters";
 
 /**
  * A project's own filters on top of the judge: words a lead must or must not
@@ -190,6 +190,28 @@ describe.skipIf(!hasDatabase)("a project's filters where leads are read", () => 
     const strict = await fixture({ alertMinScore: 10 }, 71);
     const kept = await seedRepro(strict);
     expect(alertable(await newLeadsSince(strict.project.id, since), since).map((row) => row.id)).toEqual([kept.wanted]);
+  });
+
+  it("reads only what a message could carry: a buyer at the floor, on a post still fresh for the window", async () => {
+    const owned = await fixture({});
+    const { db, schema } = owned;
+    const { eq } = await import("drizzle-orm");
+    const { newLeadsSince } = await import("@/lib/alerts/leads");
+    const { FRESH_SLACK_MS } = await import("@/lib/alerts/select");
+    const since = new Date(Date.now() - 2 * HOUR_MS);
+    const wanted = await redditLead(owned, "Which invoice software?", "", 72);
+    await redditLead(owned, "Any invoice tool?", "", ALERT_SCORE_FLOOR - 1);
+    const context = await redditLead(owned, "Invoices are dull", "", 80);
+    await db().update(schema.leads).set({ kind: "context" }).where(eq(schema.leads.id, context));
+    // Found inside the window, on a thread posted before its slack.
+    const stale = await redditLead(owned, "Old invoice question", "", 80);
+    const [{ postId }] = await db().select({ postId: schema.leads.postId }).from(schema.leads).where(eq(schema.leads.id, stale));
+    await db()
+      .update(schema.redditPosts)
+      .set({ createdAt: new Date(since.getTime() - FRESH_SLACK_MS - HOUR_MS) })
+      .where(eq(schema.redditPosts.id, postId ?? ""));
+
+    expect((await newLeadsSince(owned.project.id, since)).map((row) => row.id)).toEqual([wanted]);
   });
 
   it("holds X asks to the same words and to the project's X floor", async () => {

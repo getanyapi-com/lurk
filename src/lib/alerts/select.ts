@@ -20,8 +20,6 @@ export const CHAT_LEAD_CAP = 5;
 /** The email lists this many and counts the rest, so a big day stays readable. */
 export const EMAIL_LEAD_CAP = 20;
 
-export { ALERT_SCORE_FLOOR };
-
 /**
  * The house floor is on the Reddit lead model's scale. An X ask has already
  * passed X's own gates (src/lib/x/gates.ts `decide`), and its score only orders

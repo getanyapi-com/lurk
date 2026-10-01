@@ -3,13 +3,14 @@ import { db } from "@/db";
 import { alerts, projects, userActions, users } from "@/db/schema";
 import { PRODUCT_NAME, PRODUCT_NAME_WITH_PROVIDER } from "@/lib/brand";
 import { config } from "@/lib/config";
+import { ALERT_SCORE_FLOOR } from "@/lib/leadFilters";
 import { enqueueOnce } from "@/jobs/enqueue";
 import { hasActiveSearch } from "@/lib/scan/widen";
 import { addChannel } from "./channels";
 import { sendEmail, type EmailMessage } from "./email";
 import { brandRow, emailDocument, threadRow } from "./digest";
-import { newLeadsSince } from "./leads";
-import { ALERT_SCORE_FLOOR, alertable, digestLead, type SelectableLead } from "./select";
+import { newLeadsSince, recentAlertableLeads, recentAlertableLeadSql } from "./leads";
+import { alertable, digestLead, type SelectableLead } from "./select";
 import { signToken, verifyToken } from "./signedLink";
 import { EMAIL_COLORS as C, EMAIL_FONT, EMAIL_RADIUS, escapeHtml } from "./tokens";
 import type { DigestLead } from "./types";
@@ -80,28 +81,17 @@ export async function invitees(now: Date, limit: number): Promise<Invitee[]> {
     select distinct on (u.id) u.id as user_id, u.email, p.id as project_id, p.name as project_name,
       (select count(*)::int from leads l
         where l.project_id = p.id and l.kind = 'buyer' and l.score >= ${ALERT_SCORE_FLOOR}) as lead_count,
-      (select count(*)::int from leads rl
-        join reddit_posts rp on rp.id = rl.post_id
-        left join reddit_comments rc on rc.id = rl.comment_id
-        where rl.project_id = p.id and rl.kind = 'buyer' and rl.status = 'new'
-          and rl.score >= ${ALERT_SCORE_FLOOR}
-          and coalesce(rc.created_at, rp.created_at) >= ${recent.toISOString()}) as recent_count
+      (select count(*)::int from ${recentAlertableLeads(sql`p.id`, recent)}) as recent_count
     from ${users} u
     join ${projects} p on p.user_id = u.id
     where u.email is not null
       and not exists (select 1 from ${alerts} a join ${projects} ap on ap.id = a.project_id where ap.user_id = u.id)
       and not exists (select 1 from ${userActions} ua where ua.user_id = u.id and ua.action = ${INVITE_SENT})
       and (select min(created_at) from ${projects} op where op.user_id = u.id) <= ${settled.toISOString()}
-      and exists (select 1 from leads rl
-        join reddit_posts rp on rp.id = rl.post_id
-        left join reddit_comments rc on rc.id = rl.comment_id
-        where rl.project_id = p.id and rl.kind = 'buyer' and rl.status = 'new'
-          and rl.score >= ${ALERT_SCORE_FLOOR}
-          and coalesce(rc.created_at, rp.created_at) >= ${recent.toISOString()})
+      and ${recentAlertableLeadSql(sql`p.id`, recent)}
     order by u.id, lead_count desc, p.created_at asc
   `);
   return [...rows]
-    .filter((row) => row.recent_count > 0)
     .slice(0, limit)
     .map((row) => ({
       userId: row.user_id,
@@ -129,7 +119,7 @@ export const INVITE_LEAD_SAMPLE = 3;
  * thread: three replies to the same post read as one lead said three times.
  */
 export async function sampleLeads(projectId: string, now = new Date()): Promise<DigestLead[]> {
-  const rows = await newLeadsSince(projectId, new Date(0));
+  const rows = await newLeadsSince(projectId, new Date(now.getTime() - SAMPLE_WINDOW_MS));
   const picked: SelectableLead[] = [];
   const threads = new Set<string>();
   for (const window of [SAMPLE_RECENT_MS, SAMPLE_WINDOW_MS]) {
