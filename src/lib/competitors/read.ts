@@ -43,11 +43,14 @@ export type CompetitorRow = { name: string; domain: string | null };
 /** A watched competitor, with the evidence discovery has counted for it. */
 export type WatchedCompetitor = CompetitorRow & { evidence: number };
 
+/** The states a watched competitor is in, the same ones a scan retrieves. */
+const WATCHED_STATES = [...RETRIEVED_STATES];
+
 /**
- * The competitors this project watches: the active and pinned ones, the same
- * states a scan retrieves. One a person excluded on the Product page is not
- * one of theirs, so no screen names or counts it and discovery's labeller is
- * not told about it. Read here for every surface, so they cannot disagree.
+ * The competitors this project watches: the active and pinned ones. One a
+ * person excluded on the Product page is not one of theirs, so no screen names
+ * or counts it and discovery's labeller is not told about it. Read here for
+ * every surface, so they cannot disagree.
  */
 export async function watchedCompetitors(projectId: string): Promise<WatchedCompetitor[]> {
   return await db()
@@ -60,10 +63,21 @@ export async function watchedCompetitors(projectId: string): Promise<WatchedComp
     .where(
       and(
         eq(projectCompetitors.projectId, projectId),
-        inArray(projectCompetitors.state, [...RETRIEVED_STATES]),
+        inArray(projectCompetitors.state, WATCHED_STATES),
       ),
     );
 }
+
+/**
+ * A mention's own competitor row, joined only while the project still watches
+ * it. A mention found before its competitor was excluded stays stored, but no
+ * list, bar or count shows it, so the screen agrees with watchedCompetitors.
+ */
+const WATCHED_MENTION = and(
+  eq(projectCompetitors.projectId, competitorMentions.projectId),
+  eq(projectCompetitors.name, competitorMentions.competitor),
+  inArray(projectCompetitors.state, WATCHED_STATES),
+);
 
 /**
  * The site each competitor sells from, keyed by name. A name discovery never
@@ -75,10 +89,10 @@ export function domainsByName(rows: CompetitorRow[]): Record<string, string | nu
 }
 
 /**
- * How many mentions are in the window. The rail's pill wants the number and
- * nothing else, and asking the database to count is a great deal less work
- * than reading every mention with its thread, its author and its icon on every
- * page of the app.
+ * How many mentions of a watched competitor are in the window. The rail's pill
+ * wants the number and nothing else, and asking the database to count is a
+ * great deal less work than reading every mention with its thread, its author
+ * and its icon on every page of the app.
  */
 export async function countMentions(
   projectId: string,
@@ -87,6 +101,7 @@ export async function countMentions(
   const rows = await db()
     .select({ total: count() })
     .from(competitorMentions)
+    .innerJoin(projectCompetitors, WATCHED_MENTION)
     .innerJoin(redditPosts, eq(redditPosts.id, competitorMentions.postId))
     .where(
       and(
@@ -98,10 +113,10 @@ export async function countMentions(
 }
 
 /**
- * Every mention inside the window, newest first. A mention sits on a thread or
- * one reply in it the way a lead does, so it reads the lead's fragments: the
- * one who named the competitor is the reply's author when a reply did, and a
- * reply is as old as itself.
+ * Every mention of a watched competitor inside the window, newest first. A
+ * mention sits on a thread or one reply in it the way a lead does, so it reads
+ * the lead's fragments: the one who named the competitor is the reply's author
+ * when a reply did, and a reply is as old as itself.
  */
 export async function listMentions(
   projectId: string,
@@ -125,6 +140,7 @@ export async function listMentions(
       createdAt: NEED_AT,
     })
     .from(competitorMentions)
+    .innerJoin(projectCompetitors, WATCHED_MENTION)
     .innerJoin(redditPosts, eq(redditPosts.id, competitorMentions.postId))
     .leftJoin(redditComments, eq(redditComments.id, competitorMentions.commentId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
