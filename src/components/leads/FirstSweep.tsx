@@ -151,8 +151,8 @@ export function FirstSweep({ projectId, first }: { projectId: string; first: Swe
   const [status, setStatus] = useState(first);
   const ended = status.state === "done" || status.state === "stopped";
   // A read that finds no sweep at all means the jobs behind it are gone, which
-  // a failed setup leaves. This has nothing more to report then, and never
-  // reads the page again.
+  // a failed setup leaves. This has nothing more to report then, so it stops
+  // reading the sweep and never reads the page again.
   const [gone, setGone] = useState(false);
   // This reads the page again whenever a lead lands, so the layout's poll has
   // nothing to add while the sweep runs. It takes over again once the sweep
@@ -180,7 +180,7 @@ export function FirstSweep({ projectId, first }: { projectId: string; first: Swe
   }, [status.feedLeads, ended, router]);
 
   useEffect(() => {
-    if (ended) {
+    if (ended || gone) {
       return;
     }
     let stopped = false;
@@ -212,7 +212,7 @@ export function FirstSweep({ projectId, first }: { projectId: string; first: Swe
       stopped = true;
       clearTimeout(timer);
     };
-  }, [projectId, ended]);
+  }, [projectId, ended, gone]);
 
   return (
     <>
