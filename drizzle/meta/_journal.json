@@ -274,6 +274,13 @@
       "when": 1790894918877,
       "tag": "0038_stop_using_dead_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790896388069,
+      "tag": "0039_drop_dead_columns",
+      "breakpoints": true
     }
   ]
 }
