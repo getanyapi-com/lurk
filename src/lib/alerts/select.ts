@@ -1,5 +1,6 @@
 import { wordsOf } from "@/lib/filterWords";
 import { ALERT_SCORE_FLOOR } from "@/lib/leadFilters";
+import { DAY_MS, HOUR_MS } from "@/lib/time";
 import type { TierLimits } from "@/lib/tiers";
 import { excerptOf } from "./excerpt";
 import {
@@ -11,8 +12,8 @@ import {
 
 /** How long one cadence waits between messages. */
 export const CADENCE_MS: Record<AlertCadence, number> = {
-  hourly: 60 * 60 * 1000,
-  daily: 24 * 60 * 60 * 1000,
+  hourly: HOUR_MS,
+  daily: DAY_MS,
 };
 
 /** The contract's number: Slack and Discord carry the top five leads. */

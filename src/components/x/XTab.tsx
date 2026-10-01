@@ -20,6 +20,7 @@ import { config } from "@/lib/config";
 import { atBounds, atKey, grainOf, type FeedParams } from "@/lib/feed";
 import { compactCount, relativeAge, relativeUntil } from "@/lib/format";
 import { limitsForUser } from "@/lib/tier";
+import { DAY_MS } from "@/lib/time";
 import { QUIET_RECHECK_DAYS } from "@/lib/x/constants";
 import { allowanceFor } from "@/lib/throttle";
 import { withParams } from "@/lib/url";
@@ -110,7 +111,7 @@ function statusLine(status: XStatus): string {
 function quietClause(status: XStatus): string {
   if (!status.quiet.quiet || status.lastFailure) return "";
   const weekly =
-    status.nextScanAt && status.lastScanAt && status.nextScanAt.getTime() - status.lastScanAt.getTime() >= (QUIET_RECHECK_DAYS - 1) * 86_400_000;
+    status.nextScanAt && status.lastScanAt && status.nextScanAt.getTime() - status.lastScanAt.getTime() >= (QUIET_RECHECK_DAYS - 1) * DAY_MS;
   return weekly ? " X is quiet for this product, so it is checked weekly." : " X is quiet for this product, so after the next check it is checked weekly.";
 }
 

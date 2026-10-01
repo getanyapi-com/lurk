@@ -4,7 +4,7 @@ import { jobs, projects, xAuthors, xEvaluations, xLanes, xLeads, xPosts, xProjec
 import { xShownWhere } from "@/lib/leadFilters";
 import { atBounds, grainOf, type LeadFace } from "@/lib/feed";
 import { nextQueuedJob } from "@/jobs/enqueue";
-import { daysAgo, utcDayStart } from "@/lib/time";
+import { HOUR_MS, daysAgo, utcDayStart } from "@/lib/time";
 import {
   CLOSE_CALL_FIT,
   CLOSE_CALL_INTENT,
@@ -740,7 +740,7 @@ export function projectedWalletCostPerDay(
     // A lane whose pages stopped short of its window read less than the month:
     // count it as a day, which quotes high rather than low.
     const lookBack = lane.fullPages > 0 ? 24 : FIRST_LOOK_HOURS;
-    const hours = lookBack + Math.max(0, (now.getTime() - lane.createdAt.getTime()) / 3_600_000);
+    const hours = lookBack + Math.max(0, (now.getTime() - lane.createdAt.getTime()) / HOUR_MS);
     const rate = lane.newPosts / hours;
     const postsPerDay = rate * 24;
     dollars += pagesPerDayAt(rate) * SEARCH_PAGE_USD;

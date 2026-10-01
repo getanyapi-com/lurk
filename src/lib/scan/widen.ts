@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { projectKeywords } from "@/db/schema";
 import { recentAlertableLeadSql } from "@/lib/alerts/leads";
+import { daysAgo } from "@/lib/time";
 import { RETRIEVED_STATES } from "./planStates";
 import { loadScanProject } from "./project";
 import { runScan } from "./run";
@@ -75,7 +76,7 @@ export async function widenSearches(projectId: string, jobId: string): Promise<n
  * raw SQL below spells out.
  */
 export async function projectsOwedSearches(now: Date): Promise<string[]> {
-  const month = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const month = daysAgo(30, now);
   const rows = await db().execute<{ id: string }>(sql`
     select p.id from projects p
     where p.discovered_at is not null

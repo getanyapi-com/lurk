@@ -1,4 +1,5 @@
 import { googleQuery } from "@/lib/seo/fetch";
+import { DAY_MS, WEEK_MS } from "@/lib/time";
 import { isRetrieved } from "./planStates";
 
 /**
@@ -6,10 +7,6 @@ import { isRetrieved } from "./planStates";
  * a pure function of the plan rows and the clock, so the retrieval loop only
  * has to spend the calls these functions choose.
  */
-
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
-const WEEK_MS = 7 * DAY_MS;
 
 /** How a candidate was found: a plain search, a scoped one, a listing, Google. */
 export type SourceKind = "search" | "scoped" | "listing" | "serp";
