@@ -15,6 +15,7 @@ import { readThreads, type ThreadRead } from "@/lib/scan/comments";
 import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy } from "@/lib/settings/types";
+import { inFlight } from "@/lib/inFlight";
 import { evaluationsFor, judgePosts, unjudged } from "@/lib/scan/judging";
 import { requireScanProject, type ScanProject } from "@/lib/scan/project";
 import { tierForUser } from "@/lib/tier";
@@ -99,12 +100,15 @@ async function refreshPhrasing(
   phrasing: string,
 ): Promise<{ threads: number; costUsd: number; seen: Seen[]; opened: StoredPost[] }> {
   const ranked = await googleSearch(ctx, googleQuery(phrasing), { preferLatency: true });
+  // The threads are opened together, and what they found is then taken in
+  // Google's order, so the result is the same as opening them one by one.
+  const reads = await inFlight(ranked.value, (result) => readThread(ctx, result.url));
   let costUsd = ranked.costUsd;
   const seen: Seen[] = [];
   const opened: StoredPost[] = [];
   const positions = new Map<string, number>();
-  for (const result of ranked.value) {
-    const thread = await readThread(ctx, result.url);
+  for (const [index, result] of ranked.value.entries()) {
+    const thread = reads[index];
     costUsd += thread.costUsd;
     if (!thread.post) {
       continue;
@@ -243,6 +247,8 @@ export async function runSeoRefresh(
   let costUsd = 0;
   const seen: Seen[] = [];
   const opened: StoredPost[] = [];
+  // One phrasing at a time: its own threads already fill the job's share of
+  // Reddit calls, and each writes a progress line of its own.
   for (const [index, phrasing] of settings.phrasings.entries()) {
     await writeProgress(
       jobId,

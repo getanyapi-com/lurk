@@ -6,6 +6,7 @@ import { clientForUser } from "@/lib/anyapi";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost, fetchSearch } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
+import { inFlight } from "@/lib/inFlight";
 import { requireScanProject } from "@/lib/scan/project";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { capped, tierForUser } from "@/lib/tier";
@@ -106,12 +107,20 @@ async function scanOne(
     .slice(0, MENTION_POSTS_PER_COMPETITOR);
 
   await writeProgress(jobId, `Reading ${fresh.length} posts about ${competitor}`);
-  const full: StoredPost[] = [];
-  for (const post of fresh) {
-    const result = await fetchPost(ctx, post.url, RETENTION_MS);
-    costUsd += result.costUsd;
-    full.push(result.value[0] ?? post);
-  }
+  // Opened together, as a scan opens its shortlist, and kept in the order the
+  // search ranked them. A post Reddit will not hand back is judged on the text
+  // the search carried, so one failure costs that post its full text rather
+  // than stranding the posts beside it.
+  const opened = await inFlight(fresh, async (post) => {
+    try {
+      const result = await fetchPost(ctx, post.url, RETENTION_MS);
+      return { post: result.value[0] ?? post, costUsd: result.costUsd };
+    } catch {
+      return { post, costUsd: 0 };
+    }
+  });
+  const full = opened.map((one) => one.post);
+  costUsd += opened.reduce((sum, one) => sum + one.costUsd, 0);
   if (full.length === 0) {
     return { read: 0, mentions: 0, skipped: 0, costUsd };
   }
@@ -157,6 +166,8 @@ export async function runCompetitorScan(
     skipped: 0,
     costUsd: 0,
   };
+  // One competitor at a time: its own posts already fill the job's share of
+  // Reddit calls, and each writes progress lines of its own.
   for (const name of names) {
     const one = await scanOne(ctx, jobId, name);
     outcome.read += one.read;

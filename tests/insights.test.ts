@@ -98,6 +98,22 @@ describe("clustering calls", () => {
     expect(themes[0].leadIds).toHaveLength(items.length);
   });
 
+  it("merges the batches in the order they were cut, whichever answers first", async () => {
+    // The first batch answers last. Both claim lead-0 under their own label,
+    // and the first batch's claim is the one that stands, as it did when the
+    // calls were made one after the other.
+    generateStructured.mockImplementation(async (call: { prompt: string }) => {
+      const first = call.prompt.includes("id: lead-0 ");
+      await new Promise((resolve) => setTimeout(resolve, first ? 20 : 0));
+      return {
+        themes: [{ label: first ? "First" : "Second", summary: "s", leadIds: ["lead-0"] }],
+      };
+    });
+    const themes = await clusterLeads("project-1", leadsNamed(THEME_BATCH_SIZE + 1));
+    expect(generateStructured).toHaveBeenCalledTimes(2);
+    expect(themes.map((theme) => [theme.label, theme.leadIds])).toEqual([["First", ["lead-0"]]]);
+  });
+
   it("asks nothing when there is nothing to group", async () => {
     expect(await clusterLeads("project-1", [])).toEqual([]);
     expect(generateStructured).not.toHaveBeenCalled();

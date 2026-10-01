@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { leads, painThemes, redditComments, redditPosts } from "@/db/schema";
 import { generateStructured } from "@/lib/llm";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
+import { inFlight } from "@/lib/inFlight";
+import { MODEL_CONCURRENCY } from "@/lib/scan/constants";
 import { daysAgo } from "@/lib/time";
 
 /** How many leads one clustering call reads. */
@@ -120,20 +122,30 @@ export function mergeThemes(batches: Theme[][], validIds: Iterable<string>): The
     .slice(0, MAX_THEMES);
 }
 
-/** One clustering call per batch of leads, then one merged set of themes. */
+/**
+ * One clustering call per batch of leads, then one merged set of themes. The
+ * calls run together and their answers are merged in the order the batches
+ * were cut, so the set is the one calling them in turn would have made.
+ */
 export async function clusterLeads(projectId: string, items: ThemeInput[]): Promise<Theme[]> {
-  const batches: Theme[][] = [];
+  const cuts: ThemeInput[][] = [];
   for (let start = 0; start < items.length; start += THEME_BATCH_SIZE) {
-    const batch = items.slice(start, start + THEME_BATCH_SIZE);
-    const result = await generateStructured({
-      purpose: "insights",
-      projectId,
-      schema: themesSchema,
-      system: THEMES_SYSTEM,
-      prompt: ["Leads:", ...batch.map(describe)].join("\n"),
-    });
-    batches.push(result.themes);
+    cuts.push(items.slice(start, start + THEME_BATCH_SIZE));
   }
+  const batches = await inFlight(
+    cuts,
+    async (batch) => {
+      const result = await generateStructured({
+        purpose: "insights",
+        projectId,
+        schema: themesSchema,
+        system: THEMES_SYSTEM,
+        prompt: ["Leads:", ...batch.map(describe)].join("\n"),
+      });
+      return result.themes;
+    },
+    MODEL_CONCURRENCY,
+  );
   return mergeThemes(
     batches,
     items.map((item) => item.id),
