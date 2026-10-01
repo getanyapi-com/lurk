@@ -9,9 +9,9 @@ import { BODY_CHAR_BUDGET, truncateBody } from "@/lib/scan/evidence";
 import { decide, judge } from "@/lib/scan/gates";
 import type { Assessment, ScorableItem, TriageItem } from "@/lib/scan/judgement";
 import { itemState, ownSpans, spans } from "@/lib/scan/spans";
-import { retentionCutoff } from "@/lib/retention";
 import { redditScore } from "@/lib/scoring/weights";
-import { TIERS } from "@/lib/tiers";
+import { DAY_MS, daysAgo } from "@/lib/time";
+import { RETENTION_DAYS, TIERS } from "@/lib/tiers";
 import { judgeAnswers, product, triageAnswers } from "./jevAnswers";
 
 const { askJev } = vi.hoisted(() => ({ askJev: vi.fn() }));
@@ -497,12 +497,12 @@ describe("what one scan may buy", () => {
 describe("retention cutoff", () => {
   it("keeps exactly the feed window", () => {
     const now = new Date("2026-09-05T00:00:00Z");
-    expect(retentionCutoff(now).toISOString()).toBe("2026-08-06T00:00:00.000Z");
+    expect(daysAgo(RETENTION_DAYS, now).toISOString()).toBe("2026-08-06T00:00:00.000Z");
   });
 
   it("matches the tier feed window", () => {
     const now = new Date("2026-09-05T00:00:00Z");
-    const days = (now.getTime() - retentionCutoff(now).getTime()) / (24 * 60 * 60 * 1000);
+    const days = (now.getTime() - daysAgo(RETENTION_DAYS, now).getTime()) / DAY_MS;
     expect(days).toBe(TIERS.free.feedWindowDays);
   });
 });

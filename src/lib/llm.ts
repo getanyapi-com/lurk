@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { llmUsage } from "@/db/schema";
 import { HEARTBEAT_MS } from "@/jobs/lease";
 import { config } from "./config";
+import { utcDayStart } from "./time";
 
 /**
  * OpenRouter's published price for meta/muse-spark-1.3-contributor, read from
@@ -102,17 +103,12 @@ export class LlmNotConfiguredError extends Error {
   }
 }
 
-function startOfToday(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
-
 /** What the house has spent on the language model since midnight UTC. */
 export async function llmSpendToday(): Promise<number> {
   const rows = await db()
     .select({ total: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)` })
     .from(llmUsage)
-    .where(gte(llmUsage.at, startOfToday()));
+    .where(gte(llmUsage.at, utcDayStart()));
   return Number(rows[0]?.total ?? 0);
 }
 

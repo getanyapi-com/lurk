@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { leads, painThemes, redditComments, redditPosts } from "@/db/schema";
 import { generateStructured } from "@/lib/llm";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
+import { daysAgo } from "@/lib/time";
 
 /** How many leads one clustering call reads. */
 export const THEME_BATCH_SIZE = 40;
@@ -44,10 +45,6 @@ const themesSchema = z.object({
   ),
 });
 
-function windowStart(days = INSIGHTS_WINDOW_DAYS): Date {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-}
-
 /** The leads worth clustering: still in the feed or hidden, inside the window. */
 export async function clusterableLeads(projectId: string): Promise<ThemeInput[]> {
   const rows = await db()
@@ -66,7 +63,7 @@ export async function clusterableLeads(projectId: string): Promise<ThemeInput[]>
       and(
         eq(leads.projectId, projectId),
         inArray(leads.status, ["new", "hidden"]),
-        gte(leads.scoredAt, windowStart()),
+        gte(leads.scoredAt, daysAgo(INSIGHTS_WINDOW_DAYS)),
       ),
     );
   return rows.map((row) => ({

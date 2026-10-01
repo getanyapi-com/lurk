@@ -4,6 +4,7 @@ import { jobs, projects, xAuthors, xEvaluations, xLanes, xLeads, xPosts, xProjec
 import { xShownWhere } from "@/lib/leadFilters";
 import { atBounds, grainOf, type LeadFace } from "@/lib/feed";
 import { nextQueuedJob } from "@/jobs/enqueue";
+import { daysAgo, utcDayStart } from "@/lib/time";
 import {
   CLOSE_CALL_FIT,
   CLOSE_CALL_INTENT,
@@ -20,8 +21,6 @@ import { reachScore, replyWindowOpen } from "./reach";
 import type { XVia } from "./store";
 
 /** What the X tab reads. Nothing here joins a Reddit table. The project's own filters (lib/leadFilters.ts) hold here as on Reddit. */
-
-const DAY_MS = 24 * 3_600_000;
 
 /**
  * The windows the X tab offers, in the Leads tab's own words. The first look
@@ -153,10 +152,6 @@ function replyingToOf(context: unknown): string[] {
   return Array.isArray(list) ? list.filter((item): item is string => typeof item === "string") : [];
 }
 
-function windowStart(days: number, now = new Date()): Date {
-  return new Date(now.getTime() - days * DAY_MS);
-}
-
 /** A post's headline: the sentence the verdict rests on, or its own first line. */
 export function headlineOf(text: string, isReply: boolean, quote: string | null): string {
   if (quote) {
@@ -173,7 +168,7 @@ function whenWhere(filter: XFeedFilter) {
     const { start, end } = atBounds(filter.at);
     return and(gte(xPosts.createdAt, start), lt(xPosts.createdAt, end));
   }
-  return gte(xPosts.createdAt, windowStart(filter.days));
+  return gte(xPosts.createdAt, daysAgo(filter.days));
 }
 
 const authorJoin = sql`lower(${xPosts.authorUsername}) = ${xAuthors.username}`;
@@ -580,7 +575,7 @@ export async function newXLeadCount(projectId: string): Promise<number> {
         eq(xLeads.kind, "ask"),
         eq(xLeads.status, "new"),
         isNull(xPosts.unavailableAt),
-        gte(xPosts.createdAt, windowStart(FEED_WINDOW_DAYS)),
+        gte(xPosts.createdAt, daysAgo(FEED_WINDOW_DAYS)),
         xShownWhere(),
         xLeadNotMuted(),
       ),
@@ -767,8 +762,8 @@ export type XSettingsView = {
 /** What Settings, X shows for one project. */
 export async function xSettingsOf(projectId: string, now = new Date()): Promise<XSettingsView> {
   const [state] = await db().select().from(xProjects).where(eq(xProjects.projectId, projectId));
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const monthAgo = new Date(now.getTime() - FEED_WINDOW_DAYS * 86_400_000);
+  const today = utcDayStart(now);
+  const monthAgo = daysAgo(FEED_WINDOW_DAYS, now);
   const [spend] = await db()
     .select({
       today: sql<string>`coalesce(sum(${xRuns.dataUsd} + ${xRuns.llmUsd}) filter (where ${xRuns.startedAt} >= ${today.toISOString()}), 0)`,

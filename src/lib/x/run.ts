@@ -15,7 +15,8 @@ import { loadScanProject } from "@/lib/scan/project";
 import { smallSweep } from "@/lib/sweepScale";
 import { capped, limitsForUser } from "@/lib/tier";
 import { xLimitsFor, type XLimits } from "@/lib/tiers";
-import { HouseDataCapReachedError, startOfToday } from "@/lib/usage";
+import { HOUR_MS, utcDayStart } from "@/lib/time";
+import { HouseDataCapReachedError } from "@/lib/usage";
 import { xCallsSince, xJudgementsSince } from "./budget";
 import {
   FEED_WINDOW_DAYS,
@@ -99,7 +100,6 @@ type StoredContext = {
   via?: XVia;
 };
 
-const HOUR_MS = 3_600_000;
 /** Lanes searched at once; the twitter.* semaphore still bounds the calls. */
 const LANE_CONCURRENCY = 4;
 /** Posts moving through context and judging at once. */
@@ -337,7 +337,7 @@ async function syncLanes(input: {
  * the day's hourly checks.
  */
 async function firstLookState(projectId: string, runId: string): Promise<{ firstLook: boolean; since: Date }> {
-  const today = startOfToday();
+  const today = utcDayStart();
   const [first] = await db()
     .select({ startedAt: xRuns.startedAt, finishedAt: xRuns.finishedAt })
     .from(xRuns)

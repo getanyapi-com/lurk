@@ -17,6 +17,7 @@ import { listMutes, redditLeadNotMuted } from "./mutes";
 import { forgetProjectFeed } from "./projectFeedCache";
 import { FEED_FLOOR_SQL, mentions, redditWordsWhere } from "./leadFilters";
 import { atBounds } from "./feed";
+import { daysAgo } from "./time";
 
 import type {
   FeedFacets,
@@ -95,10 +96,6 @@ function feedQuery() {
 /** One lead as every read of the feed hands it over. */
 export type FeedLead = Awaited<ReturnType<typeof feedQuery>>[number];
 
-function since(days: number): Date {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-}
-
 /** A comment lead is as old as the comment, never as old as the thread. */
 const NEED_AT = sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`;
 
@@ -112,7 +109,7 @@ export function newerThan(days: FeedWindow) {
   if (days === "all") {
     return undefined;
   }
-  return sql`${NEED_AT} >= ${since(days).toISOString()}::timestamptz`;
+  return sql`${NEED_AT} >= ${daysAgo(days).toISOString()}::timestamptz`;
 }
 
 /**

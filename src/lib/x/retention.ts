@@ -1,7 +1,9 @@
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { xAuthors, xLanes, xPosts, xRuns } from "@/db/schema";
-import { deleteInBatches, RETENTION_BATCH, retentionCutoff } from "@/lib/retention";
+import { deleteInBatches, RETENTION_BATCH } from "@/lib/retention";
+import { daysAgo } from "@/lib/time";
+import { RETENTION_DAYS } from "@/lib/tiers";
 
 const RUN_HISTORY_DAYS = 90;
 
@@ -20,7 +22,7 @@ const RUN_HISTORY_DAYS = 90;
  * lose the link.
  */
 export async function deleteExpiredXData(now = new Date()): Promise<{ posts: number; authors: number }> {
-  const cutoff = retentionCutoff(now);
+  const cutoff = daysAgo(RETENTION_DAYS, now);
   const expired = db()
     .select({ id: xPosts.id })
     .from(xPosts)
@@ -34,7 +36,7 @@ export async function deleteExpiredXData(now = new Date()): Promise<{ posts: num
     .delete(xAuthors)
     .where(lt(xAuthors.fetchedAt, cutoff))
     .returning({ username: xAuthors.username });
-  const history = retentionCutoff(now, RUN_HISTORY_DAYS);
+  const history = daysAgo(RUN_HISTORY_DAYS, now);
   await db().delete(xRuns).where(lt(xRuns.startedAt, history));
   await db()
     .delete(xLanes)

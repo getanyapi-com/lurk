@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { candidateSources, leads, llmUsage, searchRuns, usageLedger } from "@/db/schema";
 import { config } from "./config";
+import { utcDayStart } from "./time";
 
 export type SkuUsage = { sku: string; calls: number; costUsd: number; reused: number };
 
@@ -14,11 +15,6 @@ export type UsageToday = {
 };
 
 const EMPTY: UsageToday = { calls: 0, costUsd: 0, fetched: 0, reused: 0, perSku: [] };
-
-export function startOfToday(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-}
 
 /** Today's ledger for a set of projects, grouped by SKU. */
 export async function usageToday(projectIds: string[]): Promise<UsageToday> {
@@ -33,7 +29,7 @@ export async function usageToday(projectIds: string[]): Promise<UsageToday> {
       reused: sql<number>`count(*) filter (where ${usageLedger.reused})::int`,
     })
     .from(usageLedger)
-    .where(and(inArray(usageLedger.projectId, projectIds), gte(usageLedger.at, startOfToday())))
+    .where(and(inArray(usageLedger.projectId, projectIds), gte(usageLedger.at, utcDayStart())))
     .groupBy(usageLedger.sku);
 
   const perSku: SkuUsage[] = rows.map((row) => ({
@@ -69,7 +65,7 @@ export async function houseDataSpendToday(): Promise<number> {
   const runs = await db()
     .select({ total: sql<string>`coalesce(sum(${searchRuns.costUsd}), 0)` })
     .from(searchRuns)
-    .where(and(eq(searchRuns.fundedBy, "house"), gte(searchRuns.fetchedAt, startOfToday())));
+    .where(and(eq(searchRuns.fundedBy, "house"), gte(searchRuns.fetchedAt, utcDayStart())));
   const unshared = await db()
     .select({ total: sql<string>`coalesce(sum(${usageLedger.costUsd}), 0)` })
     .from(usageLedger)
@@ -77,7 +73,7 @@ export async function houseDataSpendToday(): Promise<number> {
       and(
         eq(usageLedger.fundedBy, "house"),
         sql`${usageLedger.searchRunId} is null`,
-        gte(usageLedger.at, startOfToday()),
+        gte(usageLedger.at, utcDayStart()),
       ),
     );
   return Number(runs[0]?.total ?? 0) + Number(unshared[0]?.total ?? 0);
@@ -127,7 +123,7 @@ export async function serpCallsToday(projectId: string): Promise<number> {
       and(
         eq(usageLedger.projectId, projectId),
         eq(usageLedger.sku, "google.search"),
-        gte(usageLedger.at, startOfToday()),
+        gte(usageLedger.at, utcDayStart()),
       ),
     );
   return row?.calls ?? 0;

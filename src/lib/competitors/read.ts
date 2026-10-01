@@ -8,6 +8,7 @@ import {
   redditPosts,
   subreddits,
 } from "@/db/schema";
+import { DAY_MS, daysAgo } from "@/lib/time";
 import { SENTIMENTS, type Sentiment } from "./classify";
 
 /** The window the competitor screen shows, matching the feed window. */
@@ -60,10 +61,6 @@ export function domainsByName(rows: CompetitorRow[]): Record<string, string | nu
   return Object.fromEntries(rows.map((row) => [row.name, row.domain]));
 }
 
-function windowStart(days: number, now = new Date()): Date {
-  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-}
-
 /**
  * How many mentions are in the window. The rail's pill wants the number and
  * nothing else, and asking the database to count is a great deal less work
@@ -81,7 +78,7 @@ export async function countMentions(
     .where(
       and(
         eq(competitorMentions.projectId, projectId),
-        gte(redditPosts.createdAt, windowStart(days)),
+        gte(redditPosts.createdAt, daysAgo(days)),
       ),
     );
   return rows[0]?.total ?? 0;
@@ -120,7 +117,7 @@ export async function listMentions(
     .where(
       and(
         eq(competitorMentions.projectId, projectId),
-        gte(redditPosts.createdAt, windowStart(days)),
+        gte(redditPosts.createdAt, daysAgo(days)),
       ),
     )
     .orderBy(desc(sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`));
@@ -160,15 +157,14 @@ export function mentionSeries(
   days = MENTION_WINDOW_DAYS,
   now = new Date(),
 ): MentionSeries[] {
-  const start = windowStart(days, now).getTime();
-  const dayMs = 24 * 60 * 60 * 1000;
+  const start = daysAgo(days, now).getTime();
   const buckets = new Map<string, number[]>();
   const names = [...new Set([...competitors, ...mentions.map((one) => one.competitor)])];
   for (const name of names) {
     buckets.set(name, new Array(days).fill(0));
   }
   for (const mention of mentions) {
-    const index = Math.floor((mention.createdAt.getTime() - start) / dayMs);
+    const index = Math.floor((mention.createdAt.getTime() - start) / DAY_MS);
     const row = buckets.get(mention.competitor);
     if (row && index >= 0 && index < days) {
       row[index] += 1;

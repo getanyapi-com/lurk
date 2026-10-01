@@ -1,12 +1,8 @@
 import { and, eq, inArray, lt, notExists, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditPosts, seoOpportunities } from "@/db/schema";
+import { daysAgo } from "./time";
 import { RETENTION_DAYS } from "./tiers";
-
-/** The oldest post creation time we still keep. */
-export function retentionCutoff(now: Date, days = RETENTION_DAYS): Date {
-  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-}
 
 /** Rows dropped per statement, so no one delete holds its row locks for long. */
 export const RETENTION_BATCH = 500;
@@ -49,7 +45,7 @@ export async function deleteExpiredPosts(
     .from(redditPosts)
     .where(
       and(
-        lt(redditPosts.createdAt, retentionCutoff(now)),
+        lt(redditPosts.createdAt, daysAgo(RETENTION_DAYS, now)),
         notExists(
           db().select({ one: sql`1` }).from(leads).where(eq(leads.postId, redditPosts.id)),
         ),
@@ -91,7 +87,7 @@ export async function pruneFinishedJobs(
   now = new Date(),
   batch = RETENTION_BATCH,
 ): Promise<number> {
-  const cutoff = retentionCutoff(now, JOB_HISTORY_DAYS).toISOString();
+  const cutoff = daysAgo(JOB_HISTORY_DAYS, now).toISOString();
   return deleteInBatches(async () => {
     const deleted = await db().execute<{ id: string }>(sql`
       delete from jobs where id in (

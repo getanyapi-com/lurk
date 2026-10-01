@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { llmUsage, searchRuns, usageLedger } from "@/db/schema";
 import { config } from "@/lib/config";
 import { LlmCapReachedError } from "@/lib/llm";
-import { HouseDataCapReachedError, startOfToday } from "@/lib/usage";
+import { utcDayStart } from "@/lib/time";
+import { HouseDataCapReachedError } from "@/lib/usage";
 import { X_PURPOSES, X_SKUS } from "./constants";
 
 /**
@@ -37,7 +38,7 @@ export class XLlmCapReachedError extends LlmCapReachedError {
 
 /** What the house key has spent on twitter.* since midnight UTC, across every project. */
 export async function xHouseDataSpendToday(): Promise<number> {
-  const since = startOfToday();
+  const since = utcDayStart();
   const [runs] = await db()
     .select({ total: sql<string>`coalesce(sum(${searchRuns.costUsd}), 0)` })
     .from(searchRuns)
@@ -74,7 +75,7 @@ export async function xLlmSpendToday(): Promise<number> {
   const [row] = await db()
     .select({ total: sql<string>`coalesce(sum(${llmUsage.costUsd}), 0)` })
     .from(llmUsage)
-    .where(and(inArray(llmUsage.purpose, [...X_PURPOSES]), gte(llmUsage.at, startOfToday())));
+    .where(and(inArray(llmUsage.purpose, [...X_PURPOSES]), gte(llmUsage.at, utcDayStart())));
   return Number(row?.total ?? 0);
 }
 

@@ -1,8 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { apiRequestCounts } from "@/db/schema/api";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { DAY_MS, utcDayStart } from "@/lib/time";
 
 export type DailyCount = { used: number; limit: number | null; retryAfterSeconds: number };
 
@@ -13,7 +12,7 @@ export function utcDay(at: Date = new Date()): string {
 
 /** Seconds until the counter rolls over, which is what Retry-After holds. */
 export function secondsUntilReset(at: Date = new Date()): number {
-  const nextMidnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()) + DAY_MS;
+  const nextMidnight = utcDayStart(at).getTime() + DAY_MS;
   return Math.max(1, Math.ceil((nextMidnight - at.getTime()) / 1000));
 }
 

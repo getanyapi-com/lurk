@@ -2,6 +2,7 @@ import { and, desc, eq, gte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { leads, redditComments, redditPosts } from "@/db/schema";
 import type { LeadStatus } from "@/lib/feed";
+import { daysAgo } from "@/lib/time";
 import { ApiError } from "./responses";
 
 export type LeadStatusFilter = LeadStatus | "all";
@@ -62,10 +63,6 @@ export function parseLeadQuery(params: URLSearchParams): LeadQuery {
 /** When the need was written. A comment lead is as old as its comment. */
 const NEED_AT = sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`;
 
-function windowStart(days: number): Date {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-}
-
 /**
  * The conditions behind a leads call: the project, the feed window on when the
  * need was written (the comment's date for a comment lead, as the app's feed
@@ -81,7 +78,7 @@ export function leadConditions(
   return and(
     eq(leads.projectId, projectId),
     query.status === "all" ? undefined : eq(leads.status, query.status),
-    sql`${NEED_AT} >= ${windowStart(feedWindowDays).toISOString()}::timestamptz`,
+    sql`${NEED_AT} >= ${daysAgo(feedWindowDays).toISOString()}::timestamptz`,
     query.minScore === null ? undefined : gte(leads.score, query.minScore),
     query.since ? gte(leads.scoredAt, query.since) : undefined,
   );
