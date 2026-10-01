@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ACTION_FAILED, errorFrom } from "@/lib/actionError";
 import { errorMessage, failure } from "@/lib/actionResult";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * A production build hides any message a Server Action throws behind a generic
@@ -78,19 +79,10 @@ describe("what a form shows from an action", () => {
   });
 });
 
-describe.skipIf(!process.env.DATABASE_URL)("actions that refuse, against a database", () => {
+describeDb("actions that refuse, against a database", () => {
   async function owned() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
-    const { db } = await import("@/db");
-    const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id);
     signedIn = { id: user.id };
     return project;
   }

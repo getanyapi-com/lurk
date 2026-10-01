@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { makeProject, makeUser } from "./fixtures/db";
+import { makePost, makeProject, makeUser } from "./fixtures/db";
 
 let signedIn: { id: string } = { id: "" };
 const kickScheduler = vi.fn();
@@ -52,17 +52,7 @@ describe("startOnOpen against a database", () => {
   });
 
   async function post() {
-    const id = `p${randomUUID().slice(0, 8)}`;
-    await db()
-      .insert(schema.redditPosts)
-      .values({
-        id,
-        subreddit: "SaaS",
-        title: "Need a form builder",
-        url: `https://www.reddit.com/r/SaaS/comments/${id}/`,
-        createdAt: new Date(),
-      });
-    return id;
+    return (await makePost({ author: null, title: "Need a form builder" })).id;
   }
 
   it("groups the leads again on open only when some arrived since the last grouping", async () => {

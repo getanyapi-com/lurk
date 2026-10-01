@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { makeProject, makeUser } from "./fixtures/db";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -15,14 +16,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 describe("the leads Insights groups and counts", () => {
   async function fixture() {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `user_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft", leadFilters: { mustMention: ["form"] } })
-      .returning();
+    const user = await makeUser({ clerkUserId: `user_${randomUUID()}` });
+    const project = await makeProject(user.id, { leadFilters: { mustMention: ["form"] } });
     await db().insert(schema.leadMutes).values({ projectId: project.id, kind: "subreddit", value: "forhire" });
 
     async function lead(
