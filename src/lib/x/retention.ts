@@ -1,7 +1,7 @@
-import { and, eq, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { xAuthors, xLanes, xPosts, xRuns } from "@/db/schema";
-import { retentionCutoff } from "@/lib/retention";
+import { deleteInBatches, RETENTION_BATCH, retentionCutoff } from "@/lib/retention";
 
 const RUN_HISTORY_DAYS = 90;
 
@@ -11,20 +11,25 @@ const RUN_HISTORY_DAYS = 90;
  * nothing is worth holding past thirty, and lurk keeps no archive of X. A post
  * goes once it was both written and fetched before the cutoff, so a parent
  * bought as context lives thirty days from its purchase. Its evaluations, leads
- * and run links cascade, each found through its own tweet_id index.
+ * and run links cascade, each found through its own tweet_id index, and the
+ * posts go a batch at a time, as Reddit's do (see deleteExpiredPosts).
  *
  * X's search_runs rows stay, as Reddit's do: they hold a query and a cost, no
- * X content, and deleting them would scan usage_ledger and serp_results once
- * per row, neither of which has an index on search_run_id. A retired lane goes
- * with the run history, once it last ran (or was made) that long ago; the
- * verdicts that point at it keep their rows and lose the link.
+ * X content. A retired lane goes with the run history, once it last ran (or
+ * was made) that long ago; the verdicts that point at it keep their rows and
+ * lose the link.
  */
 export async function deleteExpiredXData(now = new Date()): Promise<{ posts: number; authors: number }> {
   const cutoff = retentionCutoff(now);
-  const posts = await db()
-    .delete(xPosts)
+  const expired = db()
+    .select({ id: xPosts.id })
+    .from(xPosts)
     .where(and(lt(xPosts.createdAt, cutoff), lt(xPosts.fetchedAt, cutoff)))
-    .returning({ id: xPosts.id });
+    .limit(RETENTION_BATCH);
+  const posts = await deleteInBatches(async () => {
+    const deleted = await db().delete(xPosts).where(inArray(xPosts.id, expired)).returning({ id: xPosts.id });
+    return deleted.length;
+  });
   const authors = await db()
     .delete(xAuthors)
     .where(lt(xAuthors.fetchedAt, cutoff))
@@ -34,5 +39,5 @@ export async function deleteExpiredXData(now = new Date()): Promise<{ posts: num
   await db()
     .delete(xLanes)
     .where(and(eq(xLanes.state, "retired"), sql`coalesce(${xLanes.lastRunAt}, ${xLanes.createdAt}) < ${history.toISOString()}::timestamptz`));
-  return { posts: posts.length, authors: authors.length };
+  return { posts, authors: authors.length };
 }

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, eq, inArray, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import type { JobRow } from "@/jobs/enqueue";
@@ -22,13 +22,16 @@ export type ActiveJob = {
   progress: string | null;
 };
 
+/** What is read of one job: all a page needs to say what the job is doing. */
+export type ActivityRow = Pick<JobRow, "kind" | "runAt" | "startedAt" | "finishedAt" | "progress" | "error">;
+
 export type ProjectActivity = {
   /** Running, or queued and already due. Empty means nothing is happening. */
   active: ActiveJob[];
   /** The last one of these kinds that ended, whether it worked or failed. */
-  last: JobRow | null;
+  last: ActivityRow | null;
   /** The next scan waiting for this project, however far away it is. */
-  nextScan: JobRow | null;
+  nextScan: ActivityRow | null;
 };
 
 function isKind(kind: string): kind is ActivityKind {
@@ -41,7 +44,7 @@ function isKind(kind: string): kind is ActivityKind {
  * telling a person nothing is scheduled in that minute is the exact lie this
  * replaces. A recurring scan booked for tonight is not active.
  */
-export function activityFrom(rows: JobRow[], now = new Date()): ProjectActivity {
+export function activityFrom(rows: ActivityRow[], now = new Date()): ProjectActivity {
   const mine = rows.filter((row) => isKind(row.kind));
   const active: ActiveJob[] = [];
   for (const kind of ACTIVITY_KINDS) {
@@ -61,17 +64,36 @@ export function activityFrom(rows: JobRow[], now = new Date()): ProjectActivity 
   return { active, last: finished[0] ?? null, nextScan: scans[0] ?? null };
 }
 
+const ACTIVITY_COLUMNS = {
+  kind: jobs.kind,
+  runAt: jobs.runAt,
+  startedAt: jobs.startedAt,
+  finishedAt: jobs.finishedAt,
+  progress: jobs.progress,
+  error: jobs.error,
+};
+
 /**
- * Everything this project has queued or run of the kinds a person waits on.
+ * What this project is doing in the kinds a person waits on. Only what
+ * activityFrom can use is read: every job not yet finished, and the last one
+ * that did. A project that scans every few hours holds hundreds of finished
+ * scans, and reading them all to keep one would be nearly the whole read.
+ *
  * Read once per server render (see currentLocalUser), since the leads page
  * and the feed under it both draw it.
  */
 export const projectActivity = cache(async (projectId: string): Promise<ProjectActivity> => {
-  const rows = await db()
-    .select()
-    .from(jobs)
-    .where(and(eq(jobs.projectId, projectId), inArray(jobs.kind, [...ACTIVITY_KINDS])));
-  return activityFrom(rows);
+  const these = and(eq(jobs.projectId, projectId), inArray(jobs.kind, [...ACTIVITY_KINDS]));
+  const [open, ended] = await Promise.all([
+    db().select(ACTIVITY_COLUMNS).from(jobs).where(and(these, isNull(jobs.finishedAt))),
+    db()
+      .select(ACTIVITY_COLUMNS)
+      .from(jobs)
+      .where(and(these, isNotNull(jobs.finishedAt)))
+      .orderBy(desc(jobs.finishedAt))
+      .limit(1),
+  ]);
+  return activityFrom([...open, ...ended]);
 });
 
 /**
@@ -142,7 +164,7 @@ function activeSentence(job: ActiveJob): string {
   return job.progress ? `${WORKING[job.kind]}: ${job.progress}.` : `${WORKING[job.kind]}.`;
 }
 
-function lastSentence(job: JobRow | null): string | null {
+function lastSentence(job: ActivityRow | null): string | null {
   if (!job?.finishedAt || !isKind(job.kind)) {
     return null;
   }
@@ -152,7 +174,7 @@ function lastSentence(job: JobRow | null): string | null {
   return `${FINISHED[job.kind]} ${relativeAge(job.finishedAt)}.`;
 }
 
-function nextSentence(job: JobRow | null): string | null {
+function nextSentence(job: ActivityRow | null): string | null {
   if (!job) {
     return null;
   }

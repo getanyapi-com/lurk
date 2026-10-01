@@ -8,7 +8,7 @@ import { runDiscoveryRefresh } from "@/lib/discovery/refresh";
 import { runInitialDiscovery } from "@/lib/discovery/initial";
 import { briefFromPage, writeBrief } from "@/lib/brief";
 import { readSite } from "@/lib/profile";
-import { deleteExpiredPosts } from "@/lib/retention";
+import { deleteExpiredPosts, pruneFinishedJobs } from "@/lib/retention";
 import { discoveryBudget } from "@/lib/discovery/run";
 import { runCompetitorScan } from "@/lib/competitors/scan";
 import { runBackfill } from "@/lib/scan/backfill";
@@ -124,6 +124,7 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
   retention: async () => {
     await deleteExpiredPosts();
     await deleteExpiredXData();
+    await pruneFinishedJobs();
     await enqueueOnce("retention", new Date(Date.now() + DAY_MS));
   },
   /**

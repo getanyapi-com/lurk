@@ -107,3 +107,70 @@ describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
     expect(kept).toHaveLength(1);
   });
 });
+
+/**
+ * The queue keeps a month of finished jobs, and for good the newest finished
+ * job of each kind, since pages say when a project last ran something. A job
+ * still waiting or running is never the retention job's to take.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("pruning finished jobs", () => {
+  it("drops month-old finished jobs but the newest of each kind, and never an unfinished one", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { eq, inArray } = await import("drizzle-orm");
+    const { pruneFinishedJobs } = await import("@/lib/retention");
+
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "Queue" })
+      .returning();
+    const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 3600 * 1000);
+    const ran = (kind: string, days: number, projectId: string | null = project.id) => ({
+      kind,
+      projectId,
+      runAt: daysAgo(days),
+      startedAt: daysAgo(days),
+      finishedAt: daysAgo(days),
+    });
+    // No other test queues a kind of this name, so the instance-wide pair is
+    // only ever this test's.
+    const instanceKind = `prune_${randomUUID().slice(0, 8)}`;
+    const rows = await db()
+      .insert(schema.jobs)
+      .values([
+        ran("scan", 60),
+        ran("scan", 50),
+        ran("scan", 2),
+        // Claimed long ago and never finished: a lease that ran out.
+        { kind: "scan", projectId: project.id, runAt: daysAgo(40), startedAt: daysAgo(40) },
+        { kind: "scan", projectId: project.id, runAt: daysAgo(-1) },
+        ran("backfill", 200),
+        ran("x_scan", 90),
+        ran("x_scan", 40),
+        ran(instanceKind, 45, null),
+        ran(instanceKind, 35, null),
+      ])
+      .returning({ id: schema.jobs.id });
+    const [old60, old50, recent, stuck, queued, backfill, x90, x40, instanceOld, instanceNewest] =
+      rows.map((row) => row.id);
+
+    await pruneFinishedJobs(new Date(), 1);
+
+    const left = await db()
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(inArray(schema.jobs.id, rows.map((row) => row.id)));
+    expect(left.map((row) => row.id).sort()).toEqual(
+      [recent, stuck, queued, backfill, x40, instanceNewest].sort(),
+    );
+    expect([old60, old50, x90, instanceOld].some((id) => left.some((row) => row.id === id))).toBe(false);
+
+    await db().delete(schema.jobs).where(eq(schema.jobs.kind, instanceKind));
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+  });
+});
