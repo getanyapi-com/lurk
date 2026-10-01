@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * A new project's two readings of its site. The fast one is written the moment
@@ -100,14 +100,8 @@ function held<T>(value: T | Error) {
 async function fixture() {
   const { db } = await import("@/db");
   const schema = await import("@/db/schema");
-  const [user] = await db()
-    .insert(schema.users)
-    .values({ clerkUserId: `test_${randomUUID()}` })
-    .returning();
-  const [project] = await db()
-    .insert(schema.projects)
-    .values({ userId: user.id, name: "formcraft.test", url: "https://formcraft.test" })
-    .returning();
+  const user = await makeUser();
+  const project = await makeProject(user.id, { name: "formcraft.test", url: "https://formcraft.test" });
   const { eq } = await import("drizzle-orm");
   const row = async () =>
     (await db().select().from(schema.projects).where(eq(schema.projects.id, project.id)))[0];
@@ -121,7 +115,7 @@ async function fixture() {
   return { db, schema, eq, user, project, row, competitors };
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () => {
+describeDb("a new project's fast reading", () => {
   beforeEach(() => {
     generateStructured.mockReset();
   });
@@ -258,7 +252,7 @@ describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () =>
  * A rebuild of an existing project's profile reads the site once, with no fast
  * reading, and invalidates the verdicts made against the old facts.
  */
-describe.skipIf(!process.env.DATABASE_URL)("rebuilding a profile", () => {
+describeDb("rebuilding a profile", () => {
   beforeEach(() => {
     generateStructured.mockReset();
   });

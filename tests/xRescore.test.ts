@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type { Question } from "@/lib/jev";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * A screened post gets one quick read afterwards, only so Filtered out can
@@ -35,7 +35,7 @@ function newId(): string {
   return `9${Date.now()}${String(counter).padStart(5, "0")}`;
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("scoring what the free screen set aside", () => {
+describeDb("scoring what the free screen set aside", () => {
   beforeEach(() => {
     askJev.mockReset();
     askJev.mockImplementation(async (call) => buyer(call));
@@ -47,11 +47,8 @@ describe.skipIf(!process.env.DATABASE_URL)("scoring what the free screen set asi
     const { eq } = await import("drizzle-orm");
     const { scoreScreened } = await import("@/lib/x/rescore");
     const { loadScanProject } = await import("@/lib/scan/project");
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Clipy", url: "https://clipy.example", pain: "Recording demos", solution: "A screen recorder" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Clipy", url: "https://clipy.example", pain: "Recording demos", solution: "A screen recorder" });
     const rows: Record<string, string> = {};
     for (const [name, rule] of Object.entries({ noMatch: "no_visible_term:loom", stale: "stale", farm: "reply_farm" })) {
       const id = newId();

@@ -10,6 +10,7 @@ import { isTransient, reasonFor, TRANSIENT_RETRY_MS } from "@/jobs/runner";
 import { LlmTimeoutError, LLM_CALL_TIMEOUT_MS, withCallTimeout } from "@/lib/llm";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { PRESETS } from "@/lib/settings/presets";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /** When a failed job of a free user is due again: its own cadence, not sooner. */
 function nextFreeScan(): Date {
@@ -155,7 +156,7 @@ describe("the model call deadline", () => {
  * Every test row is dated 2000 and every claim is made as of NOW, also in 2000,
  * so no row this instance already holds is due and none of them are touched.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", () => {
+describeDb("the job queue against a database", () => {
   const LONG_AGO = new Date("2000-01-01T00:00:00Z");
   const NOW = new Date("2000-01-01T01:00:00Z");
 
@@ -170,14 +171,8 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
   async function fixture() {
     const { db } = await import("@/db");
     const { jobs, projects, users } = await import("@/db/schema");
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Queue test" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Queue test" });
     return { db, jobs, projects, users, user, project };
   }
 
@@ -410,14 +405,11 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
   });
 
   it("claims a new project's setup before an older routine scan, and either sort alone when asked", async () => {
-    const { db, jobs, projects, users, user, project } = await fixture();
+    const { db, jobs, users, user, project } = await fixture();
     const { claimNextJob } = await import("@/jobs/runner");
     const { eq } = await import("drizzle-orm");
 
-    const [signup] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Signed up a moment ago" })
-      .returning();
+    const signup = await makeProject(user.id, { name: "Signed up a moment ago" });
     const [routine] = await db()
       .insert(jobs)
       .values({ kind: "noop", projectId: project.id, runAt: LONG_AGO })
@@ -436,14 +428,11 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
   });
 
   it("never claims a second job of a project that is already running one", async () => {
-    const { db, jobs, projects, users, user, project } = await fixture();
+    const { db, jobs, users, user, project } = await fixture();
     const { claimNextJob } = await import("@/jobs/runner");
     const { eq } = await import("drizzle-orm");
 
-    const [other] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Other queue test" })
-      .returning();
+    const other = await makeProject(user.id, { name: "Other queue test" });
     await db()
       .insert(jobs)
       .values({ kind: "noop", projectId: project.id, runAt: LONG_AGO, startedAt: NOW });
@@ -498,7 +487,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
   it("holds a routine job of a project nobody attends, and runs it once somebody does", async () => {
     const { db, jobs, users, user, project } = await fixture();
     const { claimNextJob } = await import("@/jobs/runner");
-    const { alerts, apiKeys, projects } = await import("@/db/schema");
+    const { alerts, apiKeys } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
 
     const [scan] = await db()
@@ -527,10 +516,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
 
     // An alert channel keeps a project running with nobody looking.
     await db().update(users).set({ lastSeenAt: null }).where(eq(users.id, user.id));
-    const [alerting] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Alerts on" })
-      .returning();
+    const alerting = await makeProject(user.id, { name: "Alerts on" });
     await db()
       .insert(alerts)
       .values({ projectId: alerting.id, channel: "email", target: "a@example.com", cadence: "daily" });
@@ -541,10 +527,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
     expect((await claimNextJob(NOW))?.id).toBe(alerted.id);
 
     // So does an API key the owner called with inside the window.
-    const [called] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Read over the API" })
-      .returning();
+    const called = await makeProject(user.id, { name: "Read over the API" });
     const [refresh] = await db()
       .insert(jobs)
       .values({ kind: "seo_refresh", projectId: called.id, runAt: LONG_AGO })
@@ -585,14 +568,8 @@ describe.skipIf(!process.env.DATABASE_URL)("the job queue against a database", (
       .update(projects)
       .set({ discoveredAt: new Date(), briefProfileVersion: 1 })
       .where(eq(projects.id, project.id));
-    const [unbriefed] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Made before briefs", discoveredAt: new Date() })
-      .returning();
-    const [fresh] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Never discovered" })
-      .returning();
+    const unbriefed = await makeProject(user.id, { name: "Made before briefs", discoveredAt: new Date() });
+    const fresh = await makeProject(user.id, { name: "Never discovered" });
     // Both already search, so neither is owed the sweep's searches (tests/widenSearches.test.ts).
     const { projectKeywords } = await import("@/db/schema");
     await db()
@@ -672,7 +649,7 @@ describe("what a finished scan queues", () => {
  * is the only thing standing between one upstream error and a schedule that
  * never runs again. Every kind that recurs must have one.
  */
-describe.skipIf(!process.env.DATABASE_URL)("when a failed recurring job is due again", () => {
+describeDb("when a failed recurring job is due again", () => {
   const job = (kind: string, projectId: string | null): Job =>
     ({ id: randomUUID(), kind, projectId }) as Job;
 

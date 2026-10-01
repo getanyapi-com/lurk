@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import type { DiscoveryPlan } from "@/lib/discovery/plan";
 import type { ThreadLabel } from "@/lib/discovery/label";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * Publishing a plan replaces what discovery itself wrote and nothing else. A
@@ -22,13 +22,13 @@ const PLAN: DiscoveryPlan = {
   ],
 };
 
-describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => {
+describeDb("publishing a discovery plan", () => {
   it("files a round in one trip, each thread's last verdict and last place named on every row", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { applyRelevances, loadEvidence, writeObservations } = await import("@/lib/discovery/store");
     const { eq } = await import("drizzle-orm");
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
+    const user = await makeUser();
     const projects = await db().insert(schema.projects).values(
       ["batch", "untouched"].map((name) => ({ userId: user.id, name })),
     ).returning();
@@ -81,14 +81,8 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
     const { publishDiscoveryPlan } = await import("@/lib/discovery/plan");
     const { eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "HotelsAllow" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "HotelsAllow" });
 
     await db().insert(schema.projectSubreddits).values([
       { projectId: project.id, name: "vegas", source: "serp", state: "pinned", evidence: 1 },
@@ -152,14 +146,8 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
     const { publishDiscoveryPlan } = await import("@/lib/discovery/plan");
     const { eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "YAROOMS" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "YAROOMS" });
     await db().insert(schema.projectCompetitors).values([
       { projectId: project.id, name: "Robin", source: "page", state: "active" },
       { projectId: project.id, name: "Envoy", source: "page", state: "active" },
@@ -194,14 +182,8 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
     );
     const { eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "HotelsAllow" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "HotelsAllow" });
 
     const seen = {
       postId: "abc123",

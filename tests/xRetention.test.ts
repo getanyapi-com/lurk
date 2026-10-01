@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The time the pass runs as, with this file's rows dated by it. The pass
@@ -15,15 +16,15 @@ const NOW = new Date("2010-01-01T00:00:00Z");
  * week), and its evaluations and leads go with it. Search runs stay, as
  * Reddit's do: they hold a query and a cost, no X content.
  */
-describe.skipIf(!process.env.DATABASE_URL)("deleting expired X data", () => {
+describeDb("deleting expired X data", () => {
   it("drops old posts with their leads, keeps fresh ones and parents bought lately, and leaves every run", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { inArray } = await import("drizzle-orm");
     const { deleteExpiredXData } = await import("@/lib/x/retention");
 
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
-    const [project] = await db().insert(schema.projects).values({ userId: user.id, name: "Retention" }).returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Retention" });
     const old = new Date(NOW.getTime() - 40 * 24 * 3_600_000);
     const suffix = Date.now();
     const ids = { stale: `8${suffix}1`, fresh: `8${suffix}2`, parent: `8${suffix}3` };

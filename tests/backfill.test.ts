@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
 import { judgeAnswers, triageAnswers } from "./jevAnswers";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The one-time backfill, against a real database with only AnyAPI and the
@@ -50,8 +51,6 @@ vi.mock("@/lib/anyapi", () => ({
   tierNameFor: async () => "free" as const,
 }));
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** One search call as the test reads it: the query, the sort, the timeframe. */
@@ -71,7 +70,7 @@ function maxAgesOf(): number[] {
   return fetchSearch.mock.calls.map((call) => (call[0] as { maxAgeMs: number }).maxAgeMs);
 }
 
-describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
+describeDb("runBackfill against a database", () => {
   let db: typeof import("@/db").db;
   let schema: typeof import("@/db/schema");
   let runBackfill: typeof import("@/lib/scan/backfill").runBackfill;
@@ -95,19 +94,11 @@ describe.skipIf(!hasDatabase)("runBackfill against a database", () => {
   });
 
   async function project(phrasings: string[] = []) {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [row] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: "Formcraft",
-        solution: "A form builder with conditional logic.",
-        problemPhrasings: phrasings,
-      })
-      .returning();
+    const user = await makeUser();
+    const row = await makeProject(user.id, {
+      solution: "A form builder with conditional logic.",
+      problemPhrasings: phrasings,
+    });
     await db()
       .insert(schema.projectKeywords)
       .values({ projectId: row.id, keyword: "form builder" });

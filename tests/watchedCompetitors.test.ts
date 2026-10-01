@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * Which competitors a project watches, read once in competitors/read.ts, and
@@ -35,7 +36,7 @@ vi.mock("@/jobs/enqueue", async (importOriginal) => ({
   enqueueJob: vi.fn(),
 }));
 
-describe.skipIf(!process.env.DATABASE_URL)("the competitors a project watches", () => {
+describeDb("the competitors a project watches", () => {
   beforeEach(() => {
     googleSearch.mockReset();
     labelThreads.mockReset();
@@ -48,19 +49,11 @@ describe.skipIf(!process.env.DATABASE_URL)("the competitors a project watches", 
   async function fixture() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: "Formcraft",
-        solution: "A form builder with conditional logic.",
-        problemPhrasings: ["forms that branch", "conditional survey logic"],
-      })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, {
+      solution: "A form builder with conditional logic.",
+      problemPhrasings: ["forms that branch", "conditional survey logic"],
+    });
     const competitors = await db()
       .insert(schema.projectCompetitors)
       .values([

@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it } from "vitest";
 import { forgetEveryProjectFeed } from "@/lib/projectFeedCache";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What the leads page reads against a real database, and what it does not read
@@ -8,11 +8,9 @@ import { forgetEveryProjectFeed } from "@/lib/projectFeedCache";
  * the page's own reads go through it, and that the writers behind them drop it.
  */
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-describe.skipIf(!hasDatabase)("the leads page read", () => {
+describeDb("the leads page read", () => {
   /** Every user this file made, so nothing it wrote outlives the test. */
   const made: string[] = [];
 
@@ -39,26 +37,10 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
   async function fixture() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     made.push(user.id);
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: "asker",
-        title: "Form question",
-        url: "https://www.reddit.com/r/SaaS/comments/x/form/",
-        createdAt: new Date(Date.now() - DAY_MS),
-      })
-      .returning();
+    const project = await makeProject(user.id);
+    const post = await makePost({ createdAt: new Date(Date.now() - DAY_MS) });
     return { db, schema, project, post };
   }
 
@@ -68,17 +50,11 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
     schema: Awaited<ReturnType<typeof fixture>>["schema"],
     projectId: string,
   ) {
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: "asker",
-        title: "Another form question",
-        url: "https://www.reddit.com/r/SaaS/comments/y/form/",
-        createdAt: new Date(Date.now() - DAY_MS),
-      })
-      .returning();
+    const post = await makePost({
+      title: "Another form question",
+      url: "https://www.reddit.com/r/SaaS/comments/y/form/",
+      createdAt: new Date(Date.now() - DAY_MS),
+    });
     await db()
       .insert(schema.leads)
       .values({ projectId, postId: post.id, score: 60, stage: "comparing" });
@@ -111,17 +87,11 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
   it("opens an empty window nobody picked on all time, and answers its repeat from one entry", async () => {
     const { db, schema, project } = await fixture();
     const { feedPage } = await import("@/lib/feedPage");
-    const [old] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: "asker",
-        title: "An old form question",
-        url: "https://www.reddit.com/r/SaaS/comments/z/form/",
-        createdAt: new Date(Date.now() - 90 * DAY_MS),
-      })
-      .returning();
+    const old = await makePost({
+      title: "An old form question",
+      url: "https://www.reddit.com/r/SaaS/comments/z/form/",
+      createdAt: new Date(Date.now() - 90 * DAY_MS),
+    });
     await db()
       .insert(schema.leads)
       .values({ projectId: project.id, postId: old.id, score: 60, stage: "comparing" });

@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { describe, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What the product page can and cannot do is a fact the scorer judges against,
@@ -19,19 +19,13 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 async function fixture(values: Record<string, unknown>) {
   const { db } = await import("@/db");
   const schema = await import("@/db/schema");
-  const [user] = await db()
-    .insert(schema.users)
-    .values({ clerkUserId: `test_${randomUUID()}` })
-    .returning();
-  const [project] = await db()
-    .insert(schema.projects)
-    .values({ userId: user.id, name: "HotelsAllow", ...values })
-    .returning();
+  const user = await makeUser();
+  const project = await makeProject(user.id, { name: "HotelsAllow", ...values });
   auth.userId = user.id;
   return { user, project, db, schema };
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("capabilities and exclusions", () => {
+describeDb("capabilities and exclusions", () => {
   it("reaches the scan's product text as what it can and does not do", async () => {
     const { user, project, db, schema } = await fixture({
       capabilities: ["check in guests aged 18 and over"],
@@ -92,7 +86,7 @@ describe.skipIf(!process.env.DATABASE_URL)("capabilities and exclusions", () => 
  * judge is told the personas that share this product's vocabulary and never
  * buy, and a persona edit invalidates verdicts exactly as a capability does.
  */
-describe.skipIf(!process.env.DATABASE_URL)("who is not a buyer", () => {
+describeDb("who is not a buyer", () => {
   it("reaches the scan's product text as its own line", async () => {
     const { user, project, db, schema } = await fixture({
       notBuyers: ["students looking for a free plan"],
@@ -142,7 +136,7 @@ describe.skipIf(!process.env.DATABASE_URL)("who is not a buyer", () => {
  * A competitor a person excluded on the Product page is a decision, not a
  * suggestion: the scan must neither read it nor name it to the judge.
  */
-describe.skipIf(!process.env.DATABASE_URL)("an excluded competitor", () => {
+describeDb("an excluded competitor", () => {
   it("is left out of the competitors the scan reads and out of the product text", async () => {
     const { user, project, db, schema } = await fixture({});
     await db()

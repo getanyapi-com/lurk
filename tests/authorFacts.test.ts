@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The author facts a lead card reads: what the profile call already returns,
@@ -7,23 +8,15 @@ import { describe, expect, it } from "vitest";
  * because the storing and the join are both SQL.
  */
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
 /** The profile SKU reports `createdUtc` in Unix seconds. */
 const CREATED_UTC = 1_500_000_000;
 
-describe.skipIf(!hasDatabase)("author facts from the profile call", () => {
+describeDb("author facts from the profile call", () => {
   async function context(username: string) {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id);
     const funded = {
       funding: "wallet:test" as const,
       client: {
@@ -71,17 +64,7 @@ describe.skipIf(!hasDatabase)("author facts from the profile call", () => {
     const { listLeads } = await import("@/lib/leads");
     await fetchAuthorProfile(ctx, username, 0);
 
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: username,
-        title: "Form question",
-        url: "https://www.reddit.com/r/SaaS/comments/x/form/",
-        createdAt: new Date(),
-      })
-      .returning();
+    const post = await makePost({ author: username });
     await db()
       .insert(schema.leads)
       .values({ projectId: project.id, postId: post.id, score: 60, stage: "comparing" });

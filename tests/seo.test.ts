@@ -5,6 +5,7 @@ import { competitorsNamed } from "@/lib/competitors/match";
 import { seoSettings } from "@/lib/seo/limits";
 import { redditResults, redditThread } from "@/lib/seo/links";
 import { TIERS } from "@/lib/tiers";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /** Only the booking is faked; writeProgress still writes to the real jobs row. */
 vi.mock("@/jobs/enqueue", async (importOriginal) => ({
@@ -89,23 +90,16 @@ describe("phrasing cap", () => {
  * plan's Reddit queries, which are Boolean expressions Google reads as
  * literal text, so this is the seam that has to stay pointed at the phrasings.
  */
-describe.skipIf(!process.env.DATABASE_URL)("what a refresh searches", () => {
+describeDb("what a refresh searches", () => {
   it("takes the project's phrasings, never its Reddit Boolean queries", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { loadScanProject } = await import("@/lib/scan/project");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: "HotelsAllow",
-        problemPhrasings: ["hotels that let 19 year olds check in"],
-      })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, {
+      name: "HotelsAllow",
+      problemPhrasings: ["hotels that let 19 year olds check in"],
+    });
     await db()
       .insert(schema.projectKeywords)
       .values({ projectId: project.id, keyword: "(hotel OR hotels) AND (18 OR 19)" });
@@ -123,7 +117,7 @@ describe.skipIf(!process.env.DATABASE_URL)("what a refresh searches", () => {
  * phrasings yet, so the one job a new project gets was also its last: the page
  * kept saying the first refresh had finished and nothing ever looked again.
  */
-describe.skipIf(!process.env.DATABASE_URL)("what a refresh books next", () => {
+describeDb("what a refresh books next", () => {
   it("books the next refresh even when there are no phrasings to search", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
@@ -132,14 +126,8 @@ describe.skipIf(!process.env.DATABASE_URL)("what a refresh books next", () => {
     const booked = vi.mocked(enqueueJob);
     booked.mockClear();
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "No phrasings yet", problemPhrasings: [] })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "No phrasings yet", problemPhrasings: [] });
     const [job] = await db()
       .insert(schema.jobs)
       .values({ kind: "seo_refresh", projectId: project.id, runAt: new Date() })
@@ -166,20 +154,14 @@ describe.skipIf(!process.env.DATABASE_URL)("what a refresh books next", () => {
  * verdict now and hides nothing: a thread nobody asked in still ranks, and one
  * reply in it still works.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the order ranking threads are read in", () => {
+describeDb("the order ranking threads are read in", () => {
   it("puts the threads worth replying in first, and an unjudged one above a rejected one", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { listOpportunities, verdictOf } = await import("@/lib/seo/read");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "AnyAPI" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "AnyAPI" });
 
     const run = randomUUID().replace(/-/g, "").slice(0, 8);
     const verdicts = [
@@ -249,21 +231,15 @@ describe.skipIf(!process.env.DATABASE_URL)("the order ranking threads are read i
  * arrive with a verdict already on them, and asking the model about those
  * again would buy an answer this project already holds.
  */
-describe.skipIf(!process.env.DATABASE_URL)("what a refresh pays to judge", () => {
+describeDb("what a refresh pays to judge", () => {
   it("judges only the ranking threads nothing has judged yet", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const label = await import("@/lib/discovery/label");
     const { judgeUnseen } = await import("@/lib/seo/refresh");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "AnyAPI" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "AnyAPI" });
 
     const run = randomUUID().replace(/-/g, "").slice(0, 8);
     const judged = `${run}judged`;
@@ -317,20 +293,14 @@ describe.skipIf(!process.env.DATABASE_URL)("what a refresh pays to judge", () =>
  * post has aged out of our thirty days keeps its row with a null post, and the
  * list does not show it.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the ranking-thread count in the rail", () => {
+describeDb("the ranking-thread count in the rail", () => {
   it("counts what the list shows, and not a thread whose post is gone", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { countOpportunities, listOpportunities } = await import("@/lib/seo/read");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "AnyAPI" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "AnyAPI" });
 
     const run = randomUUID().replace(/-/g, "").slice(0, 8);
     const held = [`${run}a`, `${run}b`];
@@ -389,20 +359,14 @@ describe.skipIf(!process.env.DATABASE_URL)("the ranking-thread count in the rail
  * filter and not a deletion: asking for them brings them back, after the open
  * ones, because they are still evidence of what ranks.
  */
-describe.skipIf(!process.env.DATABASE_URL)("closed ranking threads", () => {
+describeDb("closed ranking threads", () => {
   it("hides a closed thread until it is asked for, then sorts it last", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { listOpportunities, seoFacets } = await import("@/lib/seo/read");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "AnyAPI" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "AnyAPI" });
 
     const run = randomUUID().replace(/-/g, "").slice(0, 8);
     // The closed ones rank above the open one, so Google's order alone would
@@ -478,7 +442,7 @@ describe.skipIf(!process.env.DATABASE_URL)("closed ranking threads", () => {
  * halves: that the read still hands the judgement over, and that the order puts
  * it to use.
  */
-describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer intent", () => {
+describeDb("ranking threads ordered by buyer intent", () => {
   it("puts the higher intent first and an unjudged thread last", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
@@ -486,14 +450,8 @@ describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer int
     const { scoreThreads } = await import("@/lib/seo/score");
     const { orderThreads } = await import("@/lib/seo/views");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "AnyAPI" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "AnyAPI" });
 
     const run = randomUUID().replace(/-/g, "").slice(0, 8);
     // Google ranks them in exactly the order buyer intent does not.
@@ -577,21 +535,15 @@ describe.skipIf(!process.env.DATABASE_URL)("ranking threads ordered by buyer int
  * snippet: a post can carry evidence from several phrasings, and a snippet from
  * the wrong one is a claim about what a searcher saw that is simply false.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the facts a thread arrives with", () => {
+describeDb("the facts a thread arrives with", () => {
   it("takes the snippet Google showed for this phrasing, not for another one", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { listOpportunities, toThread } = await import("@/lib/seo/read");
     const { watchedCompetitors } = await import("@/lib/competitors/read");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "AnyAPI" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "AnyAPI" });
 
     const run = randomUUID().replace(/-/g, "").slice(0, 8);
     const postId = `${run}post`;

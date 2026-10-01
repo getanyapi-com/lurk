@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 const sent = vi.fn();
 vi.mock("@/lib/alerts/email", () => ({ sendEmail: (mail: unknown) => sent(mail) }));
@@ -19,7 +20,7 @@ describe("invite tokens", () => {
  * Who gets asked, and that nobody is asked twice. Proven against a real
  * database, because the eligibility query is the claim.
  */
-describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
+describeDb("alert invites", () => {
   beforeEach(() => sent.mockReset());
 
   async function person(opts: { leads: number; alert?: boolean; ageMs?: number; postedDaysAgo?: number }) {
@@ -27,18 +28,11 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
     const schema = await import("@/db/schema");
     const { upsertPosts } = await import("@/lib/reddit/store");
     const email = `invite-${randomUUID()}@example.com`;
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}`, email })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: `Proj ${randomUUID().slice(0, 6)}`,
-        createdAt: new Date(Date.now() - (opts.ageMs ?? 3 * 24 * 3600 * 1000)),
-      })
-      .returning();
+    const user = await makeUser({ email });
+    const project = await makeProject(user.id, {
+      name: `Proj ${randomUUID().slice(0, 6)}`,
+      createdAt: new Date(Date.now() - (opts.ageMs ?? 3 * 24 * 3600 * 1000)),
+    });
     if (opts.leads > 0) {
       const posts = await upsertPosts(
         Array.from({ length: opts.leads }, (_, i) => ({
@@ -168,10 +162,7 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
     const { eq } = await import("drizzle-orm");
     const { acceptInvite } = await import("@/lib/alerts/invite");
     const { user, project, email } = await person({ leads: 1 });
-    const [second] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Second" })
-      .returning();
+    const second = await makeProject(user.id, { name: "Second" });
 
     await acceptInvite(user.id);
     await acceptInvite(user.id);
@@ -189,7 +180,7 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
  * finds the invites off must book no successor, or every instance without them
  * wakes hourly to do nothing.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the hourly invite pass", () => {
+describeDb("the hourly invite pass", () => {
   async function queued() {
     const { db } = await import("@/db");
     const { jobs } = await import("@/db/schema");

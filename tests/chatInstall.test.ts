@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * Both legs of Add to Slack and Add to Discord, through the routes the
@@ -18,11 +18,8 @@ vi.mock("@/lib/auth", () => ({
 async function person() {
   const { db } = await import("@/db");
   const schema = await import("@/db/schema");
-  const [user] = await db()
-    .insert(schema.users)
-    .values({ clerkUserId: `test_${randomUUID()}` })
-    .returning();
-  const [project] = await db().insert(schema.projects).values({ userId: user.id, name: "Chat" }).returning();
+  const user = await makeUser();
+  const project = await makeProject(user.id, { name: "Chat" });
   auth.userId = user.id;
   return { user, project, db, schema };
 }
@@ -33,7 +30,7 @@ function setCookie(response: Response, name: string): string | null {
   return header ? header.slice(name.length + 1).split(";")[0] : null;
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("adding a chat channel in one click", () => {
+describeDb("adding a chat channel in one click", () => {
   beforeEach(() => {
     vi.stubEnv("APP_URL", "https://lurk.so/");
     vi.stubEnv("SLACK_CLIENT_ID", "1.2");

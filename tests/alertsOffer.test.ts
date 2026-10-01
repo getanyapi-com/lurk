@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { safeReturnPath } from "@/lib/alerts/offer";
+import { describeDb, makeUser } from "./fixtures/db";
 
 vi.mock("@/jobs/enqueue", () => ({ enqueueOnce: vi.fn() }));
 
@@ -16,15 +17,12 @@ describe("safeReturnPath", () => {
 });
 
 /** The offer asks, then says where leads go, and "Not now" holds per project. */
-describe.skipIf(!process.env.DATABASE_URL)("alerts offer", () => {
+describeDb("alerts offer", () => {
   async function person() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const email = `offer-${randomUUID()}@example.com`;
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}`, email })
-      .returning();
+    const user = await makeUser({ email });
     const [first, second] = await db()
       .insert(schema.projects)
       .values([

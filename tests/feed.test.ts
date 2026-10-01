@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What the feed decides when it is read, rather than when the scan ran: the
@@ -7,33 +8,15 @@ import { describe, expect, it } from "vitest";
  * against a real database, because both are SQL.
  */
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-describe.skipIf(!hasDatabase)("the feed at read time", () => {
+describeDb("the feed at read time", () => {
   async function fixture(threshold: number | null) {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft", scoreThreshold: threshold })
-      .returning();
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: "asker",
-        title: "Form question",
-        url: "https://www.reddit.com/r/SaaS/comments/x/form/",
-        createdAt: new Date(Date.now() - 10 * DAY_MS),
-      })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { scoreThreshold: threshold });
+    const post = await makePost({ createdAt: new Date(Date.now() - 10 * DAY_MS) });
     return { db, schema, project, post };
   }
 
@@ -46,17 +29,11 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
   ) {
     const rows = [{ postId: firstPostId, score: 70 }];
     for (const score of [60, 50]) {
-      const [extra] = await db()
-        .insert(schema.redditPosts)
-        .values({
-          id: `p${randomUUID().slice(0, 8)}`,
-          subreddit: "SaaS",
-          author: "asker",
-          title: `Form question ${score}`,
-          url: `https://www.reddit.com/r/SaaS/comments/${score}/form/`,
-          createdAt: new Date(Date.now() - 10 * DAY_MS),
-        })
-        .returning();
+      const extra = await makePost({
+        title: `Form question ${score}`,
+        url: `https://www.reddit.com/r/SaaS/comments/${score}/form/`,
+        createdAt: new Date(Date.now() - 10 * DAY_MS),
+      });
       rows.push({ postId: extra.id, score });
     }
     return db()
@@ -137,17 +114,11 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
   it("narrows the feed to the leads one Insights theme holds", async () => {
     const { db, schema, project, post } = await fixture(null);
     const { listLeads } = await import("@/lib/leads");
-    const [other] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: "asker",
-        title: "Another form question",
-        url: "https://www.reddit.com/r/SaaS/comments/z/form/",
-        createdAt: new Date(Date.now() - 2 * DAY_MS),
-      })
-      .returning();
+    const other = await makePost({
+      title: "Another form question",
+      url: "https://www.reddit.com/r/SaaS/comments/z/form/",
+      createdAt: new Date(Date.now() - 2 * DAY_MS),
+    });
     const held = await db()
       .insert(schema.leads)
       .values([
@@ -172,17 +143,11 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
   it("shows what the day windows cut off once the window is all time", async () => {
     const { db, schema, project, post } = await fixture(null);
     const { listLeads } = await import("@/lib/leads");
-    const [old] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        author: "asker",
-        title: "Form question from last year",
-        url: "https://www.reddit.com/r/SaaS/comments/y/form/",
-        createdAt: new Date(Date.now() - 300 * DAY_MS),
-      })
-      .returning();
+    const old = await makePost({
+      title: "Form question from last year",
+      url: "https://www.reddit.com/r/SaaS/comments/y/form/",
+      createdAt: new Date(Date.now() - 300 * DAY_MS),
+    });
     await db()
       .insert(schema.leads)
       .values([
@@ -283,17 +248,12 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     ];
     const leadRows = [{ postId: post.id, stage: "purchase_ready" }];
     for (const row of later) {
-      const [extra] = await db()
-        .insert(schema.redditPosts)
-        .values({
-          id: `p${randomUUID().slice(0, 8)}`,
-          subreddit: row.subreddit,
-          author: "asker",
-          title: `Form question in ${row.subreddit}`,
-          url: `https://www.reddit.com/r/${row.subreddit}/comments/${randomUUID().slice(0, 6)}/form/`,
-          createdAt: new Date(Date.now() - 10 * DAY_MS),
-        })
-        .returning();
+      const extra = await makePost({
+        subreddit: row.subreddit,
+        title: `Form question in ${row.subreddit}`,
+        url: `https://www.reddit.com/r/${row.subreddit}/comments/${randomUUID().slice(0, 6)}/form/`,
+        createdAt: new Date(Date.now() - 10 * DAY_MS),
+      });
       leadRows.push({ postId: extra.id, stage: row.stage });
     }
     await db()

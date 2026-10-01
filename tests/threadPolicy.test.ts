@@ -3,14 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy, ThreadPolicySettings } from "@/lib/settings/types";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What a scan and an SEO refresh pay for in a comment thread, under a policy.
  * The query is the thing worth pinning: which lead's thread is bought, how old
  * a post may be to be bought again, and how many are bought at once.
  */
-
-const hasDatabase = !!process.env.DATABASE_URL;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,7 +25,7 @@ function policy(patch: Partial<ThreadPolicySettings> = {}): ThreadPolicy {
   });
 }
 
-describe.skipIf(!hasDatabase)("threadsToRead against a database", () => {
+describeDb("threadsToRead against a database", () => {
   let db: typeof import("@/db").db;
   let schema: typeof import("@/db/schema");
   let threadsToRead: typeof import("@/lib/scan/leads").threadsToRead;
@@ -40,14 +39,8 @@ describe.skipIf(!hasDatabase)("threadsToRead against a database", () => {
   });
 
   async function project(): Promise<string> {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [row] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft", solution: "A form builder." })
-      .returning();
+    const user = await makeUser();
+    const row = await makeProject(user.id, { solution: "A form builder." });
     return row.id;
   }
 
@@ -56,17 +49,12 @@ describe.skipIf(!hasDatabase)("threadsToRead against a database", () => {
     projectId: string,
     { ageDays = 0, replies = 5, score = 60 } = {},
   ): Promise<string> {
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "SaaS",
-        title: "Form question",
-        url: `https://www.reddit.com/r/SaaS/comments/${randomUUID().slice(0, 6)}/form/`,
-        numComments: replies,
-        createdAt: new Date(Date.now() - ageDays * DAY_MS),
-      })
-      .returning();
+    const post = await makePost({
+      author: null,
+      url: `https://www.reddit.com/r/SaaS/comments/${randomUUID().slice(0, 6)}/form/`,
+      numComments: replies,
+      createdAt: new Date(Date.now() - ageDays * DAY_MS),
+    });
     await db()
       .insert(schema.leads)
       .values({ projectId, postId: post.id, score, kind: "buyer" });

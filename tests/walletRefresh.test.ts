@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
+import { describeDb, makeUser } from "./fixtures/db";
 
 /**
  * AnyAPI rotates the refresh token on every use and revokes the connection
@@ -21,16 +21,13 @@ const refreshTokens = vi.fn(async (refreshToken: string) => {
 
 vi.mock("@/lib/oauth", () => ({ refreshTokens }));
 
-describe.skipIf(!process.env.DATABASE_URL)("refreshing a wallet's access token", () => {
+describeDb("refreshing a wallet's access token", () => {
   it("spends the refresh token once when two jobs find it expired together", async () => {
     const { db } = await import("@/db");
     const { users, walletConnections } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
     const { clientForUser, saveWalletTokens } = await import("@/lib/anyapi");
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     try {
       await saveWalletTokens(user.id, {
         access_token: "expired",

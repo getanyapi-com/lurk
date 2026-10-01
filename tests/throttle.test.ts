@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { opensAtFrom } from "@/lib/throttle";
 import { TIERS } from "@/lib/tiers";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -35,7 +35,7 @@ describe("when a paid button comes back", () => {
  * One account looping a paid button runs out of its own presses, so the house
  * caps every user shares are never its to trip.
  */
-describe.skipIf(!process.env.DATABASE_URL)("a free user pressing paid buttons", () => {
+describeDb("a free user pressing paid buttons", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -43,21 +43,15 @@ describe.skipIf(!process.env.DATABASE_URL)("a free user pressing paid buttons", 
   it("gets each once for good, and a double click costs one press", async () => {
     vi.stubEnv("SELF_HOSTED", "false");
     const { db } = await import("@/db");
-    const { jobs, projects, userActions, users } = await import("@/db/schema");
+    const { jobs, userActions, users } = await import("@/db/schema");
     const { ActionThrottledError, allowanceFor, pressForJob, spendAllowance } = await import(
       "@/lib/throttle"
     );
     const { eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     try {
-      const [project] = await db()
-        .insert(projects)
-        .values({ userId: user.id, name: "Throttled" })
-        .returning();
+      const project = await makeProject(user.id, { name: "Throttled" });
 
       await expect(spendAllowance(user.id, "scan_now")).rejects.toBeInstanceOf(
         ActionThrottledError,

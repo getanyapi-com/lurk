@@ -11,6 +11,7 @@ import {
   type LeadFactors,
   type ScoringSettings,
 } from "@/lib/scoring/weights";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The owner's ranking weights. Every project that never set any has to keep
@@ -118,33 +119,25 @@ describe("ranking weights", () => {
   });
 });
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
-describe.skipIf(!hasDatabase)("re-ranking a project's stored leads", () => {
+describeDb("re-ranking a project's stored leads", () => {
   it("rewrites the scores the new weights move, and puts them back on reset", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");
     const { rerankProject, scoringPreview } = await import("@/lib/scoring/apply");
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
-    const [project] = await db().insert(schema.projects).values({ userId: user.id, name: "Shopkeep" }).returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Shopkeep" });
     const rows = [
       { subreddit: "shopify", quality: 0.75, intent: 2, engagement: 4 },
       { subreddit: "smallbusiness", quality: 0.75, intent: 4, engagement: 0 },
     ];
     const ids: string[] = [];
     for (const row of rows) {
-      const [post] = await db()
-        .insert(schema.redditPosts)
-        .values({
-          id: `p${randomUUID().slice(0, 8)}`,
-          subreddit: row.subreddit,
-          author: "asker",
-          title: `A question in ${row.subreddit}`,
-          url: `https://www.reddit.com/r/${row.subreddit}/comments/${randomUUID().slice(0, 6)}/q/`,
-          createdAt: new Date(),
-        })
-        .returning();
+      const post = await makePost({
+        subreddit: row.subreddit,
+        title: `A question in ${row.subreddit}`,
+        url: `https://www.reddit.com/r/${row.subreddit}/comments/${randomUUID().slice(0, 6)}/q/`,
+      });
       const [lead] = await db()
         .insert(schema.leads)
         .values({

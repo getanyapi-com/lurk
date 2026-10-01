@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The one job a new project starts with, and what it leaves behind. Everything
@@ -23,27 +23,19 @@ const HOUR_MS = 60 * 60 * 1000;
 async function fixture(discovered: Date | null = null) {
   const { db } = await import("@/db");
   const schema = await import("@/db/schema");
-  const [user] = await db()
-    .insert(schema.users)
-    .values({ clerkUserId: `test_${randomUUID()}` })
-    .returning();
-  const [project] = await db()
-    .insert(schema.projects)
-    .values({
-      userId: user.id,
-      name: "Formcraft",
-      pain: "Forms cannot branch.",
-      solution: "A form builder with conditional logic.",
-      targetUsers: "Ops teams",
-      capabilities: ["branching"],
-      problemPhrasings: ["forms that branch"],
-      discoveredAt: discovered,
-    })
-    .returning();
+  const user = await makeUser();
+  const project = await makeProject(user.id, {
+    pain: "Forms cannot branch.",
+    solution: "A form builder with conditional logic.",
+    targetUsers: "Ops teams",
+    capabilities: ["branching"],
+    problemPhrasings: ["forms that branch"],
+    discoveredAt: discovered,
+  });
   return { db, schema, user, project };
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
+describeDb("the initial discovery", () => {
   beforeEach(() => {
     process.env.SELF_HOSTED = "false";
     runDiscovery.mockClear();

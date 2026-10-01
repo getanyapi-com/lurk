@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Question } from "@/lib/jev";
 import { FIRST_LOOK_EXTRA, FIRST_LOOK_HOURS, OPENED_WITHIN_DAYS } from "@/lib/x/constants";
 import { TIERS } from "@/lib/tiers";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The X pipeline end to end, against a real database with only AnyAPI and the
@@ -38,7 +39,6 @@ vi.mock("@/lib/anyapi", async (importOriginal) => ({
   tierNameFor: async () => (wallet.connected ? ("connected" as const) : ("free" as const)),
 }));
 
-const hasDatabase = !!process.env.DATABASE_URL;
 const HOUR = 3_600_000;
 
 let counter = 0;
@@ -143,7 +143,7 @@ function answerAll(call: { questions: Record<string, Question>; state: { posts: 
   return answers;
 }
 
-describe.skipIf(!hasDatabase)("the X pipeline against a database", () => {
+describeDb("the X pipeline against a database", () => {
   let db: typeof import("@/db").db;
   let schema: typeof import("@/db/schema");
   let run: typeof import("@/lib/x/run");
@@ -178,7 +178,7 @@ describe.skipIf(!hasDatabase)("the X pipeline against a database", () => {
   });
 
   async function fixture(competitors: string[], opts: { brief?: boolean } = {}) {
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
+    const user = await makeUser();
     const brief = {
       kind: "open source meeting scheduling software",
       neighbours: [
@@ -191,17 +191,13 @@ describe.skipIf(!hasDatabase)("the X pipeline against a database", () => {
       goodAsks: ["need a calendly alternative for my team"],
       nearMisses: [{ ask: "best calendar app?", why: "calendar, not booking" }],
     };
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: "Cal.com",
-        url: "https://cal.com",
-        pain: "Scheduling back and forth",
-        solution: "Scheduling links",
-        ...(opts.brief ? { brief } : {}),
-      })
-      .returning();
+    const project = await makeProject(user.id, {
+      name: "Cal.com",
+      url: "https://cal.com",
+      pain: "Scheduling back and forth",
+      solution: "Scheduling links",
+      ...(opts.brief ? { brief } : {}),
+    });
     for (const name of competitors) {
       await db().insert(schema.projectCompetitors).values({ projectId: project.id, name, source: "user" });
     }

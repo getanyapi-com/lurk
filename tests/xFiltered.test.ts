@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { filteredPointer, filteredSentence, filteredSummary, filteredWord } from "@/components/x/filtered";
 import type { XFiltered, XFilteredCard } from "@/lib/x/read";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What the X tab shows of the posts it left out: those the judge passed but
@@ -16,7 +17,6 @@ function newId(): string {
   counter += 1;
   return `8${Date.now()}${String(counter).padStart(5, "0")}`;
 }
-
 describe("the filtered-out words", () => {
   it("names a screened post by its rule, a judged one by the gates' code, and an unfinished one as such", () => {
     expect(filteredWord({ kind: "screened", code: "listicle" })).toBe("list");
@@ -80,15 +80,12 @@ describe("the filtered-out words", () => {
   });
 });
 
-describe.skipIf(!process.env.DATABASE_URL)("the filtered-out list against a database", () => {
+describeDb("the filtered-out list against a database", () => {
   async function seed(rows: Record<string, Row>) {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Clipy", url: "https://clipy.example", pain: "Recording demos", solution: "A screen recorder" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Clipy", url: "https://clipy.example", pain: "Recording demos", solution: "A screen recorder" });
     const ids: Record<string, string> = {};
     const evaluations: Record<string, string> = {};
     for (const [name, row] of Object.entries(rows)) {

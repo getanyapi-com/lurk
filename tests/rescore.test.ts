@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { judgeAnswers, readingAnswers, type JevSpec } from "./jevAnswers";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The one sweep a scorer change owes a project: every verdict an older scorer
@@ -16,9 +17,7 @@ vi.mock("@/lib/jev", async (importOriginal) => ({
   askJev,
 }));
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
-describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
+describeDb("re-judging a project under a new scorer", () => {
   let db: typeof import("@/db").db;
   let schema: typeof import("@/db/schema");
   let runRescore: typeof import("@/lib/scan/rescore").runRescore;
@@ -39,14 +38,8 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
 
   /** One project holding one stale verdict on one post, with or without a lead. */
   async function fixture(options: { lead: null | { status: string } }) {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft", solution: "A form builder." })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { solution: "A form builder." });
     const [post] = await upsertPosts([
       {
         id: `p${randomUUID().slice(0, 8)}`,

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The competitor scan and the SEO refresh open their posts together rather
@@ -49,7 +50,7 @@ vi.mock("@/jobs/enqueue", async (importOriginal) => ({
 
 const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-describe.skipIf(!process.env.DATABASE_URL)("posts a job opens together", () => {
+describeDb("posts a job opens together", () => {
   beforeEach(() => {
     for (const mock of [
       fetchSearch,
@@ -69,14 +70,8 @@ describe.skipIf(!process.env.DATABASE_URL)("posts a job opens together", () => {
   async function fixture(phrasings: string[] = []) {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft", problemPhrasings: phrasings })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { problemPhrasings: phrasings });
     await db()
       .insert(schema.projectCompetitors)
       .values({ projectId: project.id, name: "Typeform", state: "active" });

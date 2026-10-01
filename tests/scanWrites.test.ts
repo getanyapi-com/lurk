@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import type { Judgement } from "@/lib/scan/judgement";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What the two scan writers do with a candidate that reached them twice.
@@ -30,19 +31,13 @@ function judgement(score: number): Judgement {
   };
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and leads", () => {
+describeDb("writing one scan's verdicts and leads", () => {
   async function fixture() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { upsertComments, upsertPosts } = await import("@/lib/reddit/store");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id);
     const [post] = await upsertPosts([
       {
         id: `p${randomUUID().slice(0, 8)}`,
@@ -164,20 +159,14 @@ describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and lead
  * statement for the whole run, so a row or a post that reached it twice must
  * still come out as writing them one at a time would have left it.
  */
-describe.skipIf(!process.env.DATABASE_URL)("marking what one scan covered and read", () => {
+describeDb("marking what one scan covered and read", () => {
   it("moves every covered row's watermark, in both tables, and no other row's", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { markCovered } = await import("@/lib/scan/sources");
     const { eq } = await import("drizzle-orm");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id);
     const keywords = await db()
       .insert(schema.projectKeywords)
       .values(
@@ -232,10 +221,7 @@ describe.skipIf(!process.env.DATABASE_URL)("marking what one scan covered and re
     const { upsertPosts } = await import("@/lib/reddit/store");
     const { markThreadsRead } = await import("@/lib/scan/leads");
     const { and, eq, isNull } = await import("drizzle-orm");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     const [project, other] = await db()
       .insert(schema.projects)
       .values([

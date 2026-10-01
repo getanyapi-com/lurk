@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
+import { describeDb, makeUser } from "./fixtures/db";
 
 /**
  * What creating a project does inside the request. Reading Google for where a
@@ -62,7 +62,7 @@ const profile = {
   budgetFit: "Under $50 a month",
 };
 
-describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
+describeDb("creating a project", () => {
   beforeEach(() => {
     runDiscovery.mockClear();
     redirect.mockClear();
@@ -77,10 +77,7 @@ describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
     const { createProjectAndProfileAction } = await import(
       "@/app/app/projects/new/actions"
     );
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     signedIn = { id: user.id };
 
     const form = new FormData();

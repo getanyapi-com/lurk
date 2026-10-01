@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { expect, expectTypeOf, it } from "vitest";
 import { db } from "@/db";
 import { leads, projects, redditComments, redditPosts } from "@/db/schema";
 import { leadsBase } from "@/lib/leadSql";
+import { describeDb } from "./fixtures/db";
 
 /**
  * leadsBase builds its joins over any selection and is typed by hand, because
@@ -29,7 +30,7 @@ function writtenOut() {
 
 type Rows<T extends () => PromiseLike<unknown>> = Awaited<ReturnType<T>>;
 
-describe.skipIf(!process.env.DATABASE_URL)("leadsBase", () => {
+describeDb("leadsBase", () => {
   it("is the four-table join written out, in its SQL and in its rows", () => {
     expect(leadsBase(fields).toSQL()).toEqual(writtenOut().toSQL());
     expectTypeOf<Rows<() => ReturnType<typeof leadsBase<typeof fields>>>>().toEqualTypeOf<

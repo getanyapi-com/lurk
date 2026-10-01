@@ -1,25 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * A run row has to exist before its results can point at it, so there is a
  * moment when the run is stored and its results are not. Nobody may be handed
  * the run in that moment, and two callers who both missed buy it once.
  */
-describe.skipIf(!process.env.DATABASE_URL)("a shared fetch still being stored", () => {
+describeDb("a shared fetch still being stored", () => {
   async function fixture() {
     const { db } = await import("@/db");
-    const { projects, searchRuns, users } = await import("@/db/schema");
+    const { searchRuns, users } = await import("@/db/schema");
     const { fetchShared } = await import("@/lib/reddit/fetch");
     const { eq } = await import("drizzle-orm");
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Race" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Race" });
     const query = `race test ${randomUUID()}`;
     const funded = {
       funding: `wallet:${user.id}` as const,

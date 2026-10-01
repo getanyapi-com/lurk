@@ -1,10 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import { displayPrefix, generateApiKey, hashApiKey, KEY_PREFIX, PREFIX_LENGTH } from "@/lib/api/keys";
 import { DEFAULT_LIMIT, MAX_LIMIT, leadConditions, parseLeadQuery } from "@/lib/api/leadsQuery";
 import { secondsUntilReset, utcDay } from "@/lib/api/limit";
 import { ApiError } from "@/lib/api/responses";
+import { describeDb, makeUser } from "./fixtures/db";
 
 describe("api key hashing", () => {
   it("mints a recognizable key and keeps only its hash", () => {
@@ -101,16 +101,11 @@ describe("leads filter query builder", () => {
  * and the counter is an upsert; neither has anything to say in isolation. Skips
  * when DATABASE_URL is absent, like the other database-backed test here.
  */
-describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a database", () => {
+describeDb("api keys and the counter against a database", () => {
   it("finds a key by its hash, and nothing by a wrong one", async () => {
-    const { db } = await import("@/db");
-    const { users } = await import("@/db/schema");
     const { createApiKey, findApiKey, listApiKeys, revokeApiKey } = await import("@/lib/api/keys");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     const { key, id } = await createApiKey(user.id, "Test key");
 
     const found = await findApiKey(key);
@@ -128,15 +123,10 @@ describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a d
   });
 
   it("counts requests per key per day and refuses the one over the limit", async () => {
-    const { db } = await import("@/db");
-    const { users } = await import("@/db/schema");
     const { createApiKey } = await import("@/lib/api/keys");
     const { consumeDailyRequest, requestsToday } = await import("@/lib/api/limit");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     const { id } = await createApiKey(user.id, "Counter key");
 
     expect(await requestsToday(id)).toBe(0);
@@ -163,10 +153,7 @@ describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a d
     const { eq } = await import("drizzle-orm");
     const { createApiKey, listApiKeys, touchApiKey } = await import("@/lib/api/keys");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     const { id } = await createApiKey(user.id, "Touched key");
     const usedAt = async () => (await listApiKeys(user.id))[0].lastUsedAt;
     const now = new Date("2026-09-30T12:00:00Z");

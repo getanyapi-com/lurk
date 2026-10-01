@@ -15,6 +15,7 @@ import {
 import type { ScheduledChannel } from "@/lib/alerts/channels";
 import type { Digest, DigestLead } from "@/lib/alerts/types";
 import type { xLeads, xPosts } from "@/db/schema";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * X asks reach the user through the alerts they already have: the same
@@ -345,7 +346,7 @@ describe("a digest carrying X asks beside Reddit leads", () => {
 });
 
 /** The query and the switch are the claim, so they are proven against a real database. */
-describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => {
+describeDb("reading X asks for a digest", () => {
   const saved = { X_LEADS: process.env.X_LEADS };
   afterEach(() => {
     // Assigning undefined to process.env stores the string "undefined".
@@ -361,8 +362,8 @@ describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => 
   async function owner() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
-    const [project] = await db().insert(schema.projects).values({ userId: user.id, name: "X alerts" }).returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "X alerts" });
     return { db, schema, user, project };
   }
 
@@ -503,7 +504,7 @@ describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => 
   it("knows whether a project has a channel to carry its leads", async () => {
     const { db, schema, user, project } = await owner();
     const { projectHasAlertChannel } = await import("@/lib/alerts/channels");
-    const [sibling] = await db().insert(schema.projects).values({ userId: user.id, name: "Sibling" }).returning();
+    const sibling = await makeProject(user.id, { name: "Sibling" });
     await db().insert(schema.alerts).values({ projectId: sibling.id, channel: "email", target: "you@example.com", cadence: "daily" });
     expect(await projectHasAlertChannel(project.id)).toBe(false);
     expect(await projectHasAlertChannel(sibling.id)).toBe(true);

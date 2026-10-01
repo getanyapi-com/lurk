@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb } from "./fixtures/db";
 
 /**
  * Reddit search hands the post's own text back under `selftext`, and a stored
  * post that keeps it is a post nobody has to buy again through `reddit.post`.
  * Proven against a real database, because the write is the claim.
  */
-describe.skipIf(!process.env.DATABASE_URL)("storing a search result", () => {
+describeDb("storing a search result", () => {
   it("keeps the text a search carried, and dates the observation", async () => {
     const { upsertPosts } = await import("@/lib/reddit/store");
 
@@ -54,7 +55,7 @@ describe.skipIf(!process.env.DATABASE_URL)("storing a search result", () => {
  * The ranking a run stores is the order upstream returned, so the caller must
  * still get that order back.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the order posts are stored in", () => {
+describeDb("the order posts are stored in", () => {
   it("returns them as upstream ranked them, whatever order they are written in", async () => {
     const { upsertPosts } = await import("@/lib/reddit/store");
     const suffix = randomUUID().slice(0, 8);
@@ -82,7 +83,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the order posts are stored in", () =
  * current state, so a fetch that carries one overwrites it and a fetch that
  * carries nothing leaves it alone. Absent is unknown, never false.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
+describeDb("the archive and lock flags", () => {
   it("keeps a flag a search carried, and lets a later fetch correct it", async () => {
     const { upsertPosts } = await import("@/lib/reddit/store");
     const id = `t3_${randomUUID().slice(0, 8)}`;
@@ -127,7 +128,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
   });
 });
 
-describe.skipIf(!process.env.DATABASE_URL)("what a stored comment answers", () => {
+describeDb("what a stored comment answers", () => {
   it("records the post for a top-level comment, the comment for a reply, and keeps it when a later read omits it", async () => {
     const { upsertComments, upsertPosts } = await import("@/lib/reddit/store");
     const [post] = await upsertPosts([

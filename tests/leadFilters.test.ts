@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { subredditKey, termsOf, wordsOf } from "@/lib/filterWords";
 import { ALERT_SCORE_FLOOR, mentions, passesWords, type LeadFilters } from "@/lib/leadFilters";
 import { foldQuotes } from "@/lib/scan/evidence";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * A project's own filters on top of the judge: words a lead must or must not
@@ -11,7 +12,6 @@ import { foldQuotes } from "@/lib/scan/evidence";
  * and one that is not, which the judge can score alike.
  */
 
-const hasDatabase = !!process.env.DATABASE_URL;
 const HOUR_MS = 3_600_000;
 
 const none: LeadFilters = { mustMention: [], alertMinScore: null, xMinScore: null };
@@ -59,7 +59,7 @@ describe("word matching", () => {
   });
 });
 
-describe.skipIf(!hasDatabase)("a project's filters where leads are read", () => {
+describeDb("a project's filters where leads are read", () => {
   /** A project with these filters, and `muted` as its keyword mutes. */
   async function fixture(
     { muted = [], ...leadFilters }: Partial<LeadFilters> & { muted?: string[] },
@@ -67,16 +67,12 @@ describe.skipIf(!hasDatabase)("a project's filters where leads are read", () => 
   ) {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: "Invoicer",
-        scoreThreshold,
-        leadFilters: Object.keys(leadFilters).length > 0 ? { ...none, ...leadFilters } : null,
-      })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, {
+      name: "Invoicer",
+      scoreThreshold,
+      leadFilters: Object.keys(leadFilters).length > 0 ? { ...none, ...leadFilters } : null,
+    });
     if (muted.length > 0) {
       const { setKeywordMutes } = await import("@/lib/mutes");
       await setKeywordMutes(project.id, muted);
@@ -88,18 +84,13 @@ describe.skipIf(!hasDatabase)("a project's filters where leads are read", () => 
 
   /** A Reddit lead on its own thread, found now and posted an hour ago. */
   async function redditLead({ db, schema, project }: Owned, title: string, body: string, score: number) {
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "smallbusiness",
-        author: "asker",
-        title,
-        body,
-        url: `https://www.reddit.com/r/smallbusiness/comments/${randomUUID().slice(0, 6)}/x/`,
-        createdAt: new Date(Date.now() - HOUR_MS),
-      })
-      .returning();
+    const post = await makePost({
+      subreddit: "smallbusiness",
+      title,
+      body,
+      url: `https://www.reddit.com/r/smallbusiness/comments/${randomUUID().slice(0, 6)}/x/`,
+      createdAt: new Date(Date.now() - HOUR_MS),
+    });
     const [lead] = await db().insert(schema.leads).values({ projectId: project.id, postId: post.id, score }).returning();
     return lead.id;
   }
@@ -162,17 +153,13 @@ describe.skipIf(!hasDatabase)("a project's filters where leads are read", () => 
   it("checks a reply lead against its thread as well as its own words", async () => {
     const owned = await fixture({ muted: ["hiring"] });
     const { db, schema, project } = owned;
-    const [post] = await db()
-      .insert(schema.redditPosts)
-      .values({
-        id: `p${randomUUID().slice(0, 8)}`,
-        subreddit: "smallbusiness",
-        author: "op",
-        title: "Hiring thread: who needs help?",
-        url: "https://www.reddit.com/r/smallbusiness/comments/h/x/",
-        createdAt: new Date(Date.now() - HOUR_MS),
-      })
-      .returning();
+    const post = await makePost({
+      subreddit: "smallbusiness",
+      author: "op",
+      title: "Hiring thread: who needs help?",
+      url: "https://www.reddit.com/r/smallbusiness/comments/h/x/",
+      createdAt: new Date(Date.now() - HOUR_MS),
+    });
     const [comment] = await db()
       .insert(schema.redditComments)
       .values({

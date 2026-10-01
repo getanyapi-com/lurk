@@ -1,25 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The reuse path touches four tables, so it is proven against a real database
  * with only the AnyAPI client faked. It skips when DATABASE_URL is absent.
  */
-describe.skipIf(!process.env.DATABASE_URL)("fetchShared against a database", () => {
+describeDb("fetchShared against a database", () => {
   it("calls AnyAPI once and reuses the run for the second caller", async () => {
     const { db } = await import("@/db");
-    const { projects, redditPosts, searchRuns, usageLedger, users } = await import("@/db/schema");
+    const { redditPosts, searchRuns, usageLedger, users } = await import("@/db/schema");
     const { fetchSearch } = await import("@/lib/reddit/skus");
     const { and, eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Test project" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Test project" });
 
     const query = `reuse test ${randomUUID()}`;
     let calls = 0;
@@ -97,18 +92,11 @@ function restore(name: string, value: string | undefined): void {
  * operator's AnyAPI bill, so it is proven to stop a paid house call and to
  * leave a user spending their own wallet alone.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the house data cap", () => {
+describeDb("the house data cap", () => {
   async function fixture(funding: "house" | `wallet:${string}`, calls: { count: number }) {
     const { db } = await import("@/db");
-    const { projects, users } = await import("@/db/schema");
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Cap test" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Cap test" });
     const funded = {
       funding,
       call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
@@ -184,21 +172,15 @@ describe.skipIf(!process.env.DATABASE_URL)("the house data cap", () => {
  * stores is a thread's canonical URL, and what it reuses includes the runs the
  * SEO refresh stored before that, under the same key with the link Google gave.
  */
-describe.skipIf(!process.env.DATABASE_URL)("google.search's stored runs", () => {
+describeDb("google.search's stored runs", () => {
   it("stores canonical thread URLs, and still serves a run stored with Google's own link", async () => {
     const { db } = await import("@/db");
-    const { projects, searchRuns, serpResults, users } = await import("@/db/schema");
+    const { searchRuns, serpResults, users } = await import("@/db/schema");
     const { googleSearch } = await import("@/lib/seo/fetch");
     const { eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Google test" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Google test" });
     const query = `google test ${randomUUID()} reddit`;
     const asked: Record<string, unknown>[] = [];
     const funded = {

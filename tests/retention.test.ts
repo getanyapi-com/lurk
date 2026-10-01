@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The time every pass here runs as, with this file's rows dated before it. A
@@ -18,7 +19,7 @@ const NOW = new Date("2010-01-01T00:00:00Z");
  * post anything still points at outlives the window. Proven against a real
  * database, because the delete is the claim.
  */
-describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
+describeDb("deleting expired posts", () => {
   async function fixture() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
@@ -26,14 +27,8 @@ describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
     const { deleteExpiredPosts } = await import("@/lib/retention");
     const { inArray } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "HotelsAllow" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "HotelsAllow" });
 
     const longAgo = Math.floor(NOW.getTime() / 1000) - 600 * 24 * 3600;
     const [led, ranked, loose] = await upsertPosts(
@@ -123,21 +118,15 @@ describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
  * job of each kind, since pages say when a project last ran something. A job
  * still waiting or running is never the retention job's to take.
  */
-describe.skipIf(!process.env.DATABASE_URL)("pruning finished jobs", () => {
+describeDb("pruning finished jobs", () => {
   it("drops month-old finished jobs but the newest of each kind, and never an unfinished one", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { eq, inArray } = await import("drizzle-orm");
     const { pruneFinishedJobs } = await import("@/lib/retention");
 
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Queue" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Queue" });
     const daysAgo = (days: number) => new Date(NOW.getTime() - days * 24 * 3600 * 1000);
     const ran = (kind: string, days: number, projectId: string | null = project.id) => ({
       kind,

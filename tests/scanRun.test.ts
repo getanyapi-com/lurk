@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
 import { judgeAnswers, readingAnswers, triageAnswers, type JevSpec } from "./jevAnswers";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The scan's order of operations, against a real database with only AnyAPI and
@@ -45,8 +46,6 @@ vi.mock("@/lib/anyapi", () => ({
   tierNameFor: async () => "free" as const,
 }));
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
 /** One candidate as a Jev request carries it: a title, or a post's sentences. */
 type Asked = { title?: string; sentences?: Record<string, string> };
 
@@ -55,7 +54,7 @@ function wordsOf(one: Asked): string {
   return one.title ?? Object.values(one.sentences ?? {}).join(" ");
 }
 
-describe.skipIf(!hasDatabase)("runScan against a database", () => {
+describeDb("runScan against a database", () => {
   let db: typeof import("@/db").db;
   let schema: typeof import("@/db/schema");
   let runScan: typeof import("@/lib/scan/run").runScan;
@@ -86,19 +85,11 @@ describe.skipIf(!hasDatabase)("runScan against a database", () => {
   });
 
   async function project(threshold: number | null = null) {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [row] = await db()
-      .insert(schema.projects)
-      .values({
-        userId: user.id,
-        name: "Formcraft",
-        solution: "A form builder with conditional logic.",
-        scoreThreshold: threshold,
-      })
-      .returning();
+    const user = await makeUser();
+    const row = await makeProject(user.id, {
+      solution: "A form builder with conditional logic.",
+      scoreThreshold: threshold,
+    });
     await db()
       .insert(schema.projectKeywords)
       .values({ projectId: row.id, keyword: "form builder" });

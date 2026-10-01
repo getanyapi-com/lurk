@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -76,31 +77,22 @@ describe("an alert's act links", () => {
   });
 });
 
-describe.skipIf(!process.env.DATABASE_URL)("replied threads and mutes, read from the database", () => {
+describeDb("replied threads and mutes, read from the database", () => {
   async function fixture() {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft", scoreThreshold: 0 })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { scoreThreshold: 0 });
     async function post(subreddit: string, title: string, body: string | null = null) {
       const id = `p${randomUUID().slice(0, 8)}`;
-      await db()
-        .insert(schema.redditPosts)
-        .values({
-          id,
-          subreddit,
-          author: "asker",
-          title,
-          body,
-          url: `https://www.reddit.com/r/${subreddit}/comments/${id}/`,
-          createdAt: new Date(Date.now() - DAY_MS / 2),
-        });
+      await makePost({
+        id,
+        subreddit,
+        title,
+        body,
+        url: `https://www.reddit.com/r/${subreddit}/comments/${id}/`,
+        createdAt: new Date(Date.now() - DAY_MS / 2),
+      });
       return id;
     }
     return { db, schema, projectId: project.id, post };

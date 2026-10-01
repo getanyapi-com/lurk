@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { variantOf } from "@/lib/reddit/fetch";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 describe("variant string", () => {
   it("is the same string however the caller ordered the parameters", () => {
@@ -22,7 +23,7 @@ describe("variant string", () => {
  * silently serves one endpoint's answer to another, or page one to a caller
  * asking for page two. Proven against a real database; skips without one.
  */
-describe.skipIf(!process.env.DATABASE_URL)("the stored run key", () => {
+describeDb("the stored run key", () => {
   it("tells two SKUs and two page variants apart", async () => {
     const { db } = await import("@/db");
     const { searchRuns } = await import("@/db/schema");
@@ -76,18 +77,12 @@ describe.skipIf(!process.env.DATABASE_URL)("the stored run key", () => {
 
   it("buys each cursor page once and hands the cursor back on reuse", async () => {
     const { db } = await import("@/db");
-    const { projects, redditPosts, searchRuns, users } = await import("@/db/schema");
+    const { redditPosts, searchRuns, users } = await import("@/db/schema");
     const { fetchSearch } = await import("@/lib/reddit/skus");
     const { and, eq } = await import("drizzle-orm");
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(projects)
-      .values({ userId: user.id, name: "Cursor test" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id, { name: "Cursor test" });
 
     const query = `cursor test ${randomUUID()}`;
     const page = (id: string, title: string) => ({

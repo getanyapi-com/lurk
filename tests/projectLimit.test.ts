@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { TIERS } from "@/lib/tiers";
+import { describeDb, makeUser } from "./fixtures/db";
 
-describe.skipIf(!process.env.DATABASE_URL)("the project limit under concurrent requests", () => {
+describeDb("the project limit under concurrent requests", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("lets through only as many projects as the tier allows", async () => {
@@ -13,10 +13,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the project limit under concurrent r
     const { eq } = await import("drizzle-orm");
     const limit = TIERS.free.projects as number;
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
+    const user = await makeUser();
     try {
       const attempts = await Promise.allSettled(
         Array.from({ length: limit + 4 }, (_, index) => createProject(user.id, `P${index}`, null)),

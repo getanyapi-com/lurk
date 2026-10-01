@@ -1,15 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The sums every cap and run report reads, against a real database because
  * they are SQL. Each narrows to a SKU or purpose no other test writes, so the
  * house-wide totals are this test's own whatever runs beside it.
  */
-describe.skipIf(!process.env.DATABASE_URL)("spend", () => {
+describeDb("spend", () => {
   it("sums the house's runs and unshared lines, a project's lines and calls, and model calls", async () => {
     const { db } = await import("@/db");
-    const { llmUsage, projects, searchRuns, usageLedger, users } = await import("@/db/schema");
+    const { llmUsage, searchRuns, usageLedger, users } = await import("@/db/schema");
     const { houseDataSpend, ledgerCalls, llmSpend, projectLedgerSpend } = await import("@/lib/spend");
     const { utcDayStart } = await import("@/lib/time");
     const { eq, inArray } = await import("drizzle-orm");
@@ -30,15 +31,9 @@ describe.skipIf(!process.env.DATABASE_URL)("spend", () => {
     });
     const runIds = [`a${tag}`, `b${tag}`, `c${tag}`];
 
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${tag}` })
-      .returning();
+    const user = await makeUser();
     try {
-      const [project] = await db()
-        .insert(projects)
-        .values({ userId: user.id, name: "Spend" })
-        .returning();
+      const project = await makeProject(user.id, { name: "Spend" });
       await db()
         .insert(searchRuns)
         .values([

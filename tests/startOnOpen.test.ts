@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { makeProject, makeUser } from "./fixtures/db";
 
 let signedIn: { id: string } = { id: "" };
 const kickScheduler = vi.fn();
@@ -16,14 +17,8 @@ vi.mock("@/jobs/scheduler", () => ({ kickScheduler }));
  */
 describe("startOnOpen against a database", () => {
   async function owned() {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `user_${randomUUID()}`, email: `${randomUUID()}@example.com` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
+    const user = await makeUser({ clerkUserId: `user_${randomUUID()}`, email: `${randomUUID()}@example.com` });
+    const project = await makeProject(user.id);
     return { user, project };
   }
 

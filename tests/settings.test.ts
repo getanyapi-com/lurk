@@ -1,10 +1,10 @@
-import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { PRESETS } from "@/lib/settings/presets";
 import { resolveSettings } from "@/lib/settings/resolve";
 import { settingsOverridesSchema } from "@/lib/settings/schema";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The settings module owns every number a scan's cadence and thread policy
@@ -123,7 +123,7 @@ describe("a thread policy", () => {
  * Saving settings has to move the schedule, or a free user who picks 9am waits
  * until the scan already booked under the old cadence happens to run.
  */
-describe.skipIf(!process.env.DATABASE_URL)("saving settings against a database", () => {
+describeDb("saving settings against a database", () => {
   let db: typeof import("@/db").db;
   let schema: typeof import("@/db/schema");
   let saveUserSettings: typeof import("@/lib/settings/resolve").saveUserSettings;
@@ -139,18 +139,9 @@ describe.skipIf(!process.env.DATABASE_URL)("saving settings against a database",
   });
 
   it("moves a waiting scan to the new cadence and leaves a project without one alone", async () => {
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [scheduled] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Scheduled" })
-      .returning();
-    const [idle] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Idle" })
-      .returning();
+    const user = await makeUser();
+    const scheduled = await makeProject(user.id, { name: "Scheduled" });
+    const idle = await makeProject(user.id, { name: "Idle" });
     const far = new Date("2030-01-01T00:00:00Z");
     await db().insert(schema.jobs).values({ kind: "scan", projectId: scheduled.id, runAt: far });
 

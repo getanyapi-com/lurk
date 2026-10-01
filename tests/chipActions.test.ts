@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * The plan's chips on the Sources page: a keyword, a subreddit and a
@@ -19,19 +19,13 @@ vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 async function fixture() {
   const { db } = await import("@/db");
   const schema = await import("@/db/schema");
-  const [user] = await db()
-    .insert(schema.users)
-    .values({ clerkUserId: `test_${randomUUID()}` })
-    .returning();
-  const [project] = await db()
-    .insert(schema.projects)
-    .values({ userId: user.id, name: "Chips" })
-    .returning();
+  const user = await makeUser();
+  const project = await makeProject(user.id, { name: "Chips" });
   auth.userId = user.id;
   return { user, project, db, schema };
 }
 
-describe.skipIf(!process.env.DATABASE_URL)("the plan's chips", () => {
+describeDb("the plan's chips", () => {
   // The tier caps are what chipsOn counts against, and a self-hosted install has none.
   let selfHosted: string | undefined;
   beforeEach(() => {

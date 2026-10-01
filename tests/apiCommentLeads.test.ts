@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import { describeDb, makeProject, makeUser } from "./fixtures/db";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -7,10 +8,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * A comment lead is as old as its comment and lives at its comment. The app's
  * feed reads it that way, and the API and the alerts must agree with the feed.
  */
-describe.skipIf(!process.env.DATABASE_URL)("a fresh comment on an old thread", () => {
+describeDb("a fresh comment on an old thread", () => {
   it("is listed by the API inside the window and links to the comment", async () => {
     const { db } = await import("@/db");
-    const { leads, projects, redditComments, redditPosts, users } = await import("@/db/schema");
+    const { leads, redditComments, redditPosts, users } = await import("@/db/schema");
     const { listLeads } = await import("@/lib/leads");
     const { getApiLead, listApiLeads } = await import("@/lib/api/leadsRead");
     const { parseLeadQuery } = await import("@/lib/api/leadsQuery");
@@ -21,15 +22,9 @@ describe.skipIf(!process.env.DATABASE_URL)("a fresh comment on an old thread", (
     const postUrl = "https://www.reddit.com/r/test/comments/old/";
     const commentUrl = "https://www.reddit.com/r/test/comments/old/comment/new/";
     const commented = new Date();
-    const [user] = await db()
-      .insert(users)
-      .values({ clerkUserId: `test_${id}` })
-      .returning();
+    const user = await makeUser();
     try {
-      const [project] = await db()
-        .insert(projects)
-        .values({ userId: user.id, name: "Audit" })
-        .returning();
+      const project = await makeProject(user.id, { name: "Audit" });
       await db().insert(redditPosts).values({
         id,
         subreddit: "test",

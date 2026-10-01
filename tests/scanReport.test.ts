@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { verdictSentence, type ScanReport } from "@/lib/scan/report";
+import { describeDb, makePost, makeProject, makeUser } from "./fixtures/db";
 
 /**
  * What a window of scanning reports, and what the page says when that report is
@@ -8,23 +9,15 @@ import { verdictSentence, type ScanReport } from "@/lib/scan/report";
  * database; the sentence is a pure function of the counts.
  */
 
-const hasDatabase = !!process.env.DATABASE_URL;
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-describe.skipIf(!hasDatabase)("counting one window of scanning", () => {
+describeDb("counting one window of scanning", () => {
   async function fixture() {
     const { db } = await import("@/db");
     const { eq } = await import("drizzle-orm");
     const schema = await import("@/db/schema");
-    const [user] = await db()
-      .insert(schema.users)
-      .values({ clerkUserId: `test_${randomUUID()}` })
-      .returning();
-    const [project] = await db()
-      .insert(schema.projects)
-      .values({ userId: user.id, name: "Formcraft" })
-      .returning();
+    const user = await makeUser();
+    const project = await makeProject(user.id);
 
     /**
      * A post of a given age, kept out of the retention sweep's reach.
@@ -34,17 +27,9 @@ describe.skipIf(!hasDatabase)("counting one window of scanning", () => {
      * both old and unreferenced, whatever runs beside this file.
      */
     async function post(ageDays: number) {
-      const [row] = await db()
-        .insert(schema.redditPosts)
-        .values({
-          id: `p${randomUUID().slice(0, 8)}`,
-          subreddit: "SaaS",
-          author: "asker",
-          title: "Form question",
-          url: `https://www.reddit.com/r/SaaS/comments/${randomUUID().slice(0, 6)}/form/`,
-          createdAt: new Date(),
-        })
-        .returning();
+      const row = await makePost({
+        url: `https://www.reddit.com/r/SaaS/comments/${randomUUID().slice(0, 6)}/form/`,
+      });
       await db().insert(schema.leads).values({ projectId: project.id, postId: row.id, score: 0 });
       const [aged] = await db()
         .update(schema.redditPosts)
