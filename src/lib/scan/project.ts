@@ -5,7 +5,7 @@ import { withoutNegations } from "@/lib/discovery/rank";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts, type ProductFacts } from "@/lib/product";
 import { parseScoring, type ScoringSettings } from "@/lib/scoring/weights";
-import { retrieved, type PlanRow } from "./coverage";
+import type { PlanRow } from "./coverage";
 import { isRetrieved } from "./planStates";
 
 export type ScanProject = {
