@@ -7,7 +7,7 @@ import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost, fetchSearch } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
 import { loadScanProject } from "@/lib/scan/project";
-import { cadenceFor } from "@/lib/settings";
+import { cadenceFor } from "@/lib/settings/cadence";
 import { capped, tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { classifyMentions, type MentionCandidate, type Verdict } from "./classify";

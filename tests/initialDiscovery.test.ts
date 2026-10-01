@@ -89,7 +89,7 @@ describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
     // The recurring scan waits for the project's own next slot. A daily cadence
     // puts that anywhere from minutes to a day away depending on the hour the
     // test runs, so it is checked against the slot rather than a fixed gap.
-    const { cadenceFor } = await import("@/lib/settings");
+    const { cadenceFor } = await import("@/lib/settings/cadence");
     const { tierForUser } = await import("@/lib/tier");
     const { settings } = await tierForUser(user.id);
     const slot = cadenceFor(settings.settings.cadence).nextRunAt(new Date()).getTime();

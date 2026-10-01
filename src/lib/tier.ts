@@ -1,7 +1,7 @@
 import { walletConnection } from "./anyapi";
 import { config } from "./config";
-import { presetFor, settingsForPreset } from "./settings";
-import type { ResolvedSettings } from "./settings";
+import { presetFor, settingsForPreset } from "./settings/resolve";
+import type { ResolvedSettings } from "./settings/types";
 import { limitsFor, type TierLimits, type TierName } from "./tiers";
 
 export type UserTier = {

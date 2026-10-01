@@ -16,9 +16,12 @@ import type {
   ThreadPolicySettings,
 } from "./types";
 
-/** Which preset a user is on. Self-host is its own, whatever the tier says. */
+/**
+ * Which preset a user is on. A self-hosted instance pays for its own calls, so
+ * it is on connected's, whatever the tier says.
+ */
 export function presetFor(tier: TierName, selfHosted: boolean): SettingsPreset {
-  return selfHosted ? "selfHost" : tier;
+  return selfHosted ? "connected" : tier;
 }
 
 /** Drops the keys this preset does not let the user change, and the empty ones. */

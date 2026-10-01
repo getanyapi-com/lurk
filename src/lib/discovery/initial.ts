@@ -7,7 +7,7 @@ import { discoveryBudget, runDiscovery } from "@/lib/discovery/run";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts } from "@/lib/product";
 import { smallSweep } from "@/lib/sweepScale";
-import { cadenceFor } from "@/lib/settings";
+import { cadenceFor } from "@/lib/settings/cadence";
 import { tierForUser } from "@/lib/tier";
 import { openX } from "@/lib/x/open";
 import { xEnabledFor } from "@/lib/x/enabled";

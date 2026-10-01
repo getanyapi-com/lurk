@@ -31,16 +31,6 @@ export const PRESETS: Record<SettingsPreset, ScanSettings> = {
       readSeoReplies: true,
     },
   },
-  selfHost: {
-    cadence: { kind: "interval", hours: 1 },
-    threads: {
-      replyWindowDays: 3,
-      minReplies: 3,
-      threadsPerScan: null,
-      readOldThreadsOnce: true,
-      readSeoReplies: true,
-    },
-  },
 };
 
 /** Every key a user could ever be allowed to change. */
@@ -64,5 +54,4 @@ export const EDITABLE_KEYS: readonly EditableKey[] = [
 export const EDITABLE: Record<SettingsPreset, ReadonlySet<EditableKey>> = {
   free: new Set<EditableKey>(["cadence.hour", "cadence.timezone"]),
   connected: new Set<EditableKey>(EDITABLE_KEYS),
-  selfHost: new Set<EditableKey>(EDITABLE_KEYS),
 };

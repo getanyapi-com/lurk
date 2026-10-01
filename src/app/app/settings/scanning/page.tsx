@@ -3,7 +3,7 @@ import { WalletPanel } from "@/components/WalletPanel";
 import { walletConnection } from "@/lib/anyapi";
 import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
-import { settingsForUser } from "@/lib/settings";
+import { settingsForUser } from "@/lib/settings/resolve";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
 

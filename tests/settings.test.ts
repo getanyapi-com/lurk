@@ -82,7 +82,7 @@ describe("what a user may change", () => {
   });
 
   it("is the preset itself when the user has saved nothing", () => {
-    expect(resolveSettings("selfHost", null).settings).toEqual(PRESETS.selfHost);
+    expect(resolveSettings("connected", null).settings).toEqual(PRESETS.connected);
     expect([...resolveSettings("free", null).editable]).toEqual([
       "cadence.hour",
       "cadence.timezone",

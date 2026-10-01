@@ -13,7 +13,7 @@ import { fetchPost } from "@/lib/reddit/skus";
 import { commentsOfPost, type StoredPost } from "@/lib/reddit/store";
 import { readThreads, type ThreadRead } from "@/lib/scan/comments";
 import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
-import { threadPolicyFor } from "@/lib/settings";
+import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy } from "@/lib/settings/types";
 import { loadScanProject, type ScanProject } from "@/lib/scan/project";
 import { readPosts, splitByReading } from "@/lib/scan/reading";

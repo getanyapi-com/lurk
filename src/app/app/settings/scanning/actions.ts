@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireLocalUser } from "@/lib/auth";
-import { saveUserSettings, type SettingsOverrides } from "@/lib/settings";
+import { saveUserSettings } from "@/lib/settings/resolve";
+import type { SettingsOverrides } from "@/lib/settings/schema";
 
 type CadenceOverrides = NonNullable<SettingsOverrides["cadence"]>;
 type ThreadOverrides = NonNullable<SettingsOverrides["threads"]>;

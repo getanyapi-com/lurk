@@ -1,3 +1,5 @@
+import type { TierName } from "@/lib/tiers";
+
 /**
  * Scan settings: how often a project is scanned and what a scan may buy from
  * a comment thread. Every value here has a preset per tier (`presets.ts`),
@@ -6,8 +8,8 @@
  * of these numbers.
  */
 
-/** Hosted free wallet, hosted with the user's own AnyAPI wallet, or self-host. */
-export type SettingsPreset = "free" | "connected" | "selfHost";
+/** One preset per tier. A self-hosted instance is on connected's (see presetFor). */
+export type SettingsPreset = TierName;
 
 export type ScanCadenceSettings =
   /** Every `hours` hours, from whenever the last scan finished. */

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoredPost } from "@/lib/reddit/store";
-import { threadPolicyFor } from "@/lib/settings";
+import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy, ThreadPolicySettings } from "@/lib/settings/types";
 
 /**
