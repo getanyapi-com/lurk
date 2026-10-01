@@ -1,7 +1,5 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 /* Dark is a data attribute on <html>, matching tokens.css. */
 @custom-variant dark (&:is([data-theme="dark"] *));
