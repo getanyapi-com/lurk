@@ -90,7 +90,6 @@ describe("TierLimits", () => {
   beforeEach(() => {
     vi.stubEnv("DATABASE_URL", "postgres://reddit_leads@localhost:5433/reddit_leads");
     vi.stubEnv("APP_ENCRYPTION_KEY", Buffer.alloc(32).toString("base64"));
-    vi.stubEnv("X_LEADS_USERS", "");
   });
 
   afterEach(() => {
