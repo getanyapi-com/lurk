@@ -4,14 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { enqueueJob } from "@/jobs/enqueue";
 import { kickScheduler } from "@/jobs/scheduler";
+import { errorMessage, failure } from "@/lib/actionResult";
 import { requireLocalUser } from "@/lib/auth";
 import { createProject } from "@/lib/projects";
 
 export type NewProjectState = { error: string | null };
 
-function sentence(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
+const FALLBACK = "Something went wrong.";
 
 /**
  * The name the project carries until the page read names it: the host, less
@@ -55,14 +54,14 @@ export async function createProjectAndProfileAction(
     }
     projectId = project.id;
   } catch (error) {
-    return { error: sentence(error) };
+    return failure(error, FALLBACK);
   }
 
   try {
     await enqueueJob("discovery_initial", projectId);
     kickScheduler();
   } catch (error) {
-    return { error: `${name} was created but its setup could not be queued: ${sentence(error)}` };
+    return { error: `${name} was created but its setup could not be queued: ${errorMessage(error, FALLBACK)}` };
   }
 
   revalidatePath("/app", "layout");

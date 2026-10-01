@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failure, type ActionResult } from "@/lib/actionResult";
 import { requireLocalUser } from "@/lib/auth";
 import { saveUserSettings } from "@/lib/settings/resolve";
 import type { SettingsOverrides } from "@/lib/settings/schema";
@@ -86,19 +87,25 @@ function threadsFrom(formData: FormData): ThreadOverrides | undefined {
 /**
  * Saves what the Scanning screen changed. The form only carries the fields
  * this user may edit, so anything absent is left to the preset; the settings
- * module drops a key the tier does not allow either way.
+ * module drops a key the tier does not allow either way. A number it cannot
+ * take comes back as the sentence the form shows.
  */
-export async function saveScanSettingsAction(formData: FormData): Promise<void> {
+export async function saveScanSettingsAction(formData: FormData): Promise<ActionResult> {
   const user = await requireLocalUser();
-  const overrides: SettingsOverrides = {};
-  const cadence = cadenceFrom(formData);
-  const threads = threadsFrom(formData);
-  if (cadence) {
-    overrides.cadence = cadence;
+  try {
+    const overrides: SettingsOverrides = {};
+    const cadence = cadenceFrom(formData);
+    const threads = threadsFrom(formData);
+    if (cadence) {
+      overrides.cadence = cadence;
+    }
+    if (threads) {
+      overrides.threads = threads;
+    }
+    await saveUserSettings(user.id, overrides);
+  } catch (error) {
+    return failure(error, "Nothing was saved.");
   }
-  if (threads) {
-    overrides.threads = threads;
-  }
-  await saveUserSettings(user.id, overrides);
   revalidatePath("/app/settings/scanning");
+  return { error: null };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failure, type ActionResult } from "@/lib/actionResult";
 import { addChannel, channelForProject, removeChannel } from "@/lib/alerts/channels";
 import { sampleDigest } from "@/lib/alerts/fixtures";
 import { CHAT_LEAD_CAP } from "@/lib/alerts/select";
@@ -11,22 +12,31 @@ import { requireOwnedProject } from "@/lib/owned";
 
 export type TestSendResult = { ok: boolean; message: string };
 
-/** Adds a channel, which the hourly digest job serves from its next pass. */
-export async function addChannelAction(projectId: string, formData: FormData) {
+/**
+ * Adds a channel, which the hourly digest job serves from its next pass. An
+ * address the channel cannot take, a duplicate or a tier at its cap comes back
+ * as the sentence the form shows.
+ */
+export async function addChannelAction(projectId: string, formData: FormData): Promise<ActionResult> {
   const { user } = await requireOwnedProject(projectId);
   const channel = String(formData.get("channel") ?? "");
   if (!isAlertChannel(channel)) {
-    throw new Error("Pick a channel");
+    return { error: "Pick a channel" };
   }
   const cadence = formData.get("cadence") === "hourly" ? "hourly" : "daily";
-  await addChannel({
-    projectId,
-    userId: user.id,
-    channel,
-    target: String(formData.get("target") ?? ""),
-    cadence,
-  });
+  try {
+    await addChannel({
+      projectId,
+      userId: user.id,
+      channel,
+      target: String(formData.get("target") ?? ""),
+      cadence,
+    });
+  } catch (error) {
+    return failure(error);
+  }
   revalidatePath("/app/settings/alerts");
+  return { error: null };
 }
 
 export async function removeChannelAction(projectId: string, alertId: string) {
@@ -59,14 +69,19 @@ export async function sendTestAction(
 }
 
 /** Mutes a keyword or a subreddit for the project, in the feed and every channel. */
-export async function addMuteAction(projectId: string, formData: FormData) {
+export async function addMuteAction(projectId: string, formData: FormData): Promise<ActionResult> {
   await requireOwnedProject(projectId);
   const kind = String(formData.get("kind") ?? "");
   if (!isMuteKind(kind)) {
-    throw new Error("Pick a keyword or a subreddit");
+    return { error: "Pick a keyword or a subreddit" };
   }
-  await addMute(projectId, kind, String(formData.get("value") ?? ""));
+  try {
+    await addMute(projectId, kind, String(formData.get("value") ?? ""));
+  } catch (error) {
+    return failure(error);
+  }
   revalidatePath("/app", "layout");
+  return { error: null };
 }
 
 export async function removeMuteAction(projectId: string, muteId: string) {

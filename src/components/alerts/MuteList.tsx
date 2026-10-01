@@ -28,11 +28,7 @@ export function MuteList({ projectId, mutes }: MuteListProps) {
 
   async function submit(formData: FormData) {
     setError(null);
-    try {
-      await addMuteAction(projectId, formData);
-    } catch (problem) {
-      setError(problem instanceof Error ? problem.message : String(problem));
-    }
+    setError((await addMuteAction(projectId, formData)).error);
   }
 
   return (

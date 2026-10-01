@@ -11,6 +11,7 @@ import {
   projects,
 } from "@/db/schema";
 import { enqueueJob } from "@/jobs/enqueue";
+import { failure } from "@/lib/actionResult";
 import { competitorHost } from "@/lib/competitors/host";
 import type { Destination } from "@/lib/discovery/queries";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
@@ -102,10 +103,7 @@ export async function saveProfileAction(
     revalidatePath("/app", "layout");
     return { error: null, saved: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Nothing was saved.",
-      saved: false,
-    };
+    return { ...failure(error, "Nothing was saved."), saved: false };
   }
 }
 
@@ -155,10 +153,7 @@ export async function saveLeadFiltersAction(
     revalidatePath("/app", "layout");
     return { error: null, saved: true };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Nothing was saved.",
-      saved: false,
-    };
+    return { ...failure(error, "Nothing was saved."), saved: false };
   }
 }
 
@@ -255,10 +250,7 @@ export async function addChipAction(
     revalidatePath("/app/sources");
     return { error: null };
   } catch (error) {
-    return {
-      error:
-        error instanceof Error ? error.message : "That could not be added.",
-    };
+    return failure(error, "That could not be added.");
   }
 }
 
@@ -320,9 +312,7 @@ export async function setChipStateAction(
     revalidatePath("/app/sources");
     return { error: null };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "That could not be changed.",
-    };
+    return failure(error, "That could not be changed.");
   }
 }
 
@@ -357,9 +347,7 @@ export async function setCompetitorDomainAction(
     revalidatePath("/app/sources");
     return { error: null };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "That could not be changed.",
-    };
+    return failure(error, "That could not be changed.");
   }
 }
 
@@ -450,9 +438,7 @@ export async function addListItemAction(
     await saveLists(project.id, kind, lists);
     return { error: null };
   } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "That could not be added.",
-    };
+    return failure(error, "That could not be added.");
   }
 }
 
@@ -526,6 +512,6 @@ export async function saveScoringAction(projectId: string, raw: unknown): Promis
     revalidatePath("/app", "layout");
     return { error: null, moved };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Nothing was saved.", moved: 0 };
+    return { ...failure(error, "Nothing was saved."), moved: 0 };
   }
 }

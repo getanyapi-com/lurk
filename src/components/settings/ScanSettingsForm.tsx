@@ -135,12 +135,9 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
   async function submit(formData: FormData) {
     setError(null);
     setSaved(false);
-    try {
-      await saveScanSettingsAction(formData);
-      setSaved(true);
-    } catch (problem) {
-      setError(problem instanceof Error ? problem.message : String(problem));
-    }
+    const { error: problem } = await saveScanSettingsAction(formData);
+    setError(problem);
+    setSaved(problem === null);
   }
 
   return (

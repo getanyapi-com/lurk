@@ -53,11 +53,7 @@ export function AddChannelForm({
 
   async function submit(formData: FormData) {
     setError(null);
-    try {
-      await addChannelAction(projectId, formData);
-    } catch (problem) {
-      setError(problem instanceof Error ? problem.message : String(problem));
-    }
+    setError((await addChannelAction(projectId, formData)).error);
   }
 
   return (
