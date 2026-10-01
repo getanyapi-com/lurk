@@ -49,11 +49,8 @@ const seconds = (ms: number) => `${Math.round(Math.max(0, ms) / 1000)} s`;
 function Pulse({ warm }: { warm: boolean }) {
   return (
     <span
-      className="size-2 shrink-0 rounded-full"
-      style={{
-        background: warm ? "var(--score-warm)" : "var(--score-hot)",
-        animation: warm ? "firstSweepPulse 1.2s ease-in-out infinite" : undefined,
-      }}
+      className={`size-2 shrink-0 rounded-full${warm ? " animate-scan-pulse" : ""}`}
+      style={{ background: warm ? "var(--score-warm)" : "var(--score-hot)" }}
     />
   );
 }
@@ -214,10 +211,5 @@ export function FirstSweep({ projectId, first }: { projectId: string; first: Swe
     };
   }, [projectId, ended, gone]);
 
-  return (
-    <>
-      {setup ? <SweepSetup lines={lines} /> : <SweepLine projectId={projectId} status={status} />}
-      <style>{"@keyframes firstSweepPulse { 0% { opacity: 0.35; } 50% { opacity: 1; } 100% { opacity: 0.35; } }"}</style>
-    </>
-  );
+  return setup ? <SweepSetup lines={lines} /> : <SweepLine projectId={projectId} status={status} />;
 }

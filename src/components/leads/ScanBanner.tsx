@@ -30,12 +30,8 @@ export function ScanDone({ title, line }: { title: string; line: string }) {
 export function ScanRunning({ text }: { text: string }) {
   return (
     <div className="text-small flex items-center gap-3 rounded-card border bg-surface px-4 py-2.5" aria-live="polite">
-      <span
-        className="size-2 shrink-0 rounded-full"
-        style={{ background: "var(--score-warm)", animation: "scanPulse 1.2s ease-in-out infinite" }}
-      />
+      <span className="size-2 shrink-0 animate-scan-pulse rounded-full" style={{ background: "var(--score-warm)" }} />
       <span className="min-w-0 flex-1">{text}</span>
-      <style>{"@keyframes scanPulse { 0% { opacity: 0.35; } 50% { opacity: 1; } 100% { opacity: 0.35; } }"}</style>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 import { TermInput } from "@/components/product/TermInput";
 import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/input";
 import type { HiddenLead } from "@/lib/leads";
 import {
   saveLeadFiltersAction,
@@ -32,16 +33,6 @@ type LeadFiltersFormProps = {
 };
 
 const INITIAL: ProfileState = { error: null, saved: false };
-const INPUT = "h-10 rounded-control border bg-surface px-2 text-body text-fg";
-
-function Line({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-small text-fg-muted">
-      {label}
-      {children}
-    </label>
-  );
-}
 
 function Score({
   name,
@@ -53,7 +44,7 @@ function Score({
   placeholder?: string;
 }) {
   return (
-    <input
+    <Input
       name={name}
       type="number"
       min={0}
@@ -61,7 +52,7 @@ function Score({
       step={1}
       defaultValue={value ?? ""}
       placeholder={placeholder}
-      className={`${INPUT} w-32 tabular-nums`}
+      className="w-32 tabular-nums"
     />
   );
 }
@@ -149,20 +140,20 @@ export function LeadFiltersForm({ filters, hidden }: LeadFiltersFormProps) {
       </p>
       {hidden && hidden.hidden > 0 ? <HiddenLeads hidden={hidden} /> : null}
       <div className="flex flex-wrap gap-6">
-        <Line label="Minimum score to show a lead">
+        <Field label="Minimum score to show a lead">
           <Score name="scoreThreshold" value={filters.scoreThreshold} />
-        </Line>
-        <Line label="Minimum score to alert">
+        </Field>
+        <Field label="Minimum score to alert">
           <Score
             name="alertMinScore"
             value={filters.alertMinScore}
             placeholder={String(filters.defaultAlertScore)}
           />
-        </Line>
+        </Field>
         {filters.xMinScore === undefined ? null : (
-          <Line label="Minimum score for an X ask">
+          <Field label="Minimum score for an X ask">
             <Score name="xMinScore" value={filters.xMinScore} placeholder="None" />
-          </Line>
+          </Field>
         )}
       </div>
       <p className="text-small text-fg-muted">

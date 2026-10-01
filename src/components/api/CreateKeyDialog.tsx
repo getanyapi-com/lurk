@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/input";
 import { CopyField } from "@/components/api/CopyField";
 import { createApiKeyAction, type CreateKeyState } from "@/app/app/settings/api/actions";
 
@@ -37,16 +38,9 @@ export function CreateKeyDialog() {
             </>
           ) : (
             <form action={formAction} className="flex flex-col gap-4">
-              <label className="flex flex-col gap-1 text-small text-fg-muted">
-                Key name
-                <input
-                  name="name"
-                  required
-                  disabled={pending}
-                  placeholder="My agent"
-                  className="h-10 rounded-control border bg-surface px-2 text-body text-fg"
-                />
-              </label>
+              <Field label="Key name">
+                <Input name="name" required disabled={pending} placeholder="My agent" />
+              </Field>
               <p className="text-small text-fg-muted">
                 Keys are read-only. They can read your projects, leads, Reddit SEO, themes and
                 spend, and they can change nothing.

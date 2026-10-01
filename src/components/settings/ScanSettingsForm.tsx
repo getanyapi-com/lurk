@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Lock } from "lucide-react";
 import { saveScanSettingsAction } from "@/app/app/settings/scanning/actions";
 import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/input";
 import { SearchSelect } from "@/components/ui/searchSelect";
 import { Select } from "@/components/ui/select";
 import { errorFrom } from "@/lib/actionError";
@@ -18,7 +19,6 @@ type ScanSettingsFormProps = {
   timezoneChosen: boolean;
 };
 
-const INPUT = "h-10 rounded-control border bg-surface px-2 text-body text-fg";
 const YES_NO = [
   { value: "yes", label: "Yes" },
   { value: "no", label: "No" },
@@ -32,17 +32,6 @@ function hourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
-/** One labelled row, whether it holds a control or a value you cannot change. */
-function Line({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-small text-fg-muted">
-      {label}
-      {children}
-      {hint ? <span className="text-small text-fg-muted">{hint}</span> : null}
-    </label>
-  );
-}
-
 const LOCKED_TITLE = "Set by the free template. Connect an AnyAPI wallet to change it.";
 
 /**
@@ -51,20 +40,20 @@ const LOCKED_TITLE = "Set by the free template. Connect an AnyAPI wallet to chan
  */
 function Fixed({ label, hint, value }: { label: string; hint?: string; value: string }) {
   return (
-    <Line label={label} hint={hint}>
+    <Field label={label} hint={hint}>
       <span className="relative flex items-center" title={LOCKED_TITLE}>
-        <input
+        <Input
           type="text"
           value={value}
           readOnly
           disabled
           aria-label={label}
           title={LOCKED_TITLE}
-          className={`${INPUT} w-full cursor-not-allowed bg-surface-2 pr-8 text-fg-muted`}
+          className="w-full cursor-not-allowed bg-surface-2 pr-8 text-fg-muted"
         />
         <Lock className="pointer-events-none absolute right-2.5 size-4 text-fg-muted" aria-hidden="true" />
       </span>
-    </Line>
+    </Field>
   );
 }
 
@@ -150,7 +139,7 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
         {cadence.kind === "daily" ? (
           <div className="grid gap-4 md:grid-cols-2">
             {can.has("cadence.hour") ? (
-              <Line label="Scan once a day at">
+              <Field label="Scan once a day at">
                 <Select
                   key={`hour-${cadence.hour}`}
                   name="hour"
@@ -159,30 +148,30 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
                   options={HOURS}
                   className="h-10 px-3 text-body"
                 />
-              </Line>
+              </Field>
             ) : (
               <Fixed label="Scan once a day at" value={hourLabel(cadence.hour)} />
             )}
             {can.has("cadence.timezone") ? (
-              <Line label="In this timezone">
+              <Field label="In this timezone">
                 <TimezoneField value={timezone} onChange={setTimezone} />
-              </Line>
+              </Field>
             ) : (
               <Fixed label="In this timezone" value={cadence.timezone} />
             )}
           </div>
         ) : can.has("cadence.hours") ? (
-          <Line label="Hours between scans">
-            <input
+          <Field label="Hours between scans">
+            <Input
               name="hours"
               type="number"
               min={1}
               max={24}
               step={1}
               defaultValue={cadence.hours}
-              className={`${INPUT} w-32 tabular-nums`}
+              className="w-32 tabular-nums"
             />
-          </Line>
+          </Field>
         ) : (
           <Fixed
             label="Hours between scans"
@@ -198,17 +187,17 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           {can.has("replyWindowDays") ? (
-            <Line label="Reply window, in days" hint="A lead's replies are bought while the post is younger than this.">
-              <input
+            <Field label="Reply window, in days" hint="A lead's replies are bought while the post is younger than this.">
+              <Input
                 name="replyWindowDays"
                 type="number"
                 min={1}
                 max={30}
                 step={1}
                 defaultValue={threads.replyWindowDays}
-                className={`${INPUT} w-32 tabular-nums`}
+                className="w-32 tabular-nums"
               />
-            </Line>
+            </Field>
           ) : (
             <Fixed
               label="Reply window, in days"
@@ -217,17 +206,17 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
             />
           )}
           {can.has("minReplies") ? (
-            <Line label="Minimum replies" hint="A quieter thread is never bought.">
-              <input
+            <Field label="Minimum replies" hint="A quieter thread is never bought.">
+              <Input
                 name="minReplies"
                 type="number"
                 min={0}
                 max={100}
                 step={1}
                 defaultValue={threads.minReplies}
-                className={`${INPUT} w-32 tabular-nums`}
+                className="w-32 tabular-nums"
               />
-            </Line>
+            </Field>
           ) : (
             <Fixed
               label="Minimum replies"
@@ -236,8 +225,8 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
             />
           )}
           {can.has("threadsPerScan") ? (
-            <Line label="Threads per scan" hint="Leave it empty for no cap.">
-              <input
+            <Field label="Threads per scan" hint="Leave it empty for no cap.">
+              <Input
                 name="threadsPerScan"
                 type="number"
                 min={1}
@@ -245,9 +234,9 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
                 step={1}
                 placeholder="No cap"
                 defaultValue={threads.threadsPerScan ?? ""}
-                className={`${INPUT} w-32 tabular-nums`}
+                className="w-32 tabular-nums"
               />
-            </Line>
+            </Field>
           ) : (
             <Fixed
               label="Threads per scan"
@@ -255,7 +244,7 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
             />
           )}
           {can.has("readOldThreadsOnce") ? (
-            <Line label="Read older lead threads once" hint="One read of a thread past the window, for what your competitors said in it.">
+            <Field label="Read older lead threads once" hint="One read of a thread past the window, for what your competitors said in it.">
               <Select
                 key={`old-${threads.readOldThreadsOnce}`}
                 name="readOldThreadsOnce"
@@ -264,7 +253,7 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
                 options={YES_NO}
                 className="h-10 px-3 text-body"
               />
-            </Line>
+            </Field>
           ) : (
             <Fixed
               label="Read older lead threads once"
@@ -273,7 +262,7 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
             />
           )}
           {can.has("readSeoReplies") ? (
-            <Line label="Read replies on Google-ranked threads" hint="The threads on your SEO screen, read for who is recommended in them.">
+            <Field label="Read replies on Google-ranked threads" hint="The threads on your SEO screen, read for who is recommended in them.">
               <Select
                 key={`seo-${threads.readSeoReplies}`}
                 name="readSeoReplies"
@@ -282,7 +271,7 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
                 options={YES_NO}
                 className="h-10 px-3 text-body"
               />
-            </Line>
+            </Field>
           ) : (
             <Fixed
               label="Read replies on Google-ranked threads"

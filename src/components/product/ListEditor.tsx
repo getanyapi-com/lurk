@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
   addListItemAction,
@@ -107,12 +108,12 @@ export function ListEditor({
         }}
         className="flex gap-2"
       >
-        <input
+        <Input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={placeholder}
           aria-label={`Add to ${title}`}
-          className="h-10 flex-1 rounded-control border bg-surface px-2 text-body text-fg"
+          className="flex-1"
         />
         {kinds ? (
           <Select

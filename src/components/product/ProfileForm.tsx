@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field, Input, Textarea } from "@/components/ui/input";
 import {
   saveProfileAction,
   type ProfileState,
@@ -21,23 +22,6 @@ export type ProfileFields = {
 type ProfileFormProps = { project: ProfileFields };
 
 const INITIAL: ProfileState = { error: null, saved: false };
-const INPUT = "h-10 rounded-control border bg-surface px-2 text-body text-fg";
-const AREA = "rounded-control border bg-surface p-2 text-body text-fg";
-
-function Line({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-small text-fg-muted">
-      {label}
-      {children}
-    </label>
-  );
-}
 
 /** The product profile a scan scores against, editable by hand. */
 export function ProfileForm({ project }: ProfileFormProps) {
@@ -53,51 +37,26 @@ export function ProfileForm({ project }: ProfileFormProps) {
     >
       <input type="hidden" name="projectId" value={project.id} />
       <div className="grid gap-4 md:grid-cols-2">
-        <Line label="Project name">
-          <input
-            name="name"
-            required
-            defaultValue={project.name}
-            className={INPUT}
-          />
-        </Line>
-        <Line label="Product URL">
-          <input
-            name="url"
-            type="url"
-            defaultValue={project.url}
-            className={INPUT}
-          />
-        </Line>
+        <Field label="Project name">
+          <Input name="name" required defaultValue={project.name} />
+        </Field>
+        <Field label="Product URL">
+          <Input name="url" type="url" defaultValue={project.url} />
+        </Field>
       </div>
-      <Line label="The problem it solves">
-        <textarea
-          name="pain"
-          rows={3}
-          defaultValue={project.pain}
-          className={AREA}
-        />
-      </Line>
-      <Line label="How it solves it">
-        <textarea
-          name="solution"
-          rows={3}
-          defaultValue={project.solution}
-          className={AREA}
-        />
-      </Line>
-      <Line label="Who buys it">
-        <textarea
-          name="targetUsers"
-          rows={3}
-          defaultValue={project.targetUsers}
-          className={AREA}
-        />
-      </Line>
+      <Field label="The problem it solves">
+        <Textarea name="pain" rows={3} defaultValue={project.pain} />
+      </Field>
+      <Field label="How it solves it">
+        <Textarea name="solution" rows={3} defaultValue={project.solution} />
+      </Field>
+      <Field label="Who buys it">
+        <Textarea name="targetUsers" rows={3} defaultValue={project.targetUsers} />
+      </Field>
       {project.geography === null ? null : (
-        <Line label="Where the product works">
-          <input name="geography" defaultValue={project.geography} className={INPUT} />
-        </Line>
+        <Field label="Where the product works">
+          <Input name="geography" defaultValue={project.geography} />
+        </Field>
       )}
       <div className="flex items-center gap-3">
         <Button type="submit" size="lg" disabled={pending}>

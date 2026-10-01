@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Favicon } from "@/components/Favicon";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   addChipAction,
   removeChipAction,
@@ -319,12 +320,12 @@ export function PlanEditor({
         }}
         className="flex gap-2"
       >
-        <input
+        <Input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={placeholder}
           aria-label={addLabel}
-          className="h-10 flex-1 rounded-control border bg-surface px-2 text-body text-fg"
+          className="flex-1"
         />
         <Button type="submit" variant="outline" size="lg" disabled={pending}>
           {addLabel}
