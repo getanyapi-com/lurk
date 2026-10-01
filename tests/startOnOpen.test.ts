@@ -56,6 +56,20 @@ describe("startOnOpen against a database", () => {
     expect(await queued(project.id, "competitor_scan")).toHaveLength(0);
   });
 
+  async function post() {
+    const id = `p${randomUUID().slice(0, 8)}`;
+    await db()
+      .insert(schema.redditPosts)
+      .values({
+        id,
+        subreddit: "SaaS",
+        title: "Need a form builder",
+        url: `https://www.reddit.com/r/SaaS/comments/${id}/`,
+        createdAt: new Date(),
+      });
+    return id;
+  }
+
   it("groups the leads again on open only when some arrived since the last grouping", async () => {
     const { regroupOnOpen } = await import("@/lib/startOnOpen");
     const { user, project } = await owned();
@@ -64,7 +78,11 @@ describe("startOnOpen against a database", () => {
     // No leads, nothing to group.
     expect(await regroupOnOpen(project.id)).toBe(false);
 
-    await db().insert(schema.leads).values({ projectId: project.id, score: 80 });
+    // Nor a lead the feed does not show, which grouping would never send.
+    await db().insert(schema.leads).values({ projectId: project.id, postId: await post(), score: 20 });
+    expect(await regroupOnOpen(project.id)).toBe(false);
+
+    await db().insert(schema.leads).values({ projectId: project.id, postId: await post(), score: 80 });
     expect(await regroupOnOpen(project.id)).toBe(true);
     // Queued and not yet run: a second open queues nothing more.
     expect(await regroupOnOpen(project.id)).toBe(false);
@@ -80,7 +98,7 @@ describe("startOnOpen against a database", () => {
 
     await db()
       .insert(schema.leads)
-      .values({ projectId: project.id, score: 70, foundAt: new Date(ranAt.getTime() + 1000) });
+      .values({ projectId: project.id, postId: await post(), score: 70, foundAt: new Date(ranAt.getTime() + 1000) });
     expect(await regroupOnOpen(project.id)).toBe(true);
   });
 

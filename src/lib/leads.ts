@@ -15,7 +15,7 @@ import {
 import { listMutes, redditLeadNotMuted } from "./mutes";
 import { forgetProjectFeed } from "./projectFeedCache";
 import { FEED_FLOOR_SQL, mentions, redditWordsWhere } from "./leadFilters";
-import { atBounds } from "./feed";
+import { atBounds, feedFilter } from "./feed";
 import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN, LEAD_BODY, LEAD_URL, NEED_AT, leadsBase } from "./leadSql";
 import { STAGES } from "./scan/questions";
 import { daysAgo } from "./time";
@@ -124,6 +124,16 @@ export function onAt(at: string | undefined) {
 const OVER_THRESHOLD = sql`((${leads.kind} = 'buyer' AND ${leads.score} >= ${FEED_FLOOR_SQL} AND ${redditWordsWhere()}) OR (${leads.kind} = 'context' AND ${leads.status} <> 'new'))`;
 
 /**
+ * Whether the feed shows a lead on the tab its status puts it on: over that
+ * floor and those word lists, and no mute on it. Insights groups and counts by
+ * this too, so a theme holds leads its link can open. Needs `reddit_posts`, a
+ * left-joined `reddit_comments` and `projects`.
+ */
+export function shownInFeed() {
+  return and(OVER_THRESHOLD, redditLeadNotMuted());
+}
+
+/**
  * The lead ids one Insights theme holds. The theme owns the list, so narrowing
  * the feed to a theme is a membership test against that row and not a rescore.
  * The row is found by id: a label is model-written prose that two runs can
@@ -142,13 +152,12 @@ function feedWhere(projectId: string, filter: FeedFilter) {
   return and(
     eq(leads.projectId, projectId),
     eq(leads.status, filter.status),
-    OVER_THRESHOLD,
+    shownInFeed(),
     newerThan(filter.days),
     onAt(filter.at),
     filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
     filter.stage ? eq(leads.stage, filter.stage) : undefined,
     filter.theme ? inArray(leads.id, leadIdsOfTheme(projectId, filter.theme)) : undefined,
-    redditLeadNotMuted(),
   );
 }
 
@@ -199,6 +208,39 @@ export async function listLeads(
 export async function countLeads(projectId: string, filter: FeedFilter): Promise<number> {
   const rows = await leadsBase({ total: count() }).where(feedWhere(projectId, filter));
   return rows[0]?.total ?? 0;
+}
+
+/**
+ * The leads a link to each Insights theme opens the feed on. The link sets no
+ * pill but the theme, so the feed opens on the theme's new leads written in
+ * the last 30 days, or in all time when none of them is that recent, as Feed
+ * does with a window nobody chose. A card counts and puts faces to these, so
+ * the number on it is the number of rows its link shows.
+ */
+export async function themeLinkLeads(
+  projectId: string,
+  themes: { id: string; leadIds: string[] }[],
+): Promise<Map<string, string[]>> {
+  const ids = themes.flatMap((theme) => theme.leadIds);
+  const opened = feedFilter({});
+  const rows =
+    ids.length === 0
+      ? []
+      : await db()
+          .select({ id: leads.id, recent: sql<boolean>`${newerThan(opened.days) ?? sql`true`}` })
+          .from(leads)
+          .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
+          .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
+          .innerJoin(projects, eq(projects.id, leads.projectId))
+          .where(and(feedWhere(projectId, { ...opened, days: "all" }), inArray(leads.id, ids)));
+  const shown = new Set(rows.map((row) => row.id));
+  const recent = new Set(rows.filter((row) => row.recent).map((row) => row.id));
+  return new Map(
+    themes.map((theme) => {
+      const inWindow = theme.leadIds.filter((id) => recent.has(id));
+      return [theme.id, inWindow.length > 0 ? inWindow : theme.leadIds.filter((id) => shown.has(id))];
+    }),
+  );
 }
 
 /**

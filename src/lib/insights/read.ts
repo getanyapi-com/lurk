@@ -9,6 +9,7 @@ import {
   subreddits,
 } from "@/db/schema";
 import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN } from "@/lib/leadSql";
+import { themeLinkLeads } from "@/lib/leads";
 
 /** How many faces a theme card shows before it stops. */
 export const THEME_FACES = 5;
@@ -122,6 +123,12 @@ function communitiesOf(leadIds: string[], facts: Map<string, LeadFact>): ThemeCo
  * The stored themes with their faces, quotes and communities, biggest first.
  * A card quotes the same leads it shows faces for, so the two halves of the
  * card describe one set of people rather than two.
+ *
+ * A theme keeps the leads it was grouped from, and a card describes only those
+ * its link opens the feed on: one triaged, muted or filtered out since the
+ * grouping leaves the count, the faces, the quotes and the communities, so the
+ * number on the card is the number of rows the link shows. The theme itself
+ * stays until the next grouping, which decides what the leads have in common.
  */
 export async function listThemes(projectId: string): Promise<ThemeView[]> {
   const rows = await db()
@@ -129,27 +136,32 @@ export async function listThemes(projectId: string): Promise<ThemeView[]> {
     .from(painThemes)
     .where(eq(painThemes.projectId, projectId))
     .orderBy(desc(painThemes.generatedAt));
-  const facts = await factsFor(rows.flatMap((row) => row.leadIds ?? []));
+  const opened = await themeLinkLeads(
+    projectId,
+    rows.map((row) => ({ id: row.id, leadIds: row.leadIds ?? [] })),
+  );
+  const themes = rows.map((row) => ({ ...row, leadIds: opened.get(row.id) ?? [] }));
+  const facts = await factsFor(themes.flatMap((theme) => theme.leadIds));
   const quotes = themeQuotes(
-    rows.flatMap((row) =>
-      (row.leadIds ?? [])
+    themes.flatMap((theme) =>
+      theme.leadIds
         .slice(0, THEME_FACES)
-        .map((id) => ({ themeId: row.id, phrase: facts.get(id)?.phrase ?? null })),
+        .map((id) => ({ themeId: theme.id, phrase: facts.get(id)?.phrase ?? null })),
     ),
   );
-  return rows
-    .map((row) => ({
-      id: row.id,
-      label: row.label,
-      summary: row.summary,
-      count: (row.leadIds ?? []).length,
-      faces: (row.leadIds ?? [])
+  return themes
+    .map((theme) => ({
+      id: theme.id,
+      label: theme.label,
+      summary: theme.summary,
+      count: theme.leadIds.length,
+      faces: theme.leadIds
         .slice(0, THEME_FACES)
         .map((id) => facts.get(id)?.face)
         .filter((face): face is ThemeFace => face !== undefined),
-      quotes: quotes.get(row.id) ?? [],
-      communities: communitiesOf(row.leadIds ?? [], facts),
-      generatedAt: row.generatedAt,
+      quotes: quotes.get(theme.id) ?? [],
+      communities: communitiesOf(theme.leadIds, facts),
+      generatedAt: theme.generatedAt,
     }))
     .sort((a, b) => b.count - a.count);
 }

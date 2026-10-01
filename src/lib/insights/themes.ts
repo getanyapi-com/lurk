@@ -1,7 +1,8 @@
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gt, gte, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { leads, painThemes, redditComments, redditPosts } from "@/db/schema";
+import { leads, painThemes, projects, redditComments, redditPosts } from "@/db/schema";
+import { shownInFeed } from "@/lib/leads";
 import { generateStructured } from "@/lib/llm";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import { inFlight } from "@/lib/inFlight";
@@ -47,7 +48,24 @@ const themesSchema = z.object({
   ),
 });
 
-/** The leads worth clustering: still in the feed or hidden, inside the window. */
+/**
+ * The leads worth grouping: the ones the feed shows on its New and Hidden tabs,
+ * judged inside the window. A context thread, one under the project's floor,
+ * one its words keep out and one it muted are never shown, so none of them is
+ * paid for here. Read over the lead joined to its post, its comment and its
+ * project.
+ */
+function clusterableWhere(projectId: string, foundAfter?: Date) {
+  return and(
+    eq(leads.projectId, projectId),
+    inArray(leads.status, ["new", "hidden"]),
+    gte(leads.scoredAt, daysAgo(INSIGHTS_WINDOW_DAYS)),
+    shownInFeed(),
+    foundAfter ? gt(leads.foundAt, foundAfter) : undefined,
+  );
+}
+
+/** What one grouping sends the model. */
 export async function clusterableLeads(projectId: string): Promise<ThemeInput[]> {
   const rows = await db()
     .select({
@@ -61,13 +79,8 @@ export async function clusterableLeads(projectId: string): Promise<ThemeInput[]>
     .from(leads)
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .where(
-      and(
-        eq(leads.projectId, projectId),
-        inArray(leads.status, ["new", "hidden"]),
-        gte(leads.scoredAt, daysAgo(INSIGHTS_WINDOW_DAYS)),
-      ),
-    );
+    .innerJoin(projects, eq(projects.id, leads.projectId))
+    .where(clusterableWhere(projectId));
   return rows.map((row) => ({
     id: row.id,
     title: row.commentBody ? `Reply on: ${row.title}` : row.title,
@@ -75,6 +88,22 @@ export async function clusterableLeads(projectId: string): Promise<ThemeInput[]>
     matchedPhrase: row.matchedPhrase,
     stage: row.stage,
   }));
+}
+
+/**
+ * Whether a lead worth grouping was found after a moment, or at all when there
+ * is none: the only new leads a regroup would send the model.
+ */
+export async function clusterableFoundAfter(projectId: string, after: Date | null): Promise<boolean> {
+  const [found] = await db()
+    .select({ id: leads.id })
+    .from(leads)
+    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
+    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
+    .innerJoin(projects, eq(projects.id, leads.projectId))
+    .where(clusterableWhere(projectId, after ?? undefined))
+    .limit(1);
+  return found !== undefined;
 }
 
 function describe(item: ThemeInput): string {
