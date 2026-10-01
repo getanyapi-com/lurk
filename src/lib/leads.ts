@@ -5,6 +5,7 @@ import {
   leadEvaluations,
   leads,
   painThemes,
+  projects,
   redditAuthors,
   redditComments,
   redditPosts,
