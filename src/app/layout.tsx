@@ -24,10 +24,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    // Signing in lands on the leads page itself: /app only redirects there, and
+    // would draw the whole app layout, every read behind the rail included, first.
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      signInFallbackRedirectUrl="/app"
-      signUpFallbackRedirectUrl="/app"
+      signInFallbackRedirectUrl="/app/leads"
+      signUpFallbackRedirectUrl="/app/leads"
     >
       <html lang="en" suppressHydrationWarning>
         <head>

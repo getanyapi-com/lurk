@@ -81,35 +81,44 @@ export const searched = and(
   or(isNull(xRuns.partialReason), like(xRuns.partialReason, "%lookups failed%")),
 );
 
-export async function xQuiet(projectId: string, now = new Date()): Promise<XQuiet> {
+/**
+ * The rule, read for one project. `enabledAt` is the project's x_projects
+ * time, which a caller holding that row passes in rather than have it read
+ * again; left out, it is read here.
+ */
+export async function xQuiet(projectId: string, now = new Date(), enabledAt?: Date | null): Promise<XQuiet> {
   const lookback = new Date(now.getTime() - QUIET_LOOKBACK_DAYS * DAY_MS);
-  const [all] = await db()
-    .select({ runs: sql<number>`count(*)::int` })
-    .from(xRuns)
-    .where(and(eq(xRuns.projectId, projectId), searched));
-  const [firstRun] = await db()
-    .select({ startedAt: xRuns.startedAt, fullPages: xRuns.fullPages })
-    .from(xRuns)
-    .where(and(eq(xRuns.projectId, projectId), searched))
-    .orderBy(asc(xRuns.startedAt))
-    .limit(1);
-  const [recent] = await db()
-    .select({
-      first: sql<Date | null>`min(${xRuns.startedAt})`,
-      posts: sql<number>`coalesce(sum(${xRuns.postsNew}), 0)::int`,
-    })
-    .from(xRuns)
-    .where(and(eq(xRuns.projectId, projectId), searched, gte(xRuns.startedAt, lookback)));
-  // Anything shown ends it, whatever the run that found it was cut short by.
-  const [found] = await db()
-    .select({ shown: sql<number>`coalesce(sum(${xRuns.leads} + ${xRuns.replies}), 0)::int` })
-    .from(xRuns)
-    .where(and(eq(xRuns.projectId, projectId), isNotNull(xRuns.finishedAt), gte(xRuns.startedAt, lookback)));
-  const [waiting] = await db()
-    .select({ n: sql<number>`count(*)::int` })
-    .from(xEvaluations)
-    .where(and(eq(xEvaluations.projectId, projectId), inArray(xEvaluations.stage, PENDING_STAGES)));
-  const [state] = await db().select({ enabledAt: xProjects.enabledAt }).from(xProjects).where(eq(xProjects.projectId, projectId));
+  const [[all], [firstRun], [recent], [found], [waiting], [state]] = await Promise.all([
+    db()
+      .select({ runs: sql<number>`count(*)::int` })
+      .from(xRuns)
+      .where(and(eq(xRuns.projectId, projectId), searched)),
+    db()
+      .select({ startedAt: xRuns.startedAt, fullPages: xRuns.fullPages })
+      .from(xRuns)
+      .where(and(eq(xRuns.projectId, projectId), searched))
+      .orderBy(asc(xRuns.startedAt))
+      .limit(1),
+    db()
+      .select({
+        first: sql<Date | null>`min(${xRuns.startedAt})`,
+        posts: sql<number>`coalesce(sum(${xRuns.postsNew}), 0)::int`,
+      })
+      .from(xRuns)
+      .where(and(eq(xRuns.projectId, projectId), searched, gte(xRuns.startedAt, lookback))),
+    // Anything shown ends it, whatever the run that found it was cut short by.
+    db()
+      .select({ shown: sql<number>`coalesce(sum(${xRuns.leads} + ${xRuns.replies}), 0)::int` })
+      .from(xRuns)
+      .where(and(eq(xRuns.projectId, projectId), isNotNull(xRuns.finishedAt), gte(xRuns.startedAt, lookback))),
+    db()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(xEvaluations)
+      .where(and(eq(xEvaluations.projectId, projectId), inArray(xEvaluations.stage, PENDING_STAGES))),
+    enabledAt !== undefined
+      ? [{ enabledAt }]
+      : db().select({ enabledAt: xProjects.enabledAt }).from(xProjects).where(eq(xProjects.projectId, projectId)),
+  ]);
   return quietFrom(
     {
       runs: all?.runs ?? 0,

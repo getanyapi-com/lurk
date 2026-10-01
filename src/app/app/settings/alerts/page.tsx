@@ -29,8 +29,11 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const { project: requested, slack, discord } = await searchParams;
   const outcome = installOutcome("Slack", slack) ?? installOutcome("Discord", discord);
   const project = await requireActiveProject(user.id, requested);
-  const { limits } = await limitsForUser(user.id);
-  const [channels, mutes] = await Promise.all([listChannels(project.id), listMutes(project.id)]);
+  const [{ limits }, channels, mutes] = await Promise.all([
+    limitsForUser(user.id),
+    listChannels(project.id),
+    listMutes(project.id),
+  ]);
   const kinds = channels.map((one) => one.channel);
   const allowance = customWebhookAllowance(kinds, limits);
   const rows: ChannelRow[] = channels.map((one) => ({

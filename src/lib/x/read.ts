@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs, projects, xAuthors, xEvaluations, xLanes, xLeads, xPosts, xProjects, xRuns } from "@/db/schema";
 import { xShownWhere } from "@/lib/leadFilters";
@@ -652,48 +652,40 @@ export type XStatus = {
 };
 
 export async function xStatus(projectId: string): Promise<XStatus> {
-  const [state] = await db().select().from(xProjects).where(eq(xProjects.projectId, projectId));
-  const [lastRun] = await db()
-    .select()
-    .from(xRuns)
-    .where(and(eq(xRuns.projectId, projectId), sql`${xRuns.finishedAt} is not null`))
-    .orderBy(desc(xRuns.startedAt))
-    .limit(1);
-  const [running] = await db()
-    .select({ kind: jobs.kind, progress: jobs.progress })
-    .from(jobs)
-    .where(
-      and(
-        eq(jobs.projectId, projectId),
-        eq(jobs.kind, "x_scan"),
-        isNull(jobs.finishedAt),
-        sql`${jobs.startedAt} is not null`,
-      ),
-    )
-    .limit(1);
+  const now = new Date();
+  const [[state], [lastRun], [running], [lastFinished], next] = await Promise.all([
+    db().select().from(xProjects).where(eq(xProjects.projectId, projectId)),
+    db()
+      .select()
+      .from(xRuns)
+      .where(and(eq(xRuns.projectId, projectId), sql`${xRuns.finishedAt} is not null`))
+      .orderBy(desc(xRuns.startedAt))
+      .limit(1),
+    db()
+      .select({ kind: jobs.kind, progress: jobs.progress })
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.projectId, projectId),
+          eq(jobs.kind, "x_scan"),
+          isNull(jobs.finishedAt),
+          sql`${jobs.startedAt} is not null`,
+        ),
+      )
+      .limit(1),
+    db()
+      .select({ error: jobs.error })
+      .from(jobs)
+      .where(and(eq(jobs.projectId, projectId), eq(jobs.kind, "x_scan"), sql`${jobs.finishedAt} is not null`))
+      .orderBy(desc(jobs.finishedAt))
+      .limit(1),
+    nextQueuedJob("x_scan", projectId),
+  ]);
+  // The project's row already says when X was turned on, which is all the quiet rule reads of it.
+  const quiet = await xQuiet(projectId, now, state?.enabledAt ?? null);
   // The first check, due now, is as good as running; a later one booked is just the next check.
-  const [waitingFirst] = state?.lastScanAt
-    ? []
-    : await db()
-        .select({ kind: jobs.kind })
-        .from(jobs)
-        .where(
-          and(
-            eq(jobs.projectId, projectId),
-            eq(jobs.kind, "x_scan"),
-            isNull(jobs.startedAt),
-            lte(jobs.runAt, new Date()),
-          ),
-        )
-        .limit(1);
-  const [lastFinished] = await db()
-    .select({ error: jobs.error })
-    .from(jobs)
-    .where(and(eq(jobs.projectId, projectId), eq(jobs.kind, "x_scan"), sql`${jobs.finishedAt} is not null`))
-    .orderBy(desc(jobs.finishedAt))
-    .limit(1);
-  const next = await nextQueuedJob("x_scan", projectId);
-  const quiet = await xQuiet(projectId);
+  // The next job waiting is the earliest, so it is due exactly when any waiting one is.
+  const waitingFirst = !state?.lastScanAt && next !== null && next.runAt.getTime() <= now.getTime();
   return {
     quiet,
     opened: Boolean(state),

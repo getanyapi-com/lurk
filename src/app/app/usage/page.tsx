@@ -18,10 +18,13 @@ type UsagePageProps = { searchParams: Promise<{ project?: string }> };
 export default async function UsagePage({ searchParams }: UsagePageProps) {
   const user = await requireLocalUser();
   const active = await requireActiveProject(user.id, (await searchParams).project);
-  const usage = await usageToday([active.id]);
-  const job = await lastRunJob("scan", active.id);
+  // Only the last scan's spend waits on which scan was last.
+  const [usage, job, sources] = await Promise.all([
+    usageToday([active.id]),
+    lastRunJob("scan", active.id),
+    sourceYield(active.id),
+  ]);
   const scan = job?.startedAt ? await usageSince(active.id, job.startedAt) : null;
-  const sources = await sourceYield(active.id);
 
   return (
     <div className="flex flex-col gap-6">
