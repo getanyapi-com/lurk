@@ -10,7 +10,7 @@ import { leadInSubreddit, listLeads, setLeadStatus } from "@/lib/leads";
 import { addMute } from "@/lib/mutes";
 import { promoPolicyFor } from "@/lib/profile";
 import { projectForUser } from "@/lib/projects";
-import { sweepStatus, sweepThreadDetail, type SweepStatus } from "@/lib/sweep";
+import { sweepStatus, type SweepStatus } from "@/lib/sweep";
 
 async function ownedProject(projectId: string) {
   const user = await requireLocalUser();
@@ -90,12 +90,6 @@ export async function moreLeadsAction(
 export async function sweepAction(projectId: string): Promise<SweepStatus | null> {
   await ownedProject(projectId);
   return sweepStatus(projectId);
-}
-
-/** One thread off the sweep's board, in full, for the shelf a phone opens it on. */
-export async function sweepThreadAction(projectId: string, postId: string) {
-  await ownedProject(projectId);
-  return sweepThreadDetail(projectId, postId);
 }
 
 /**
