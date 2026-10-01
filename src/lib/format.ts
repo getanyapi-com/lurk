@@ -33,6 +33,25 @@ export function relativeUntil(date: Date, now = new Date()): string {
   return `in ${shortAge(now, date)}`;
 }
 
+/** Whether an error leads with the SQL of a statement that failed, as drizzle writes one. */
+export function isFailedQuery(message: string): boolean {
+  return message.startsWith("Failed query:");
+}
+
+/**
+ * The first sentence of a stored failure, which is written for whoever debugs
+ * it, for the status line that follows "Last scan stopped:". A failed statement
+ * leads with its SQL, which means nothing to the person reading the tab, so
+ * that one is said in words instead.
+ */
+export function errorSentence(error: string): string {
+  if (isFailedQuery(error)) {
+    return "the database could not finish it. It is safe to try again.";
+  }
+  const line = error.split("\n")[0].trim();
+  return line.endsWith(".") ? line : `${line}.`;
+}
+
 /** A count as a short mono figure: 950, 1.2k, 18k, 2.4M. */
 export function compactCount(value: number): string {
   if (value < 1000) return String(value);

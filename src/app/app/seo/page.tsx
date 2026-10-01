@@ -1,8 +1,8 @@
 import { openSeoAction, refreshSeoAction } from "@/app/app/jobs";
 import { EmptyState } from "@/components/EmptyState";
+import { JobStatus, type JobWords } from "@/components/JobStatus";
 import { StartOnOpen } from "@/components/StartOnOpen";
 import { NoPhrasings } from "@/components/seo/NoPhrasings";
-import { RefreshStatus } from "@/components/seo/RefreshStatus";
 import { SeoFilters } from "@/components/seo/SeoFilters";
 import { SplitView } from "@/components/seo/SplitView";
 import { ThreadTable } from "@/components/seo/ThreadTable";
@@ -30,6 +30,19 @@ type SeoParams = {
 };
 
 type SeoPageProps = { searchParams: Promise<SeoParams> };
+
+/** The refresh's status line. One with no phrasing to look up finished without searching. */
+const REFRESH_WORDS: JobWords = {
+  noun: "refresh",
+  running: "Refreshing now",
+  finished: (job, ago) =>
+    job.progress === NO_PHRASINGS_PROGRESS
+      ? `The last refresh, ${ago}, had nothing to look up.`
+      : `Last refresh finished ${ago}.`,
+  stopped: "Last refresh stopped",
+  never: "No refresh has run yet.",
+  button: "Refresh now",
+};
 
 const EMPTY_SENTENCE =
   "A refresh asks Google which Reddit threads rank for each way your buyers say the problem, then opens every thread for its score, replies and age. At catalog prices the search is about $0.001 per phrasing, and each thread it opens is about $0.001 more.";
@@ -92,7 +105,7 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
           <h2 className="text-h2" style={{ fontWeight: 500 }}>
             Reddit SEO
           </h2>
-          <RefreshStatus last={last} next={next} />
+          <JobStatus last={last} next={next} words={REFRESH_WORDS} />
           {threads.length > 0 ? (
             <p className="text-mono text-fg-muted">
               {tally(

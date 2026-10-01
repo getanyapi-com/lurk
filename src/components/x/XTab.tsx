@@ -18,7 +18,7 @@ import { XLeadRow, repliedHandle } from "@/components/x/XLeadRow";
 import { XReplyChip } from "@/components/x/XReplyChip";
 import { config } from "@/lib/config";
 import { atBounds, atKey, grainOf, type FeedParams } from "@/lib/feed";
-import { compactCount, relativeAge, relativeUntil } from "@/lib/format";
+import { compactCount, errorSentence, relativeAge, relativeUntil } from "@/lib/format";
 import { limitsForUser } from "@/lib/tier";
 import { DAY_MS } from "@/lib/time";
 import { QUIET_RECHECK_DAYS } from "@/lib/x/constants";
@@ -96,7 +96,7 @@ function statusLine(status: XStatus): string {
   }
   if (status.lastFailure) {
     const retry = status.nextScanAt ? ` Trying again ${relativeUntil(status.nextScanAt)}.` : " Trying again within the hour.";
-    return `The last X search stopped: ${status.lastFailure}.${retry}`;
+    return `The last X search stopped: ${errorSentence(status.lastFailure)}${retry}`;
   }
   const last = status.lastScanAt ? `Checked X ${relativeAge(status.lastScanAt)}.` : "X has not been checked yet.";
   const next = status.nextScanAt ? ` Next check ${relativeUntil(status.nextScanAt)}.` : "";

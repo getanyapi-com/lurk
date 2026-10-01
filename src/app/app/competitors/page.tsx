@@ -4,7 +4,7 @@ import { MentionCard } from "@/components/competitors/MentionCard";
 import { MentionsBar } from "@/components/competitors/MentionsBar";
 import { TopCompetitors } from "@/components/competitors/TopCompetitors";
 import { EmptyState } from "@/components/EmptyState";
-import { relativeAge, relativeUntil } from "@/lib/format";
+import { JobStatus, type JobWords } from "@/components/JobStatus";
 import { lastRunJob, nextQueuedJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { allowanceFor } from "@/lib/throttle";
@@ -20,36 +20,15 @@ import { requireActiveProject } from "@/lib/projects";
 
 type CompetitorsPageProps = { searchParams: Promise<{ project?: string }> };
 
-type Job = Awaited<ReturnType<typeof lastRunJob>>;
-
-function lastSentence(job: Job): string | null {
-  if (!job?.startedAt) {
-    return null;
-  }
-  if (!job.finishedAt) {
-    return job.progress ? `Scanning now: ${job.progress}` : "Scanning now.";
-  }
-  if (job.error) {
-    return `Last scan stopped: ${job.error.split("\n")[0].trim()}`;
-  }
-  return `Last scanned ${relativeAge(job.finishedAt)}.`;
-}
-
-function nextSentence(job: Job): string {
-  if (!job) {
-    return "No scan is scheduled. Press Scan now.";
-  }
-  const until = relativeUntil(job.runAt);
-  return until === "now" ? "The next scan is due now." : `Next scan ${until}.`;
-}
-
-/** What the last scan did and when the next one runs, as one line. */
-function statusLine(last: Job, next: Job): string {
-  if (last?.startedAt && !last.finishedAt) {
-    return lastSentence(last) ?? "";
-  }
-  return [lastSentence(last) ?? "No competitor scan has run yet.", nextSentence(next)].join(" ");
-}
+/** The competitor scan's status line. */
+const SCAN_WORDS: JobWords = {
+  noun: "scan",
+  running: "Scanning now",
+  finished: (_job, ago) => `Last scanned ${ago}.`,
+  stopped: "Last scan stopped",
+  never: "No competitor scan has run yet.",
+  button: "Scan now",
+};
 
 export default async function CompetitorsPage({ searchParams }: CompetitorsPageProps) {
   const user = await requireLocalUser();
@@ -76,7 +55,7 @@ export default async function CompetitorsPage({ searchParams }: CompetitorsPageP
           <h1 className="text-h2" style={{ fontWeight: 500 }}>
             Competitors
           </h1>
-          <p className="text-small text-fg-muted">{statusLine(last, next)}</p>
+          <JobStatus last={last} next={next} words={SCAN_WORDS} />
         </div>
         <form action={scanCompetitorsAction.bind(null, project.id)}>
           <PaidButton label="Scan now" allowance={allowance} />

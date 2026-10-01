@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import type { JobRow } from "@/jobs/enqueue";
-import { relativeAge, relativeUntil } from "@/lib/format";
+import { errorSentence, relativeAge, relativeUntil } from "@/lib/format";
 
 /**
  * What one project is doing right now, read once and shown everywhere. The
@@ -144,19 +144,6 @@ const STOPPED: Record<ActivityKind, string> = {
   scan: "Last scan stopped",
 };
 
-/**
- * The first sentence of a stored failure, which is written for whoever debugs
- * it. A failed statement leads with its SQL, which means nothing to the person
- * reading the board, so that one is said in words instead.
- */
-function firstSentence(error: string): string {
-  if (error.startsWith("Failed query:")) {
-    return "the database could not finish it. It is safe to try again.";
-  }
-  const line = error.split("\n")[0].trim();
-  return line.endsWith(".") ? line : `${line}.`;
-}
-
 function activeSentence(job: ActiveJob): string {
   if (!job.running) {
     return WAITING[job.kind];
@@ -169,7 +156,7 @@ function lastSentence(job: ActivityRow | null): string | null {
     return null;
   }
   if (job.error) {
-    return `${STOPPED[job.kind]}: ${firstSentence(job.error)}`;
+    return `${STOPPED[job.kind]}: ${errorSentence(job.error)}`;
   }
   return `${FINISHED[job.kind]} ${relativeAge(job.finishedAt)}.`;
 }

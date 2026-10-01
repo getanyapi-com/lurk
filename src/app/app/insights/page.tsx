@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { CommunitiesTable } from "@/components/insights/CommunitiesTable";
 import { InsightsTabs, type InsightsTab } from "@/components/insights/InsightsTabs";
 import { ThemeCard } from "@/components/insights/ThemeCard";
-import { relativeAge } from "@/lib/format";
+import { errorSentence, relativeAge } from "@/lib/format";
 import { lastRunJob } from "@/jobs/enqueue";
 import { requireLocalUser } from "@/lib/auth";
 import { allowanceFor } from "@/lib/throttle";
@@ -23,7 +23,7 @@ function lastRunSentence(job: Awaited<ReturnType<typeof lastRunJob>>): string {
     return job.progress ? `Grouping now: ${job.progress}` : "A grouping is queued.";
   }
   if (job.error) {
-    return `Last grouping stopped: ${job.error.split("\n")[0]}`;
+    return `Last grouping stopped: ${errorSentence(job.error)}`;
   }
   return `Last grouped ${relativeAge(job.finishedAt)}.`;
 }
