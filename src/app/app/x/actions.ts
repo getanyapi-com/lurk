@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { kickScheduler } from "@/jobs/scheduler";
 import { requireLocalUser } from "@/lib/auth";
-import { markThreadReplied } from "@/lib/handled";
+import { markThreadReplied, reopenThread } from "@/lib/handled";
 import { projectForUser } from "@/lib/projects";
 import { pressForJob } from "@/lib/throttle";
 import { xEnabledFor } from "@/lib/x/enabled";
@@ -58,6 +58,16 @@ export async function repliedXLeadAction(projectId: string, leadId: string) {
   const conversation = await xLeadConversation(projectId, leadId);
   if (conversation) {
     await markThreadReplied(projectId, "x", conversation);
+  }
+  revalidatePath("/app", "layout");
+}
+
+/** Takes Replied back: the conversation's leads are new again, and later ones arrive as before. */
+export async function reopenXLeadAction(projectId: string, leadId: string) {
+  await ownedXProject(projectId);
+  const conversation = await xLeadConversation(projectId, leadId);
+  if (conversation) {
+    await reopenThread(projectId, "x", conversation);
   }
   revalidatePath("/app", "layout");
 }

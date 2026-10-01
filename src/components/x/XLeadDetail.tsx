@@ -1,10 +1,11 @@
 import { ExternalLink, Eye, Heart, MessageCircle, Search } from "lucide-react";
+import { hideXLeadAction, notFitXLeadAction, reopenXLeadAction, repliedXLeadAction } from "@/app/app/x/actions";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { VerdictBadge } from "@/components/VerdictBadge";
+import { LeadActions } from "@/components/leads/LeadActions";
 import { Meter } from "@/components/leads/Meter";
 import { accountAge } from "@/components/leads/workspace";
 import { XBody } from "@/components/x/XBody";
-import { XLeadActions } from "@/components/x/XLeadActions";
 import { XReplyChip } from "@/components/x/XReplyChip";
 import { XThread } from "@/components/x/XThread";
 import { filteredSentence } from "@/components/x/filtered";
@@ -20,6 +21,9 @@ export type XSelection =
 
 /** Nothing here is estimated, so a fact X never gave reads as a dash. */
 const MISSING = "-";
+
+/** Why a post worth a reply was a miss. "No active need" is true of every reply by construction. */
+const REPLY_NOT_FIT_REASONS = ["can't help them", "not worth replying", "seller side", "other"];
 
 function tally(value: number | null): string {
   return value === null ? MISSING : value.toLocaleString("en-US");
@@ -247,7 +251,7 @@ export function XLeadDetail({
           </div>
           <XDetailRail card={item} engagement={item.engagement} unscored={filtered?.kind === "screened" && filtered.score === null} />
         </div>
-        <XLeadActions projectId={projectId} leadId={null} url={item.url} />
+        <LeadActions openLabel="Open on X" url={item.url} actions={null} />
       </Pane>
     );
   }
@@ -288,7 +292,18 @@ export function XLeadDetail({
         </div>
         <XDetailRail card={lead} engagement={lead.engagement} reply={reply} moment={lead.moment} />
       </div>
-      <XLeadActions projectId={projectId} leadId={lead.id} url={lead.url} kind={lead.kind} />
+      <LeadActions
+        openLabel="Open on X"
+        url={lead.url}
+        replied={lead.status === "replied"}
+        actions={{
+          replied: repliedXLeadAction.bind(null, projectId, lead.id),
+          reopen: reopenXLeadAction.bind(null, projectId, lead.id),
+          hide: hideXLeadAction.bind(null, projectId, lead.id),
+          notFit: notFitXLeadAction.bind(null, projectId, lead.id),
+        }}
+        reasons={reply ? REPLY_NOT_FIT_REASONS : undefined}
+      />
     </Pane>
   );
 }

@@ -166,6 +166,34 @@ describe.skipIf(!process.env.DATABASE_URL)("replied threads and mutes, read from
     );
   });
 
+  it("marks an X conversation replied and takes it back, every lead in it alike", async () => {
+    const { db, schema, projectId } = await fixture();
+    const { eq } = await import("drizzle-orm");
+    const { isThreadHandled, markThreadReplied, reopenThread } = await import("@/lib/handled");
+    const conversation = `9${Date.now()}`;
+    const ids = [conversation, `${conversation}1`, `8${Date.now()}`];
+    await db()
+      .insert(schema.xPosts)
+      .values(ids.map((id) => ({ id, text: "any good typeform alternative?", createdAt: new Date(), authorUsername: `a${id.slice(-6)}` })));
+    await db()
+      .insert(schema.xLeads)
+      .values([
+        { projectId, tweetId: ids[0], score: 80, authorUsername: "a", conversationId: conversation },
+        { projectId, tweetId: ids[1], score: 70, authorUsername: "b", conversationId: conversation },
+        { projectId, tweetId: ids[2], score: 60, authorUsername: "c", conversationId: ids[2] },
+      ]);
+    const statuses = async () =>
+      (await db().select().from(schema.xLeads).where(eq(schema.xLeads.projectId, projectId)))
+        .sort((a, b) => b.score - a.score)
+        .map((lead) => lead.status);
+
+    await markThreadReplied(projectId, "x", conversation);
+    expect(await statuses()).toEqual(["replied", "replied", "new"]);
+    await reopenThread(projectId, "x", conversation);
+    expect(await statuses()).toEqual(["new", "new", "new"]);
+    expect(await isThreadHandled(projectId, "x", conversation)).toBe(false);
+  });
+
   it("mutes a whole word or phrase and a whole subreddit, and unmuting brings them back", async () => {
     const { db, schema, projectId, post } = await fixture();
     const { addMute, listMutes, removeMute } = await import("@/lib/mutes");

@@ -10,7 +10,7 @@ import { PeopleStrip } from "@/components/leads/PeopleStrip";
 import { ScanStatus } from "@/components/leads/ScanStatus";
 import { FirstSweep } from "@/components/leads/FirstSweep";
 import { AlertsOffer } from "@/components/leads/AlertsOffer";
-import { Skeleton } from "@/components/Skeleton";
+import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
@@ -57,15 +57,7 @@ function ArrivingLeads() {
         Your first leads appear here as soon as they are found, usually within a minute. You can stay
         on this page; it fills in by itself.
       </p>
-      {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 border-b p-3 last:border-b-0" style={{ opacity: 1 - index * 0.17 }}>
-          <Skeleton className="size-8 shrink-0 rounded-full" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Skeleton className="h-4 w-full max-w-80" />
-            <Skeleton className="h-3 w-40" />
-          </div>
-        </div>
-      ))}
+      <ListSkeleton rows={5} bare fade={0.17} />
     </div>
   );
 }

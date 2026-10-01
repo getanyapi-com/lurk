@@ -1,3 +1,10 @@
+import {
+  hideLeadAction,
+  markNotFitAction,
+  muteSubredditAction,
+  reopenLeadAction,
+  repliedLeadAction,
+} from "@/app/app/leads/actions";
 import { Avatar } from "@/components/Avatar";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { VerdictBadge } from "@/components/VerdictBadge";
@@ -185,11 +192,16 @@ export function LeadDetail({ selection, projectId, competitors, scoring }: LeadD
         />
       </div>
       <LeadActions
-        projectId={projectId}
-        leadId={lead.id}
+        openLabel="Open on Reddit"
         url={lead.url}
-        subreddit={lead.subreddit}
         replied={lead.status === "replied"}
+        actions={{
+          replied: repliedLeadAction.bind(null, projectId, lead.id),
+          reopen: reopenLeadAction.bind(null, projectId, lead.id),
+          hide: hideLeadAction.bind(null, projectId, lead.id),
+          notFit: markNotFitAction.bind(null, projectId, lead.id),
+          mute: { label: `Mute r/${lead.subreddit}`, action: muteSubredditAction.bind(null, projectId, lead.subreddit) },
+        }}
       />
     </Pane>
   );

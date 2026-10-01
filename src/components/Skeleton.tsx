@@ -31,12 +31,31 @@ export function PillsSkeleton({ count }: { count: number }) {
   );
 }
 
-/** A card holding a list of rows, the shape most of this app is made of. */
-export function ListSkeleton({ rows, className }: { rows: number; className?: string }) {
+/**
+ * A card holding a list of rows, the shape most of this app is made of.
+ * `bare` drops the card, for rows inside a list that already has one; `fade`
+ * is how much fainter each row is than the one above, for rows that stand for
+ * leads still arriving.
+ */
+export function ListSkeleton({
+  rows,
+  className,
+  bare = false,
+  fade = 0,
+}: {
+  rows: number;
+  className?: string;
+  bare?: boolean;
+  fade?: number;
+}) {
   return (
-    <div className={cn("flex flex-col rounded-card border bg-surface", className)}>
+    <div className={cn("flex flex-col", !bare && "rounded-card border bg-surface", className)}>
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 border-b p-3 last:border-b-0">
+        <div
+          key={index}
+          className="flex items-center gap-3 border-b p-3 last:border-b-0"
+          style={fade ? { opacity: 1 - index * fade } : undefined}
+        >
           <Skeleton className="size-8 shrink-0 rounded-full" />
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <Skeleton className="h-4 w-full max-w-80" />
