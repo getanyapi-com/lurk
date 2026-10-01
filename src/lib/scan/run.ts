@@ -141,9 +141,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
    * this way round it costs one repeated judgement instead.
    */
   await writeEvaluations(evaluationsFor(project, unjudgedPosts, judgements));
-  for (const entry of retrieval.covered) {
-    await markCovered(entry.row, entry.at);
-  }
+  await markCovered(retrieval.covered);
 
   await writeProgress(jobId, "Reading comment threads");
   const threadPosts = await threadsToRead(projectId, threadPolicyFor(settings.settings.threads));

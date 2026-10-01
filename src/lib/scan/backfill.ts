@@ -67,6 +67,13 @@ const QUIET_MS = 3000;
 const STALE_PAGES = 3;
 
 /**
+ * How often a sweep rewrites its progress line. Its counts move with every
+ * page found and every post scored, which is up to sixty writes in flight on
+ * a ten-connection pool, and the person watching reads a line a second at most.
+ */
+const REPORT_EVERY_MS = 1000;
+
+/**
  * Pages each walk reads in the first pass, before any walk reads more. A page
  * takes about two seconds and a walk reads its pages one after another, so
  * the first pass is over in about as many seconds as this times two, whatever
@@ -442,8 +449,16 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   let walks = 0;
   let cutShort = 0;
   let pass: "first" | "rest" | "scoring" = "first";
-  const report = (): Promise<void> =>
-    progress(
+  let reportedAt = 0;
+  // At most once every REPORT_EVERY_MS. A new pass and the counts the sweep
+  // ends on are forced through, so no line a person should see is skipped.
+  const report = (force = false): Promise<void> => {
+    const now = Date.now();
+    if (!force && now - reportedAt < REPORT_EVERY_MS) {
+      return Promise.resolve();
+    }
+    reportedAt = now;
+    return progress(
       jobId,
       pass === "first"
         ? `First pass over a year of Reddit · ${plan.length} searches · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
@@ -451,6 +466,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
           ? `Reading further where the leads are · ${walks} of ${plan.length} searches done · ${found.size} posts found · ${judge.judged.length} scored · ${judge.leads.length} leads`
           : `Scoring ${judge.candidates.length} posts · ${judge.judged.length} scored · ${judge.leads.length} leads`,
     );
+  };
   const judge: Judge = new Judge(project, stored, sourcesByPost, report);
 
   // Every walk is independent of every other and nearly all waiting on Reddit,
@@ -490,7 +506,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
     .slice(0, DEEP_WALKS);
   walks = plan.length - deeper.length;
   pass = "rest";
-  await report();
+  await report(true);
   await Promise.all(
     deeper.map(async (item) => {
       await run(item, depthPages - firstPassPages);
@@ -498,8 +514,9 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
     }),
   );
   pass = "scoring";
-  await report();
+  await report(true);
   await judge.settle();
+  await report(true);
 
   // Faces for the top of the feed only. A full sweep writes hundreds of leads:
   // looked up for all 448 of them on 2026-09-18, through `reddit.profile` as
@@ -543,11 +560,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
     );
   }
   const at = new Date();
-  for (const query of queries) {
-    for (const row of query.rows) {
-      await markCovered(row, at);
-    }
-  }
+  await markCovered(queries.flatMap((query) => query.rows.map((row) => ({ row, at }))));
 
   await progress(
     jobId,

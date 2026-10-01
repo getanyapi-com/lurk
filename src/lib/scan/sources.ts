@@ -57,10 +57,29 @@ export function refsOf(sources: CandidateSource[]): SourceRef[] {
 
 const TABLES = { keyword: projectKeywords, community: projectSubreddits } as const;
 
-/** Moves a row's watermark forward, which only a covered window may do. */
-export async function markCovered(row: PlanRow, at: Date): Promise<void> {
-  const table = TABLES[row.table];
-  await db().update(table).set({ lastCoveredAt: at }).where(eq(table.id, row.id));
+/**
+ * Moves the watermarks of the windows a run covered forward, which only a
+ * covered window may do. One UPDATE per table and moment: every window one
+ * scan or sweep covers shares its moment, so a whole run is at most two
+ * statements however many rows it covered. A row listed twice keeps its last
+ * moment, as writing them one at a time would have left it.
+ */
+export async function markCovered(covered: { row: PlanRow; at: Date }[]): Promise<void> {
+  const last = new Map(covered.map((entry) => [`${entry.row.table}:${entry.row.id}`, entry]));
+  const groups = new Map<string, { table: PlanTable; at: Date; ids: Set<string> }>();
+  for (const { row, at } of last.values()) {
+    const key = `${row.table}:${at.getTime()}`;
+    const group = groups.get(key) ?? { table: row.table, at, ids: new Set<string>() };
+    group.ids.add(row.id);
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) {
+    const table = TABLES[group.table];
+    await db()
+      .update(table)
+      .set({ lastCoveredAt: group.at })
+      .where(inArray(table.id, [...group.ids]));
+  }
 }
 
 /**

@@ -179,8 +179,9 @@ export async function judgeItems(
     async (batch) => {
       const judged = await judgeBatch(projectId, product, batch, readings);
       if (onJudged) {
-        // A failed commit of ten must not lose the other batches' verdicts, for
-        // the same reason a dropped model call does not lose the sweep.
+        // A failed commit of one batch must not lose the other batches'
+        // verdicts, for the same reason a dropped model call does not lose the
+        // sweep.
         try {
           await onJudged(judged);
         } catch {

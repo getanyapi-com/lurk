@@ -158,3 +158,147 @@ describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and lead
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 });
+
+/**
+ * The scan's bookkeeping after its leads: the plan rows whose windows it
+ * covered, and the reply counts its lead threads were read at. Each is one
+ * statement for the whole run, so a row or a post that reached it twice must
+ * still come out as writing them one at a time would have left it.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("marking what one scan covered and read", () => {
+  it("moves every covered row's watermark, in both tables, and no other row's", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { markCovered } = await import("@/lib/scan/sources");
+    const { eq } = await import("drizzle-orm");
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project] = await db()
+      .insert(schema.projects)
+      .values({ userId: user.id, name: "Formcraft" })
+      .returning();
+    const keywords = await db()
+      .insert(schema.projectKeywords)
+      .values(
+        ["form builder", "typeform alternative", "untouched"].map((keyword) => ({
+          projectId: project.id,
+          keyword,
+        })),
+      )
+      .returning();
+    const [community] = await db()
+      .insert(schema.projectSubreddits)
+      .values({ projectId: project.id, name: "SaaS" })
+      .returning();
+    const row = (id: string, table: "keyword" | "community") =>
+      ({ id, table, key: id, source: "serp", state: "active", lastCoveredAt: null, evidence: 0 }) as never;
+    const at = new Date("2026-09-30T12:00:00Z");
+    const earlier = new Date("2026-09-29T12:00:00Z");
+
+    await markCovered([
+      { row: row(keywords[0].id, "keyword"), at },
+      { row: row(keywords[1].id, "keyword"), at },
+      // Listed again at another moment and then at this one: the last wins.
+      { row: row(keywords[1].id, "keyword"), at: earlier },
+      { row: row(keywords[0].id, "keyword"), at },
+      { row: row(keywords[1].id, "keyword"), at },
+      { row: row(community.id, "community"), at },
+    ]);
+    await markCovered([]);
+
+    const held = await db()
+      .select()
+      .from(schema.projectKeywords)
+      .where(eq(schema.projectKeywords.projectId, project.id));
+    const covered = held.map((keyword) => [keyword.keyword, keyword.lastCoveredAt?.toISOString() ?? null]);
+    expect(Object.fromEntries(covered)).toEqual({
+      "form builder": at.toISOString(),
+      "typeform alternative": at.toISOString(),
+      untouched: null,
+    });
+    const [sub] = await db()
+      .select()
+      .from(schema.projectSubreddits)
+      .where(eq(schema.projectSubreddits.id, community.id));
+    expect(sub.lastCoveredAt?.toISOString()).toBe(at.toISOString());
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+  });
+
+  it("records each lead thread's reply count, the last one for a post listed twice", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const { markThreadsRead } = await import("@/lib/scan/leads");
+    const { and, eq, isNull } = await import("drizzle-orm");
+    const [user] = await db()
+      .insert(schema.users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const [project, other] = await db()
+      .insert(schema.projects)
+      .values([
+        { userId: user.id, name: "Formcraft" },
+        { userId: user.id, name: "Someone else's view" },
+      ])
+      .returning();
+    const posts = await upsertPosts(
+      ["a", "b"].map((name) => ({
+        id: `p${name}${randomUUID().slice(0, 8)}`,
+        subreddit: "SaaS",
+        author: "asker",
+        title: `Need a form tool ${name}`,
+        permalink: `/r/SaaS/comments/x${name}/form/`,
+        createdUtc: Math.floor(Date.now() / 1000),
+        numComments: 4,
+      })),
+    );
+    const comment = `c${randomUUID().slice(0, 8)}`;
+    await db()
+      .insert(schema.redditComments)
+      .values({ id: comment, postId: posts[0].id, body: "Me too", createdAt: new Date() });
+    await db()
+      .insert(schema.leads)
+      .values([
+        ...posts.map((post) => ({
+          projectId: project.id,
+          postId: post.id,
+          score: 70,
+          kind: "buyer" as const,
+        })),
+        { projectId: project.id, postId: posts[0].id, commentId: comment, score: 70, kind: "buyer" as const },
+        { projectId: other.id, postId: posts[0].id, score: 70, kind: "buyer" as const },
+      ]);
+
+    await markThreadsRead(project.id, [
+      { ...posts[0], numComments: 4 },
+      posts[1],
+      { ...posts[0], numComments: 9 },
+    ]);
+    await markThreadsRead(project.id, []);
+
+    const counts = await db()
+      .select({
+        postId: schema.leads.postId,
+        commentId: schema.leads.commentId,
+        count: schema.leads.threadReadCount,
+      })
+      .from(schema.leads)
+      .where(eq(schema.leads.projectId, project.id));
+    const countOf = (postId: string, commentId: string | null) =>
+      counts.find((row) => row.postId === postId && row.commentId === commentId)?.count;
+    expect(countOf(posts[0].id, null)).toBe(9);
+    expect(countOf(posts[1].id, null)).toBe(4);
+    // A comment's lead is not the thread's, and another project's lead is its own.
+    expect(countOf(posts[0].id, comment)).toBeNull();
+    const [theirs] = await db()
+      .select()
+      .from(schema.leads)
+      .where(and(eq(schema.leads.projectId, other.id), isNull(schema.leads.commentId)));
+    expect(theirs.threadReadCount).toBeNull();
+
+    await db().delete(schema.users).where(eq(schema.users.id, user.id));
+  });
+});

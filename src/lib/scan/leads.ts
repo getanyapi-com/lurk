@@ -140,17 +140,23 @@ export async function threadsToRead(
 /**
  * Records that this project has judged these threads at the reply counts they
  * were read at. Written after the comment leads are, so a scan that dies in
- * between reads the thread again instead of losing the people in it.
+ * between reads the thread again instead of losing the people in it. One
+ * statement for the whole scan; a post listed twice keeps its last count.
  */
 export async function markThreadsRead(projectId: string, posts: StoredPost[]): Promise<void> {
-  for (const post of posts) {
-    await db()
-      .update(leads)
-      .set({ threadReadCount: post.numComments ?? 0 })
-      .where(
-        and(eq(leads.projectId, projectId), eq(leads.postId, post.id), isNull(leads.commentId)),
-      );
+  const counts = new Map(posts.map((post) => [post.id, post.numComments ?? 0]));
+  if (counts.size === 0) {
+    return;
   }
+  const values = [...counts].map(([postId, count]) => sql`(${postId}::text, ${count}::integer)`);
+  await db().execute(sql`
+    update ${leads}
+    set thread_read_count = thread.read_count
+    from (values ${sql.join(values, sql`, `)}) as thread(post_id, read_count)
+    where ${leads.projectId} = ${projectId}
+      and ${leads.postId} = thread.post_id
+      and ${leads.commentId} is null
+  `);
 }
 
 /** One candidate a re-judgement no longer puts in the feed. */
