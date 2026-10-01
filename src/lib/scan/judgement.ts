@@ -68,14 +68,13 @@ export type Decision = Assessment["decision"];
  * code gates settled on, the engagement computed from the item's own age and
  * comment count, and the 0-100 feed sort order.
  *
- * `matchedPhrase` and `sellerSide` are derived here rather than asked of the
- * model, so the leads table keeps its columns.
+ * `matchedPhrase` is derived here rather than asked of the model, so the leads
+ * table keeps its column.
  */
 export type Judgement = Assessment & {
   engagement: number;
   score: number;
   matchedPhrase: string;
-  sellerSide: boolean;
   /** Where the person posted, which the owner's ranking weights may favour (lib/scoring/weights.ts). */
   subreddit: string;
 };

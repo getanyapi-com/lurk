@@ -171,21 +171,4 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
 
     expect((await feedPage(project.id, FILTER)).rows).toHaveLength(0);
   });
-
-  /**
-   * The scan report over the feed counts candidates, so a scan recording what
-   * it found while someone watches their feed has to move that number.
-   */
-  it("reads again after a scan records a candidate", async () => {
-    const { project, post } = await fixture();
-    const { feedPage } = await import("@/lib/feedPage");
-    const { recordSources } = await import("@/lib/scan/sources");
-    expect((await feedPage(project.id, FILTER)).report.candidates).toBe(0);
-
-    await recordSources(project.id, [
-      { postId: post.id, sources: [{ kind: "search", key: "prefilled forms", rows: [] }] },
-    ]);
-
-    expect((await feedPage(project.id, FILTER)).report.candidates).toBe(1);
-  });
 });

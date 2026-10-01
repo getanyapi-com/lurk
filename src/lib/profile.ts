@@ -76,7 +76,7 @@ const fastReadingSchema = z.object({
   budgetFit: z.string(),
   capabilities: z.array(z.string()),
   problemPhrasings: z.array(z.string()),
-  brief: briefSchema.omit({ freePlan: true, limits: true }),
+  brief: briefSchema,
   exclusions: z.array(groundedSchema),
   notBuyers: z.array(groundedSchema),
 });
@@ -418,8 +418,7 @@ export async function profileFromPage(
 
 /**
  * The fast reading of the same pages (FAST_READING_SYSTEM), as a SiteReading
- * with the fields it does not ask for left empty. The judge never reads the
- * brief's freePlan or limits, so they are left out of the question.
+ * with the fields it does not ask for left empty.
  */
 export async function fastProfileFromPage(
   projectId: string,
@@ -450,7 +449,7 @@ export async function fastProfileFromPage(
     platforms: [],
     sellsPlatformData: false,
     competitors: [],
-    brief: { ...reading.brief, freePlan: null, limits: [] },
+    brief: reading.brief,
   };
 }
 

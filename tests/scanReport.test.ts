@@ -95,19 +95,7 @@ describe.skipIf(!hasDatabase)("counting one window of scanning", () => {
       return row;
     }
 
-    async function found(postId: string, sourceKind: string) {
-      await db()
-        .insert(schema.candidateSources)
-        .values({
-          projectId: project.id,
-          postId,
-          sourceKind,
-          sourceKey: "form builder",
-          firstSeenAt: new Date(),
-        });
-    }
-
-    return { project, post, comment, judged, found };
+    return { project, post, comment, judged };
   }
 
   it("counts the verdicts inside the window and leaves the older one out", async () => {
@@ -145,35 +133,22 @@ describe.skipIf(!hasDatabase)("counting one window of scanning", () => {
 
     expect(await scanReport(project.id, 7)).toMatchObject({ read: 1, qualified: 1 });
   });
-
-  it("counts a post found four ways once, and only inside the window", async () => {
-    const { project, judged, found } = await fixture();
-    const inside = await judged("qualify", 1);
-    const outside = await judged("reject", 40);
-    await found(inside.id, "search");
-    await found(inside.id, "listing");
-    await found(outside.id, "search");
-    const { scanReport } = await import("@/lib/scan/report");
-
-    expect((await scanReport(project.id, 7)).candidates).toBe(1);
-    expect((await scanReport(project.id, "all")).candidates).toBe(2);
-  });
 });
 
 describe("what the page says about a window", () => {
   function report(patch: Partial<ScanReport>): ScanReport {
-    return { candidates: 0, read: 0, qualified: 0, held: 0, rejected: 0, ...patch };
+    return { read: 0, qualified: 0, held: 0, rejected: 0, ...patch };
   }
 
   it("says nothing has been read when no candidate has a verdict", () => {
-    expect(verdictSentence(report({ candidates: 12 }), 0)).toBe(
+    expect(verdictSentence(report({}), 0)).toBe(
       "No scan has read this window yet.",
     );
   });
 
   it("says Reddit talks about this and nobody asked to buy, with the counts", () => {
     const sentence = verdictSentence(
-      report({ candidates: 112, read: 30, qualified: 0, held: 2, rejected: 28 }),
+      report({ read: 30, qualified: 0, held: 2, rejected: 28 }),
       0,
     );
     expect(sentence).toBe(
@@ -183,7 +158,7 @@ describe("what the page says about a window", () => {
 
   it("gives the counts alone once there are leads to show", () => {
     const sentence = verdictSentence(
-      report({ candidates: 112, read: 30, qualified: 4, held: 2, rejected: 24 }),
+      report({ read: 30, qualified: 4, held: 2, rejected: 24 }),
       4,
     );
     expect(sentence).toBe("We read 30 posts, 4 cleared the bar and 2 held for review.");

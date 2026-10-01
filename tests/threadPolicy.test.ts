@@ -143,7 +143,7 @@ describe.skipIf(!hasDatabase)("threadsToRead against a database", () => {
     const { readLeadThreads } = await import("@/lib/scan/comments");
     const paid = vi.fn();
     const ctx = { projectId: second, maxAgeMs: 0, funded: { call: paid } } as never;
-    const { threads } = await readLeadThreads(ctx, owed);
+    const threads = await readLeadThreads(ctx, owed);
     expect(paid).not.toHaveBeenCalled();
     expect(threads[0].comments.map((comment) => comment.body)).toEqual(["I need this too"]);
   });

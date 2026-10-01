@@ -38,20 +38,22 @@ describe.skipIf(!process.env.DATABASE_URL)("capabilities and exclusions", () => 
       exclusions: ["anything outside the United States"],
     });
     const { loadScanProject } = await import("@/lib/scan/project");
+    const { productText } = await import("@/lib/product");
 
     const loaded = await loadScanProject(project.id);
-    expect(loaded?.productText).toContain("Can: check in guests aged 18 and over");
-    expect(loaded?.productText).toContain("Does not: anything outside the United States");
+    expect(productText(loaded!.product)).toContain("Can: check in guests aged 18 and over");
+    expect(productText(loaded!.product)).toContain("Does not: anything outside the United States");
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 
   it("says neither line when the page named none", async () => {
     const { user, project, db, schema } = await fixture({});
     const { loadScanProject } = await import("@/lib/scan/project");
+    const { productText } = await import("@/lib/product");
 
     const loaded = await loadScanProject(project.id);
-    expect(loaded?.productText).not.toContain("Can:");
-    expect(loaded?.productText).not.toContain("Does not:");
+    expect(productText(loaded!.product)).not.toContain("Can:");
+    expect(productText(loaded!.product)).not.toContain("Does not:");
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 
@@ -96,18 +98,20 @@ describe.skipIf(!process.env.DATABASE_URL)("who is not a buyer", () => {
       notBuyers: ["students looking for a free plan"],
     });
     const { loadScanProject } = await import("@/lib/scan/project");
+    const { productText } = await import("@/lib/product");
 
     const loaded = await loadScanProject(project.id);
-    expect(loaded?.productText).toContain("Not a buyer: students looking for a free plan");
+    expect(productText(loaded!.product)).toContain("Not a buyer: students looking for a free plan");
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 
   it("says no such line when the page named none", async () => {
     const { user, project, db, schema } = await fixture({});
     const { loadScanProject } = await import("@/lib/scan/project");
+    const { productText } = await import("@/lib/product");
 
     const loaded = await loadScanProject(project.id);
-    expect(loaded?.productText).not.toContain("Not a buyer:");
+    expect(productText(loaded!.product)).not.toContain("Not a buyer:");
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 
@@ -148,11 +152,12 @@ describe.skipIf(!process.env.DATABASE_URL)("an excluded competitor", () => {
         { projectId: project.id, name: "Booking", state: "excluded" },
       ]);
     const { loadScanProject } = await import("@/lib/scan/project");
+    const { productText } = await import("@/lib/product");
 
     const loaded = await loadScanProject(project.id);
     expect(loaded?.competitors).toEqual(["Hotelages"]);
-    expect(loaded?.productText).toContain("Competitors: Hotelages");
-    expect(loaded?.productText).not.toContain("Booking");
+    expect(productText(loaded!.product)).toContain("Competitors: Hotelages");
+    expect(productText(loaded!.product)).not.toContain("Booking");
     await db().delete(schema.users).where(eq(schema.users.id, user.id));
   });
 });

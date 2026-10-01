@@ -3,16 +3,13 @@ import { db } from "@/db";
 import { projectCompetitors, projectKeywords, projectSubreddits, projects } from "@/db/schema";
 import { withoutNegations } from "@/lib/discovery/rank";
 import { parseDestinations, parseTextList } from "@/lib/discovery/store";
-import { productFacts, productText, type ProductFacts } from "@/lib/product";
+import { productFacts, type ProductFacts } from "@/lib/product";
 import { parseScoring, type ScoringSettings } from "@/lib/scoring/weights";
-import { DEFAULT_SCORE_THRESHOLD } from "./constants";
 import { retrieved, type PlanRow } from "./coverage";
 
 export type ScanProject = {
   id: string;
   userId: string;
-  name: string;
-  threshold: number;
   /** How the owner wants leads ranked; null keeps the default fold. */
   scoring: ScoringSettings | null;
   /** The version of the product facts below; a verdict is only reusable for it. */
@@ -21,10 +18,6 @@ export type ScanProject = {
   queries: PlanRow[];
   /** Every community the plan holds, whatever its state, with its watermark. */
   communities: PlanRow[];
-  /** The queries and communities being retrieved now, for callers that only
-   * need the names: the SEO refresh and the competitor scan. */
-  keywords: string[];
-  subreddits: string[];
   /** How buyers say the problem, which is what the SEO refresh asks Google. */
   phrasings: string[];
   competitors: string[];
@@ -32,8 +25,6 @@ export type ScanProject = {
   destinations: string[];
   /** The product facts every judgement is made against. */
   product: ProductFacts;
-  /** The same facts as prose, for the calls that still read text. */
-  productText: string;
 };
 
 /** A person's own competitors first, then the page's, then discovery's by evidence. */
@@ -125,18 +116,13 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
   return {
     id: row.id,
     userId: row.userId,
-    name: row.name,
-    threshold: row.scoreThreshold ?? DEFAULT_SCORE_THRESHOLD,
     scoring: parseScoring(row.scoring),
     profileVersion: row.profileVersion,
     queries,
     communities,
-    keywords: retrieved(queries).map((row) => row.key),
-    subreddits: retrieved(communities).map((row) => row.key),
     competitors: competitorNames,
     phrasings: parseTextList(row.problemPhrasings),
     destinations: parseDestinations(row.destinations).map((place) => place.name),
     product: productFacts(row, competitorNames),
-    productText: productText(productFacts(row, competitorNames)),
   };
 }

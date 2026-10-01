@@ -123,7 +123,7 @@ export function downgradeToReview(item: Judgement, code: ReasonCode): Judgement 
 /**
  * One assessment as the scan uses it: the gated decision, the engagement this
  * code computed, the score under the default ranking weights (a lead is ranked
- * by its owner's when it is written, run.ts toLead), and the two columns the
+ * by its owner's when it is written, run.ts toLead), and the matched phrase the
  * leads table has always held.
  */
 export function judge(item: Assessment, source: ScorableItem): Judgement {
@@ -139,7 +139,6 @@ export function judge(item: Assessment, source: ScorableItem): Judgement {
       null,
     ),
     matchedPhrase: item.needEvidence?.quote ?? "",
-    sellerSide: item.relationship === "seller",
     subreddit: source.subreddit,
   };
 }

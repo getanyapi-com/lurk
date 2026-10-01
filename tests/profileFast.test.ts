@@ -76,7 +76,7 @@ const fullReading = {
   sellsPlatformData: false,
   competitors: [{ name: "Typeform", domain: "typeform.com" }],
   budgetFit: "Under $50 a month",
-  brief: { ...brief, freePlan: false, limits: [], kind: "form builder with branching" },
+  brief: { ...brief, kind: "form builder with branching" },
 };
 
 /** A call held until the test lets it answer. */
@@ -151,7 +151,7 @@ describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () =>
     expect(first.pain).toBe(fastReading.pain);
     expect(first.problemPhrasings).toEqual(fastReading.problemPhrasings);
     expect(first.notBuyers).toEqual(["students wanting a free plan"]);
-    expect(first.brief).toMatchObject({ kind: "conditional form builder", freePlan: null, limits: [] });
+    expect(first.brief).toEqual(brief);
     expect(first.geography).toBeNull();
     expect(await competitors()).toEqual([]);
 

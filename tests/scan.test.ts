@@ -96,7 +96,6 @@ describe("the qualification gates", () => {
 
   it("treats a helper as neither a seller nor a lead", () => {
     const judged = judge(assessment({ relationship: "helper" }), item);
-    expect(judged.sellerSide).toBe(false);
     expect(judged.decision).toBe("reject");
     expect(judged.reasonCode).toBe("helper_only");
   });
@@ -307,8 +306,6 @@ describe("judging a batch", () => {
       buyers: ["founders"],
       nonBuyers: ["students"],
       price: "cheap self-serve",
-      freePlan: true,
-      limits: [],
       goodAsks: ["need a form that takes payments"],
       nearMisses: [{ ask: "how do I print a form", why: "paper" }],
     };

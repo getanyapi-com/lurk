@@ -37,8 +37,6 @@ export type Retrieval = {
   candidates: Candidate[];
   /** Windows this scan could not finish covering, in the user's words. */
   gaps: string[];
-  /** Posts dropped as older than the feed window. They stay as evidence. */
-  outsideWindow: number;
   /** reddit.post calls already spent, which the shortlist read may not spend twice. */
   hydrated: number;
   /**
@@ -58,13 +56,12 @@ type Loop = {
   found: Map<string, Candidate>;
   gaps: string[];
   covered: { row: PlanRow; at: Date }[];
-  outsideWindow: number;
 };
 
 function keep(loop: Loop, posts: StoredPost[], source: CandidateSource): void {
   for (const post of posts) {
+    // Older than the feed window: not a candidate, though it stays as evidence.
     if (loop.now.getTime() - post.createdAt.getTime() > loop.windowMs) {
-      loop.outsideWindow += 1;
       continue;
     }
     const held = loop.found.get(post.id);
@@ -239,7 +236,6 @@ export async function retrieve(input: RetrieveInput): Promise<Retrieval> {
     found: new Map(),
     gaps: [],
     covered: [],
-    outsideWindow: 0,
   };
   const explorer = explorationPick(project.queries, project.communities);
   const queries = searchSlots(project, budgets.searches, explorer);
@@ -276,7 +272,6 @@ export async function retrieve(input: RetrieveInput): Promise<Retrieval> {
   return {
     candidates,
     gaps: loop.gaps,
-    outsideWindow: loop.outsideWindow,
     hydrated,
     covered: loop.covered,
   };

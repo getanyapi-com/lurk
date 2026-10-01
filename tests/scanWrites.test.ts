@@ -26,7 +26,6 @@ function judgement(score: number): Judgement {
     engagement: 2,
     score,
     matchedPhrase: "conditional logic",
-    sellerSide: false,
     subreddit: "forms",
   };
 }

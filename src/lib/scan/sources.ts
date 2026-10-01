@@ -2,7 +2,6 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { candidateSources, projectKeywords, projectSubreddits, searchRuns } from "@/db/schema";
 import { normalizeQuery } from "@/lib/reddit/fetch";
-import { forgetProjectFeed } from "@/lib/projectFeedCache";
 import type { PlanRow, PlanTable, SourceKind } from "./coverage";
 
 /**
@@ -42,9 +41,6 @@ export async function recordSources(
     .values(values)
     .onConflictDoNothing()
     .returning({ id: candidateSources.id });
-  // The scan report over the feed counts these, so a scan running while
-  // someone watches their feed moves a number this project has already read.
-  forgetProjectFeed(projectId);
   return written.length;
 }
 

@@ -82,7 +82,7 @@ async function threadsOf(
   policy: ThreadPolicy,
   posts: StoredPost[],
 ): Promise<ThreadRead[]> {
-  const { threads } = await readThreads(
+  const threads = await readThreads(
     ctx,
     posts.filter((post) => repliesWorthReading(policy, post)),
   );

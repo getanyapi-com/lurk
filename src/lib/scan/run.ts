@@ -281,7 +281,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
 
   await writeProgress(jobId, "Reading comment threads");
   const threadPosts = await threadsToRead(projectId, threadPolicyFor(settings.settings.threads));
-  const { threads } = await readLeadThreads(ctx, threadPosts);
+  const threads = await readLeadThreads(ctx, threadPosts);
   await writeThreadMentions(projectId, project.competitors, threads);
   const judged = await judgeThreads(project, threads, stored);
   const askers = judged.discovery.filter((item) => item.judgement.decision === "qualify");

@@ -32,10 +32,7 @@ export type ThreadRead = { post: StoredPost; comments: StoredComment[] };
  * count the thread was read at so the next scan buys it again only once that
  * count has moved. A failure loses one thread and records nothing.
  */
-export async function readThreads(
-  ctx: FetchContext,
-  posts: StoredPost[],
-): Promise<{ threads: ThreadRead[]; failures: number }> {
+export async function readThreads(ctx: FetchContext, posts: StoredPost[]): Promise<ThreadRead[]> {
   const reads = await inFlight(posts, async (post): Promise<ThreadRead | null> => {
     try {
       const result = await fetchPostComments(ctx, post.id, post.url);
@@ -48,8 +45,7 @@ export async function readThreads(
       return null;
     }
   });
-  const threads = reads.filter((read): read is ThreadRead => read !== null);
-  return { threads, failures: reads.length - threads.length };
+  return reads.filter((read): read is ThreadRead => read !== null);
 }
 
 /** Whether the stored comments are the thread as Reddit last reported it. */
@@ -62,10 +58,7 @@ function storedIsCurrent(post: StoredPost): boolean {
  * bought at this reply count is read from the store for nothing; the rest are
  * bought. Either way this project still has every comment to judge.
  */
-export async function readLeadThreads(
-  ctx: FetchContext,
-  posts: StoredPost[],
-): Promise<{ threads: ThreadRead[]; failures: number }> {
+export async function readLeadThreads(ctx: FetchContext, posts: StoredPost[]): Promise<ThreadRead[]> {
   const held = await Promise.all(
     posts
       .filter(storedIsCurrent)
@@ -75,7 +68,7 @@ export async function readLeadThreads(
     ctx,
     posts.filter((post) => !storedIsCurrent(post)),
   );
-  return { threads: [...held, ...bought.threads], failures: bought.failures };
+  return [...held, ...bought];
 }
 
 /**

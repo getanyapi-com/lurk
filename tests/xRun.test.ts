@@ -189,8 +189,6 @@ describe.skipIf(!hasDatabase)("the X pipeline against a database", () => {
       buyers: ["consultants"],
       nonBuyers: ["scheduling vendors"],
       price: "freemium",
-      freePlan: true,
-      limits: [],
       goodAsks: ["need a calendly alternative for my team"],
       nearMisses: [{ ask: "best calendar app?", why: "calendar, not booking" }],
     };
