@@ -3,7 +3,6 @@ import { FeedFilters } from "@/components/leads/FeedFilters";
 import { HeldSection } from "@/components/leads/HeldSection";
 import { LeadDetail } from "@/components/leads/LeadDetail";
 import { LeadPages } from "@/components/leads/LeadPages";
-import { LeadRow } from "@/components/leads/LeadRow";
 import { OpeningProvider } from "@/components/leads/opening";
 import { LeadWorkspace } from "@/components/leads/LeadWorkspace";
 import { PeopleStrip } from "@/components/leads/PeopleStrip";
@@ -11,16 +10,14 @@ import { ScanStatus } from "@/components/leads/ScanStatus";
 import { FirstSweep } from "@/components/leads/FirstSweep";
 import { AlertsOffer } from "@/components/leads/AlertsOffer";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
-import { VerdictBadge } from "@/components/VerdictBadge";
-import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
-import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
+import { requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
 import { chatAppConfigured } from "@/lib/alerts/config";
 import { alertsOffer, offerPreview } from "@/lib/alerts/offer";
 import type { LocalUser } from "@/lib/auth";
-import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
+import { feedFilter, toCard, toRow, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
 import { competitorsNamedIn } from "@/lib/competitors/read";
 import { feedPage } from "@/lib/feedPage";
-import { findLead } from "@/lib/leads";
+import { findLead, type FeedLead } from "@/lib/leads";
 import type { Project } from "@/lib/projects";
 import { parseScoring } from "@/lib/scoring/weights";
 import { isOnboarding, type ProjectActivity } from "@/lib/projectActivity";
@@ -88,6 +85,11 @@ function ArrivingPane() {
 /** The prefix a lead's entry id carries, so a held item can never be one. */
 const LEAD_PREFIX = "lead-";
 
+/** A lead as the pane can open it, under the id its row carries in the URL. */
+function entryOf(lead: FeedLead): StreamEntry {
+  return { id: `${LEAD_PREFIX}${lead.id}`, lead: toCard(lead) };
+}
+
 /**
  * The same page over the whole of time, keeping every other filter pill. The
  * slice a strip column picked goes with the window it narrowed.
@@ -120,7 +122,7 @@ async function openOn(
   if (requestedId?.startsWith(LEAD_PREFIX)) {
     const lead = await findLead(projectId, requestedId.slice(LEAD_PREFIX.length));
     if (lead) {
-      return { kind: "lead", entry: buildStream([toCard(lead)])[0] };
+      return { kind: "lead", entry: entryOf(lead) };
     }
   }
   return selectEntry(entries, held);
@@ -158,7 +160,14 @@ export async function Feed({ user, project, activity, params: asked }: FeedProps
   // A project still being set up or swept has no leads yet because none have
   // been found yet, not because there are none: its empty list says so.
   const arriving = isOnboarding(activity) && filter.status === "new";
-  const entries = buildStream(page.rows.map(toCard));
+  // The leads stay in the order the feed query gave them: score, then how
+  // recently the need was posted. Freshness is already half of that score, so
+  // sorting by date on top of it threw fit and intent away and opened the feed
+  // on whatever was newest; on 2026-09-10 that was two crossposts of one person
+  // recruiting festival companions. Held candidates are not entries either:
+  // four of them, warm-badged, once sat above the first real lead, and they
+  // have their own group under the leads instead.
+  const entries = page.rows.map(entryOf);
   const held = filter.status === "new" ? page.review : [];
   // While the first leads are found, the page asks once whether to send new
   // ones on: the person is already watching, and a project with no channel is
@@ -248,29 +257,10 @@ export async function Feed({ user, project, activity, params: asked }: FeedProps
                   key={feedSearch(params)}
                   projectId={projectId}
                   search={feedSearch(params)}
-                  drawn={entries.length}
-                  lastPostId={entries.at(-1)?.lead.postId ?? null}
+                  initialRows={page.rows.map(toRow)}
                   total={total}
                   selectedId={selectedId}
-                >
-                  {entries.map((entry, index) => (
-                    <LeadRow
-                      key={entry.id}
-                      id={entry.id}
-                      href={entryHref(params, entry.id)}
-                      selected={entry.id === selectedId}
-                      title={entry.lead.title}
-                      excerpt={rowExcerpt(entry.lead)}
-                      nested={index > 0 && entries[index - 1].lead.postId === entry.lead.postId}
-                      author={entry.lead.author}
-                      avatarUrl={entry.lead.avatarUrl}
-                      subreddit={entry.lead.subreddit}
-                      subredditIconUrl={entry.lead.subredditIconUrl}
-                      createdAt={entry.lead.createdAt}
-                      trailing={<VerdictBadge fit={entry.lead.fit} intent={entry.lead.intent} />}
-                    />
-                  ))}
-                </LeadPages>
+                />
               )}
               {held.length > 0 ? (
                 <HeldSection items={held} params={params} selectedId={selectedId} />

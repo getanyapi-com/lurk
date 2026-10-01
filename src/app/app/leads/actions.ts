@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { failure, type ActionResult } from "@/lib/actionResult";
 import { dismissAlertsOffer, turnOnDiscordAlerts, turnOnEmailAlerts } from "@/lib/alerts/offer";
-import { toRow } from "@/components/leads/stream";
-import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
+import { FEED_PAGE_SIZE, feedFilter, toRow, type FeedRow } from "@/lib/feed";
 import { markThreadReplied, redditLeadThread, reopenThread } from "@/lib/handled";
 import { leadInSubreddit, listLeads, setLeadStatus } from "@/lib/leads";
 import { addMute } from "@/lib/mutes";

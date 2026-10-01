@@ -12,35 +12,23 @@ type LeadPagesProps = {
   projectId: string;
   /** The filters this list is showing, as the URL spells them. */
   search: string;
-  /** How many rows the server drew, which is where the next page starts. */
-  drawn: number;
-  /** The thread the server's last row sits in, which the next page may carry on. */
-  lastPostId: string | null;
+  /** The first page, read on the server, which is where the next page starts. */
+  initialRows: FeedRow[];
   /** Every lead these filters hold, so the list knows when it is whole. */
   total: number;
   selectedId: string | null;
-  /** The first page, drawn on the server. */
-  children: React.ReactNode;
 };
 
 /**
- * The rest of the feed, a page at a time as the list is scrolled.
+ * The feed's list, a page at a time as it is scrolled.
  *
- * The server draws the first page and stops, because a project with a year of
+ * The server reads the first page and stops, because a project with a year of
  * backfill behind it holds hundreds of leads and reading and drawing all of
  * them is the whole of the wait before anything appears. Everything after that
  * is fetched when the foot of the list comes into view, so the wait is one page
  * long however many leads there are.
  */
-export function LeadPages({
-  projectId,
-  search,
-  drawn,
-  lastPostId,
-  total,
-  selectedId,
-  children,
-}: LeadPagesProps) {
+export function LeadPages({ projectId, search, initialRows, total, selectedId }: LeadPagesProps) {
   const [rows, setRows] = useState<FeedRow[]>([]);
   const [failed, setFailed] = useState(false);
   const foot = useRef<HTMLDivElement | null>(null);
@@ -48,6 +36,7 @@ export function LeadPages({
   /** The count these pages were read against, so a change in it is noticed. */
   const counted = useRef(total);
   const params = useMemo(() => Object.fromEntries(new URLSearchParams(search)), [search]);
+  const drawn = initialRows.length;
   const shown = drawn + rows.length;
   const whole = shown >= total;
   const held = rows.length;
@@ -123,10 +112,13 @@ export function LeadPages({
     return () => watch.disconnect();
   }, [failed, more, whole]);
 
+  // The server's page and the ones fetched after it are one list, so a row
+  // that carries on the thread above it is nested across a page's edge too.
+  const listed = [...initialRows, ...rows];
+
   return (
     <>
-      {children}
-      {rows.map((row, index) => (
+      {listed.map((row, index) => (
         <LeadRow
           key={row.id}
           id={row.id}
@@ -134,7 +126,7 @@ export function LeadPages({
           selected={row.id === selectedId}
           title={row.title}
           excerpt={row.excerpt}
-          nested={(index > 0 ? rows[index - 1].postId : lastPostId) === row.postId}
+          nested={index > 0 && listed[index - 1].postId === row.postId}
           author={row.author}
           avatarUrl={row.avatarUrl}
           subreddit={row.subreddit}

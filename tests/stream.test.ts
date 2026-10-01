@@ -1,59 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildStream, timeline, type CardLead } from "@/components/leads/stream";
+import { timeline } from "@/components/leads/stream";
 import type { LeadFace } from "@/lib/feed";
 
-/**
- * The feed opens on the best lead, not the newest thing found. Sorting the
- * stream by date on top of the query's score order threw fit and intent away,
- * and on 2026-09-10 put two crossposts of one person recruiting festival
- * companions above every real buyer.
- */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function card(id: string, score: number, ageDays: number): CardLead {
-  return {
-    id,
-    postId: `post-${id}`,
-    score,
-    quality: 0.7,
-    fit: 3,
-    intent: 2,
-    engagement: 1,
-    stage: "solution_seeking",
-    kind: "buyer",
-    status: "new",
-    reason: "",
-    matchedPhrase: "",
-    title: id,
-    url: `https://reddit.test/${id}`,
-    subreddit: "hotels",
-    subredditIconUrl: null,
-    subredditWeeklyActive: null,
-    promoPolicy: null,
-    rulesText: null,
-    imageUrl: null,
-    numComments: 0,
-    points: 0,
-    createdAt: new Date(Date.now() - ageDays * DAY_MS),
-    body: "",
-    author: "asker",
-    avatarUrl: null,
-    authorKarma: null,
-    authorCreatedAt: null,
-    isComment: false,
-    postAuthor: "asker",
-    postAuthorAvatar: null,
-  };
-}
-
 describe("the lead stream", () => {
-  it("keeps the feed query's order, so the weakest lead never opens it", () => {
-    // As listLeads returns them: score first, then the newer need.
-    const entries = buildStream([card("strong", 75, 20), card("weak", 55, 1)]);
-
-    expect(entries.map((entry) => entry.lead.id)).toEqual(["strong", "weak"]);
-  });
-
   it("draws a window of days in days, so a column is a day you can click", () => {
     const now = new Date(2026, 8, 17, 15, 30).getTime();
     const face = (id: string, daysAgo: number): LeadFace => ({

@@ -1,5 +1,7 @@
 /** Feed vocabulary shared by the server queries and the client filter pills. */
 
+import type { FeedLead } from "@/lib/leads";
+
 /**
  * `replied` is the owner saying they answered the thread, and it covers the
  * whole thread, the leads found in it later included (lib/handled.ts).
@@ -180,6 +182,118 @@ export type FeedRow = {
   fit: number | null;
   intent: number | null;
 };
+
+/** One lead as the detail pane shows it: the post or comment, and how it judged. */
+export type CardLead = {
+  id: string;
+  /** The thread the lead sits in, its own post or the post its comment answers. */
+  postId: string | null;
+  /** The lead model's verdict, which the owner's ranking weights fold with the rest. */
+  quality: number | null;
+  fit: number | null;
+  intent: number | null;
+  engagement: number | null;
+  kind: string;
+  /** Where the user put it: new, replied, hidden, not_fit, or resolved by the scan. */
+  status: string;
+  reason: string | null;
+  matchedPhrase: string | null;
+  title: string;
+  url: string;
+  subreddit: string;
+  subredditIconUrl: string | null;
+  subredditWeeklyActive: number | null;
+  promoPolicy: string | null;
+  rulesText: string | null;
+  numComments: number | null;
+  points: number | null;
+  createdAt: Date;
+  body: string;
+  author: string | null;
+  avatarUrl: string | null;
+  authorKarma: number | null;
+  authorCreatedAt: Date | null;
+  isComment: boolean;
+  postAuthor: string | null;
+  postAuthorAvatar: string | null;
+};
+
+/**
+ * A lead as the feed reads it, as the card the pane draws. A comment lead is
+ * its comment throughout: its author, its age, its body and its permalink,
+ * with the thread only underneath.
+ */
+export function toCard(lead: FeedLead): CardLead {
+  const isComment = lead.commentId !== null;
+  return {
+    id: lead.id,
+    postId: lead.postId,
+    quality: lead.quality,
+    fit: lead.fit,
+    intent: lead.intent,
+    engagement: lead.engagement,
+    kind: lead.kind,
+    status: lead.status,
+    reason: lead.reason,
+    matchedPhrase: lead.matchedPhrase,
+    title: lead.title,
+    url: (isComment ? lead.commentPermalink : lead.url) ?? lead.url,
+    subreddit: lead.subreddit,
+    subredditIconUrl: lead.subredditIconUrl,
+    subredditWeeklyActive: lead.subredditWeeklyActive,
+    promoPolicy: lead.promoPolicy,
+    rulesText: lead.rulesText,
+    numComments: lead.numComments,
+    points: isComment ? lead.commentScore : lead.postScore,
+    createdAt: (isComment ? lead.commentCreatedAt : lead.createdAt) ?? lead.createdAt,
+    body: (isComment ? lead.commentBody : lead.body) ?? "",
+    author: isComment ? lead.commentAuthor : lead.postAuthor,
+    avatarUrl: lead.authorAvatar,
+    authorKarma: lead.authorKarma,
+    authorCreatedAt: lead.authorCreatedAt,
+    isComment,
+    postAuthor: lead.postAuthor,
+    postAuthorAvatar: lead.postAuthorAvatar,
+  };
+}
+
+/** As much of a comment as a row could ever show before it is cut off. */
+const EXCERPT_LENGTH = 160;
+
+/**
+ * What a comment lead's row is headed by: the comment's own words on one line.
+ * Headed by the thread's title, three comments in one thread were three rows
+ * nobody could tell apart from each other or from the post.
+ */
+export function rowExcerpt(lead: Pick<CardLead, "isComment" | "body">): string | null {
+  if (!lead.isComment) {
+    return null;
+  }
+  const line = lead.body.replace(/\s+/g, " ").trim();
+  return line ? line.slice(0, EXCERPT_LENGTH) : null;
+}
+
+/**
+ * The same lead as one line in the list column, for the first page the server
+ * draws and every page fetched after it. It carries what a row draws and not
+ * the thread's body: the pane reads that from the server when a row is opened.
+ */
+export function toRow(lead: FeedLead): FeedRow {
+  const card = toCard(lead);
+  return {
+    id: `lead-${card.id}`,
+    postId: card.postId,
+    title: card.title,
+    excerpt: rowExcerpt(card),
+    author: card.author,
+    avatarUrl: card.avatarUrl,
+    subreddit: card.subreddit,
+    subredditIconUrl: card.subredditIconUrl,
+    createdAt: card.createdAt,
+    fit: card.fit,
+    intent: card.intent,
+  };
+}
 
 /** One face in the people strip: who posted, when, and how it scored. */
 export type LeadFace = {

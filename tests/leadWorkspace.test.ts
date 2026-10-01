@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildStream, type CardLead } from "@/components/leads/stream";
 import { entryHref, heldEntryId, requestedEntry, selectEntry } from "@/components/leads/workspace";
-import type { ReviewItem } from "@/lib/feed";
+import type { CardLead, ReviewItem } from "@/lib/feed";
 import { withParams } from "@/lib/url";
+
+import type { StreamEntry } from "@/components/leads/stream";
 
 /**
  * The workspace always has something in its right pane. It opens on the row the
@@ -13,12 +14,10 @@ function card(id: string): CardLead {
   return {
     id,
     postId: `post-${id}`,
-    score: 70,
     quality: 0.7,
     fit: 3,
     intent: 2,
     engagement: 1,
-    stage: "solution_seeking",
     kind: "buyer",
     status: "new",
     reason: "They asked for a recommendation.",
@@ -30,7 +29,6 @@ function card(id: string): CardLead {
     subredditWeeklyActive: null,
     promoPolicy: null,
     rulesText: null,
-    imageUrl: null,
     numComments: 0,
     points: 0,
     createdAt: new Date("2026-09-01T00:00:00Z"),
@@ -43,6 +41,10 @@ function card(id: string): CardLead {
     postAuthor: "asker",
     postAuthorAvatar: null,
   };
+}
+
+function entry(id: string): StreamEntry {
+  return { id: `lead-${id}`, lead: card(id) };
 }
 
 function heldItem(id: string): ReviewItem {
@@ -70,7 +72,7 @@ function heldItem(id: string): ReviewItem {
 }
 
 describe("selectEntry", () => {
-  const entries = buildStream([card("first"), card("second")]);
+  const entries = [entry("first"), entry("second")];
   const held = [heldItem("held-one"), heldItem("held-two")];
 
   it("opens the lead the URL asked for", () => {
@@ -100,7 +102,7 @@ describe("selectEntry", () => {
 });
 
 describe("requestedEntry", () => {
-  const entries = buildStream([card("first"), card("second")]);
+  const entries = [entry("first"), entry("second")];
   const held = [heldItem("held-one")];
 
   /**
