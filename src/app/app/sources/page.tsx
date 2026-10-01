@@ -14,7 +14,6 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const user = await requireLocalUser();
   const project = await requireActiveProject(user.id, (await searchParams).project);
 
-
   return (
     <div className="flex max-w-5xl flex-col gap-6">
       <div className="flex flex-col gap-1">

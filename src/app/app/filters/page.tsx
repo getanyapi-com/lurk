@@ -22,7 +22,6 @@ export default async function FiltersPage({ searchParams }: FiltersPageProps) {
   const user = await requireLocalUser();
   const project = await requireActiveProject(user.id, (await searchParams).project);
 
-
   const [preview, hidden, mutes] = await Promise.all([
     scoringPreview(project.id),
     wordsHidden(project.id),

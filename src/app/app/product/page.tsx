@@ -18,7 +18,6 @@ export default async function ProductPage({ searchParams }: ProductPageProps) {
   const user = await requireLocalUser();
   const project = await requireActiveProject(user.id, (await searchParams).project);
 
-
   const [activity, scanNow, rebuild] = await Promise.all([
     projectActivity(project.id),
     allowanceFor(user.id, "scan_now"),
