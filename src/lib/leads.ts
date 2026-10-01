@@ -17,6 +17,7 @@ import { forgetProjectFeed } from "./projectFeedCache";
 import { FEED_FLOOR_SQL, mentions, redditWordsWhere } from "./leadFilters";
 import { atBounds } from "./feed";
 import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN, LEAD_BODY, LEAD_URL, NEED_AT, leadsBase } from "./leadSql";
+import { STAGES } from "./scan/questions";
 import { daysAgo } from "./time";
 
 import type {
@@ -295,10 +296,17 @@ export async function listReviewItems(
   return rows;
 }
 
+/** Where a stage sits in the buying journey; one the judge no longer names goes last. */
+function stageRank(stage: string): number {
+  const rank = (STAGES as readonly string[]).indexOf(stage);
+  return rank === -1 ? STAGES.length : rank;
+}
+
 /**
  * The subreddits and stages this project actually has leads in. Each pair is
  * read once rather than once per lead; a subreddit can still come back with
- * several stages, so each list is made unique again.
+ * several stages, so each list is made unique again. Subreddits are in name
+ * order and stages in journey order, so neither list moves when a lead lands.
  */
 export async function feedFacets(projectId: string): Promise<FeedFacets> {
   const rows = await db()
@@ -308,7 +316,9 @@ export async function feedFacets(projectId: string): Promise<FeedFacets> {
     .where(eq(leads.projectId, projectId));
   return {
     subreddits: [...new Set(rows.map((row) => row.subreddit))].sort(),
-    stages: [...new Set(rows.map((row) => row.stage).filter((stage): stage is string => !!stage))],
+    stages: [...new Set(rows.map((row) => row.stage).filter((stage): stage is string => !!stage))].sort(
+      (a, b) => stageRank(a) - stageRank(b),
+    ),
   };
 }
 

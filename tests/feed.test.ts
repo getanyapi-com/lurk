@@ -273,6 +273,39 @@ describe.skipIf(!hasDatabase)("the feed at read time", () => {
     expect(faces[0].subreddit).toBe("SaaS");
     expect(faces[0].at).toBeInstanceOf(Date);
   });
+
+  it("lists the filter's subreddits by name and its stages in journey order, whatever order the leads land in", async () => {
+    const { db, schema, project, post } = await fixture(null);
+    const { feedFacets } = await import("@/lib/leads");
+    const later = [
+      { subreddit: "smallbusiness", stage: "problem_aware" },
+      { subreddit: "Entrepreneur", stage: "comparing" },
+      { subreddit: "smallbusiness", stage: "problem_aware" },
+    ];
+    const leadRows = [{ postId: post.id, stage: "purchase_ready" }];
+    for (const row of later) {
+      const [extra] = await db()
+        .insert(schema.redditPosts)
+        .values({
+          id: `p${randomUUID().slice(0, 8)}`,
+          subreddit: row.subreddit,
+          author: "asker",
+          title: `Form question in ${row.subreddit}`,
+          url: `https://www.reddit.com/r/${row.subreddit}/comments/${randomUUID().slice(0, 6)}/form/`,
+          createdAt: new Date(Date.now() - 10 * DAY_MS),
+        })
+        .returning();
+      leadRows.push({ postId: extra.id, stage: row.stage });
+    }
+    await db()
+      .insert(schema.leads)
+      .values(leadRows.map((row) => ({ projectId: project.id, score: 70, ...row })));
+
+    expect(await feedFacets(project.id)).toEqual({
+      subreddits: ["Entrepreneur", "SaaS", "smallbusiness"],
+      stages: ["problem_aware", "comparing", "purchase_ready"],
+    });
+  });
 });
 
 /**
