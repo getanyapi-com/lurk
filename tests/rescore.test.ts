@@ -177,6 +177,70 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
     }
   });
 
+  /**
+   * The scan judges only comments that answer the post, so a stale verdict on a
+   * reply to another comment, or on one whose parent is unknown, is never
+   * judged again: re-judged it could put a nested reply in the feed.
+   */
+  it("judges a stale comment verdict only when the comment answers the post", async () => {
+    const { project, post } = await fixture({ lead: null });
+    await db()
+      .update(schema.leadEvaluations)
+      .set({ scorerVersion: SCORER_VERSION })
+      .where(eq(schema.leadEvaluations.projectId, project.id));
+    const comment = async (parentId: string | null) => {
+      const [row] = await db()
+        .insert(schema.redditComments)
+        .values({
+          id: `c${randomUUID().slice(0, 8)}`,
+          postId: post.id,
+          parentId,
+          author: `replier${randomUUID().slice(0, 4)}`,
+          body: "We need conditional logic on our signup form too.",
+          createdAt: new Date(),
+        })
+        .returning();
+      await db().insert(schema.leadEvaluations).values({
+        projectId: project.id,
+        postId: post.id,
+        commentId: row.id,
+        decision: "reject",
+        relationship: "unknown",
+        needState: "unknown",
+        engagement: 2,
+        score: 0,
+        reasonCodes: ["insufficient_evidence"],
+        requirements: [],
+        answerCoverage: "none",
+        reason: "An older scorer said so.",
+        profileVersion: project.profileVersion,
+        contentHash: "stale",
+        scorerVersion: "2026-01-01.0",
+      });
+      return row;
+    };
+    const nested = await comment("t1_another");
+    const unknown = await comment(null);
+    expect((await projectsWithStaleEvaluations()).has(project.id)).toBe(false);
+    expect(await runRescore(project.id, randomUUID())).toEqual({ judged: 0, demoted: 0, promoted: 0, unchanged: 0 });
+
+    const answering = await comment(post.id);
+    expect((await projectsWithStaleEvaluations()).has(project.id)).toBe(true);
+    answers({});
+    const outcome = await runRescore(project.id, randomUUID());
+
+    expect(outcome.judged).toBe(1);
+    expect((await leadsOf(project.id)).map((row) => row.commentId)).toEqual([answering.id]);
+    const stored = await db()
+      .select()
+      .from(schema.leadEvaluations)
+      .where(eq(schema.leadEvaluations.projectId, project.id));
+    const versionOf = (id: string) => stored.find((row) => row.commentId === id)?.scorerVersion;
+    expect(versionOf(nested.id)).toBe("2026-01-01.0");
+    expect(versionOf(unknown.id)).toBe("2026-01-01.0");
+    expect(versionOf(answering.id)).toBe(SCORER_VERSION);
+  });
+
   it("judges nothing when every verdict is already current", async () => {
     const { project } = await fixture({ lead: { status: "new" } });
     await db()
