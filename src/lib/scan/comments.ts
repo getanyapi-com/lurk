@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { redditPosts } from "@/db/schema";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPostComments } from "@/lib/reddit/skus";
-import { commentsOfPost, type StoredComment, type StoredPost } from "@/lib/reddit/store";
+import { commentsOfPosts, type StoredComment, type StoredPost } from "@/lib/reddit/store";
 import { inFlight } from "@/lib/inFlight";
 import {
   alreadyJudged,
@@ -31,7 +31,7 @@ export type ThreadRead = { post: StoredPost; comments: StoredComment[] };
  * count the thread was read at so the next scan buys it again only once that
  * count has moved. A failure loses one thread and records nothing.
  */
-export async function readThreads(ctx: FetchContext, posts: StoredPost[]): Promise<ThreadRead[]> {
+async function readThreads(ctx: FetchContext, posts: StoredPost[]): Promise<ThreadRead[]> {
   const reads = await inFlight(posts, async (post): Promise<ThreadRead | null> => {
     try {
       const result = await fetchPostComments(ctx, post.id, post.url);
@@ -47,26 +47,36 @@ export async function readThreads(ctx: FetchContext, posts: StoredPost[]): Promi
   return reads.filter((read): read is ThreadRead => read !== null);
 }
 
-/** Whether the stored comments are the thread as Reddit last reported it. */
-function storedIsCurrent(post: StoredPost): boolean {
+/**
+ * Whether the stored comments are the thread as Reddit last reported it, so
+ * reading them from the store misses nobody. A scan and the SEO refresh both
+ * buy a thread's replies again only once this stops being true, so a thread
+ * both hold is bought once between them.
+ */
+export function commentsAreCurrent(post: StoredPost): boolean {
   return post.commentsObservedAt !== null && (post.numComments ?? 0) === post.commentsReadCount;
 }
 
+/** Each post with whatever comments the store holds for it, in one query. */
+export async function storedThreads(posts: StoredPost[]): Promise<ThreadRead[]> {
+  const comments = await commentsOfPosts(posts.map((post) => post.id));
+  return posts.map((post) => ({ post, comments: comments.get(post.id) ?? [] }));
+}
+
 /**
- * A project's own read of its leads' threads. A thread somebody else already
- * bought at this reply count is read from the store for nothing; the rest are
- * bought. Either way this project still has every comment to judge.
+ * A project's own read of these threads. The ones `shouldBuy` picks are
+ * bought, by default every thread whose stored comments are behind, and the
+ * rest are read from the store for nothing, so a thread somebody else already
+ * bought at this reply count costs this project nothing and it still has every
+ * comment to judge. A thread whose purchase failed is left out.
  */
-export async function readLeadThreads(ctx: FetchContext, posts: StoredPost[]): Promise<ThreadRead[]> {
-  const held = await Promise.all(
-    posts
-      .filter(storedIsCurrent)
-      .map(async (post): Promise<ThreadRead> => ({ post, comments: await commentsOfPost(post.id) })),
-  );
-  const bought = await readThreads(
-    ctx,
-    posts.filter((post) => !storedIsCurrent(post)),
-  );
+export async function readLeadThreads(
+  ctx: FetchContext,
+  posts: StoredPost[],
+  shouldBuy: (post: StoredPost) => boolean = (post) => !commentsAreCurrent(post),
+): Promise<ThreadRead[]> {
+  const held = await storedThreads(posts.filter((post) => !shouldBuy(post)));
+  const bought = await readThreads(ctx, posts.filter(shouldBuy));
   return [...held, ...bought];
 }
 

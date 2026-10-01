@@ -10,8 +10,8 @@ import {
 import { competitorsInThread, writeThreadMentions } from "@/lib/competitors/threads";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost } from "@/lib/reddit/skus";
-import { commentsOfPost, type StoredPost } from "@/lib/reddit/store";
-import { readThreads, type ThreadRead } from "@/lib/scan/comments";
+import type { StoredPost } from "@/lib/reddit/store";
+import { commentsAreCurrent, readLeadThreads, storedThreads } from "@/lib/scan/comments";
 import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy } from "@/lib/settings/types";
@@ -52,9 +52,10 @@ async function readThread(
 
 /**
  * Whether a thread's replies are worth buying: the policy reads replies here
- * at all, there are enough of them to name anyone, and the thread was either
- * never read or has grown since. The same reply rule a scan applies to a
- * lead's thread, so a thread both surfaces hold is bought once between them.
+ * at all, there are enough of them to name anyone, and the stored comments are
+ * not the thread as Reddit last reported it. The same freshness rule a scan
+ * applies to a lead's thread, so a thread both surfaces hold is bought once
+ * between them.
  *
  * Age gates nothing here. A thread Google still ranks is worth its replies
  * however old the post is; what earns the call is the ranking, not the clock.
@@ -64,32 +65,10 @@ async function readThread(
  * Exported for its own test: the refresh around it needs a funded client.
  */
 export function repliesWorthReading(policy: ThreadPolicy, post: StoredPost): boolean {
-  const replies = post.numComments ?? 0;
   return (
     policy.readSeoReplies &&
-    replies >= policy.minReplies &&
-    (post.commentsObservedAt === null || post.numComments !== post.commentsReadCount)
-  );
-}
-
-/**
- * Each opened thread with its replies: bought now when they are worth reading,
- * otherwise whatever an earlier read stored, which is what the flag is judged on.
- */
-async function threadsOf(
-  ctx: FetchContext,
-  policy: ThreadPolicy,
-  posts: StoredPost[],
-): Promise<ThreadRead[]> {
-  const threads = await readThreads(
-    ctx,
-    posts.filter((post) => repliesWorthReading(policy, post)),
-  );
-  const read = new Map(threads.map((thread) => [thread.post.id, thread]));
-  return Promise.all(
-    posts.map(
-      async (post) => read.get(post.id) ?? { post, comments: await commentsOfPost(post.id) },
-    ),
+    (post.numComments ?? 0) >= policy.minReplies &&
+    !commentsAreCurrent(post)
   );
 }
 
@@ -125,7 +104,13 @@ async function refreshPhrasing(
       snippet: result.snippet,
     });
   }
-  const threads = await threadsOf(ctx, policy, opened);
+  // Each opened thread with its replies: bought now when they are worth
+  // reading, otherwise whatever an earlier read stored, which is what the flag
+  // is judged on. Every opened thread is a row on the tab, so one whose
+  // replies could not be bought this time falls back to the store as well.
+  const read = await readLeadThreads(ctx, opened, (post) => repliesWorthReading(policy, post));
+  const got = new Set(read.map((thread) => thread.post.id));
+  const threads = [...read, ...(await storedThreads(opened.filter((post) => !got.has(post.id))))];
   await writeThreadMentions(project.id, project.competitors, threads);
   const rows: OpportunityRow[] = threads.map((thread) => ({
     postId: thread.post.id,

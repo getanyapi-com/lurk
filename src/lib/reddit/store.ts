@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { redditComments, redditPosts, searchRunPosts, searchRuns } from "@/db/schema";
 
@@ -234,4 +234,22 @@ export async function upsertComments(
 
 export async function commentsOfPost(postId: string): Promise<StoredComment[]> {
   return db().select().from(redditComments).where(eq(redditComments.postId, postId));
+}
+
+/** The stored comments of several posts in one query, by post. */
+export async function commentsOfPosts(postIds: string[]): Promise<Map<string, StoredComment[]>> {
+  const byPost = new Map<string, StoredComment[]>();
+  if (postIds.length === 0) {
+    return byPost;
+  }
+  const rows = await db()
+    .select()
+    .from(redditComments)
+    .where(inArray(redditComments.postId, [...new Set(postIds)]));
+  for (const row of rows) {
+    const held = byPost.get(row.postId) ?? [];
+    held.push(row);
+    byPost.set(row.postId, held);
+  }
+  return byPost;
 }
