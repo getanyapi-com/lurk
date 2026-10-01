@@ -75,7 +75,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the stored run key", () => {
   });
 
   it("buys each cursor page once and hands the cursor back on reuse", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { projects, redditPosts, searchRuns, users } = await import("@/db/schema");
     const { fetchSearch } = await import("@/lib/reddit/skus");

@@ -21,3 +21,9 @@ for (const key of PAID_KEYS) {
   delete process.env[key];
 }
 process.env.RUN_SCHEDULER = "false";
+/**
+ * The config refuses to load without an encryption key, and every test that
+ * reaches the database loads it. Any 32 bytes will do where .env has no key,
+ * as in CI; a test that needs a particular key stubs it with vi.stubEnv.
+ */
+process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");

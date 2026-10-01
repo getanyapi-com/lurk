@@ -65,7 +65,6 @@ describe.skipIf(!hasDatabase)("a project's filters where leads are read", () => 
     { muted = [], ...leadFilters }: Partial<LeadFilters> & { muted?: string[] },
     scoreThreshold: number | null = null,
   ) {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();

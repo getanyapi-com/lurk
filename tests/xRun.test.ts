@@ -151,7 +151,6 @@ describe.skipIf(!hasDatabase)("the X pipeline against a database", () => {
   let orm: typeof import("drizzle-orm");
 
   beforeEach(async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     process.env.X_LEADS = "true";
     // The local .env is self-hosted, which has no caps; these tests are about the hosted tiers.
     process.env.SELF_HOSTED = "false";

@@ -4,7 +4,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 beforeAll(() => {
-  process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
   process.env.APP_URL ??= "http://localhost:3000";
 });
 

@@ -103,7 +103,6 @@ describe("leads filter query builder", () => {
  */
 describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a database", () => {
   it("finds a key by its hash, and nothing by a wrong one", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { users } = await import("@/db/schema");
     const { createApiKey, findApiKey, listApiKeys, revokeApiKey } = await import("@/lib/api/keys");
@@ -129,7 +128,6 @@ describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a d
   });
 
   it("counts requests per key per day and refuses the one over the limit", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { users } = await import("@/db/schema");
     const { createApiKey } = await import("@/lib/api/keys");
@@ -160,7 +158,6 @@ describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a d
   });
 
   it("stamps a key's use at most every few minutes", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { users } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");

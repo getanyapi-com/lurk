@@ -76,7 +76,6 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
   });
 
   it("replaces what discovery wrote and keeps what a person decided", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { publishDiscoveryPlan } = await import("@/lib/discovery/plan");
@@ -148,7 +147,6 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
   });
 
   it("keeps the competitors the page named, and gives discovery only the room they leave", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { publishDiscoveryPlan } = await import("@/lib/discovery/plan");
@@ -189,7 +187,6 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
   });
 
   it("records one thread once per query and files the model's verdict on all of them", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { applyRelevances, loadEvidence, writeObservations } = await import(

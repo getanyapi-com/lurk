@@ -64,7 +64,6 @@ const profile = {
 
 describe.skipIf(!process.env.DATABASE_URL)("creating a project", () => {
   beforeEach(() => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     runDiscovery.mockClear();
     redirect.mockClear();
     generateStructured.mockReset();

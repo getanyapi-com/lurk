@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
  */
 describe.skipIf(!process.env.DATABASE_URL)("a shared fetch still being stored", () => {
   async function fixture() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { projects, searchRuns, users } = await import("@/db/schema");
     const { fetchShared } = await import("@/lib/reddit/fetch");

@@ -13,7 +13,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe.skipIf(!hasDatabase)("the feed at read time", () => {
   async function fixture(threshold: number | null) {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db()

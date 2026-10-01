@@ -359,7 +359,6 @@ describe.skipIf(!process.env.DATABASE_URL)("reading X asks for a digest", () => 
   });
 
   async function owner() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();

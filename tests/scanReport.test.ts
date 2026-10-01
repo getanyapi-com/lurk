@@ -14,7 +14,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe.skipIf(!hasDatabase)("counting one window of scanning", () => {
   async function fixture() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { eq } = await import("drizzle-orm");
     const schema = await import("@/db/schema");

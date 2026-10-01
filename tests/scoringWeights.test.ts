@@ -122,7 +122,6 @@ const hasDatabase = !!process.env.DATABASE_URL;
 
 describe.skipIf(!hasDatabase)("re-ranking a project's stored leads", () => {
   it("rewrites the scores the new weights move, and puts them back on reset", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");

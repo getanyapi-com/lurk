@@ -45,7 +45,6 @@ async function fixture(discovered: Date | null = null) {
 
 describe.skipIf(!process.env.DATABASE_URL)("the initial discovery", () => {
   beforeEach(() => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     process.env.SELF_HOSTED = "false";
     runDiscovery.mockClear();
     resolveActiveSubreddits.mockClear();

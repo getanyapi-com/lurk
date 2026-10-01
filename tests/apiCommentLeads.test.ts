@@ -9,7 +9,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 describe.skipIf(!process.env.DATABASE_URL)("a fresh comment on an old thread", () => {
   it("is listed by the API inside the window and links to the comment", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { leads, projects, redditComments, redditPosts, users } = await import("@/db/schema");
     const { listLeads } = await import("@/lib/leads");

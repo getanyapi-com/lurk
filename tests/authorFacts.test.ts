@@ -14,7 +14,6 @@ const CREATED_UTC = 1_500_000_000;
 
 describe.skipIf(!hasDatabase)("author facts from the profile call", () => {
   async function context(username: string) {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db()

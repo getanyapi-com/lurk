@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
  */
 describe("the twitter.* price cap", () => {
   it("caps the three X endpoints and leaves every other call identical", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { withXPriceCap } = await import("@/lib/anyapi");
     const base = "https://api.getanyapi.com/v1/run";
     expect(String(withXPriceCap(`${base}/twitter.search`))).toBe(`${base}/twitter.search?max_cost_usd=0.001`);

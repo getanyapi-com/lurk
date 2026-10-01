@@ -17,7 +17,6 @@ const NOW = new Date("2010-01-01T00:00:00Z");
  */
 describe.skipIf(!process.env.DATABASE_URL)("deleting expired X data", () => {
   it("drops old posts with their leads, keeps fresh ones and parents bought lately, and leaves every run", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { inArray } = await import("drizzle-orm");

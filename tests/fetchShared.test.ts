@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
  */
 describe.skipIf(!process.env.DATABASE_URL)("fetchShared against a database", () => {
   it("calls AnyAPI once and reuses the run for the second caller", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { projects, redditPosts, searchRuns, usageLedger, users } = await import("@/db/schema");
     const { fetchSearch } = await import("@/lib/reddit/skus");
@@ -100,7 +99,6 @@ function restore(name: string, value: string | undefined): void {
  */
 describe.skipIf(!process.env.DATABASE_URL)("the house data cap", () => {
   async function fixture(funding: "house" | `wallet:${string}`, calls: { count: number }) {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { projects, users } = await import("@/db/schema");
     const [user] = await db()
@@ -188,7 +186,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the house data cap", () => {
  */
 describe.skipIf(!process.env.DATABASE_URL)("google.search's stored runs", () => {
   it("stores canonical thread URLs, and still serves a run stored with Google's own link", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { projects, searchRuns, serpResults, users } = await import("@/db/schema");
     const { googleSearch } = await import("@/lib/seo/fetch");

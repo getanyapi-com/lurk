@@ -123,7 +123,6 @@ async function fixture() {
 
 describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () => {
   beforeEach(() => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     generateStructured.mockReset();
   });
 
@@ -261,7 +260,6 @@ describe.skipIf(!process.env.DATABASE_URL)("a new project's fast reading", () =>
  */
 describe.skipIf(!process.env.DATABASE_URL)("rebuilding a profile", () => {
   beforeEach(() => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     generateStructured.mockReset();
   });
 

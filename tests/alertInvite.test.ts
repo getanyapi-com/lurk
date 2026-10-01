@@ -4,8 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const sent = vi.fn();
 vi.mock("@/lib/alerts/email", () => ({ sendEmail: (mail: unknown) => sent(mail) }));
 
-process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
-
 describe("invite tokens", () => {
   it("names the person it was issued for and refuses an altered one", async () => {
     const { inviteToken, userForToken } = await import("@/lib/alerts/invite");

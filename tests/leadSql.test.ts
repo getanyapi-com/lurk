@@ -31,7 +31,6 @@ type Rows<T extends () => PromiseLike<unknown>> = Awaited<ReturnType<T>>;
 
 describe.skipIf(!process.env.DATABASE_URL)("leadsBase", () => {
   it("is the four-table join written out, in its SQL and in its rows", () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     expect(leadsBase(fields).toSQL()).toEqual(writtenOut().toSQL());
     expectTypeOf<Rows<() => ReturnType<typeof leadsBase<typeof fields>>>>().toEqualTypeOf<
       Rows<typeof writtenOut>

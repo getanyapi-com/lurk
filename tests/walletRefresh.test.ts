@@ -23,7 +23,6 @@ vi.mock("@/lib/oauth", () => ({ refreshTokens }));
 
 describe.skipIf(!process.env.DATABASE_URL)("refreshing a wallet's access token", () => {
   it("spends the refresh token once when two jobs find it expired together", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { users, walletConnections } = await import("@/db/schema");
     const { eq } = await import("drizzle-orm");

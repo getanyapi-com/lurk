@@ -23,7 +23,6 @@ describe.skipIf(!hasDatabase)("X search runs in the shared store", () => {
   let searchPage: typeof import("@/lib/x/skus").searchPage;
 
   beforeEach(async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     process.env.HOUSE_X_DATA_CAP_USD_PER_DAY = "5";
     ({ db } = await import("@/db"));
     schema = await import("@/db/schema");

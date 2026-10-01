@@ -67,7 +67,6 @@ describe.skipIf(!process.env.DATABASE_URL)("posts a job opens together", () => {
   });
 
   async function fixture(phrasings: string[] = []) {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db()

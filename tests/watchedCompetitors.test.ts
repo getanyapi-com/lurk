@@ -46,7 +46,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the competitors a project watches", 
    * active, pinned, typed in by a person, and excluded.
    */
   async function fixture() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db()

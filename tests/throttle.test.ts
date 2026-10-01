@@ -42,7 +42,6 @@ describe.skipIf(!process.env.DATABASE_URL)("a free user pressing paid buttons", 
 
   it("gets each once for good, and a double click costs one press", async () => {
     vi.stubEnv("SELF_HOSTED", "false");
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { jobs, projects, userActions, users } = await import("@/db/schema");
     const { ActionThrottledError, allowanceFor, pressForJob, spendAllowance } = await import(

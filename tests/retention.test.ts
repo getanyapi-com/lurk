@@ -20,7 +20,6 @@ const NOW = new Date("2010-01-01T00:00:00Z");
  */
 describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
   async function fixture() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { upsertPosts } = await import("@/lib/reddit/store");
@@ -126,7 +125,6 @@ describe.skipIf(!process.env.DATABASE_URL)("deleting expired posts", () => {
  */
 describe.skipIf(!process.env.DATABASE_URL)("pruning finished jobs", () => {
   it("drops month-old finished jobs but the newest of each kind, and never an unfinished one", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { eq, inArray } = await import("drizzle-orm");

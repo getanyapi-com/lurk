@@ -18,8 +18,6 @@ vi.mock("@/lib/scan/searches", async (original) => ({
 vi.mock("@/lib/scan/run", () => ({ runScan: (...args: unknown[]) => runScan(...args) }));
 vi.mock("@/lib/alerts/email", () => ({ sendEmail: async () => {} }));
 
-process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
-
 const MADE = [
   ...["a", "b", "c"].map((x) => ({ kind: "symptom", text: `symptom ${x}` })),
   ...["a", "b", "c", "d", "e"].map((x) => ({ kind: "tool_ask", text: `tool for ${x}` })),

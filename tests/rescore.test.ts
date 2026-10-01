@@ -28,7 +28,6 @@ describe.skipIf(!hasDatabase)("re-judging a project under a new scorer", () => {
   let eq: typeof import("drizzle-orm").eq;
 
   beforeEach(async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     ({ db } = await import("@/db"));
     schema = await import("@/db/schema");
     ({ runRescore, projectsWithStaleEvaluations } = await import("@/lib/scan/rescore"));

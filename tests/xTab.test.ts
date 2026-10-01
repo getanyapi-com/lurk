@@ -22,7 +22,6 @@ describe("the X leads switch", () => {
   });
 
   it.skipIf(!process.env.DATABASE_URL)("keeps X's limits out of /api/v1/me unless X is on for the caller", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { me } = await import("@/lib/api/handlers");
     const { TIERS } = await import("@/lib/tiers");
     const caller = {

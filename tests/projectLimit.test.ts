@@ -6,7 +6,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the project limit under concurrent r
   afterEach(() => vi.unstubAllEnvs());
 
   it("lets through only as many projects as the tier allows", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     vi.stubEnv("SELF_HOSTED", "false");
     const { db } = await import("@/db");
     const { users } = await import("@/db/schema");

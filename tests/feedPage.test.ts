@@ -37,7 +37,6 @@ describe.skipIf(!hasDatabase)("the leads page read", () => {
   });
 
   async function fixture() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const [user] = await db()

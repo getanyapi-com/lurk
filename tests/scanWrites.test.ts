@@ -32,7 +32,6 @@ function judgement(score: number): Judgement {
 
 describe.skipIf(!process.env.DATABASE_URL)("writing one scan's verdicts and leads", () => {
   async function fixture() {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { upsertComments, upsertPosts } = await import("@/lib/reddit/store");

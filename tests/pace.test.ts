@@ -12,7 +12,6 @@ import { isRefusal, paceSnapshot, paced, resetPace } from "@/lib/reddit/pace";
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 process.env.DATABASE_URL ??= "postgres://unused";
-process.env.APP_ENCRYPTION_KEY ??= "unused";
 
 describe("paced", () => {
   beforeEach(() => {

@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
  */
 describe.skipIf(!process.env.DATABASE_URL)("spend", () => {
   it("sums the house's runs and unshared lines, a project's lines and calls, and model calls", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const { llmUsage, projects, searchRuns, usageLedger, users } = await import("@/db/schema");
     const { houseDataSpend, ledgerCalls, llmSpend, projectLedgerSpend } = await import("@/lib/spend");

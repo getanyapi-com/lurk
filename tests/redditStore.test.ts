@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
  */
 describe.skipIf(!process.env.DATABASE_URL)("storing a search result", () => {
   it("keeps the text a search carried, and dates the observation", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { upsertPosts } = await import("@/lib/reddit/store");
 
     const [stored] = await upsertPosts([
@@ -30,7 +29,6 @@ describe.skipIf(!process.env.DATABASE_URL)("storing a search result", () => {
   });
 
   it("leaves a body-less listing unobserved", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { upsertPosts } = await import("@/lib/reddit/store");
 
     const [stored] = await upsertPosts([
@@ -58,7 +56,6 @@ describe.skipIf(!process.env.DATABASE_URL)("storing a search result", () => {
  */
 describe.skipIf(!process.env.DATABASE_URL)("the order posts are stored in", () => {
   it("returns them as upstream ranked them, whatever order they are written in", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { upsertPosts } = await import("@/lib/reddit/store");
     const suffix = randomUUID().slice(0, 8);
     // Ranked z, a, m: the reverse of the order the statement lists them in.
@@ -87,7 +84,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the order posts are stored in", () =
  */
 describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
   it("keeps a flag a search carried, and lets a later fetch correct it", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { upsertPosts } = await import("@/lib/reddit/store");
     const id = `t3_${randomUUID().slice(0, 8)}`;
     const listing = {
@@ -113,7 +109,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
   });
 
   it("leaves both unknown when nothing has ever reported them", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { upsertPosts } = await import("@/lib/reddit/store");
     const id = `t3_${randomUUID().slice(0, 8)}`;
 
@@ -134,7 +129,6 @@ describe.skipIf(!process.env.DATABASE_URL)("the archive and lock flags", () => {
 
 describe.skipIf(!process.env.DATABASE_URL)("what a stored comment answers", () => {
   it("records the post for a top-level comment, the comment for a reply, and keeps it when a later read omits it", async () => {
-    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { upsertComments, upsertPosts } = await import("@/lib/reddit/store");
     const [post] = await upsertPosts([
       {
