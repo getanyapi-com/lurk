@@ -15,7 +15,7 @@ vi.mock("ai", async (importOriginal) => ({
   generateObject,
 }));
 vi.mock("@openrouter/ai-sdk-provider", () => ({
-  createOpenRouter: () => ({ chat: (model: string) => model }),
+  createOpenRouter: () => ({ chat: (model: string, settings?: unknown) => ({ model, settings }) }),
 }));
 vi.mock("@/lib/config", () => ({
   config: () => ({
@@ -46,8 +46,8 @@ const schema = z.object({
   reasons: z.array(z.string()),
 });
 
-/** One answer as the SDK hands it back, with the metadata a row needs. */
-function answered(object: unknown) {
+/** One answer as the SDK hands it back, with the metadata a row needs, and the bill when OpenRouter sent one. */
+function answered(object: unknown, billedUsd?: number) {
   return {
     object,
     usage: {
@@ -56,7 +56,9 @@ function answered(object: unknown) {
       outputTokenDetails: { reasoningTokens: 3 },
     },
     finishReason: "stop",
-    providerMetadata: { openrouter: { provider: "Fireworks" } },
+    providerMetadata: {
+      openrouter: { provider: "Fireworks", usage: billedUsd === undefined ? {} : { cost: billedUsd } },
+    },
     response: { modelId: "served-model" },
   };
 }
@@ -155,8 +157,31 @@ describe("what the language model boundary records", () => {
       schemaFailed: true,
       inputTokens: 40,
       outputTokens: 0,
+      // The error carries the tokens and not the bill, so the table prices it.
+      costUsd: "0.000004",
       itemsAnswered: null,
     });
+  });
+
+  /**
+   * The house cap is a sum of these rows, and OPENROUTER_MODEL can name a model
+   * dearer than the one the table was read for. So a row holds what OpenRouter
+   * billed, and the table prices only a call that came back without a bill.
+   */
+  it("records what OpenRouter billed, and prices from the table only without a bill", async () => {
+    recorded.length = 0;
+    generateObject.mockReset();
+    const base = { purpose: "test", projectId: null, schema, system: "s", prompt: "p" };
+
+    generateObject.mockResolvedValueOnce(answered({ verdict: { quote: "q" }, reasons: [] }, 0.0123));
+    await generateStructured(base);
+    generateObject.mockResolvedValueOnce(answered({ verdict: { quote: "q" }, reasons: [] }));
+    await generateStructured(base);
+
+    const model = (generateObject.mock.calls[0][0] as { model: { settings: unknown } }).model;
+    expect(model.settings).toEqual({ usage: { include: true } });
+    // 10 input tokens at $0.10 and 5 output at $0.20 per million.
+    expect(recorded.map((row) => row.costUsd)).toEqual(["0.012300", "0.000002"]);
   });
 
   /**

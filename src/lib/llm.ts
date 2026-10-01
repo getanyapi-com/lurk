@@ -11,7 +11,10 @@ import { utcDayStart } from "./time";
 /**
  * OpenRouter's published price for meta/muse-spark-1.3-contributor, read from
  * GET https://openrouter.ai/api/v1/models on 2026-09-05: $0.10 per million
- * input tokens and $0.20 per million output tokens.
+ * input tokens and $0.20 per million output tokens. A call is recorded at what
+ * OpenRouter says it billed, whichever model OPENROUTER_MODEL names; this
+ * prices only a call whose answer leaves that out, which is every failed one,
+ * since the SDK's error carries the tokens and not the bill.
  */
 export const MODEL_PRICE_USD_PER_MILLION = { input: 0.1, output: 0.2 };
 
@@ -159,6 +162,8 @@ export type LlmCall<T> = {
 type CallRecord = {
   inputTokens: number;
   outputTokens: number;
+  /** What OpenRouter says the call cost, when the answer carried it. */
+  billedUsd: number | null;
   reasoningTokens: number | null;
   model: string;
   provider: string | null;
@@ -192,6 +197,16 @@ export async function recordLlmUsage(
     .values({ ...values, costUsd: values.costUsd.toFixed(6) });
 }
 
+/**
+ * What OpenRouter billed for the call, from the usage accounting the model is
+ * built to ask for. Absent when the answer leaves it out, and then the call is
+ * priced from the table.
+ */
+function billedOf(metadata: unknown): number | null {
+  const usage = (metadata as { openrouter?: { usage?: { cost?: unknown } } } | undefined)?.openrouter?.usage;
+  return typeof usage?.cost === "number" && Number.isFinite(usage.cost) ? usage.cost : null;
+}
+
 async function record(call: LlmCall<unknown>, made: CallRecord): Promise<void> {
   await recordLlmUsage({
     projectId: call.projectId,
@@ -199,7 +214,7 @@ async function record(call: LlmCall<unknown>, made: CallRecord): Promise<void> {
     inputTokens: made.inputTokens,
     outputTokens: made.outputTokens,
     reasoningTokens: made.reasoningTokens,
-    costUsd: costOf(made.inputTokens, made.outputTokens),
+    costUsd: made.billedUsd ?? costOf(made.inputTokens, made.outputTokens),
     model: made.model,
     provider: made.provider,
     latencyMs: made.latencyMs,
@@ -248,7 +263,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
   try {
     result = await withCallTimeout((abortSignal) =>
       generateObject({
-        model: openrouter.chat(OPENROUTER_MODEL),
+        model: openrouter.chat(OPENROUTER_MODEL, { usage: { include: true } }),
         schema: call.schema,
         system: call.system,
         prompt: call.prompt,
@@ -262,6 +277,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
     await record(call as LlmCall<unknown>, {
       inputTokens: spent.input,
       outputTokens: spent.output,
+      billedUsd: null,
       reasoningTokens: spent.reasoning,
       model: OPENROUTER_MODEL,
       provider: null,
@@ -276,6 +292,7 @@ export async function generateStructured<T>(call: LlmCall<T>): Promise<T> {
   await record(call as LlmCall<unknown>, {
     inputTokens: result.usage.inputTokens ?? 0,
     outputTokens: result.usage.outputTokens ?? 0,
+    billedUsd: billedOf(result.providerMetadata),
     reasoningTokens: result.usage.outputTokenDetails.reasoningTokens ?? null,
     model: result.response?.modelId ?? OPENROUTER_MODEL,
     provider: providerOf(result.providerMetadata),
