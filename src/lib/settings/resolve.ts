@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { projects, users } from "@/db/schema";
 import { enqueueJob, nextScanJob } from "@/jobs/enqueue";
-import { walletConnection } from "@/lib/anyapi";
+import { tierNameFor } from "@/lib/anyapi";
 import { config } from "@/lib/config";
 import type { TierName } from "@/lib/tiers";
 import { cadenceFor } from "./cadence";
@@ -122,8 +122,7 @@ export async function settingsForPreset(
 
 /** The settings in force for a user: their preset, with their own choices on it. */
 export async function settingsForUser(userId: string): Promise<ResolvedSettings> {
-  const tier: TierName = (await walletConnection(userId)) ? "connected" : "free";
-  return settingsForPreset(userId, presetFor(tier, config().SELF_HOSTED));
+  return settingsForPreset(userId, presetFor(await tierNameFor(userId), config().SELF_HOSTED));
 }
 
 /**

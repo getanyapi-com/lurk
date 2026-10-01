@@ -10,7 +10,6 @@ import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { relativeAge } from "@/lib/format";
 import { requireActiveProject } from "@/lib/projects";
-import { tierForUser } from "@/lib/tier";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { listXLanes, projectedWalletCostPerDay, xSettingsOf } from "@/lib/x/read";
 
@@ -34,15 +33,15 @@ export default async function XSettingsPage({ searchParams }: XSettingsPageProps
   }
   const { project: requested } = await searchParams;
   const project = await requireActiveProject(user.id, requested);
-  const [tier, view, channels, lanes, connection] = await Promise.all([
-    tierForUser(user.id),
+  const [view, channels, lanes, connection] = await Promise.all([
     xSettingsOf(project.id),
     listChannels(project.id),
     listXLanes(project.id),
     walletConnection(user.id),
   ]);
   const selfHosted = config().SELF_HOSTED;
-  const paid = tier.name === "connected" || selfHosted;
+  // A connected wallet is what puts a user on the connected tier.
+  const paid = connection !== null || selfHosted;
   const active = lanes.filter((lane) => lane.state === "active");
   // The wallet's figure from this project's own search rates, once it has searches to measure.
   const walletCost =

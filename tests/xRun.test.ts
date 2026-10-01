@@ -35,7 +35,7 @@ vi.mock("@/lib/anyapi", async (importOriginal) => ({
     funding: "house" as const,
     call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
   }),
-  walletConnection: async () => (wallet.connected ? { userId: "w" } : null),
+  tierNameFor: async () => (wallet.connected ? ("connected" as const) : ("free" as const)),
 }));
 
 const hasDatabase = !!process.env.DATABASE_URL;

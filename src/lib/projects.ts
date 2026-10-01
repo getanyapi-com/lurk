@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { projects, users } from "@/db/schema";
 import { limitsFor } from "./tiers";
 import { config } from "./config";
-import { walletConnection } from "./anyapi";
+import { tierNameFor } from "./anyapi";
 
 export type Project = typeof projects.$inferSelect;
 
@@ -18,8 +18,7 @@ export async function listProjects(userId: string): Promise<Project[]> {
  * requests arriving together are counted one after the other, not both at once.
  */
 export async function createProject(userId: string, name: string, url: string | null) {
-  const connected = (await walletConnection(userId)) !== null;
-  const limits = limitsFor(connected ? "connected" : "free", config().SELF_HOSTED);
+  const limits = limitsFor(await tierNameFor(userId), config().SELF_HOSTED);
   return db().transaction(async (tx) => {
     if (limits?.projects != null) {
       await tx.select({ id: users.id }).from(users).where(eq(users.id, userId)).for("update");

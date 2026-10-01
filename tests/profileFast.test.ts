@@ -32,7 +32,7 @@ vi.mock("@/lib/anyapi", () => ({
     funding: "house" as const,
     call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
   }),
-  walletConnection: async () => null,
+  tierNameFor: async () => "free" as const,
 }));
 
 const brief = {
@@ -269,8 +269,8 @@ describe.skipIf(!process.env.DATABASE_URL)("rebuilding a profile", () => {
     const { user, project, row, competitors } = await fixture();
     const tier = await import("@/lib/tier");
     const { buildProfile } = await import("@/lib/profile");
-    const current = await tier.tierForUser(user.id);
-    const lookup = vi.spyOn(tier, "tierForUser").mockResolvedValue({
+    const current = await tier.limitsForUser(user.id);
+    const lookup = vi.spyOn(tier, "limitsForUser").mockResolvedValue({
       ...current, limits: { ...(await import("@/lib/tiers")).TIERS.free, competitors: 1 },
     });
     const reading = held({ ...fullReading, competitors: [

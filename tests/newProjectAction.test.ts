@@ -42,7 +42,7 @@ vi.mock("@/lib/anyapi", () => ({
     funding: "house" as const,
     call: async <T>(fn: () => Promise<T>) => ({ result: await fn(), requestId: null }),
   }),
-  walletConnection: async () => null,
+  tierNameFor: async () => "free" as const,
 }));
 
 const profile = {

@@ -3,7 +3,7 @@ import { WalletPanel } from "@/components/WalletPanel";
 import { walletConnection } from "@/lib/anyapi";
 import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
-import { settingsForUser } from "@/lib/settings/resolve";
+import { presetFor, settingsForPreset } from "@/lib/settings/resolve";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
 
@@ -17,7 +17,10 @@ type ScanningSettingsPageProps = { searchParams: Promise<{ project?: string }> }
 export default async function ScanningSettingsPage({ searchParams }: ScanningSettingsPageProps) {
   const user = await requireLocalUser();
   const { project } = await searchParams;
-  const [resolved, connection] = await Promise.all([settingsForUser(user.id), walletConnection(user.id)]);
+  // The connection the wallet panel shows is also what decides the preset, so
+  // it is read once for both.
+  const connection = await walletConnection(user.id);
+  const resolved = await settingsForPreset(user.id, presetFor(connection ? "connected" : "free", config().SELF_HOSTED));
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">

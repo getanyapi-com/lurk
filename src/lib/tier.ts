@@ -1,24 +1,36 @@
-import { walletConnection } from "./anyapi";
+import { tierNameFor } from "./anyapi";
 import { config } from "./config";
 import { presetFor, settingsForPreset } from "./settings/resolve";
 import type { ResolvedSettings } from "./settings/types";
 import { limitsFor, type TierLimits, type TierName } from "./tiers";
 
-export type UserTier = {
+/** Which tier a user is on and the limits that go with it. */
+export type TierWithLimits = {
   name: TierName;
   limits: TierLimits | null;
+};
+
+export type UserTier = TierWithLimits & {
   /** Cadence and thread policy, which the tier presets and the user may edit. */
   settings: ResolvedSettings;
 };
 
+/**
+ * Which tier a user is on and the limits that go with it, for the many callers
+ * that need nothing else: every allowance check and cap.
+ */
+export async function limitsForUser(userId: string): Promise<TierWithLimits> {
+  const name = await tierNameFor(userId);
+  return { name, limits: limitsFor(name, config().SELF_HOSTED) };
+}
+
 /** Which tier a user is on, the limits that go with it, and their settings. */
 export async function tierForUser(userId: string): Promise<UserTier> {
-  const name: TierName = (await walletConnection(userId)) ? "connected" : "free";
-  const selfHosted = config().SELF_HOSTED;
+  const { name, limits } = await limitsForUser(userId);
   return {
     name,
-    limits: limitsFor(name, selfHosted),
-    settings: await settingsForPreset(userId, presetFor(name, selfHosted)),
+    limits,
+    settings: await settingsForPreset(userId, presetFor(name, config().SELF_HOSTED)),
   };
 }
 

@@ -19,7 +19,7 @@ import { XReplyChip } from "@/components/x/XReplyChip";
 import { config } from "@/lib/config";
 import { atBounds, atKey, grainOf, type FeedParams } from "@/lib/feed";
 import { compactCount, relativeAge, relativeUntil } from "@/lib/format";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 import { QUIET_RECHECK_DAYS } from "@/lib/x/constants";
 import { allowanceFor } from "@/lib/throttle";
 import {
@@ -254,7 +254,7 @@ export async function XTab({ userId, project, params }: { userId: string; projec
     at: validAt(params.at),
   };
 
-  const tier = await tierForUser(userId);
+  const tier = await limitsForUser(userId);
   const [status, found, held, filtered, lanes, faces, allowance] = await Promise.all([
     xStatus(project.id),
     listXLeads(project.id, filter),

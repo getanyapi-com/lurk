@@ -8,7 +8,7 @@ import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/selec
 import { requireLocalUser } from "@/lib/auth";
 import { listMutes } from "@/lib/mutes";
 import { requireActiveProject } from "@/lib/projects";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 
 type AlertsPageProps = { searchParams: Promise<{ project?: string; slack?: string; discord?: string }> };
 
@@ -29,7 +29,7 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
   const { project: requested, slack, discord } = await searchParams;
   const outcome = installOutcome("Slack", slack) ?? installOutcome("Discord", discord);
   const project = await requireActiveProject(user.id, requested);
-  const { limits } = await tierForUser(user.id);
+  const { limits } = await limitsForUser(user.id);
   const [channels, mutes] = await Promise.all([listChannels(project.id), listMutes(project.id)]);
   const kinds = channels.map((one) => one.channel);
   const allowance = customWebhookAllowance(kinds, limits);

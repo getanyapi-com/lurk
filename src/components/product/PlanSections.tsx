@@ -12,7 +12,7 @@ import { dedupeThreads } from "@/lib/discovery/rank";
 import { loadEvidence } from "@/lib/discovery/store";
 import { retrievalBudgets } from "@/lib/scan/constants";
 import { byWorth, explorationPick, retrieved, type PlanRow, type PlanTable } from "@/lib/scan/coverage";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 
 type PlanSectionsProps = { projectId: string; userId: string };
 
@@ -106,7 +106,7 @@ export async function PlanSections({ projectId, userId }: PlanSectionsProps) {
     db().select().from(projectKeywords).where(eq(projectKeywords.projectId, projectId)),
     db().select().from(projectSubreddits).where(eq(projectSubreddits.projectId, projectId)),
     db().select().from(projectCompetitors).where(eq(projectCompetitors.projectId, projectId)),
-    tierForUser(userId),
+    limitsForUser(userId),
     loadEvidence(projectId),
   ]);
   const budgets = retrievalBudgets(limits);

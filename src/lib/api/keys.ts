@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { apiKeys } from "@/db/schema";
 
@@ -81,6 +81,22 @@ export async function findApiKey(presented: string): Promise<ApiKeyRow | null> {
   return rows[0] ?? null;
 }
 
-export async function touchApiKey(keyId: string): Promise<void> {
-  await db().update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, keyId));
+/**
+ * How often a key's use is written down. The queue reads it against a 24-hour
+ * window and the settings table shows it to the day, so an agent calling every
+ * few seconds needs one write in five minutes, not one per call.
+ */
+const TOUCH_EVERY_MS = 5 * 60 * 1000;
+
+/** Stamps a key as used, at most once every few minutes. */
+export async function touchApiKey(keyId: string, now = new Date()): Promise<void> {
+  await db()
+    .update(apiKeys)
+    .set({ lastUsedAt: now })
+    .where(
+      and(
+        eq(apiKeys.id, keyId),
+        or(isNull(apiKeys.lastUsedAt), lt(apiKeys.lastUsedAt, new Date(now.getTime() - TOUCH_EVERY_MS))),
+      ),
+    );
 }

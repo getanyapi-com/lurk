@@ -2,7 +2,7 @@ import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { userActions } from "@/db/schema";
 import { enqueueJob, nextQueuedJob } from "@/jobs/enqueue";
-import { tierForUser } from "./tier";
+import { limitsForUser } from "./tier";
 import type { ActionWindow, PaidAction } from "./tiers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,7 +36,7 @@ export class ActionThrottledError extends Error {
 }
 
 async function rationFor(userId: string, action: PaidAction): Promise<Ration | null> {
-  const { limits } = await tierForUser(userId);
+  const { limits } = await limitsForUser(userId);
   return limits ? { limit: limits.actions.presses[action], window: limits.actions.window } : null;
 }
 

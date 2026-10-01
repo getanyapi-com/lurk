@@ -158,4 +158,31 @@ describe.skipIf(!process.env.DATABASE_URL)("api keys and the counter against a d
     expect(uncapped.limit).toBeNull();
     expect(uncapped.used).toBe(4);
   });
+
+  it("stamps a key's use at most every few minutes", async () => {
+    process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
+    const { db } = await import("@/db");
+    const { users } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { createApiKey, listApiKeys, touchApiKey } = await import("@/lib/api/keys");
+
+    const [user] = await db()
+      .insert(users)
+      .values({ clerkUserId: `test_${randomUUID()}` })
+      .returning();
+    const { id } = await createApiKey(user.id, "Touched key");
+    const usedAt = async () => (await listApiKeys(user.id))[0].lastUsedAt;
+    const now = new Date("2026-09-30T12:00:00Z");
+
+    expect(await usedAt()).toBeNull();
+    await touchApiKey(id, now);
+    expect(await usedAt()).toEqual(now);
+    await touchApiKey(id, new Date(now.getTime() + 60_000));
+    expect(await usedAt()).toEqual(now);
+    const later = new Date(now.getTime() + 10 * 60_000);
+    await touchApiKey(id, later);
+    expect(await usedAt()).toEqual(later);
+
+    await db().delete(users).where(eq(users.id, user.id));
+  });
 });

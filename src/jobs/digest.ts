@@ -15,7 +15,7 @@ import {
 import { sendToChannel } from "@/lib/alerts/send";
 import type { Digest } from "@/lib/alerts/types";
 import { inFlight } from "@/lib/inFlight";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 import type { TierLimits } from "@/lib/tiers";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { enqueueOnce } from "./enqueue";
@@ -27,7 +27,7 @@ async function limitsCache(): Promise<(userId: string) => Promise<TierLimits | n
   const seen = new Map<string, TierLimits | null>();
   return async (userId: string) => {
     if (!seen.has(userId)) {
-      seen.set(userId, (await tierForUser(userId)).limits);
+      seen.set(userId, (await limitsForUser(userId)).limits);
     }
     return seen.get(userId) ?? null;
   };

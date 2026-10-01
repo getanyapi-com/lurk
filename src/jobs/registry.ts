@@ -22,7 +22,7 @@ import { cadenceFor } from "@/lib/settings/cadence";
 import { PRESETS } from "@/lib/settings/presets";
 import { settingsForUser } from "@/lib/settings/resolve";
 import type { ScanCadence } from "@/lib/settings/types";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 import { runDigest } from "./digest";
 import { runInsights } from "./insights";
 import { enqueueOnce } from "./enqueue";
@@ -165,7 +165,7 @@ async function scanCadenceFor(projectId: string): Promise<ScanCadence> {
 /** Days between this project's discovery deltas, which its tier decides. */
 async function discoveryRefreshDaysFor(projectId: string): Promise<number> {
   const userId = await ownerOf(projectId);
-  return discoveryBudget(userId ? (await tierForUser(userId)).limits : null).refreshDays;
+  return discoveryBudget(userId ? (await limitsForUser(userId)).limits : null).refreshDays;
 }
 
 /**

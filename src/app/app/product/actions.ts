@@ -22,7 +22,7 @@ import { rerankProject } from "@/lib/scoring/apply";
 import { parseScoring, scoringSchema, type ScoringSettings } from "@/lib/scoring/weights";
 import { requireOwnedProject } from "@/lib/owned";
 import { pressForJob, spendAllowance } from "@/lib/throttle";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 
 export type ChipKind = "keyword" | "subreddit" | "competitor";
 /** What a person has decided about one row of the plan. */
@@ -171,7 +171,7 @@ async function chipLimit(
   kind: ChipKind,
   userId: string,
 ): Promise<number | null> {
-  const { limits } = await tierForUser(userId);
+  const { limits } = await limitsForUser(userId);
   if (!limits) {
     return null;
   }

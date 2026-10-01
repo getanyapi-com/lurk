@@ -13,7 +13,7 @@ import type { ProductFacts } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { loadScanProject } from "@/lib/scan/project";
 import { smallSweep } from "@/lib/sweepScale";
-import { capped, tierForUser } from "@/lib/tier";
+import { capped, limitsForUser } from "@/lib/tier";
 import { xLimitsFor, type XLimits } from "@/lib/tiers";
 import { HouseDataCapReachedError, startOfToday } from "@/lib/usage";
 import { xCallsSince, xJudgementsSince } from "./budget";
@@ -490,7 +490,7 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
   if (!scanProject) {
     return;
   }
-  const tier = await tierForUser(project.userId);
+  const tier = await limitsForUser(project.userId);
   const x = sized(xLimitsFor(tier.limits));
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs: 0 };

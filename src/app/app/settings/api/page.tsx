@@ -3,11 +3,11 @@ import { ApiKeysPanel } from "@/components/api/ApiKeysPanel";
 import { listApiKeys } from "@/lib/api/keys";
 import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 
 export default async function ApiSettingsPage() {
   const user = await requireLocalUser();
-  const [keys, tier] = await Promise.all([listApiKeys(user.id), tierForUser(user.id)]);
+  const [keys, tier] = await Promise.all([listApiKeys(user.id), limitsForUser(user.id)]);
   const origin = config().APP_URL.replace(/\/$/, "");
   return (
     <div className="flex max-w-2xl flex-col gap-6">

@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { alerts, projects } from "@/db/schema";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 import { customWebhookAllowance, isCustomWebhook } from "./select";
 import { CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "./types";
 
@@ -128,7 +128,7 @@ export async function addChannel(input: AddChannelInput): Promise<ProjectChannel
   if (isCustomWebhook(input.channel)) {
     const allowance = customWebhookAllowance(
       existing.map((one) => one.channel),
-      (await tierForUser(input.userId)).limits,
+      (await limitsForUser(input.userId)).limits,
     );
     if (allowance.atCap) {
       throw new Error(

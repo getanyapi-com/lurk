@@ -5,7 +5,7 @@ import { projectCompetitors, projects } from "@/db/schema";
 import { clientForUser } from "@/lib/anyapi";
 import { productFacts, productText } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 import { labelThreads } from "./label";
 import { expandDiscoveryQueries, type DiscoveryQuery } from "./queries";
 import {
@@ -87,7 +87,7 @@ export async function runDiscoveryRefresh(
   if (!project) {
     throw new Error("This project no longer exists");
   }
-  const { limits } = await tierForUser(project.userId);
+  const { limits } = await limitsForUser(project.userId);
   const budget = discoveryBudget(limits);
   const maxAgeMs = budget.refreshDays * DAY_MS;
   const destinations = parseDestinations(project.destinations);

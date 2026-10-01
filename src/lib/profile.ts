@@ -8,7 +8,7 @@ import { generateStructured } from "./llm";
 import { BRIEF_INSTRUCTIONS, briefSchema, storedBrief, type ProductBrief } from "./brief";
 import { COMPETITORS_SYSTEM, FAST_READING_SYSTEM, PROFILE_SYSTEM } from "./prompts";
 import { recordUsage } from "./reddit/fetch";
-import { capped, tierForUser } from "./tier";
+import { capped, limitsForUser } from "./tier";
 import { assertHouseDataUnderCap } from "./usage";
 
 /**
@@ -421,7 +421,7 @@ export async function buildProfile(projectId: string, userId: string, url: strin
   // on 2026-09-25, instead of adding its database reads after that call.
   const [profile, { limits }] = await Promise.all([
     profileFromPage(projectId, page),
-    tierForUser(userId),
+    limitsForUser(userId),
   ]);
   return writeReading(projectId, profile, limits?.competitors, true);
 }
@@ -521,7 +521,7 @@ export async function buildProfileFast(
   const page = await readSite(projectId, userId, url);
 
   await onStep?.("profile");
-  const tier = tierForUser(userId);
+  const tier = limitsForUser(userId);
   const fullRead = profileFromPage(projectId, page).then(
     (reading) => ({ reading }),
     (error: unknown) => ({ error }),

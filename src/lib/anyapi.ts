@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { AnyAPI } from "@getanyapi/sdk";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { walletConnections } from "@/db/schema";
 import { config } from "./config";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { refreshTokens } from "./oauth";
+import type { TierName } from "./tiers";
 
 /** Who pays for a call: the operator's house key, or one user's AnyAPI wallet. */
 export type Funding = "house" | `wallet:${string}`;
@@ -126,6 +127,21 @@ export async function walletConnection(userId: string) {
     .from(walletConnections)
     .where(eq(walletConnections.userId, userId));
   return rows[0] ?? null;
+}
+
+/**
+ * Which tier a user is on, which is only whether a wallet is connected. It
+ * asks for that and nothing else, so the tokens never leave the database for
+ * a question that does not need them. It lives here rather than in tier.ts
+ * because settings needs it too, and tier.ts already imports settings.
+ */
+export async function tierNameFor(userId: string): Promise<TierName> {
+  const rows = await db()
+    .select({ one: sql`1` })
+    .from(walletConnections)
+    .where(eq(walletConnections.userId, userId))
+    .limit(1);
+  return rows.length > 0 ? "connected" : "free";
 }
 
 type WalletRow = typeof walletConnections.$inferSelect;

@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { config } from "@/lib/config";
-import { tierForUser } from "@/lib/tier";
+import { limitsForUser } from "@/lib/tier";
 import type { TierLimits, TierName } from "@/lib/tiers";
 import { findApiKey, touchApiKey } from "./keys";
 import { consumeDailyRequest } from "./limit";
@@ -42,7 +42,7 @@ export async function authenticate(request: Request): Promise<ApiCaller> {
   if (!user) {
     throw new ApiError("unauthorized", "That API key is not valid.");
   }
-  const { name, limits } = await tierForUser(user.id);
+  const { name, limits } = await limitsForUser(user.id);
   return {
     user,
     keyId: key.id,
