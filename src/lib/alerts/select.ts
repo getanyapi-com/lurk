@@ -153,14 +153,18 @@ export function alertable(
   return inTurns(fresh);
 }
 
-/** The leads one message carries: the first `limit` of `alertable`. */
-export function selectLeads(
+/**
+ * One message's split of `alertable`, ranked once: the first `limit` as the
+ * leads it lists, and the rest it only counts.
+ */
+export function messageLeads(
   rows: SelectableLead[],
   since: Date,
   limit: number,
   askFloor: Date = since,
-): DigestLead[] {
-  return alertable(rows, since, askFloor).slice(0, limit).map(digestLead);
+): { leads: DigestLead[]; rest: SelectableLead[] } {
+  const ranked = alertable(rows, since, askFloor);
+  return { leads: ranked.slice(0, limit).map(digestLead), rest: ranked.slice(limit) };
 }
 
 export function digestLead(row: SelectableLead): DigestLead {

@@ -9,7 +9,7 @@ import {
   CHAT_LEAD_CAP,
   EMAIL_LEAD_CAP,
   alertable,
-  selectLeads,
+  messageLeads,
   type SelectableLead,
 } from "@/lib/alerts/select";
 import type { ScheduledChannel } from "@/lib/alerts/channels";
@@ -107,7 +107,7 @@ function digestOf(leads: DigestLead[], more = 0, morePlatforms?: Digest["morePla
   return { projectName: "Acme", generatedAt: NOW, since: SINCE, cadence: "daily", leads, more, morePlatforms, appUrl: APP };
 }
 
-const mixed = () => selectLeads([reddit({ id: "r1" }), xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP);
+const mixed = () => messageLeads([reddit({ id: "r1" }), xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP).leads;
 
 describe("an X ask as the digest reads it", () => {
   it("is headed by its quote, quotes the post's own words and links the post", () => {
@@ -174,7 +174,7 @@ describe("an X ask as the digest reads it", () => {
       xAskLead(xLead({ score: 50 }), xPost()),
       xAskLead(xLead({ id: "x-lead-2", score: 90 }), xPost({ id: "1830000000000000002" })),
     ];
-    expect(selectLeads(rows, SINCE, CHAT_LEAD_CAP).map((one) => one.id)).toEqual([
+    expect(messageLeads(rows, SINCE, CHAT_LEAD_CAP).leads.map((one) => one.id)).toEqual([
       "r0",
       "x-lead-2",
       "r1",
@@ -199,11 +199,11 @@ describe("a digest carrying X asks beside Reddit leads", () => {
   });
 
   it("draws an X author with no picture by initials, never as a Reddit Snoo", () => {
-    const html = renderDigestHtml(digestOf(selectLeads([xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP)));
+    const html = renderDigestHtml(digestOf(messageLeads([xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP).leads));
     expect(html).not.toContain("redditstatic.com");
     expect(html).toContain(">AS</div>");
     const withFace = renderDigestHtml(
-      digestOf(selectLeads([xAskLead(xLead(), xPost({ authorImage: "https://pbs.twimg.com/a.jpg" }))], SINCE, EMAIL_LEAD_CAP)),
+      digestOf(messageLeads([xAskLead(xLead(), xPost({ authorImage: "https://pbs.twimg.com/a.jpg" }))], SINCE, EMAIL_LEAD_CAP).leads),
     );
     expect(withFace).toContain('<img src="https://pbs.twimg.com/a.jpg"');
   });
@@ -212,7 +212,7 @@ describe("a digest carrying X asks beside Reddit leads", () => {
     const both = renderDigestHtml(digestOf(mixed()));
     expect(both).toContain(`<a href="${APP}/app/leads" style="color:#636363">Open the feed</a>`);
     expect(both).toContain(`<a href="${APP}/app/x" style="color:#636363">Open X leads</a>`);
-    const onlyX = digestOf(selectLeads([xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP), 2);
+    const onlyX = digestOf(messageLeads([xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP).leads, 2);
     const html = renderDigestHtml(onlyX);
     expect(html).not.toContain(`${APP}/app/leads`);
     expect(html).toContain(`And 2 more <a href="${APP}/app/x"`);
@@ -222,11 +222,11 @@ describe("a digest carrying X asks beside Reddit leads", () => {
   });
 
   it("links where the leads it left out are, not only where the listed ones are", () => {
-    const listed = selectLeads(
+    const listed = messageLeads(
       Array.from({ length: EMAIL_LEAD_CAP }, (_, index) => reddit({ id: `r${index}`, score: 90 - index })),
       SINCE,
       EMAIL_LEAD_CAP,
-    );
+    ).leads;
     const html = renderDigestHtml(digestOf(listed, 6, ["x"]));
     expect(html).toContain(
       `And 6 more <a href="${APP}/app/x" style="color:#181818;text-decoration:underline">in X leads</a>.`,
@@ -252,7 +252,7 @@ describe("a digest carrying X asks beside Reddit leads", () => {
   });
 
   it("prints no score on an X card, whose score is not on Reddit's scale", () => {
-    const html = renderDigestHtml(digestOf(selectLeads([xAskLead(xLead({ score: 45 }), xPost())], SINCE, EMAIL_LEAD_CAP)));
+    const html = renderDigestHtml(digestOf(messageLeads([xAskLead(xLead({ score: 45 }), xPost())], SINCE, EMAIL_LEAD_CAP).leads));
     expect(html).not.toContain(">45<");
     expect(html).toContain(`<td valign="top" align="right" width="72" style="padding:16px 16px 16px 0">\n<a href="https://x.com/Asker_Jo/status/1830000000000000001"`);
     const text = renderDigestText(digestOf(mixed()));
@@ -268,7 +268,7 @@ describe("a digest carrying X asks beside Reddit leads", () => {
         xPost({ id: "1830000000000000002", authorUsername: "second_one", text: "@Asker_Jo Same, what are people using?" }),
       ),
     ];
-    const html = renderDigestHtml(digestOf(selectLeads(rows, SINCE, EMAIL_LEAD_CAP)));
+    const html = renderDigestHtml(digestOf(messageLeads(rows, SINCE, EMAIL_LEAD_CAP).leads));
     // One card: one platform badge on one face.
     expect(html.match(/\/email\/x\.png/g)).toHaveLength(1);
     expect(html).toContain("@Asker_Jo &middot; X");
@@ -313,7 +313,7 @@ describe("a digest carrying X asks beside Reddit leads", () => {
         { description: expect.stringContaining("utm_medium=discord") },
       ],
     });
-    const noCount = payloadFor("discord", digestOf(selectLeads([xAskLead(xLead(), xPost({ replyCount: null }))], SINCE, EMAIL_LEAD_CAP)));
+    const noCount = payloadFor("discord", digestOf(messageLeads([xAskLead(xLead(), xPost({ replyCount: null }))], SINCE, EMAIL_LEAD_CAP).leads));
     expect(noCount).toMatchObject({ embeds: [{ footer: { text: "X" } }, {}] });
   });
 
@@ -337,9 +337,9 @@ describe("a digest carrying X asks beside Reddit leads", () => {
         createdAt: new Date(2026, 8, 5, 7, 0, 0).toISOString(),
       },
     ]);
-    const redditOnly = payloadFor("webhook", digestOf(selectLeads([reddit({ id: "r1" })], SINCE, EMAIL_LEAD_CAP)));
+    const redditOnly = payloadFor("webhook", digestOf(messageLeads([reddit({ id: "r1" })], SINCE, EMAIL_LEAD_CAP).leads));
     expect(redditOnly).not.toHaveProperty("xLeads");
-    const xOnly = payloadFor("webhook", digestOf(selectLeads([xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP))) as Payload;
+    const xOnly = payloadFor("webhook", digestOf(messageLeads([xAskLead(xLead(), xPost())], SINCE, EMAIL_LEAD_CAP).leads)) as Payload;
     expect(xOnly.leads).toEqual([]);
     expect(xOnly.xLeads).toHaveLength(1);
   });
