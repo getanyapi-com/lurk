@@ -114,7 +114,10 @@ export function LeadPages({ projectId, search, initialRows, total, selectedId }:
 
   // The server's page and the ones fetched after it are one list, so a row
   // that carries on the thread above it is nested across a page's edge too.
-  const listed = [...initialRows, ...rows];
+  // A lead that leaves the feed pulls the next one up into the server's page
+  // before the pages held are read again; it is drawn there and not twice.
+  const first = new Set(initialRows.map((row) => row.id));
+  const listed = [...initialRows, ...rows.filter((row) => !first.has(row.id))];
 
   return (
     <>
