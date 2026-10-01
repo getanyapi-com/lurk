@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { projectKeywords } from "@/db/schema";
 import { recentAlertableLeadSql } from "@/lib/alerts/leads";
+import { RETRIEVED_STATES } from "./planStates";
 import { loadScanProject } from "./project";
 import { runScan } from "./run";
 import { KINDS, sweepSearchItems, type SweepSearch } from "./searches";
@@ -29,7 +30,7 @@ export async function hasActiveSearch(projectId: string): Promise<boolean> {
     .where(
       and(
         eq(projectKeywords.projectId, projectId),
-        inArray(projectKeywords.state, ["active", "pinned"]),
+        inArray(projectKeywords.state, RETRIEVED_STATES),
       ),
     )
     .limit(1);
@@ -70,6 +71,8 @@ export async function widenSearches(projectId: string, jobId: string): Promise<n
  * Projects owed searches at boot: set up, no search of their own, no alert
  * channel on the owner, no lead posted in the last month, and never widened.
  * Anyone else gets theirs when they turn alerts on (lib/alerts/invite.ts).
+ * A search of their own is one in RETRIEVED_STATES (planStates.ts), which the
+ * raw SQL below spells out.
  */
 export async function projectsOwedSearches(now: Date): Promise<string[]> {
   const month = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

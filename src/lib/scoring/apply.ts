@@ -4,6 +4,7 @@ import { leads, projectSubreddits, projects, redditComments, redditPosts, xLeads
 import { redditWordsWhere } from "@/lib/leadFilters";
 import { redditLeadNotMuted } from "@/lib/mutes";
 import { forgetProjectFeed } from "@/lib/projectFeedCache";
+import { RETRIEVED_STATES } from "@/lib/scan/planStates";
 import { foldScore } from "@/lib/x/gates";
 import { communityKey, redditScore, xAskScore, type LeadFactors, type ScoringSettings } from "./weights";
 
@@ -116,7 +117,7 @@ export async function scoringPreview(projectId: string) {
   const searched = await db()
     .select({ name: projectSubreddits.name })
     .from(projectSubreddits)
-    .where(and(eq(projectSubreddits.projectId, projectId), inArray(projectSubreddits.state, ["active", "pinned"])));
+    .where(and(eq(projectSubreddits.projectId, projectId), inArray(projectSubreddits.state, RETRIEVED_STATES)));
   const name = sql<string>`lower(${redditPosts.subreddit})`;
   const found = await db()
     .select({ name })

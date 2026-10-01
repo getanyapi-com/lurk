@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { parseLeadFilters, type LeadFilters } from "@/lib/leadFilters";
 import { projectForUser, type Project } from "@/lib/projects";
+import { RETRIEVED_STATES } from "@/lib/scan/planStates";
 import { usageToday } from "@/lib/usage";
 import { ApiError } from "./responses";
 
@@ -79,9 +80,7 @@ export type ApiProjectDetail = ApiProject & {
   competitors: string[];
 };
 
-/** What the plan is actually retrieving: a candidate is not yet being read. */
-const RETRIEVED_STATES = ["active", "pinned"];
-
+/** The plan as it is being read: a candidate or an excluded row is not listed. */
 export async function getApiProject(project: Project): Promise<ApiProjectDetail> {
   const [keywords, subreddits, competitors, newLeads] = await Promise.all([
     db()

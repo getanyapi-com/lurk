@@ -13,6 +13,7 @@ import {
   type ChipKind,
 } from "@/app/app/product/actions";
 import { competitorHost } from "@/lib/competitors/host";
+import { isRetrieved } from "@/lib/scan/planStates";
 
 /** One row of the retrieval plan, with where it came from and what backs it. */
 export type PlanRow = {
@@ -211,8 +212,8 @@ export function PlanEditor({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const on = rows.filter((row) => row.state !== "excluded" && row.state !== "candidate");
-  const idle = rows.filter((row) => row.state === "excluded" || row.state === "candidate");
+  const on = rows.filter((row) => isRetrieved(row.state));
+  const idle = rows.filter((row) => !isRetrieved(row.state));
   const count = limit == null ? `${on.length} on` : `${on.length} of ${limit} on`;
 
   function run(work: () => Promise<{ error: string | null } | void>) {
@@ -223,7 +224,7 @@ export function PlanEditor({
   }
 
   const renderRow = (row: PlanRow) => {
-    const isOn = row.state === "active" || row.state === "pinned";
+    const isOn = isRetrieved(row.state);
     const result = resultOf(kind, row);
     return (
       <li

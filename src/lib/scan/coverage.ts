@@ -1,4 +1,5 @@
 import { googleQuery } from "@/lib/seo/fetch";
+import { isRetrieved } from "./planStates";
 
 /**
  * How one scan decides what to cover and in what order. Every decision here is
@@ -33,9 +34,9 @@ export type PlanRow = {
   evidence: number;
 };
 
-/** The states that are retrieved every scan. Everything else is a candidate. */
+/** The rows retrieved every scan (planStates.ts). Everything else is a candidate. */
 export function retrieved(rows: PlanRow[]): PlanRow[] {
-  return rows.filter((row) => row.state === "active" || row.state === "pinned");
+  return rows.filter((row) => isRetrieved(row.state));
 }
 
 /** The rows discovery proposed but has not promoted; exploration's only pool. */

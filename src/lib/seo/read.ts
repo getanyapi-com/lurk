@@ -10,6 +10,7 @@ import {
   subreddits,
 } from "@/db/schema";
 import type { Relevance } from "@/lib/discovery/label";
+import { isRetrieved } from "@/lib/scan/planStates";
 import type { RankingThread } from "./thread";
 
 /**
@@ -247,7 +248,7 @@ export async function watchedCompetitors(projectId: string): Promise<string[]> {
     .from(projectCompetitors)
     .where(eq(projectCompetitors.projectId, projectId));
   return rows
-    .filter((row) => row.state === "active" || row.state === "pinned")
+    .filter((row) => isRetrieved(row.state))
     .map((row) => row.name);
 }
 

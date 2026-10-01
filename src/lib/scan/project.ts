@@ -6,6 +6,7 @@ import { parseDestinations, parseTextList } from "@/lib/discovery/store";
 import { productFacts, type ProductFacts } from "@/lib/product";
 import { parseScoring, type ScoringSettings } from "@/lib/scoring/weights";
 import { retrieved, type PlanRow } from "./coverage";
+import { isRetrieved } from "./planStates";
 
 export type ScanProject = {
   id: string;
@@ -44,24 +45,16 @@ function byStanding(
 }
 
 /**
- * The competitors a scan is allowed to use. A competitor row carries the plan's
- * own state vocabulary but is not a plan row, so `retrieved` reads the states
- * off a stand-in rather than off the table itself.
+ * The competitors a scan is allowed to use: the ones in a retrieved state of
+ * the plan's own vocabulary, in the order a tier's cap cuts them.
  */
 function retrievedNames(
   rows: { id: string; name: string; source: string; state: string; evidence: number }[],
 ) {
-  return retrieved(
-    [...rows].sort(byStanding).map((row) => ({
-      id: row.id,
-      table: "keyword" as const,
-      key: row.name,
-      source: row.source,
-      state: row.state,
-      lastCoveredAt: null,
-      evidence: 0,
-    })),
-  ).map((row) => row.key);
+  return rows
+    .filter((row) => isRetrieved(row.state))
+    .sort(byStanding)
+    .map((row) => row.name);
 }
 
 /** Everything one scan needs about a project, read once. */
@@ -79,7 +72,7 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
   /**
    * A competitor a person excluded on the Product page is not one of ours, so
    * it is neither scanned nor named to the judge. Competitor rows carry the
-   * plan's own state vocabulary, so `retrieved` decides this too.
+   * plan's own state vocabulary, so `isRetrieved` decides this too.
    */
   const competitorNames = retrievedNames(competitors);
   // A keyword saved before the compiler dropped bare negations is searched
@@ -95,7 +88,7 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
     lastCoveredAt: item.lastCoveredAt,
     evidence: item.evidence ?? 0,
   }));
-  const live = (row: PlanRow) => (retrieved([row]).length > 0 ? 1 : 0);
+  const live = (row: PlanRow) => Number(isRetrieved(row.state));
   const kept = new Map<string, PlanRow>();
   for (const row of cleaned) {
     const held = kept.get(row.key);
