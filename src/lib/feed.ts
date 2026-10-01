@@ -265,7 +265,7 @@ const EXCERPT_LENGTH = 160;
  * Headed by the thread's title, three comments in one thread were three rows
  * nobody could tell apart from each other or from the post.
  */
-export function rowExcerpt(lead: Pick<CardLead, "isComment" | "body">): string | null {
+function rowExcerpt(lead: Pick<CardLead, "isComment" | "body">): string | null {
   if (!lead.isComment) {
     return null;
   }
