@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { foldScore } from "@/lib/scan/constants";
 import { foldScore as xFoldScore } from "@/lib/x/gates";
 import {
   DEFAULT_SCORING,
@@ -19,13 +18,25 @@ import {
  * able to rank them differently.
  */
 
+/**
+ * The order every project had before weights existed: under the lead model's
+ * bar its verdict alone, over it the verdict at four times the thread's
+ * freshness.
+ */
+function foldedBeforeWeights(quality: number, engagement: number): number {
+  if (quality < 0.5) {
+    return Math.min(49, Math.round(98 * quality));
+  }
+  return Math.round(50 + 50 * ((0.8 * (quality - 0.5)) / 0.5 + (0.2 * engagement) / 4));
+}
+
 describe("ranking weights", () => {
   it("rank exactly as before when nobody chose any", () => {
     for (let quality = 0; quality <= 1; quality += 0.01) {
       for (let engagement = 0; engagement <= 4; engagement += 1) {
         const lead = { quality, intent: 2, engagement, subreddit: "saas" };
-        expect(redditScore(lead, null)).toBe(foldScore(quality, engagement));
-        expect(redditScore(lead, DEFAULT_SCORING)).toBe(foldScore(quality, engagement));
+        expect(redditScore(lead, null)).toBe(foldedBeforeWeights(quality, engagement));
+        expect(redditScore(lead, DEFAULT_SCORING)).toBe(foldedBeforeWeights(quality, engagement));
       }
     }
     expect(redditScore({ quality: null, intent: 4, engagement: 4, subreddit: null }, null)).toBe(0);
@@ -140,7 +151,7 @@ describe.skipIf(!hasDatabase)("re-ranking a project's stored leads", () => {
         .values({
           projectId: project.id,
           postId: post.id,
-          score: foldScore(row.quality, row.engagement),
+          score: redditScore(row, null),
           quality: row.quality,
           fit: 4,
           intent: row.intent,

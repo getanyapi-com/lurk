@@ -131,24 +131,3 @@ export function engagementScore(ageHours: number, numComments: number | null): n
   return freshness + room;
 }
 
-/**
- * The feed's sort order, 0-100. Only leads the gates qualified reach the feed,
- * so this decides order among leads that already passed, never admission:
- *
- *   qualified (quality >= 0.5)   score = 50 + 50 * (0.8 * (quality - 0.5) / 0.5 + 0.2 * engagement / 4)
- *   not qualified                score = 98 * quality, under 50
- *
- * quality is the lead model's verdict with its threshold at 0.5
- * (scan/leadModel.ts), and carries four times the weight of the 0-4
- * engagement, because how likely the person is to buy outranks how fresh the
- * thread is. The qualified band starts at 50 and ends at 100, so the default
- * threshold and the alert floor keep their meaning. A missing quality counts
- * as 0.
- */
-export function foldScore(quality: number | null, engagement: number): number {
-  const q = quality ?? 0;
-  if (q < 0.5) {
-    return Math.min(49, Math.round(98 * q));
-  }
-  return Math.round(50 + 50 * ((0.8 * (q - 0.5)) / 0.5 + (0.2 * engagement) / 4));
-}

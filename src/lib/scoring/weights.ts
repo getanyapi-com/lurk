@@ -44,8 +44,9 @@ export type ScoringSettings = {
 
 /**
  * What every project ranked by before this setting existed: the lead model's
- * verdict at four times the weight of the thread's freshness (scan/constants.ts
- * foldScore), so a project nobody has tuned keeps exactly the order it had.
+ * verdict at four times the weight of the thread's freshness, 50 + 50 * (0.8 *
+ * match + 0.2 * fresh) for a qualified lead, so a project nobody has tuned keeps
+ * exactly the order it had.
  */
 export const DEFAULT_SCORING: ScoringSettings = {
   weights: { match: "high", intent: "off", fresh: "low", community: "off" },

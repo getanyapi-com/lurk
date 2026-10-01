@@ -3,7 +3,6 @@ import { JevRequestTooLargeError } from "@/lib/jev";
 import {
   TRIAGE_BATCH_SIZE,
   engagementScore,
-  foldScore,
   hydrationCap,
   retrievalBudgets,
 } from "@/lib/scan/constants";
@@ -12,6 +11,7 @@ import { decide, judge } from "@/lib/scan/gates";
 import type { Assessment, ScorableItem, TriageItem } from "@/lib/scan/judgement";
 import { itemState, ownSpans, spans } from "@/lib/scan/spans";
 import { retentionCutoff } from "@/lib/retention";
+import { redditScore } from "@/lib/scoring/weights";
 import { TIERS } from "@/lib/tiers";
 import { judgeAnswers, product, triageAnswers } from "./jevAnswers";
 
@@ -54,16 +54,20 @@ function assessment(patch: Partial<Assessment> = {}): Assessment {
 }
 
 describe("score folding", () => {
+  /** A judgement's own score, which folds the default weights. */
+  const defaultScore = (quality: number | null, engagement: number) =>
+    redditScore({ quality, intent: null, engagement, subreddit: null }, null);
+
   it("starts the qualified band at 50 at the lead model's threshold and ends at 100", () => {
-    expect(foldScore(0.5, 0)).toBe(50);
-    expect(foldScore(1, 4)).toBe(100);
-    expect(foldScore(0.49, 4)).toBeLessThan(50);
-    expect(foldScore(null, 4)).toBe(0);
+    expect(defaultScore(0.5, 0)).toBe(50);
+    expect(defaultScore(1, 4)).toBe(100);
+    expect(defaultScore(0.49, 4)).toBeLessThan(50);
+    expect(defaultScore(null, 4)).toBe(0);
   });
 
   it("weights the model's verdict four times as heavily as liveliness", () => {
-    expect(foldScore(0.9, 0)).toBeGreaterThan(foldScore(0.7, 4));
-    expect(foldScore(0.7, 3)).toBeGreaterThan(foldScore(0.7, 1));
+    expect(defaultScore(0.9, 0)).toBeGreaterThan(defaultScore(0.7, 4));
+    expect(defaultScore(0.7, 3)).toBeGreaterThan(defaultScore(0.7, 1));
   });
 });
 

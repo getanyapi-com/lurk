@@ -1,4 +1,5 @@
-import { engagementScore, foldScore } from "./constants";
+import { redditScore } from "@/lib/scoring/weights";
+import { engagementScore } from "./constants";
 import type { Assessment, Decision, Judgement, ReasonCode, ScorableItem } from "./judgement";
 
 /**
@@ -121,8 +122,9 @@ export function downgradeToReview(item: Judgement, code: ReasonCode): Judgement 
 
 /**
  * One assessment as the scan uses it: the gated decision, the engagement this
- * code computed, the feed sort order, and the two columns the leads table has
- * always held.
+ * code computed, the score under the default ranking weights (a lead is ranked
+ * by its owner's when it is written, run.ts toLead), and the two columns the
+ * leads table has always held.
  */
 export function judge(item: Assessment, source: ScorableItem): Judgement {
   const engagement = engagementScore(source.ageHours, source.numComments);
@@ -132,7 +134,10 @@ export function judge(item: Assessment, source: ScorableItem): Judgement {
     decision,
     reasonCode,
     engagement,
-    score: foldScore(item.quality, engagement),
+    score: redditScore(
+      { quality: item.quality, intent: item.intent, engagement, subreddit: source.subreddit },
+      null,
+    ),
     matchedPhrase: item.needEvidence?.quote ?? "",
     sellerSide: item.relationship === "seller",
     subreddit: source.subreddit,
