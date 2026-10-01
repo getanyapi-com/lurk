@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useState } from "react";
+import { XMark } from "@/components/x/XMark";
 import "./how-steps.css";
 
 /**
@@ -39,15 +40,6 @@ function ReadArt() {
   );
 }
 
-/** X's mark in the text colour: the brand file is black, which vanishes on the dark card. */
-function XGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" width={12} height={12} aria-hidden="true" className="mx-px shrink-0">
-      <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" fill="currentColor" />
-    </svg>
-  );
-}
-
 /** Threads and posts going past, and the ones that are buyers kept. */
 function ThreadsArt({ x }: { x: boolean }) {
   const rows: [string, "reddit" | "x", boolean][] = [
@@ -60,7 +52,12 @@ function ThreadsArt({ x }: { x: boolean }) {
     <div className="how-card">
       {rows.map(([title, platform, lead], index) => (
         <div key={title} className={`how-in flex items-center gap-2 ${lead ? "" : "how-fade"}`} style={{ ...at(index), opacity: lead ? 1 : 0.4 }}>
-          {platform === "x" ? <XGlyph /> : <Mark src="/brands/reddit.svg" alt="" size={14} />}
+          {platform === "x" ? (
+            // In the text colour: X's brand file is black, which vanishes on the dark card.
+            <XMark className="mx-px h-3 w-3 shrink-0" aria-hidden="true" />
+          ) : (
+            <Mark src="/brands/reddit.svg" alt="" size={14} />
+          )}
           <span className="min-w-0 flex-1 truncate">{title}</span>
           {lead ? (
             <span className="how-pop rounded-full px-2 py-0.5 font-mono text-[10px] text-white" style={{ ...at(5), background: "var(--score-hot)" }}>

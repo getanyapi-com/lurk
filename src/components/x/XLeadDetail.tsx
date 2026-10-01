@@ -2,11 +2,11 @@ import { ExternalLink, Eye, Heart, MessageCircle, Search } from "lucide-react";
 import { hideXLeadAction, notFitXLeadAction, reopenXLeadAction, repliedXLeadAction } from "@/app/app/x/actions";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { VerdictBadge } from "@/components/VerdictBadge";
+import { HighlightedBody } from "@/components/leads/HighlightedBody";
 import { LeadActions } from "@/components/leads/LeadActions";
 import { Meter } from "@/components/leads/Meter";
 import { Block, Called, Pane, Title } from "@/components/leads/pane";
 import { accountAge } from "@/components/leads/workspace";
-import { XBody } from "@/components/x/XBody";
 import { XReplyChip } from "@/components/x/XReplyChip";
 import { XThread } from "@/components/x/XThread";
 import { filteredSentence } from "@/components/x/filtered";
@@ -202,7 +202,7 @@ export function XLeadDetail({
             ) : (
               <>
                 <ReplyingTo parents={item.replyingTo} />
-                <XBody text={item.text} phrase={null} />
+                <HighlightedBody text={item.text} phrase={null} linkify />
               </>
             )}
           </div>
@@ -243,7 +243,7 @@ export function XLeadDetail({
           ) : (
             <>
               <ReplyingTo parents={lead.replyingTo} />
-              <XBody text={lead.text} phrase={lead.quote} />
+              <HighlightedBody text={lead.text} phrase={lead.quote} linkify />
             </>
           )}
         </div>
