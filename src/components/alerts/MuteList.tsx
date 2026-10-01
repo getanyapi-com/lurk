@@ -5,6 +5,7 @@ import { BellOff, X } from "lucide-react";
 import { addMuteAction, removeMuteAction } from "@/app/app/settings/alerts/actions";
 import { PillTabs } from "@/components/PillTabs";
 import { Button } from "@/components/ui/button";
+import { errorFrom } from "@/lib/actionError";
 import type { Mute, MuteKind } from "@/lib/mutes";
 
 type MuteListProps = { projectId: string; mutes: Mute[] };
@@ -28,7 +29,7 @@ export function MuteList({ projectId, mutes }: MuteListProps) {
 
   async function submit(formData: FormData) {
     setError(null);
-    setError((await addMuteAction(projectId, formData)).error);
+    setError(await errorFrom(() => addMuteAction(projectId, formData)));
   }
 
   return (

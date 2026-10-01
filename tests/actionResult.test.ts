@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { ACTION_FAILED, errorFrom } from "@/lib/actionError";
 import { errorMessage, failure } from "@/lib/actionResult";
 
 /**
@@ -45,6 +46,35 @@ describe("what a caught error says", () => {
       thrown = error;
     }
     expect(() => failure(thrown)).toThrow();
+  });
+});
+
+/**
+ * Some failures still throw past an action's catch: a dropped connection, an
+ * action a deploy replaced, a refusal thrown before the try. A throw from a
+ * form action replaces the page with the error screen, so the form catches it
+ * and says a sentence of its own, and only a redirect goes on to the router.
+ */
+describe("what a form shows from an action", () => {
+  it("is the sentence the action returned, or nothing", async () => {
+    expect(await errorFrom(async () => ({ error: "Pick a channel" }))).toBe("Pick a channel");
+    expect(await errorFrom(async () => ({ error: null }))).toBeNull();
+  });
+
+  it("is a sentence of its own when the action throws", async () => {
+    expect(
+      await errorFrom(async () => {
+        throw new Error("Failed to fetch");
+      }),
+    ).toBe(ACTION_FAILED);
+  });
+
+  it("throws a redirect on for the router", async () => {
+    await expect(
+      errorFrom(async () => {
+        redirect("/sign-in");
+      }),
+    ).rejects.toThrow();
   });
 });
 

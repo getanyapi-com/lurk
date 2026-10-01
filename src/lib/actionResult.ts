@@ -1,5 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import { z } from "zod";
+import { ACTION_FAILED } from "@/lib/actionError";
 import { isFailedQuery } from "@/lib/format";
 
 /**
@@ -30,7 +31,7 @@ export function errorMessage(error: unknown, fallback: string): string {
  * A caught error as the result an action returns. Next's own control flow, the
  * redirect to sign in among it, is thrown on rather than shown as a message.
  */
-export function failure(error: unknown, fallback = "That did not go through. Try again."): { error: string } {
+export function failure(error: unknown, fallback = ACTION_FAILED): { error: string } {
   unstable_rethrow(error);
   return { error: errorMessage(error, fallback) };
 }

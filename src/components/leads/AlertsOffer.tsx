@@ -8,6 +8,7 @@ import { ChannelMark } from "@/components/alerts/ChannelMark";
 import { Fleeting } from "@/components/Fleeting";
 import { PillTabs } from "@/components/PillTabs";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { errorFrom } from "@/lib/actionError";
 import type { ActionResult } from "@/lib/actionResult";
 import type { AlertsOffer as Offer, OfferPreview } from "@/lib/alerts/offer";
 import { EMAIL_COLORS } from "@/lib/alerts/tokens";
@@ -346,7 +347,7 @@ export function AlertsOffer({ projectId, offer, preview, slackInstall, discordIn
   const run = (action: () => Promise<ActionResult>) =>
     startTransition(async () => {
       setError(null);
-      setError((await action()).error);
+      setError(await errorFrom(action));
     });
   const back = `/app/leads?${new URLSearchParams({ project: projectId })}`;
   const connect = new URLSearchParams({ project: projectId, cadence: "daily", back });

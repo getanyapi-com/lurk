@@ -7,6 +7,7 @@ import { saveScanSettingsAction } from "@/app/app/settings/scanning/actions";
 import { Button } from "@/components/ui/button";
 import { SearchSelect } from "@/components/ui/searchSelect";
 import { Select } from "@/components/ui/select";
+import { errorFrom } from "@/lib/actionError";
 import type { EditableKey, ScanSettings } from "@/lib/settings/types";
 
 type ScanSettingsFormProps = {
@@ -135,7 +136,7 @@ export function ScanSettingsForm({ settings, editable, timezoneChosen }: ScanSet
   async function submit(formData: FormData) {
     setError(null);
     setSaved(false);
-    const { error: problem } = await saveScanSettingsAction(formData);
+    const problem = await errorFrom(() => saveScanSettingsAction(formData));
     setError(problem);
     setSaved(problem === null);
   }
