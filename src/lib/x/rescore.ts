@@ -47,8 +47,12 @@ export async function scoreScreened(projectId: string, product: ProductFacts, li
   await inFlight(
     rows,
     async ({ evaluation, post }) => {
-      const context = evaluation.context as { text?: string; replyingTo?: string[]; chainIncomplete?: boolean } | null;
-      const assessment = await judgeX(projectId, product, candidateOf(post, context, null, false), "search", false, "x_rescore");
+      const context = evaluation.context as { text?: string; replyingTo?: string[] } | null;
+      // Read as a whole chain: the chain-incomplete gate decides leads, and
+      // this read only orders the list, so its reason keeps saying what the
+      // post wants rather than that X no longer shows the post it answers.
+      const candidate = { ...candidateOf(post, context, null, false), chainIncomplete: false };
+      const assessment = await judgeX(projectId, product, candidate, "search", false, "x_rescore");
       if (!assessment) return;
       await updateEvaluation(evaluation.id, {
         fit: assessment.fit,

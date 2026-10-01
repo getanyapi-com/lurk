@@ -55,10 +55,13 @@ describe.skipIf(!process.env.DATABASE_URL)("scoring what the free screen set asi
     const rows: Record<string, string> = {};
     for (const [name, rule] of Object.entries({ noMatch: "no_visible_term:loom", stale: "stale", farm: "reply_farm" })) {
       const id = newId();
-      await db().insert(schema.xPosts).values({ id, text: `any good loom alternative? ${name}`, createdAt: new Date(), authorUsername: `a${id.slice(-8)}` });
+      const text = `any good loom alternative? ${name}`;
+      await db().insert(schema.xPosts).values({ id, text, createdAt: new Date(), authorUsername: `a${id.slice(-8)}` });
+      // The farm reply's thread was walked (trackPitchThread) and X no longer serves the post it answers.
+      const context = name === "farm" ? { replyingTo: ["op"], selfThread: [], chainIncomplete: true, text } : null;
       const [row] = await db()
         .insert(schema.xEvaluations)
-        .values({ projectId: project.id, tweetId: id, stage: "free_rejected", freeReject: rule })
+        .values({ projectId: project.id, tweetId: id, stage: "free_rejected", freeReject: rule, context })
         .returning();
       rows[name] = row.id;
     }
@@ -72,6 +75,8 @@ describe.skipIf(!process.env.DATABASE_URL)("scoring what the free screen set asi
       expect(byId.get(rows[name])?.score).toBeGreaterThan(0);
     }
     expect(byId.get(rows.noMatch)?.freeReject).toBe("no_visible_term:loom");
+    // An incomplete chain holds a lead back, not this read: the reason still says what the post wants.
+    expect(byId.get(rows.farm)?.reason).toMatch(/^Wants what this product does/);
     expect(byId.get(rows.stale)?.score).toBeNull();
     expect(await db().select().from(schema.xLeads).where(eq(schema.xLeads.projectId, project.id))).toEqual([]);
     // Recorded apart from the judge's reads, so it never spends the day's judged allowance.
