@@ -120,8 +120,13 @@ export const MAX_RIVALS_PER_LANE = 6;
 export const MAX_LANE_BODY_CHARS = 380;
 export const MAX_QUERY_CHARS = 450;
 
-/** The llm_usage purposes X writes, which the X LLM sub-cap sums. */
-export const X_PURPOSES = ["x_seeds", "x_score", "x_final", "x_reply"] as const;
+/**
+ * The llm_usage purposes X writes, which the X LLM sub-cap sums. Scoring what
+ * the free screen set aside (rescore.ts) is x_rescore, apart from the judge's
+ * x_score, so it never spends the day's judged allowance.
+ */
+export const X_PURPOSES = ["x_seeds", "x_score", "x_final", "x_reply", "x_rescore"] as const;
+export type XPurpose = (typeof X_PURPOSES)[number];
 /** The twitter.* SKUs X buys. */
 export const X_SKUS = ["twitter.search", "twitter.tweet", "twitter.profile"] as const;
 

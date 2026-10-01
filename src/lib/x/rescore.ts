@@ -4,8 +4,7 @@ import { xEvaluations, xPosts } from "@/db/schema";
 import { inFlight } from "@/lib/inFlight";
 import type { ProductFacts } from "@/lib/product";
 import { X_SCORER_VERSION } from "./constants";
-import { judgeX } from "./judge";
-import { ownWords } from "./map";
+import { candidateOf, judgeX } from "./judge";
 import { updateEvaluation } from "./write";
 
 /**
@@ -14,9 +13,11 @@ import { updateEvaluation } from "./write";
  * on 2026-09-28's first looks of 14 products, 599 of 949 left-out posts were
  * screened and so never scored. One Jev read each at the search level, the
  * cheapest the judge has (about $0.0001 a post), with no bio and no reply
- * check. The post stays screened: its stage, rule and every gate are
- * untouched, and only its fit, intent, score, reason and raw answers are kept
- * for the list's order and bar. Never a lead, never an alert.
+ * check, recorded as x_rescore: it spends X's model budget, never the day's
+ * judged allowance the scan's candidates wait on. The post stays screened:
+ * its stage, rule and every gate are untouched, and only its fit, intent,
+ * score, reason and raw answers are kept for the list's order and bar. Never
+ * a lead, never an alert.
  */
 
 /** Rules whose posts a score would not help anyone judge: out of the window, another language, a bare link, the product's or a rival's own account, Grok. */
@@ -46,27 +47,8 @@ export async function scoreScreened(projectId: string, product: ProductFacts, li
   await inFlight(
     rows,
     async ({ evaluation, post }) => {
-      const context = evaluation.context as { text?: string; replyingTo?: string[] } | null;
-      const assessment = await judgeX(
-        projectId,
-        product,
-        {
-          tweetId: post.id,
-          text: context?.text ?? ownWords(post),
-          rawText: post.text,
-          authorUsername: post.authorUsername,
-          replyingTo: context?.replyingTo ?? [],
-          chainIncomplete: false,
-          bio: null,
-          createdAt: post.createdAt,
-          replyCount: post.replyCount,
-          likeCount: post.likeCount,
-          viewCount: post.viewCount,
-          fetchedAt: post.fetchedAt,
-        },
-        "search",
-        false,
-      );
+      const context = evaluation.context as { text?: string; replyingTo?: string[]; chainIncomplete?: boolean } | null;
+      const assessment = await judgeX(projectId, product, candidateOf(post, context, null, false), "search", false, "x_rescore");
       if (!assessment) return;
       await updateEvaluation(evaluation.id, {
         fit: assessment.fit,

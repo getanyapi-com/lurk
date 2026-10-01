@@ -37,7 +37,7 @@ import {
 } from "./constants";
 import { buyBio, joinedText, ParentWalkError, storedParents, walkParents } from "./context";
 import { xEnabledFor } from "./enabled";
-import { judgeX, storedRoute, type XCandidate } from "./judge";
+import { candidateOf, judgeX, storedRoute } from "./judge";
 import { XLaneRefusedError } from "./grammar";
 import { compileLanes, lanesInputHash, rivalSeeds, VENUE_FAMILIES, type SeedSlots } from "./lanes";
 import { ownWords } from "./map";
@@ -409,24 +409,6 @@ function ownHandle(handle: string, own: Set<string>): boolean {
     const back = handle.endsWith(affix) ? handle.slice(0, -affix.length) : null;
     return (front !== null && own.has(front)) || (back !== null && own.has(back));
   });
-}
-
-function candidateOf(post: StoredXPost, context: StoredContext | null, bio: string | null, venue: boolean): XCandidate {
-  return {
-    tweetId: post.id,
-    text: context?.text ?? ownWords(post),
-    rawText: post.text,
-    authorUsername: post.authorUsername,
-    replyingTo: context?.replyingTo ?? [],
-    chainIncomplete: context?.chainIncomplete ?? false,
-    bio,
-    createdAt: post.createdAt,
-    replyCount: post.replyCount,
-    likeCount: post.likeCount,
-    viewCount: post.viewCount,
-    fetchedAt: post.fetchedAt,
-    venue,
-  };
 }
 
 /**

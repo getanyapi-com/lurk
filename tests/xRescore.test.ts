@@ -74,6 +74,8 @@ describe.skipIf(!process.env.DATABASE_URL)("scoring what the free screen set asi
     expect(byId.get(rows.noMatch)?.freeReject).toBe("no_visible_term:loom");
     expect(byId.get(rows.stale)?.score).toBeNull();
     expect(await db().select().from(schema.xLeads).where(eq(schema.xLeads.projectId, project.id))).toEqual([]);
+    // Recorded apart from the judge's reads, so it never spends the day's judged allowance.
+    expect(askJev.mock.calls.map(([call]) => call.purpose)).toEqual(["x_rescore", "x_rescore"]);
     // Scored once: a second pass finds nothing left to read.
     expect(await scoreScreened(project.id, product)).toBe(0);
   });

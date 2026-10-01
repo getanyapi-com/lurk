@@ -8,7 +8,7 @@ import { NO_QUOTE } from "@/lib/scan/questions";
 import { spans } from "@/lib/scan/spans";
 import { isVerbatim } from "@/lib/scan/validate";
 import { assertXLlmUnderCap } from "./budget";
-import { BIO_CHARS, BODY_CHARS } from "./constants";
+import { BIO_CHARS, BODY_CHARS, type XPurpose } from "./constants";
 import {
   decide,
   fitFrom,
@@ -25,8 +25,10 @@ import {
   type XSignals,
   type XStage,
 } from "./gates";
+import { ownWords } from "./map";
 import { xQuestions } from "./questions";
 import { reachScore } from "./reach";
+import type { StoredXPost } from "./store";
 
 /**
  * One X post judged against one product, one post per request, as Reddit's
@@ -62,6 +64,33 @@ export type XCandidate = {
    */
   venue?: boolean;
 };
+
+/**
+ * A stored post as the judge reads it: its own words, or the self-thread its
+ * context walk joined above them, and the posts that walk found it answering.
+ */
+export function candidateOf(
+  post: StoredXPost,
+  context: { text?: string; replyingTo?: string[]; chainIncomplete?: boolean } | null,
+  bio: string | null,
+  venue: boolean,
+): XCandidate {
+  return {
+    tweetId: post.id,
+    text: context?.text ?? ownWords(post),
+    rawText: post.text,
+    authorUsername: post.authorUsername,
+    replyingTo: context?.replyingTo ?? [],
+    chainIncomplete: context?.chainIncomplete ?? false,
+    bio,
+    createdAt: post.createdAt,
+    replyCount: post.replyCount,
+    likeCount: post.likeCount,
+    viewCount: post.viewCount,
+    fetchedAt: post.fetchedAt,
+    venue,
+  };
+}
 
 export type XAssessment = {
   level: XLevel;
@@ -204,7 +233,9 @@ export function storedRoute(
 /**
  * Judges one candidate, or null when the model never answered: an unanswered
  * post keeps no verdict and is asked again later, never rejected. A spent
- * budget, global or X's own, is thrown, and the run ends partial.
+ * budget, global or X's own, is thrown, and the run ends partial. The call is
+ * recorded under `purpose`, which the day's judged allowance counts by
+ * (run.ts poolsFor): x_score and x_final by default.
  */
 export async function judgeX(
   projectId: string,
@@ -212,6 +243,7 @@ export async function judgeX(
   candidate: XCandidate,
   level: XLevel,
   replies = true,
+  purpose: XPurpose = level === "complete" ? "x_final" : "x_score",
 ): Promise<XAssessment | null> {
   const { state, sentences } = candidateState(product, candidate, level);
   const questions = xQuestions(Object.keys(sentences), {
@@ -224,7 +256,7 @@ export async function judgeX(
     async () => {
       await assertXLlmUnderCap();
       const answers = await askJev({
-        purpose: level === "complete" ? "x_final" : "x_score",
+        purpose,
         projectId,
         state,
         questions,
