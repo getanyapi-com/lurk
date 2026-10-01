@@ -5,6 +5,7 @@ import { BellOff, X } from "lucide-react";
 import { addMuteAction, removeMuteAction } from "@/app/app/settings/alerts/actions";
 import { PillTabs } from "@/components/PillTabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { errorFrom } from "@/lib/actionError";
 import type { Mute, MuteKind } from "@/lib/mutes";
 
@@ -14,8 +15,6 @@ const PLACEHOLDERS: Record<MuteKind, string> = {
   keyword: "a word or phrase, like hiring",
   subreddit: "r/forhire",
 };
-
-const FIELD = "h-10 min-w-64 flex-1 rounded-control border bg-surface px-3 text-body text-fg";
 
 /**
  * What the project never wants to hear about: a word or phrase anywhere in a
@@ -66,13 +65,13 @@ export function MuteList({ projectId, mutes }: MuteListProps) {
           ]}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <Input
             key={kind}
             name="value"
             required
             aria-label={kind === "keyword" ? "Keyword to mute" : "Subreddit to mute"}
             placeholder={PLACEHOLDERS[kind]}
-            className={FIELD}
+            className="min-w-64 flex-1 px-3"
           />
           <Button type="submit" variant="outline">
             Mute

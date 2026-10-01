@@ -6,6 +6,7 @@ import { addChannelAction } from "@/app/app/settings/alerts/actions";
 import { ChannelMark } from "@/components/alerts/ChannelMark";
 import { PillTabs } from "@/components/PillTabs";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { errorFrom } from "@/lib/actionError";
 import { ALERT_CHANNELS, CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "@/lib/alerts/types";
@@ -28,9 +29,6 @@ const PLACEHOLDERS: Record<AlertChannel, string> = {
   discord: "https://discord.com/api/webhooks/...",
   webhook: "https://example.com/hooks/leads",
 };
-
-const FIELD =
-  "h-10 rounded-control border bg-surface px-3 text-body text-fg";
 
 /** Type, address and cadence for one new alert channel. */
 export function AddChannelForm({
@@ -76,12 +74,12 @@ export function AddChannelForm({
             Pick the channel on {service}&apos;s side.
           </span>
         ) : (
-          <input
+          <Input
             name="target"
             required
             placeholder={PLACEHOLDERS[channel]}
             aria-label="Where to send it"
-            className={`${FIELD} min-w-64 flex-1`}
+            className="min-w-64 flex-1 px-3"
           />
         )}
         <Select
