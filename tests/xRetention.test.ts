@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, it } from "vitest";
-import { describeDb, makeProject, makeUser } from "./fixtures/db";
+import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
 
 /**
  * The time the pass runs as, with this file's rows dated by it. The pass
@@ -26,8 +26,7 @@ describeDb("deleting expired X data", () => {
     const user = await makeUser();
     const project = await makeProject(user.id, { name: "Retention" });
     const old = new Date(NOW.getTime() - 40 * 24 * 3_600_000);
-    const suffix = Date.now();
-    const ids = { stale: `8${suffix}1`, fresh: `8${suffix}2`, parent: `8${suffix}3` };
+    const ids = { stale: newId("6"), fresh: newId("6"), parent: newId("6") };
     const base = { text: "alternative to calendly?", authorUsername: "someone" };
     await db()
       .insert(schema.xPosts)

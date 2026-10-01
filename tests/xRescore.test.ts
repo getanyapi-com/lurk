@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Question } from "@/lib/jev";
-import { describeDb, makeProject, makeUser } from "./fixtures/db";
+import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
 
 /**
  * A screened post gets one quick read afterwards, only so Filtered out can
@@ -29,12 +29,6 @@ function buyer(call: { questions: Record<string, Question> }) {
   return answers;
 }
 
-let counter = 0;
-function newId(): string {
-  counter += 1;
-  return `9${Date.now()}${String(counter).padStart(5, "0")}`;
-}
-
 describeDb("scoring what the free screen set aside", () => {
   beforeEach(() => {
     askJev.mockReset();
@@ -51,7 +45,7 @@ describeDb("scoring what the free screen set aside", () => {
     const project = await makeProject(user.id, { name: "Clipy", url: "https://clipy.example", pain: "Recording demos", solution: "A screen recorder" });
     const rows: Record<string, string> = {};
     for (const [name, rule] of Object.entries({ noMatch: "no_visible_term:loom", stale: "stale", farm: "reply_farm" })) {
-      const id = newId();
+      const id = newId("7");
       const text = `any good loom alternative? ${name}`;
       await db().insert(schema.xPosts).values({ id, text, createdAt: new Date(), authorUsername: `a${id.slice(-8)}` });
       // The farm reply's thread was walked (trackPitchThread) and X no longer serves the post it answers.

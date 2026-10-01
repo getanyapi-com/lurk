@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Question } from "@/lib/jev";
 import { FIRST_LOOK_EXTRA, FIRST_LOOK_HOURS, OPENED_WITHIN_DAYS } from "@/lib/x/constants";
 import { TIERS } from "@/lib/tiers";
-import { describeDb, makeProject, makeUser } from "./fixtures/db";
+import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
 
 /**
  * The X pipeline end to end, against a real database with only AnyAPI and the
@@ -41,22 +41,16 @@ vi.mock("@/lib/anyapi", async (importOriginal) => ({
 
 const HOUR = 3_600_000;
 
-let counter = 0;
 /** A rival name no other test, or test file, searches for, so no paid page is shared between them. */
 function uniqueRival(): string {
   const letters = Array.from({ length: 8 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");
   return `calendly${letters}`;
 }
-/** A snowflake-shaped id no other test uses. */
-function newId(): string {
-  counter += 1;
-  return `9${Date.now()}${String(counter).padStart(5, "0")}`;
-}
 
 type Item = Record<string, unknown>;
 
 function item(text: string, over: Item = {}): Item {
-  const id = newId();
+  const id = newId("9");
   return {
     id,
     text,
@@ -539,9 +533,9 @@ describeDb("the X pipeline against a database", () => {
       inReplyToId: asker.id,
       conversationId: asker.id,
     });
-    const offTopic = item(`@someone ${rival} here, happy to help`, { authorUsername: rival, isReply: true, inReplyToId: newId() });
+    const offTopic = item(`@someone ${rival} here, happy to help`, { authorUsername: rival, isReply: true, inReplyToId: newId("9") });
     // The product's own reply is a thread it already answered.
-    const ownReply = item(`@someone2 we're the open ${rival} alternative, come try us`, { authorUsername: "calcom", isReply: true, inReplyToId: newId() });
+    const ownReply = item(`@someone2 we're the open ${rival} alternative, come try us`, { authorUsername: "calcom", isReply: true, inReplyToId: newId("9") });
     serve("rival", page([pitch, offTopic, ownReply]));
     serveTweets(asker);
     await openX(project.id);
@@ -628,7 +622,7 @@ describeDb("the X pipeline against a database", () => {
     const elsewhere = item("anyone?", { authorUsername: "elsewhere" });
     // Screened out for its language, not its author: its thread says nothing more.
     const french = item(`@elsewhere je cherche une alternative à ${rival}`, { lang: "fr", isReply: true, inReplyToId: elsewhere.id });
-    const pitch = item(`@someone ${rival} is the alternative you want`, { authorUsername: rival, isReply: true, inReplyToId: newId() });
+    const pitch = item(`@someone ${rival} is the alternative you want`, { authorUsername: rival, isReply: true, inReplyToId: newId("9") });
     serve("rival", page([french, pitch]));
     tweet.mockRejectedValue(new AnyAPIError("upstream failed", 502));
     await openX(project.id);
@@ -687,7 +681,7 @@ describeDb("the X pipeline against a database", () => {
     const { project } = await fixture([rival]);
     const asker = item("what do you all use for booking calls?", { authorUsername: "asker" });
     const reply = item(`@asker not ${rival}, I need an alternative`, { isReply: true, inReplyToId: asker.id });
-    const other = item(`@someone ${rival} broke again, need an alternative`, { isReply: true, inReplyToId: newId() });
+    const other = item(`@someone ${rival} broke again, need an alternative`, { isReply: true, inReplyToId: newId("9") });
     serve("rival", page([reply, other]));
     tweet.mockImplementation(async ({ url }: { url: string }) => {
       if (url.endsWith(asker.id as string)) {
@@ -709,7 +703,7 @@ describeDb("the X pipeline against a database", () => {
     const ask = item(`I'm looking for an alternative to ${rival}. Round robin is all I need.`);
     const reply = item(`@someone I need an alternative to ${rival} as well, it keeps double booking me.`, {
       isReply: true,
-      inReplyToId: newId(),
+      inReplyToId: newId("9"),
     });
     serve("rival", page([ask, reply]));
     tweet.mockRejectedValue(new AnyAPIError("upstream failed", 502));
@@ -886,7 +880,7 @@ describeDb("the X pipeline against a database", () => {
       authorUsername: `v${randomUUID().slice(0, 12)}`,
     });
     const nope = item(`reply-me too: ${rival} alternative talk is everywhere this week, wild.`);
-    const conversation = newId();
+    const conversation = newId("9");
     const sameAuthorReply = item(`reply-me: ${rival} could be cheaper, its pricing is so annoying for a team our size.`, { authorUsername: "samey", conversationId: conversation });
     const sameAuthorAsk = item(`I'm looking for an alternative to ${rival} for my team of four.`, { authorUsername: "samey", conversationId: conversation });
     serve("rival", page([venting, nope, sameAuthorReply, sameAuthorAsk]));
@@ -949,7 +943,7 @@ describeDb("the X pipeline against a database", () => {
     process.env.OPENROUTER_API_KEY = "test";
     const rival = uniqueRival();
     const { project } = await fixture([rival], { brief: true });
-    const conversation = newId();
+    const conversation = newId("9");
     const author = `h${randomUUID().slice(0, 12)}`;
     const venting = item(`reply-me: ${rival} could be cheaper, its pricing is so annoying for a team our size.`, { authorUsername: author, conversationId: conversation });
     serve("rival", page([venting]));
@@ -1223,7 +1217,7 @@ describeDb("the X pipeline against a database", () => {
       viewCount: views,
       likeCount: Math.round(views / 100),
     });
-    const [ask, stale, fresh] = [post(newId(), 30, 500), post(newId(), 30, 90_000), post(newId(), 2, 20_000)];
+    const [ask, stale, fresh] = [post(newId("9"), 30, 500), post(newId("9"), 30, 90_000), post(newId("9"), 2, 20_000)];
     await db().insert(schema.xPosts).values([ask, stale, fresh]);
     await db()
       .insert(schema.xLeads)

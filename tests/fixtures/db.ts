@@ -49,3 +49,16 @@ export async function makePost(values: Partial<typeof redditPosts.$inferInsert> 
     .returning();
   return post;
 }
+
+let counter = 0;
+
+/**
+ * A snowflake-shaped id no other test uses: the prefix, the time and a count.
+ * Two files can write in the same millisecond, and each counts from one, so
+ * the prefix is what keeps them apart: each file passes one no other file
+ * uses. Taken so far: 6 xRetention, 7 xRescore, 8 xFiltered, 9 xRun.
+ */
+export function newId(prefix: string): string {
+  counter += 1;
+  return `${prefix}${Date.now()}${String(counter).padStart(5, "0")}`;
+}

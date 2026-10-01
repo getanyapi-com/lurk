@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { filteredPointer, filteredSentence, filteredSummary, filteredWord } from "@/components/x/filtered";
 import type { XFiltered, XFilteredCard } from "@/lib/x/read";
-import { describeDb, makeProject, makeUser } from "./fixtures/db";
+import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
 
 /**
  * What the X tab shows of the posts it left out: those the judge passed but
@@ -12,11 +12,6 @@ import { describeDb, makeProject, makeUser } from "./fixtures/db";
  */
 
 const HOUR = 3_600_000;
-let counter = 0;
-function newId(): string {
-  counter += 1;
-  return `8${Date.now()}${String(counter).padStart(5, "0")}`;
-}
 describe("the filtered-out words", () => {
   it("names a screened post by its rule, a judged one by the gates' code, and an unfinished one as such", () => {
     expect(filteredWord({ kind: "screened", code: "listicle" })).toBe("list");
@@ -89,7 +84,7 @@ describeDb("the filtered-out list against a database", () => {
     const ids: Record<string, string> = {};
     const evaluations: Record<string, string> = {};
     for (const [name, row] of Object.entries(rows)) {
-      const id = newId();
+      const id = newId("8");
       ids[name] = id;
       await db()
         .insert(schema.xPosts)
