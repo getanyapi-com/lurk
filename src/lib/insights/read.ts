@@ -8,6 +8,7 @@ import {
   redditPosts,
   subreddits,
 } from "@/db/schema";
+import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN } from "@/lib/leadSql";
 
 /** How many faces a theme card shows before it stops. */
 export const THEME_FACES = 5;
@@ -78,8 +79,7 @@ async function factsFor(leadIds: string[]): Promise<Map<string, LeadFact>> {
   const rows = await db()
     .select({
       id: leads.id,
-      postAuthor: redditPosts.author,
-      commentAuthor: redditComments.author,
+      author: LEAD_AUTHOR,
       avatarUrl: redditAuthors.avatarUrl,
       matchedPhrase: leads.matchedPhrase,
       subreddit: redditPosts.subreddit,
@@ -89,19 +89,13 @@ async function factsFor(leadIds: string[]): Promise<Map<string, LeadFact>> {
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
-    .leftJoin(
-      redditAuthors,
-      eq(
-        redditAuthors.username,
-        sql`lower(coalesce(${redditComments.author}, ${redditPosts.author}))`,
-      ),
-    )
+    .leftJoin(redditAuthors, LEAD_AUTHOR_JOIN)
     .where(inArray(leads.id, leadIds));
   return new Map(
     rows.map((row) => [
       row.id,
       {
-        face: { name: row.commentAuthor ?? row.postAuthor, avatarUrl: row.avatarUrl },
+        face: { name: row.author, avatarUrl: row.avatarUrl },
         phrase: row.matchedPhrase,
         community: { name: row.subreddit, iconUrl: row.subredditIconUrl },
       },

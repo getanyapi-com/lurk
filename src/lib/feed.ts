@@ -1,9 +1,5 @@
 /** Feed vocabulary shared by the server queries and the client filter pills. */
 
-import type { LeadKind } from "@/lib/scan/gates";
-
-export type { LeadKind };
-
 /**
  * `replied` is the owner saying they answered the thread, and it covers the
  * whole thread, the leads found in it later included (lib/handled.ts).
@@ -31,7 +27,6 @@ export type FeedFilter = {
    * the slice was picked from and clearing it puts you back there.
    */
   at?: string;
-  kind?: LeadKind;
   subreddit?: string;
   stage?: string;
   /** One Insights theme's id, narrowing the feed to the leads that theme holds. */

@@ -43,7 +43,6 @@ function filterKey(filter: FeedFilter, widenable: boolean): string {
   return JSON.stringify([
     filter.status,
     filter.days,
-    filter.kind ?? null,
     filter.subreddit ?? null,
     filter.stage ?? null,
     filter.theme ?? null,

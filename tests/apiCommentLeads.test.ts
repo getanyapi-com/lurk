@@ -21,6 +21,7 @@ describe.skipIf(!process.env.DATABASE_URL)("a fresh comment on an old thread", (
     const id = randomUUID();
     const postUrl = "https://www.reddit.com/r/test/comments/old/";
     const commentUrl = "https://www.reddit.com/r/test/comments/old/comment/new/";
+    const commented = new Date();
     const [user] = await db()
       .insert(users)
       .values({ clerkUserId: `test_${id}` })
@@ -43,7 +44,7 @@ describe.skipIf(!process.env.DATABASE_URL)("a fresh comment on an old thread", (
         body: "New buyer asking today",
         author: "buyer",
         permalink: commentUrl,
-        createdAt: new Date(),
+        createdAt: commented,
       });
       const [lead] = await db()
         .insert(leads)
@@ -54,6 +55,31 @@ describe.skipIf(!process.env.DATABASE_URL)("a fresh comment on an old thread", (
       const listed = await listApiLeads(project.id, parseLeadQuery(new URLSearchParams()), 30);
       expect(listed.leads.map((one) => one.url)).toEqual([commentUrl]);
       expect((await getApiLead(user.id, lead.id))?.url).toBe(commentUrl);
+      // The shape callers parse: a list read leaves the body key out entirely,
+      // and asking for bodies, or for the one lead, adds only the comment's.
+      expect(Object.keys(listed.leads[0])).toEqual([
+        "id",
+        "postId",
+        "commentId",
+        "title",
+        "subreddit",
+        "author",
+        "url",
+        "score",
+        "stage",
+        "reason",
+        "matchedPhrase",
+        "sellerSide",
+        "status",
+        "postedAt",
+        "scoredAt",
+        "costUsd",
+      ]);
+      expect(listed.leads[0]).toMatchObject({ author: "buyer", postedAt: commented.toISOString() });
+      const withBodies = await listApiLeads(project.id, parseLeadQuery(new URLSearchParams("include=body")), 30);
+      expect(withBodies.leads).toEqual([{ ...listed.leads[0], body: "New buyer asking today" }]);
+      expect(await getApiLead(user.id, lead.id)).toEqual(withBodies.leads[0]);
+      expect(await getApiLead(randomUUID(), lead.id)).toBeNull();
       const alerted = await newLeadsSince(project.id, new Date(Date.now() - DAY_MS));
       expect(alerted.map((one) => one.url)).toEqual([commentUrl]);
     } finally {

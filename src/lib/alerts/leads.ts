@@ -1,6 +1,6 @@
 import { and, eq, gte, isNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { leads, projects, redditAuthors, redditComments, redditPosts, xLeads, xPosts, xProjects } from "@/db/schema";
+import { leads, projects, redditAuthors, redditPosts, xLeads, xPosts, xProjects } from "@/db/schema";
 import {
   ALERT_FLOOR_SQL,
   ALERT_SCORE_FLOOR,
@@ -8,6 +8,7 @@ import {
   X_FLOOR_SQL,
   xWordsWhere,
 } from "@/lib/leadFilters";
+import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN, LEAD_BODY, LEAD_URL, NEED_AT, leadsBase } from "@/lib/leadSql";
 import { redditLeadNotMuted, xLeadNotMuted } from "@/lib/mutes";
 import { canonicalUrl, ownWords } from "@/lib/x/map";
 import { headlineOf } from "@/lib/x/read";
@@ -24,38 +25,27 @@ import { FRESH_SLACK_MS, type SelectableLead } from "./select";
  */
 export async function newLeadsSince(projectId: string, since: Date): Promise<SelectableLead[]> {
   const freshFrom = new Date(since.getTime() - FRESH_SLACK_MS);
-  const rows = await db()
-    .select({
-      id: leads.id,
-      postId: redditPosts.id,
-      score: leads.score,
-      reason: leads.reason,
-      matchedPhrase: leads.matchedPhrase,
-      status: leads.status,
-      kind: leads.kind,
-      foundAt: leads.foundAt,
-      title: redditPosts.title,
-      body: sql<string | null>`coalesce(${redditComments.body}, ${redditPosts.body})`,
-      isComment: sql<boolean>`${leads.commentId} is not null`,
-      numComments: redditPosts.numComments,
-      url: sql<string>`coalesce(${redditComments.permalink}, ${redditPosts.url})`,
-      subreddit: redditPosts.subreddit,
-      author: sql<string | null>`coalesce(${redditComments.author}, ${redditPosts.author})`,
-      avatarUrl: redditAuthors.avatarUrl,
-      createdAt: sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`,
-      floor: ALERT_FLOOR_SQL.mapWith(Number),
-    })
-    .from(leads)
-    .innerJoin(projects, eq(projects.id, leads.projectId))
-    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .leftJoin(
-      redditAuthors,
-      eq(
-        redditAuthors.username,
-        sql`lower(coalesce(${redditComments.author}, ${redditPosts.author}))`,
-      ),
-    )
+  const rows = await leadsBase({
+    id: leads.id,
+    postId: redditPosts.id,
+    score: leads.score,
+    reason: leads.reason,
+    matchedPhrase: leads.matchedPhrase,
+    status: leads.status,
+    kind: leads.kind,
+    foundAt: leads.foundAt,
+    title: redditPosts.title,
+    body: LEAD_BODY,
+    isComment: sql<boolean>`${leads.commentId} is not null`,
+    numComments: redditPosts.numComments,
+    url: LEAD_URL,
+    subreddit: redditPosts.subreddit,
+    author: LEAD_AUTHOR,
+    avatarUrl: redditAuthors.avatarUrl,
+    createdAt: NEED_AT,
+    floor: ALERT_FLOOR_SQL.mapWith(Number),
+  })
+    .leftJoin(redditAuthors, LEAD_AUTHOR_JOIN)
     .where(
       and(
         eq(leads.projectId, projectId),
@@ -63,7 +53,7 @@ export async function newLeadsSince(projectId: string, since: Date): Promise<Sel
         eq(leads.kind, "buyer"),
         gte(leads.foundAt, since),
         sql`${leads.score} >= ${ALERT_FLOOR_SQL}`,
-        sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt}) >= ${freshFrom.toISOString()}::timestamptz`,
+        sql`${NEED_AT} >= ${freshFrom.toISOString()}::timestamptz`,
         redditLeadNotMuted(),
         redditWordsWhere(),
       ),

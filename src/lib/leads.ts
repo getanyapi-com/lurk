@@ -5,7 +5,6 @@ import {
   leadEvaluations,
   leads,
   painThemes,
-  projects,
   redditAuthors,
   redditComments,
   redditPosts,
@@ -17,6 +16,7 @@ import { listMutes, redditLeadNotMuted } from "./mutes";
 import { forgetProjectFeed } from "./projectFeedCache";
 import { FEED_FLOOR_SQL, mentions, redditWordsWhere } from "./leadFilters";
 import { atBounds } from "./feed";
+import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN, LEAD_BODY, LEAD_URL, NEED_AT, leadsBase } from "./leadSql";
 import { daysAgo } from "./time";
 
 import type {
@@ -71,33 +71,16 @@ const feedColumns = {
   subredditWeeklyActive: subreddits.subscribers,
 };
 
-/** The author behind a lead, for the face a row and the strip both show. */
-const AUTHOR_JOIN = eq(
-  redditAuthors.username,
-  sql`lower(coalesce(${redditComments.author}, ${redditPosts.author}))`,
-);
-
-/**
- * A whole lead: the thread, the comment it may be, the project whose score
- * floor it is measured against, its community and the two faces on it.
- */
+/** A whole lead, with its community and the two faces on it: the lead's author and the thread's. */
 function feedQuery() {
-  return db()
-    .select(feedColumns)
-    .from(leads)
-    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .innerJoin(projects, eq(projects.id, leads.projectId))
+  return leadsBase(feedColumns)
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
-    .leftJoin(redditAuthors, AUTHOR_JOIN)
+    .leftJoin(redditAuthors, LEAD_AUTHOR_JOIN)
     .leftJoin(postAuthors, eq(postAuthors.username, sql`lower(${redditPosts.author})`));
 }
 
 /** One lead as every read of the feed hands it over. */
 export type FeedLead = Awaited<ReturnType<typeof feedQuery>>[number];
-
-/** A comment lead is as old as the comment, never as old as the thread. */
-const NEED_AT = sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`;
 
 /**
  * The window rule the whole Leads page reads, feed and header sentence alike:
@@ -161,7 +144,6 @@ function feedWhere(projectId: string, filter: FeedFilter) {
     OVER_THRESHOLD,
     newerThan(filter.days),
     onAt(filter.at),
-    filter.kind ? eq(leads.kind, filter.kind) : undefined,
     filter.subreddit ? eq(sql`lower(${redditPosts.subreddit})`, filter.subreddit) : undefined,
     filter.stage ? eq(leads.stage, filter.stage) : undefined,
     filter.theme ? inArray(leads.id, leadIdsOfTheme(projectId, filter.theme)) : undefined,
@@ -214,13 +196,7 @@ export async function listLeads(
 
 /** How many leads those pills hold, which is what the list column counts. */
 export async function countLeads(projectId: string, filter: FeedFilter): Promise<number> {
-  const rows = await db()
-    .select({ total: count() })
-    .from(leads)
-    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .innerJoin(projects, eq(projects.id, leads.projectId))
-    .where(feedWhere(projectId, filter));
+  const rows = await leadsBase({ total: count() }).where(feedWhere(projectId, filter));
   return rows[0]?.total ?? 0;
 }
 
@@ -231,20 +207,15 @@ export async function countLeads(projectId: string, filter: FeedFilter): Promise
  * and none of the prose a row does.
  */
 export async function listLeadFaces(projectId: string, filter: FeedFilter): Promise<LeadFace[]> {
-  return db()
-    .select({
-      id: sql<string>`'lead-' || ${leads.id}`,
-      at: sql`${NEED_AT}`.mapWith(redditPosts.createdAt),
-      score: leads.score,
-      author: sql<string | null>`coalesce(${redditComments.author}, ${redditPosts.author})`,
-      avatarUrl: redditAuthors.avatarUrl,
-      subreddit: redditPosts.subreddit,
-    })
-    .from(leads)
-    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .innerJoin(projects, eq(projects.id, leads.projectId))
-    .leftJoin(redditAuthors, AUTHOR_JOIN)
+  return leadsBase({
+    id: sql<string>`'lead-' || ${leads.id}`,
+    at: sql`${NEED_AT}`.mapWith(redditPosts.createdAt),
+    score: leads.score,
+    author: LEAD_AUTHOR,
+    avatarUrl: redditAuthors.avatarUrl,
+    subreddit: redditPosts.subreddit,
+  })
+    .leftJoin(redditAuthors, LEAD_AUTHOR_JOIN)
     .where(feedWhere(projectId, filter))
     .orderBy(...FEED_ORDER);
 }
@@ -278,8 +249,8 @@ export async function listReviewItems(
       id: leadEvaluations.id,
       title: redditPosts.title,
       subreddit: redditPosts.subreddit,
-      url: sql<string>`coalesce(${redditComments.permalink}, ${redditPosts.url})`,
-      author: sql<string | null>`coalesce(${redditComments.author}, ${redditPosts.author})`,
+      url: LEAD_URL,
+      author: LEAD_AUTHOR,
       avatarUrl: redditAuthors.avatarUrl,
       authorKarma: redditAuthors.karma,
       authorCreatedAt: redditAuthors.accountCreatedAt,
@@ -292,17 +263,14 @@ export async function listReviewItems(
       fit: leadEvaluations.fit,
       intent: leadEvaluations.intent,
       needState: leadEvaluations.needState,
-      createdAt: sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`.mapWith(redditPosts.createdAt),
+      createdAt: sql`${NEED_AT}`.mapWith(redditPosts.createdAt),
       judgedAt: leadEvaluations.judgedAt,
     })
     .from(leadEvaluations)
     .innerJoin(redditPosts, eq(redditPosts.id, leadEvaluations.postId))
     .leftJoin(redditComments, eq(redditComments.id, leadEvaluations.commentId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
-    .leftJoin(
-      redditAuthors,
-      eq(redditAuthors.username, sql`lower(coalesce(${redditComments.author}, ${redditPosts.author}))`),
-    )
+    .leftJoin(redditAuthors, LEAD_AUTHOR_JOIN)
     .where(
       and(
         eq(leadEvaluations.projectId, projectId),
@@ -327,10 +295,14 @@ export async function listReviewItems(
   return rows;
 }
 
-/** The subreddits and stages this project actually has leads in. */
+/**
+ * The subreddits and stages this project actually has leads in. Each pair is
+ * read once rather than once per lead; a subreddit can still come back with
+ * several stages, so each list is made unique again.
+ */
 export async function feedFacets(projectId: string): Promise<FeedFacets> {
   const rows = await db()
-    .select({ subreddit: redditPosts.subreddit, stage: leads.stage })
+    .selectDistinct({ subreddit: redditPosts.subreddit, stage: leads.stage })
     .from(leads)
     .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
     .where(eq(leads.projectId, projectId));
@@ -371,30 +343,18 @@ export async function wordsHidden(
   );
   const kept = sql`(${redditWordsWhere()} and ${redditLeadNotMuted()})`;
   const [counts, rows, mutes] = await Promise.all([
-    db()
-      .select({
-        total: count(),
-        kept: sql<number>`count(*) filter (where ${kept})`.mapWith(Number),
-      })
-      .from(leads)
-      .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-      .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-      .innerJoin(projects, eq(projects.id, leads.projectId))
-      .where(month),
-    db()
-      .select({
-        id: leads.id,
-        title: redditPosts.title,
-        postBody: redditPosts.body,
-        commentBody: redditComments.body,
-        url: redditPosts.url,
-        score: leads.score,
-        subreddit: redditPosts.subreddit,
-      })
-      .from(leads)
-      .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-      .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-      .innerJoin(projects, eq(projects.id, leads.projectId))
+    leadsBase({
+      total: count(),
+      kept: sql<number>`count(*) filter (where ${kept})`.mapWith(Number),
+    }).where(month),
+    leadsBase({
+      id: leads.id,
+      title: redditPosts.title,
+      body: LEAD_BODY,
+      url: redditPosts.url,
+      score: leads.score,
+      subreddit: redditPosts.subreddit,
+    })
       .where(and(month, sql`not ${kept}`))
       .orderBy(desc(leads.score), desc(leads.foundAt))
       .limit(HIDDEN_SHOWN),
@@ -405,7 +365,7 @@ export async function wordsHidden(
     hidden: total - (counts[0]?.kept ?? 0),
     total,
     leads: rows.map((row) => {
-      const text = `${row.title} ${row.commentBody ?? row.postBody ?? ""}`;
+      const text = `${row.title} ${row.body ?? ""}`;
       const word = mutes.find((mute) => mute.kind === "keyword" && mentions(text, mute.value));
       const community = mutes.find((mute) => mute.kind === "subreddit" && mute.value === row.subreddit.toLowerCase());
       return {
@@ -429,13 +389,9 @@ export async function wordsHidden(
  * over the feed counts the same thing.
  */
 export const newLeadCount = cache(async (projectId: string): Promise<number> => {
-  const rows = await db()
-    .select({ total: count() })
-    .from(leads)
-    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .innerJoin(projects, eq(projects.id, leads.projectId))
-    .where(and(eq(leads.projectId, projectId), eq(leads.status, "new"), OVER_THRESHOLD, redditLeadNotMuted()));
+  const rows = await leadsBase({ total: count() }).where(
+    and(eq(leads.projectId, projectId), eq(leads.status, "new"), OVER_THRESHOLD, redditLeadNotMuted()),
+  );
   return rows[0]?.total ?? 0;
 });
 

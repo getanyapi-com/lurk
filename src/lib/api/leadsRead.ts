@@ -1,8 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { leads, projects, redditComments, redditPosts } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { leads, projects } from "@/db/schema";
 import { leadCosts } from "@/lib/leads";
-import { LEAD_URL, leadsSelect, type LeadQuery } from "./leadsQuery";
+import { LEAD_BODY, leadsBase } from "@/lib/leadSql";
+import { LEAD_COLUMNS, leadsSelect, type LeadQuery } from "./leadsQuery";
 
 export type ApiLead = {
   id: string;
@@ -24,25 +24,7 @@ export type ApiLead = {
   body?: string | null;
 };
 
-type Row = {
-  id: string;
-  postId: string | null;
-  commentId: string | null;
-  title: string;
-  subreddit: string;
-  postAuthor: string | null;
-  commentAuthor: string | null;
-  url: string;
-  score: number;
-  stage: string | null;
-  reason: string | null;
-  matchedPhrase: string | null;
-  sellerSide: boolean;
-  status: string;
-  postedAt: Date;
-  scoredAt: Date;
-  body: string | null;
-};
+type Row = Awaited<ReturnType<typeof leadsSelect>>[number];
 
 function shape(row: Row, costUsd: number | null, includeBody: boolean): ApiLead {
   const lead: ApiLead = {
@@ -80,7 +62,7 @@ export async function listApiLeads(
   query: LeadQuery,
   feedWindowDays: number,
 ): Promise<LeadPage> {
-  const rows = (await leadsSelect(projectId, query, feedWindowDays)) as Row[];
+  const rows = await leadsSelect(projectId, query, feedWindowDays);
   const hasMore = rows.length > query.limit;
   const page = hasMore ? rows.slice(0, query.limit) : rows;
   const costs = await costsFor(projectId, page);
@@ -94,34 +76,9 @@ export async function listApiLeads(
 
 /** One lead of the caller's, with its body, or null when it is not theirs. */
 export async function getApiLead(userId: string, leadId: string): Promise<ApiLead | null> {
-  const rows = (await db()
-    .select({
-      id: leads.id,
-      postId: leads.postId,
-      commentId: leads.commentId,
-      projectId: leads.projectId,
-      title: redditPosts.title,
-      subreddit: redditPosts.subreddit,
-      postAuthor: redditPosts.author,
-      commentAuthor: redditComments.author,
-      url: LEAD_URL,
-      score: leads.score,
-      stage: leads.stage,
-      reason: leads.reason,
-      matchedPhrase: leads.matchedPhrase,
-      sellerSide: leads.sellerSide,
-      status: leads.status,
-      postedAt: sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`,
-      scoredAt: leads.scoredAt,
-      body: sql<string | null>`coalesce(${redditComments.body}, ${redditPosts.body})`,
-    })
-    .from(leads)
-    .innerJoin(projects, eq(projects.id, leads.projectId))
-    .innerJoin(redditPosts, eq(redditPosts.id, leads.postId))
-    .leftJoin(redditComments, eq(redditComments.id, leads.commentId))
-    .where(and(eq(leads.id, leadId), eq(projects.userId, userId)))) as (Row & {
-    projectId: string;
-  })[];
+  const rows = await leadsBase({ ...LEAD_COLUMNS, body: LEAD_BODY, projectId: leads.projectId }).where(
+    and(eq(leads.id, leadId), eq(projects.userId, userId)),
+  );
   const row = rows[0];
   if (!row) {
     return null;

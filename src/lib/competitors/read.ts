@@ -8,6 +8,7 @@ import {
   redditPosts,
   subreddits,
 } from "@/db/schema";
+import { LEAD_AUTHOR, LEAD_AUTHOR_JOIN, LEAD_URL, NEED_AT } from "@/lib/leadSql";
 import { DAY_MS, daysAgo } from "@/lib/time";
 import { SENTIMENTS, type Sentiment } from "./classify";
 
@@ -84,10 +85,12 @@ export async function countMentions(
   return rows[0]?.total ?? 0;
 }
 
-/** The one who named the competitor: the reply's author when a reply did. */
-const NAMED_BY = sql`coalesce(${redditComments.author}, ${redditPosts.author})`;
-
-/** Every mention inside the window, newest first. A reply is as old as itself. */
+/**
+ * Every mention inside the window, newest first. A mention sits on a thread or
+ * one reply in it the way a lead does, so it reads the lead's fragments: the
+ * one who named the competitor is the reply's author when a reply did, and a
+ * reply is as old as itself.
+ */
 export async function listMentions(
   projectId: string,
   days = MENTION_WINDOW_DAYS,
@@ -102,25 +105,25 @@ export async function listMentions(
       foundAt: competitorMentions.foundAt,
       postId: competitorMentions.postId,
       title: redditPosts.title,
-      url: sql<string>`coalesce(${redditComments.permalink}, ${redditPosts.url})`,
+      url: LEAD_URL,
       subreddit: redditPosts.subreddit,
       subredditIconUrl: subreddits.iconUrl,
-      author: sql<string | null>`${NAMED_BY}`,
+      author: LEAD_AUTHOR,
       avatarUrl: redditAuthors.avatarUrl,
-      createdAt: sql<Date>`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`,
+      createdAt: NEED_AT,
     })
     .from(competitorMentions)
     .innerJoin(redditPosts, eq(redditPosts.id, competitorMentions.postId))
     .leftJoin(redditComments, eq(redditComments.id, competitorMentions.commentId))
     .leftJoin(subreddits, eq(subreddits.name, sql`lower(${redditPosts.subreddit})`))
-    .leftJoin(redditAuthors, eq(redditAuthors.username, sql`lower(${NAMED_BY})`))
+    .leftJoin(redditAuthors, LEAD_AUTHOR_JOIN)
     .where(
       and(
         eq(competitorMentions.projectId, projectId),
         gte(redditPosts.createdAt, daysAgo(days)),
       ),
     )
-    .orderBy(desc(sql`coalesce(${redditComments.createdAt}, ${redditPosts.createdAt})`));
+    .orderBy(desc(NEED_AT));
   return rows.map((row) => ({
     ...row,
     sentiment: (row.sentiment as Sentiment | null) ?? null,
