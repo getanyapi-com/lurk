@@ -178,13 +178,6 @@ export function stageFor(decision: XDecision, level: XLevel): XStage {
   return decision === "qualify" ? "lead" : decision === "review" ? "review" : "rejected";
 }
 
-export function priorityFor(decision: XDecision, intent: number): "p0" | "p1" | null {
-  if (decision !== "qualify") return null;
-  if (intent >= 3) return "p0";
-  if (intent === 2) return "p1";
-  return null;
-}
-
 function clampLevel(level: number): number {
   return Math.min(4, Math.max(0, Math.round(level)));
 }

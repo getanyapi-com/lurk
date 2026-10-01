@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { X_LANES_VERSION } from "@/lib/x/constants";
 import { assertLane } from "@/lib/x/grammar";
 import {
   DIY_WORDS,
@@ -30,7 +32,7 @@ import { isAmbiguous, normalizeEntity } from "@/lib/x/words";
  */
 describe("X rival lanes", () => {
   it("binds coined rivals to the words people leave or weigh them in, which covers every old quoted phrase", () => {
-    const [lane] = compileRivalLanes(["calendly", "acuity scheduling"], "en");
+    const [lane] = compileRivalLanes(["calendly", "acuity scheduling"]);
     expect(lane.body).toBe(
       `(calendly OR "acuity scheduling") (${RIVAL_WORDS.map((word) => (word.includes(" ") ? `"${word}"` : word)).join(" OR ")}) lang:en -filter:retweets`,
     );
@@ -47,7 +49,7 @@ describe("X rival lanes", () => {
     expect(isAmbiguous("tally")).toBe(true);
     expect(isAmbiguous("calendly")).toBe(false);
     expect(isAmbiguous("typeform")).toBe(false);
-    const lanes = compileRivalLanes(["loom", "jam"], "en");
+    const lanes = compileRivalLanes(["loom", "jam"]);
     expect(lanes.map((lane) => lane.body)).toEqual([
       '("alternative to loom" OR "loom alternative" OR "loom alternatives" OR "alternatives to loom") lang:en -filter:retweets',
       '("alternative to jam" OR "jam alternative" OR "jam alternatives" OR "alternatives to jam") lang:en -filter:retweets',
@@ -57,7 +59,7 @@ describe("X rival lanes", () => {
 
   it("packs coined rivals up to the rival and length caps, each lane one the guard accepts", () => {
     const rivals = ["calendly", "acuity scheduling", "savvycal", "youcanbook.me", "doodle", "chili piper", "zcal", "tidycal"];
-    const lanes = compileRivalLanes(rivals, "en");
+    const lanes = compileRivalLanes(rivals);
     expect(lanes.length).toBeGreaterThan(1);
     for (const lane of lanes) {
       expect(() => assertLane(`${lane.body} since_time:1790000000`)).not.toThrow();
@@ -67,7 +69,7 @@ describe("X rival lanes", () => {
   });
 
   it("isolates a rival the model calls an everyday word, and quotes a dotted name rather than sending a bare domain", () => {
-    const lanes = compileRivalLanes(["calendly", "doodle", "youcanbook.me"], "en", ["Doodle"]);
+    const lanes = compileRivalLanes(["calendly", "doodle", "youcanbook.me"], ["Doodle"]);
     expect(lanes.map((lane) => lane.seeds)).toEqual([["calendly", "youcanbook.me"], ["doodle"]]);
     expect(lanes[0].body.startsWith('(calendly OR "youcanbook.me") (alternative OR')).toBe(true);
     expect(lanes[1].body).toBe(
@@ -105,7 +107,7 @@ describe("X build-vs-buy and workflow lanes", () => {
   };
 
   it("binds coined rivals and the category's nouns to the words someone building their own writes", () => {
-    const lane = compileDiyLane(calcom, ["calendly", "doodle", "savvycal"], ["Cal.com", "cal"], "en");
+    const lane = compileDiyLane(calcom, ["calendly", "doodle", "savvycal"], ["Cal.com", "cal"]);
     expect(lane?.family).toBe("diy");
     // The everyday-word rival, a lone generic word, the product's own name and a term naming a rival are left out.
     expect(lane?.terms[0]).toEqual(["calendly", "scheduling tool", "savvycal", "booking page"]);
@@ -119,28 +121,28 @@ describe("X build-vs-buy and workflow lanes", () => {
   it("keeps room for the category's nouns beside many rivals, and never trims the fixed words to fit", () => {
     const rivals = ["apify", "bright data", "ensembledata", "firecrawl", "hikerapi", "oxylabs", "proxycurl", "rapidapi", "zenrows"];
     const long = ["scraping api platform", "social data api", "instagram scraper tool", "tiktok data provider", "serp api service", "profile enrichment api", "lead data provider", "web scraping service"];
-    const lane = compileDiyLane({ artifacts: long, topics: [] }, rivals, [], "en");
+    const lane = compileDiyLane({ artifacts: long, topics: [] }, rivals, []);
     expect(lane?.terms[1]).toEqual(DIY_WORDS);
     expect(lane?.terms[0].some((term) => long.includes(term))).toBe(true);
     expect(lane?.seeds.every((rival) => lane.terms[0].includes(rival))).toBe(true);
     // The label names only words the query holds.
     const labelled = lane!.label.match(/their own ([^,]+),/u)?.[1];
     expect(lane?.terms[0]).toContain(labelled);
-    const stack = compileStackLane({ artifacts: [], topics: long }, [], [], "en");
+    const stack = compileStackLane({ artifacts: [], topics: long }, [], []);
     expect(stack?.terms[0]).toEqual(HARNESS_WORDS);
     expect(stack!.body.length).toBeLessThanOrEqual(380);
   });
 
   it("keeps both the rivals and the nouns when the query must be trimmed to fit", () => {
     const artifacts = ["scheduling tool", "scheduling tools", "booking page", "booking pages", "booking link", "calendar booking tool"];
-    const lane = compileDiyLane({ artifacts, topics: [] }, ["calendly", "savvycal", "acuity scheduling"], [], "en");
+    const lane = compileDiyLane({ artifacts, topics: [] }, ["calendly", "savvycal", "acuity scheduling"], []);
     expect(lane?.terms[0]).toContain("calendly");
     expect(lane?.terms[0]).toContain("scheduling tool");
     expect(lane!.body.length).toBeLessThanOrEqual(380);
   });
 
   it("leaves the product's own tools and its rivals out of the workflow lane's harness", () => {
-    const lane = compileStackLane(calcom, ["zapier", "make"], ["n8n"], "en");
+    const lane = compileStackLane(calcom, ["zapier", "make"], ["n8n"]);
     expect(lane?.terms[0]).not.toContain("zapier");
     expect(lane?.terms[0]).not.toContain("make.com");
     expect(lane?.terms[0]).not.toContain("n8n");
@@ -149,30 +151,30 @@ describe("X build-vs-buy and workflow lanes", () => {
 
   it("keeps a dotted name coined whatever the model called it", () => {
     expect([...everydayNames(["Doodle", "context.dev", "Otterly.AI", "Chaser"])].sort()).toEqual(["chaser", "doodle"]);
-    const lanes = compileRivalLanes(["apify", "context.dev"], "en", ["context.dev"]);
+    const lanes = compileRivalLanes(["apify", "context.dev"], ["context.dev"]);
     expect(lanes.map((one) => one.seeds)).toEqual([["apify", "context.dev"]]);
   });
 
   it("labels a lane with no rivals, and a workflow lane, in words that read", () => {
-    expect(compileDiyLane({ artifacts: ["form builder", "form builders"], topics: [] }, [], [], "en")?.label).toBe(
+    expect(compileDiyLane({ artifacts: ["form builder", "form builders"], topics: [] }, [], [])?.label).toBe(
       "Building or replacing their own form builder, form builders",
     );
-    expect(compileStackLane({ artifacts: [], topics: ["scraping", "scrape", "scraper", "scrapers", "tiktok data"] }, [], [], "en")?.label).toBe(
+    expect(compileStackLane({ artifacts: [], topics: ["scraping", "scrape", "scraper", "scrapers", "tiktok data"] }, [], [])?.label).toBe(
       "Popular posts on how people do scraping, tiktok data",
     );
   });
 
   it("makes a build-vs-buy lane from rivals alone, or from nouns alone, and none from neither", () => {
-    expect(compileDiyLane(null, ["calendly"], [], "en")?.terms[0]).toEqual(["calendly"]);
-    expect(compileDiyLane({ artifacts: ["scheduling tool", "booking page"], topics: [] }, [], [], "en")?.terms[0]).toEqual([
+    expect(compileDiyLane(null, ["calendly"], [])?.terms[0]).toEqual(["calendly"]);
+    expect(compileDiyLane({ artifacts: ["scheduling tool", "booking page"], topics: [] }, [], [])?.terms[0]).toEqual([
       "scheduling tool",
       "booking page",
     ]);
-    expect(compileDiyLane({ artifacts: ["app"], topics: [] }, ["loom"], [], "en")).toBeNull();
+    expect(compileDiyLane({ artifacts: ["app"], topics: [] }, ["loom"], [])).toBeNull();
   });
 
   it("binds the job's words to the tools people build with, top-level posts with reach only", () => {
-    const lane = compileStackLane(calcom, ["calendly"], ["Cal.com"], "en");
+    const lane = compileStackLane(calcom, ["calendly"], ["Cal.com"]);
     expect(lane?.family).toBe("stack");
     expect(lane?.terms).toEqual([HARNESS_WORDS, ["round robin", "booking link", "scheduling"]]);
     expect(lane?.body.endsWith(` lang:en -filter:retweets -filter:replies min_faves:${STACK_MIN_FAVES}`)).toBe(true);
@@ -180,8 +182,8 @@ describe("X build-vs-buy and workflow lanes", () => {
   });
 
   it("makes no workflow lane without topics: the tools alone are every developer on X", () => {
-    expect(compileStackLane({ ...calcom, topics: ["app", "tool"] }, [], [], "en")).toBeNull();
-    expect(compileStackLane(null, ["calendly"], [], "en")).toBeNull();
+    expect(compileStackLane({ ...calcom, topics: ["app", "tool"] }, [], [])).toBeNull();
+    expect(compileStackLane(null, ["calendly"], [])).toBeNull();
   });
 
   it("reads venue families as the ones whose posts can be worth a reply without an ask", () => {
@@ -192,7 +194,7 @@ describe("X build-vs-buy and workflow lanes", () => {
 
   it("trims the largest group until the lane fits, so a long slot still makes a lane", () => {
     const topics = Array.from({ length: 8 }, (_, index) => `topic${index} long phrase`);
-    const lane = compileStackLane({ artifacts: [], topics }, [], [], "en");
+    const lane = compileStackLane({ artifacts: [], topics }, [], []);
     expect(lane?.body.length).toBeLessThanOrEqual(380);
     expect(() => assertLane(lane!.body)).not.toThrow();
   });
@@ -214,24 +216,29 @@ describe("X lane order and inputs", () => {
   it("puts the first rival lane, build-vs-buy and workflow first, so a three-lane plan gets one of each", () => {
     const slots: SeedSlots = { artifacts: ["scraping api"], topics: ["scraping", "scraper"] };
     const rivals = ["apify", "bright data", "firecrawl", "oxylabs", "proxycurl", "rapidapi", "scraperapi", "loom"];
-    const lanes = compileLanes({ rivals, slots, ownNames: ["AnyAPI"], lang: "en" });
+    const lanes = compileLanes({ rivals, slots, ownNames: ["AnyAPI"] });
     expect(lanes.slice(0, 3).map((lane) => lane.family)).toEqual(["rival", "diy", "stack"]);
     expect(lanes.slice(3).every((lane) => lane.family === "rival")).toBe(true);
     expect(orderLanes([], null, null)).toEqual([]);
-    expect(compileLanes({ rivals: [], slots: null, ownNames: [], lang: "en" })).toEqual([]);
+    expect(compileLanes({ rivals: [], slots: null, ownNames: [] })).toEqual([]);
   });
 
   it("writes a single-alternative group bare, a phrase quoted, and the filters in the tail's order", () => {
-    expect(bodyOf([["firecrawl"], ["expensive", "ran out"]], "en")).toBe('firecrawl (expensive OR "ran out") lang:en -filter:retweets');
-    expect(bodyOf([["n8n"]], "en", { topLevelOnly: true, minFaves: 20 })).toBe("n8n lang:en -filter:retweets -filter:replies min_faves:20");
+    expect(bodyOf([["firecrawl"], ["expensive", "ran out"]])).toBe('firecrawl (expensive OR "ran out") lang:en -filter:retweets');
+    expect(bodyOf([["n8n"]], { topLevelOnly: true, minFaves: 20 })).toBe("n8n lang:en -filter:retweets -filter:replies min_faves:20");
   });
 
-  it("changes the input hash when the rivals, the seed words, the own names or the language change", () => {
-    const base = lanesInputHash(["calendly"], "en");
-    expect(lanesInputHash(["calendly"], "en")).toBe(base);
-    expect(lanesInputHash(["calendly", "doodle"], "en")).not.toBe(base);
-    expect(lanesInputHash(["calendly"], "es")).not.toBe(base);
-    expect(lanesInputHash(["calendly"], "en", { artifacts: ["booking page"], topics: [] })).not.toBe(base);
-    expect(lanesInputHash(["calendly"], "en", null, ["Cal.com"])).not.toBe(base);
+  it("changes the input hash when the rivals, the seed words or the own names change", () => {
+    const base = lanesInputHash(["calendly"]);
+    expect(lanesInputHash(["calendly"])).toBe(base);
+    expect(lanesInputHash(["calendly", "doodle"])).not.toBe(base);
+    expect(lanesInputHash(["calendly"], { artifacts: ["booking page"], topics: [] })).not.toBe(base);
+    expect(lanesInputHash(["calendly"], null, ["Cal.com"])).not.toBe(base);
+  });
+
+  it("hashes the same JSON every stored hash was made from, so no lane recompiles", () => {
+    const slots: SeedSlots = { artifacts: ["booking page"], topics: ["scheduling"] };
+    const stored = JSON.stringify({ v: X_LANES_VERSION, lang: "en", seeds: ["calendly"], slots, ownNames: ["Cal.com"] });
+    expect(lanesInputHash(["calendly"], slots, ["Cal.com"])).toBe(createHash("sha256").update(stored).digest("hex"));
   });
 });

@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { handledThreads, xEvaluations, xLeads } from "@/db/schema";
@@ -10,10 +9,6 @@ import type { StoredXPost } from "./store";
 /** Writes X verdicts and the leads they make. Nothing here touches a Reddit table. */
 
 export type XEvaluation = typeof xEvaluations.$inferSelect;
-
-export function contentHash(text: string): string {
-  return createHash("sha256").update(text).digest("hex").slice(0, 32);
-}
 
 /**
  * A first sighting: one row per project and post, so nothing is screened or
@@ -27,8 +22,6 @@ export async function insertSighting(row: {
   matchedPhrase: string | null;
   stage: string;
   freeReject: string | null;
-  text: string;
-  profileVersion: number;
   /** What it was found with, for a post found through a reply in its thread (run.ts judgeThread). */
   context?: unknown;
 }): Promise<XEvaluation | null> {
@@ -41,8 +34,6 @@ export async function insertSighting(row: {
       matchedPhrase: row.matchedPhrase,
       stage: row.stage,
       freeReject: row.freeReject,
-      contentHash: contentHash(row.text),
-      profileVersion: row.profileVersion,
       ...(row.context ? { context: row.context } : {}),
     })
     .onConflictDoNothing()
@@ -138,10 +129,8 @@ export async function recordAssessment(evaluation: XEvaluation, assessment: XAss
     intent: assessment.intent,
     engagement: assessment.engagement,
     score: assessment.score,
-    priority: assessment.priority,
     needQuote: assessment.needQuote,
     scorerVersion: X_SCORER_VERSION,
-    judgedAt: new Date(),
   });
 }
 
@@ -155,7 +144,6 @@ export type XLeadWrite = {
   reason: string;
   /** The author's own sentence the verdict rests on, verbatim. */
   quote: string | null;
-  priority: "p0" | "p1" | null;
   /** For a reply: what kind of place it is (reply.ts REPLY_MOMENTS). Null for an ask. */
   moment?: string | null;
 };
@@ -174,7 +162,6 @@ export function askFrom(assessment: XAssessment, scoring: ScoringSettings | null
     engagement: assessment.engagement,
     reason: assessment.reason,
     quote: assessment.needQuote,
-    priority: assessment.priority,
   };
 }
 
@@ -264,7 +251,6 @@ export async function writeLead(projectId: string, post: StoredXPost, lead: XLea
       engagement: lead.engagement,
       reason: lead.reason,
       matchedPhrase: lead.quote,
-      priority: lead.priority,
       moment: lead.moment ?? null,
       authorUsername: post.authorUsername,
       conversationId: conversation,
@@ -283,7 +269,6 @@ export async function writeLead(projectId: string, post: StoredXPost, lead: XLea
           engagement: values.engagement,
           reason: values.reason,
           matchedPhrase: values.matchedPhrase,
-          priority: values.priority,
           moment: values.moment,
           scoredAt: sql`now()`,
         },

@@ -24,7 +24,6 @@ export type ReplyContext = {
   chainIncomplete: boolean;
   /** Paid lookups this walk made (reused runs are free and not counted). */
   bought: number;
-  costUsd: number;
 };
 
 /** A walk that failed partway, carrying how many lookups it had already bought and the error itself. */
@@ -42,7 +41,7 @@ function sameAuthor(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
-type Hop = { parent: StoredXPost | null; bought: boolean; costUsd: number };
+type Hop = { parent: StoredXPost | null; bought: boolean };
 
 async function walk(
   post: Pick<StoredXPost, "authorUsername" | "inReplyToId">,
@@ -52,7 +51,6 @@ async function walk(
   const others: StoredXPost[] = [];
   const selfThread: string[] = [];
   let bought = 0;
-  let costUsd = 0;
   let chainIncomplete = false;
   let next = post.inReplyToId;
   for (let hop = 0; hop < hops && next; hop += 1) {
@@ -67,7 +65,6 @@ async function walk(
     }
     if (result.bought) {
       bought += 1;
-      costUsd += result.costUsd;
     }
     const parent = result.parent;
     if (!parent || parent.unavailableAt) {
@@ -90,7 +87,6 @@ async function walk(
     selfThread,
     chainIncomplete,
     bought,
-    costUsd,
   };
 }
 
@@ -102,7 +98,7 @@ export async function walkParents(
 ): Promise<ReplyContext> {
   const result = await walk(post, hops, async (id) => {
     const fetched = await fetchTweet(ctx, id);
-    return { parent: fetched.value, bought: !fetched.reused, costUsd: fetched.costUsd };
+    return { parent: fetched.value, bought: !fetched.reused };
   });
   // The paid step never answers "missing".
   return result as ReplyContext;
@@ -119,7 +115,7 @@ export async function storedParents(
 ): Promise<ReplyContext | null> {
   return walk(post, hops, async (id) => {
     const stored = (await xPostsById([id])).get(id);
-    return stored ? { parent: stored, bought: false, costUsd: 0 } : "missing";
+    return stored ? { parent: stored, bought: false } : "missing";
   });
 }
 
@@ -129,10 +125,7 @@ export function joinedText(post: { text: string; isReply: boolean }, selfThread:
 }
 
 /** The author's bio, bought once per handle a week. */
-export async function buyBio(
-  ctx: FetchContext,
-  username: string,
-): Promise<{ bio: string | null; bought: boolean; costUsd: number }> {
+export async function buyBio(ctx: FetchContext, username: string): Promise<{ bio: string | null; bought: boolean }> {
   const result = await fetchProfile(ctx, username);
-  return { bio: result.value?.bio ?? null, bought: !result.reused, costUsd: result.costUsd };
+  return { bio: result.value?.bio ?? null, bought: !result.reused };
 }

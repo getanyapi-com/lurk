@@ -1,5 +1,5 @@
 import { plainTypography } from "@/lib/scan/evidence";
-import { MAX_TEXT_CHARS } from "./constants";
+import { MAX_TEXT_CHARS, X_LANG } from "./constants";
 import type { XPost } from "./map";
 import { ownWords } from "./map";
 import { slug } from "./words";
@@ -38,8 +38,6 @@ export type ScreenInput = {
   post: XPost;
   /** The window's start; anything older is stale. */
   since: Date;
-  /** The project's language, as X's lang codes. */
-  lang: string;
   /** The project's own name and domain label: its own posts are not leads. */
   ownNames: string[];
   /** Every rival the project tracks, normalized: a rival's own account is not a lead. */
@@ -316,7 +314,7 @@ export function freeScreen(input: ScreenInput): ScreenResult {
   if (post.createdAt < input.since) {
     return { pass: false, reason: "stale" };
   }
-  if (post.lang && !NO_LANGUAGE.has(post.lang) && post.lang !== input.lang) {
+  if (post.lang && !NO_LANGUAGE.has(post.lang) && post.lang !== X_LANG) {
     return { pass: false, reason: "other_language" };
   }
   if (post.text.length > MAX_TEXT_CHARS) {

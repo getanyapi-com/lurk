@@ -12,7 +12,6 @@ import { config } from "@/lib/config";
 import { relativeAge } from "@/lib/format";
 import { activeProject } from "@/lib/projects";
 import { tierForUser } from "@/lib/tier";
-import { TIERS } from "@/lib/tiers";
 import { xEnabledFor } from "@/lib/x/enabled";
 import { listXLanes, projectedWalletCostPerDay, xSettingsOf } from "@/lib/x/read";
 
@@ -52,7 +51,7 @@ export default async function XSettingsPage({ searchParams }: XSettingsPageProps
   // The wallet's figure from this project's own search rates, once it has searches to measure.
   const walletCost =
     active.length > 0
-      ? `about ${usd(projectedWalletCostPerDay(active, new Date(), TIERS.connected.x.lanes ?? Infinity))} a day for ${project.name}`
+      ? `about ${usd(projectedWalletCostPerDay(active))} a day for ${project.name}`
       : undefined;
   const query = `?project=${encodeURIComponent(project.id)}`;
   const payer = selfHosted

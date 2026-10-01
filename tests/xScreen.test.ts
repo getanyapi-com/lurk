@@ -39,7 +39,6 @@ function post(text: string, extra: Partial<XPost> = {}): XPost {
 
 const base = {
   since: new Date(NOW.getTime() - 7 * 24 * 3_600_000),
-  lang: "en",
   ownNames: ["Cal.com", "cal"],
   rivals: ["calendly", "typeform", "loom", "jotform"],
 };

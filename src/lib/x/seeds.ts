@@ -7,7 +7,7 @@ import { generateStructured } from "@/lib/llm";
 import type { ProductFacts } from "@/lib/product";
 import { productState } from "@/lib/product";
 import { assertXLlmUnderCap } from "./budget";
-import { X_SEEDS_VERSION } from "./constants";
+import { X_LANG, X_SEEDS_VERSION } from "./constants";
 import type { SeedSlots } from "./lanes";
 
 /**
@@ -83,8 +83,9 @@ function phrasingInputs(phrasings: string[]) {
 /**
  * The request. Competitors are sorted, so discovery reordering them by
  * evidence never asks the model again and never retires every lane built from it.
+ * The cache is keyed on this text, so `language` stays in it though it never varies.
  */
-export function seedsPrompt(product: ProductFacts, phrasings: string[], competitors: string[], lang: string): string {
+export function seedsPrompt(product: ProductFacts, phrasings: string[], competitors: string[]): string {
   const { prose, platforms } = phrasingInputs(phrasings);
   const brief = product.brief;
   return JSON.stringify({
@@ -98,7 +99,7 @@ export function seedsPrompt(product: ProductFacts, phrasings: string[], competit
           neighbours_it_is_not: brief.neighbours.map((neighbour) => neighbour.kind).slice(0, 8),
         }
       : {}),
-    language: lang,
+    language: X_LANG,
   });
 }
 
@@ -115,11 +116,10 @@ export async function seedSlotsFor(input: {
   product: ProductFacts;
   phrasings: string[];
   competitors: string[];
-  lang: string;
   now?: Date;
 }): Promise<SeedSlots | null> {
   const now = input.now ?? new Date();
-  const prompt = seedsPrompt(input.product, input.phrasings, input.competitors, input.lang);
+  const prompt = seedsPrompt(input.product, input.phrasings, input.competitors);
   const key = seedsKey(prompt);
   const previous = cached(input.stored);
   if (previous?.key === key) {

@@ -590,8 +590,6 @@ export async function newXLeadCount(projectId: string): Promise<number> {
 
 export type XLaneView = {
   id: string;
-  /** Whether this plan searches it: an active lane inside the tier's lane count, by rank. */
-  inPlan: boolean;
   body: string;
   family: string;
   label: string | null;
@@ -612,20 +610,14 @@ export type XLaneView = {
   createdAt: Date;
 };
 
-/**
- * What lurk searches on X for this project, with what each search found, in
- * rank order. `laneCap` is the tier's lane count (null for none): an active
- * lane past it is one this plan does not search.
- */
-export async function listXLanes(projectId: string, laneCap: number | null = null): Promise<XLaneView[]> {
+/** What lurk searches on X for this project, with what each search found, in rank order. */
+export async function listXLanes(projectId: string): Promise<XLaneView[]> {
   const rows = await db()
     .select()
     .from(xLanes)
     .where(and(eq(xLanes.projectId, projectId), inArray(xLanes.state, ["active", "paused", "refused"])))
     .orderBy(xLanes.rank, xLanes.createdAt);
-  let activeSeen = 0;
   return rows.map((lane) => ({
-    inPlan: lane.state === "active" && (laneCap === null || ++activeSeen <= laneCap),
     id: lane.id,
     body: lane.body,
     family: lane.family,
@@ -754,11 +746,10 @@ const PROFILE_SHARE = 0.2;
 export function projectedWalletCostPerDay(
   lanes: Array<Pick<XLaneView, "newPosts" | "createdAt" | "state" | "fullPages">>,
   now = new Date(),
-  walletLanes = 10,
 ): number {
   let dollars = 0;
-  // The lanes a wallet would search: the first walletLanes active ones, in rank order.
-  for (const lane of lanes.filter((one) => one.state === "active").slice(0, walletLanes)) {
+  // A wallet searches every active lane.
+  for (const lane of lanes.filter((one) => one.state === "active")) {
     // A lane whose pages stopped short of its window read less than the month:
     // count it as a day, which quotes high rather than low.
     const lookBack = lane.fullPages > 0 ? 24 : FIRST_LOOK_HOURS;

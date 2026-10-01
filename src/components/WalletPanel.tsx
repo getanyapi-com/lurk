@@ -42,7 +42,7 @@ function rowsFor(name: TierName, scope: PlanScope, xWalletCost?: string): string
     const scanNow = t.actions.presses.x_scan_now;
     return [
       free ? "Checks X once a day" : `Checks X every hour, quiet searches every ${x.maxBackoffHours} hours`,
-      x.lanes === null ? "Every search lurk writes for a project" : `Up to ${x.lanes} searches per project`,
+      "Every search lurk writes for a project",
       free ? "Reads the newest page of each search" : "Reads two pages of each search",
       scanNow === 0 ? "No Scan now" : `Scan now ${scanNow} times a day`,
       "A first look at the last 30 days",

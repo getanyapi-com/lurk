@@ -21,7 +21,6 @@ import { atBounds, atKey, grainOf, type FeedParams } from "@/lib/feed";
 import { compactCount, relativeAge, relativeUntil } from "@/lib/format";
 import { tierForUser } from "@/lib/tier";
 import { QUIET_RECHECK_DAYS } from "@/lib/x/constants";
-import { TIERS, xLimitsFor } from "@/lib/tiers";
 import { allowanceFor } from "@/lib/throttle";
 import {
   X_STATUSES,
@@ -269,7 +268,7 @@ export async function XTab({ userId, project, params }: { userId: string; projec
     listXLeads(project.id, filter),
     filter.status === "new" ? listXHeld(project.id, filter) : Promise.resolve([]),
     filter.status === "new" ? listXFiltered(project.id, filter) : Promise.resolve(NOTHING_FILTERED),
-    listXLanes(project.id, xLimitsFor(tier.limits).lanes),
+    listXLanes(project.id),
     listXFaces(project.id, filter),
     allowanceFor(userId, "x_scan_now"),
   ]);
@@ -328,7 +327,7 @@ export async function XTab({ userId, project, params }: { userId: string; projec
           {tier.name === "free" && tier.limits && !firstCheck && activeLanes.length > 0 && !status.quiet.quiet ? (
             <p className="text-small text-fg-muted">
               Free checks X once a day; a connected wallet checks every search hourly,
-              about ${projectedWalletCostPerDay(activeLanes, new Date(), TIERS.connected.x.lanes ?? Infinity).toFixed(2)} a day from your own balance at this project&apos;s
+              about ${projectedWalletCostPerDay(activeLanes).toFixed(2)} a day from your own balance at this project&apos;s
               volume.{" "}
               <Link href="/app/settings" className="underline">
                 Connect a wallet

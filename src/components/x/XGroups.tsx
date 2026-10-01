@@ -166,11 +166,7 @@ export function XSearches({ lanes }: { lanes: XLaneView[] }) {
             <span className="text-small text-fg" style={{ fontWeight: 500 }}>
               {lane.label ?? lane.seeds.join(", ")}
             </span>
-            {STATE_WORD[lane.state] ? (
-              <span className="text-mono text-fg-muted">{STATE_WORD[lane.state]}</span>
-            ) : !lane.inPlan ? (
-              <span className="text-mono text-fg-muted">not searched on your plan</span>
-            ) : null}
+            {STATE_WORD[lane.state] ? <span className="text-mono text-fg-muted">{STATE_WORD[lane.state]}</span> : null}
           </span>
           <span className="text-mono tabular-nums text-fg-muted">
             {lane.posts} seen · {lane.screenedOut} screened out · {lane.judged} judged · {lane.leads} asking · {lane.replies}{" "}

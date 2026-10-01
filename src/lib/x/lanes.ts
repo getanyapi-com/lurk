@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { plainTypography } from "@/lib/scan/evidence";
 import { assertLane, isRefusedLoneWord } from "./grammar";
-import { MAX_LANE_BODY_CHARS, MAX_RIVALS_PER_LANE, X_LANES_VERSION } from "./constants";
+import { MAX_LANE_BODY_CHARS, MAX_RIVALS_PER_LANE, X_LANES_VERSION, X_LANG } from "./constants";
 import { isAmbiguous, normalizeEntity, slug } from "./words";
 
 /**
@@ -160,12 +160,12 @@ function alternative(term: string): string {
 /** What a lane asks of X beyond its words: top-level posts only, and a like floor. */
 export type LaneFilters = { topLevelOnly?: boolean; minFaves?: number };
 
-export function bodyOf(terms: string[][], lang: string, filters: LaneFilters = {}): string {
+export function bodyOf(terms: string[][], filters: LaneFilters = {}): string {
   const groups = terms.map((group) =>
     group.length === 1 ? alternative(group[0]) : `(${group.map(alternative).join(" OR ")})`,
   );
   const tail = [
-    `lang:${lang}`,
+    `lang:${X_LANG}`,
     "-filter:retweets",
     ...(filters.topLevelOnly ? ["-filter:replies"] : []),
     ...(filters.minFaves ? [`min_faves:${filters.minFaves}`] : []),
@@ -235,9 +235,9 @@ function slotTerms(
  * cut: trimming them first would keep a model's redundant plurals and lose
  * "replaced" or "my workflow".
  */
-function fitTerms(terms: string[][], lang: string, filters: LaneFilters = {}, trim = 0): string[][] | null {
+function fitTerms(terms: string[][], filters: LaneFilters = {}, trim = 0): string[][] | null {
   const groups = terms.map((group) => [...group]);
-  while (bodyOf(groups, lang, filters).length > MAX_LANE_BODY_CHARS) {
+  while (bodyOf(groups, filters).length > MAX_LANE_BODY_CHARS) {
     const group = groups[trim];
     if (!group || group.length <= 1) return null;
     group.pop();
@@ -259,14 +259,13 @@ function laneOf(
   family: LaneFamily,
   terms: string[][],
   label: (fitted: string[][]) => { label: string; seeds: string[] },
-  lang: string,
   filters: LaneFilters = {},
   trim = 0,
 ): CompiledLane | null {
   if (terms.length === 0 || terms.some((group) => group.length === 0)) return null;
-  const fitted = fitTerms(terms, lang, filters, trim);
+  const fitted = fitTerms(terms, filters, trim);
   if (!fitted) return null;
-  const body = bodyOf(fitted, lang, filters);
+  const body = bodyOf(fitted, filters);
   try {
     assertLane(body);
   } catch {
@@ -296,12 +295,12 @@ export function rivalSeeds(competitors: string[], ownNames: string[]): string[] 
   return seeds;
 }
 
-function coinedRivalLane(rivals: string[], lang: string): CompiledLane | null {
-  return laneOf("rival", [rivals, RIVAL_WORDS], ([kept]) => ({ label: `Leaving or weighing ${listed(kept)}`, seeds: kept }), lang);
+function coinedRivalLane(rivals: string[]): CompiledLane | null {
+  return laneOf("rival", [rivals, RIVAL_WORDS], ([kept]) => ({ label: `Leaving or weighing ${listed(kept)}`, seeds: kept }));
 }
 
-function commonRivalLane(rival: string, lang: string): CompiledLane | null {
-  return laneOf("rival", [rivalPhrases(rival)], () => ({ label: `Asking for an alternative to ${rival}`, seeds: [rival] }), lang);
+function commonRivalLane(rival: string): CompiledLane | null {
+  return laneOf("rival", [rivalPhrases(rival)], () => ({ label: `Asking for an alternative to ${rival}`, seeds: [rival] }));
 }
 
 /**
@@ -327,13 +326,13 @@ export function everydayNames(ordinary: Iterable<string>): Set<string> {
  * of Cal.com's rival posts and "contact form" 17 of 20 of Tally's. A name that
  * cannot make a lane on its own is skipped, so it never sinks the others.
  */
-export function compileRivalLanes(seeds: string[], lang: string, ordinary: Iterable<string> = []): CompiledLane[] {
+export function compileRivalLanes(seeds: string[], ordinary: Iterable<string> = []): CompiledLane[] {
   const everyday = everydayNames(ordinary);
   const lanes: CompiledLane[] = [];
   let current: string[] = [];
   const flush = () => {
     if (current.length === 0) return;
-    const lane = coinedRivalLane(current, lang);
+    const lane = coinedRivalLane(current);
     if (lane) lanes.push(lane);
     current = [];
   };
@@ -343,15 +342,15 @@ export function compileRivalLanes(seeds: string[], lang: string, ordinary: Itera
       common.push(entity);
       continue;
     }
-    if (!coinedRivalLane([entity], lang)) continue;
+    if (!coinedRivalLane([entity])) continue;
     const next = [...current, entity];
-    const fits = next.length <= MAX_RIVALS_PER_LANE && bodyOf([next, RIVAL_WORDS], lang).length <= MAX_LANE_BODY_CHARS;
+    const fits = next.length <= MAX_RIVALS_PER_LANE && bodyOf([next, RIVAL_WORDS]).length <= MAX_LANE_BODY_CHARS;
     if (!fits) flush();
     current.push(entity);
   }
   flush();
   for (const entity of common) {
-    const lane = commonRivalLane(entity, lang);
+    const lane = commonRivalLane(entity);
     if (lane) lanes.push(lane);
   }
   return lanes;
@@ -398,12 +397,7 @@ function distinctForms(terms: string[]): string[] {
  * to the words someone building or replacing their own writes. Rivals that are
  * everyday words stay out: "replaced notion" is a sentence about anything.
  */
-export function compileDiyLane(
-  slots: SeedSlots | null,
-  rivals: string[],
-  ownNames: string[],
-  lang: string,
-): CompiledLane | null {
+export function compileDiyLane(slots: SeedSlots | null, rivals: string[], ownNames: string[]): CompiledLane | null {
   const everyday = everydayNames(slots?.ordinaryWordRivals ?? []);
   const coined = rivals.filter((rival) => !isAmbiguous(rival) && !everyday.has(slug(rival))).slice(0, MAX_DIY_RIVALS);
   const artifacts = slots ? seedTerms(slots, ownNames, rivals).artifacts : [];
@@ -430,7 +424,6 @@ export function compileDiyLane(
             : `Building their own ${nouns[0]}, or replacing ${listed(named)}`;
       return { label, seeds: named };
     },
-    lang,
   );
 }
 
@@ -440,7 +433,7 @@ export function compileDiyLane(
  * an audience a reply reaches. Without topics there is no lane: the harness
  * alone is every developer on X.
  */
-export function compileStackLane(slots: SeedSlots | null, rivals: string[], ownNames: string[], lang: string): CompiledLane | null {
+export function compileStackLane(slots: SeedSlots | null, rivals: string[], ownNames: string[]): CompiledLane | null {
   if (!slots) return null;
   const { topics } = seedTerms(slots, ownNames, rivals);
   const harness = harnessFor(ownNames, rivals);
@@ -449,16 +442,16 @@ export function compileStackLane(slots: SeedSlots | null, rivals: string[], ownN
     "stack",
     [harness, topics],
     ([, kept]) => ({ label: `Popular posts on how people do ${listed(distinctForms(kept), 2)}`, seeds: [] }),
-    lang,
     { topLevelOnly: true, minFaves: STACK_MIN_FAVES },
     1,
   );
 }
 
 /**
- * A project's lanes in the order the tier's lane count takes them: the first
- * rival lane (the buyers), then build-vs-buy, then the workflow lane, then the
- * other rival lanes. A three-lane plan so gets one of each family.
+ * A project's lanes in rank order, which a run capped to its first few (a
+ * trial-size dev run) takes them in: the first rival lane (the buyers), then
+ * build-vs-buy, then the workflow lane, then the other rival lanes. Three
+ * lanes so hold one of each family.
  */
 export function orderLanes(rival: CompiledLane[], diy: CompiledLane | null, stack: CompiledLane | null): CompiledLane[] {
   const [first, ...rest] = rival;
@@ -466,21 +459,20 @@ export function orderLanes(rival: CompiledLane[], diy: CompiledLane | null, stac
 }
 
 /** Every lane for a project, compiled and ordered. */
-export function compileLanes(input: {
-  rivals: string[];
-  slots: SeedSlots | null;
-  ownNames: string[];
-  lang: string;
-}): CompiledLane[] {
-  const { rivals, slots, ownNames, lang } = input;
+export function compileLanes(input: { rivals: string[]; slots: SeedSlots | null; ownNames: string[] }): CompiledLane[] {
+  const { rivals, slots, ownNames } = input;
   return orderLanes(
-    compileRivalLanes(rivals, lang, slots?.ordinaryWordRivals ?? []),
-    compileDiyLane(slots, rivals, ownNames, lang),
-    compileStackLane(slots, rivals, ownNames, lang),
+    compileRivalLanes(rivals, slots?.ordinaryWordRivals ?? []),
+    compileDiyLane(slots, rivals, ownNames),
+    compileStackLane(slots, rivals, ownNames),
   );
 }
 
-/** What the lanes were compiled from. A different hash recompiles them. */
-export function lanesInputHash(seeds: string[], lang: string, slots: SeedSlots | null = null, ownNames: string[] = []): string {
-  return createHash("sha256").update(JSON.stringify({ v: X_LANES_VERSION, lang, seeds, slots, ownNames })).digest("hex");
+/**
+ * What the lanes were compiled from. A different hash recompiles them, and a
+ * recompile gives every paused lane another chance, so the JSON keeps its keys
+ * and their order: `lang` stays in it though it never varies.
+ */
+export function lanesInputHash(seeds: string[], slots: SeedSlots | null = null, ownNames: string[] = []): string {
+  return createHash("sha256").update(JSON.stringify({ v: X_LANES_VERSION, lang: X_LANG, seeds, slots, ownNames })).digest("hex");
 }

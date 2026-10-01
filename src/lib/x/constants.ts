@@ -20,6 +20,13 @@ export const X_REPLY_VERSION = "x-reply-2026-09-28.1";
 export const REPLY_STALE_HOURS = 48;
 /** Bumped whenever the seed-word prompt changes, so every project asks the model again. */
 export const X_SEEDS_VERSION = "x-seeds-2026-09-28.1";
+/**
+ * The language every project's X lanes search and its screen keeps, as X's
+ * lang codes. It is part of what the lanes and the seed words were made from
+ * (lanes.ts lanesInputHash, seeds.ts seedsPrompt), so changing it recompiles
+ * every lane and asks the model for every project's words again.
+ */
+export const X_LANG = "en";
 
 /**
  * How long a post stays worth replying to. The founder's own replies on posts
@@ -60,8 +67,6 @@ export const FIRST_LOOK_PAGES = 10;
  * At most about $0.09 a project, once.
  */
 export const FIRST_LOOK_EXTRA = { pages: 30, parents: 40, judged: 200, profiles: 20, replyChecks: 20 } as const;
-/** Searches the first look runs, however few the plan runs after: every rival lane gets its one month. */
-export const FIRST_LOOK_LANES = 10;
 /** The widest window a recurring scan asks for; an empty page grows its window up to this. */
 export const MAX_WINDOW_HOURS = 72;
 /** How far each window reaches back over the last one, for posts the index was slow to show. */

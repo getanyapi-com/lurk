@@ -16,7 +16,6 @@ import {
   replyScore,
   venueScore,
   foldScore,
-  priorityFor,
   reasonFrom,
   stageFor,
   type XDecision,
@@ -74,7 +73,6 @@ export type XAssessment = {
   intent: number;
   engagement: number;
   score: number;
-  priority: "p0" | "p1" | null;
   needQuote: string | null;
   /** Every raw answer, kept so the gates can be replayed and an X model fitted later. */
   signals: Answers;
@@ -177,7 +175,6 @@ export function assess(
         : route === "need"
           ? replyScore(signals, engagement)
           : foldScore(fit, signals.intent, engagement),
-    priority: priorityFor(decision, signals.intent),
     needQuote,
     signals: answers,
   };
