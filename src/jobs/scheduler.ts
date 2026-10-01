@@ -253,7 +253,8 @@ export function startScheduler(): Cron {
     const watchedWorkers = config().SCHEDULER_WATCHED_WORKERS;
     void enqueueOnce("retention");
     void enqueueOnce("digest");
-    // After the outgoing revision is gone, which has no handler for it yet.
+    // Only where an invite can go out (alertInvitesOn), and a few minutes after
+    // boot like the other passes boot queues.
     if (alertInvitesOn()) {
       void enqueueOnce("alert_invites", new Date(Date.now() + BRIEF_START_MS));
     }

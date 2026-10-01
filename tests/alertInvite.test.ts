@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sent = vi.fn();
 vi.mock("@/lib/alerts/email", () => ({ sendEmail: (mail: unknown) => sent(mail) }));
@@ -183,5 +183,65 @@ describe.skipIf(!process.env.DATABASE_URL)("alert invites", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ channel: "email", target: email, cadence: "daily" });
     }
+  });
+});
+
+/**
+ * Each pass books the next, so the switch has to stop that too: a pass that
+ * finds the invites off must book no successor, or every instance without them
+ * wakes hourly to do nothing.
+ */
+describe.skipIf(!process.env.DATABASE_URL)("the hourly invite pass", () => {
+  async function queued() {
+    const { db } = await import("@/db");
+    const { jobs } = await import("@/db/schema");
+    const { and, eq, isNull } = await import("drizzle-orm");
+    const waiting = and(eq(jobs.kind, "alert_invites"), isNull(jobs.projectId), isNull(jobs.startedAt));
+    return {
+      rows: () => db().select().from(jobs).where(waiting),
+      clear: () => db().delete(jobs).where(waiting),
+    };
+  }
+
+  beforeEach(async () => {
+    sent.mockReset();
+    vi.stubEnv("ALERTS_FROM_EMAIL", "alerts@lurk.so");
+    vi.stubEnv("SMTP_URL", "smtp://localhost:25");
+    vi.stubEnv("AZURE_EMAIL_CONNECTION_STRING", "");
+    await (await queued()).clear();
+  });
+
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await (await queued()).clear();
+  });
+
+  it.each([
+    ["ALERT_INVITES is off", { ALERT_INVITES: "false" }],
+    ["there is no email service", { ALERT_INVITES: "true", SMTP_URL: "" }],
+  ])("books no next pass when %s", async (_, env) => {
+    for (const [key, value] of Object.entries(env)) {
+      vi.stubEnv(key, value);
+    }
+    const { JOB_HANDLERS } = await import("@/jobs/registry");
+
+    await JOB_HANDLERS.alert_invites({} as never);
+
+    expect(await (await queued()).rows()).toEqual([]);
+    expect(sent).not.toHaveBeenCalled();
+  });
+
+  it("books exactly one next pass an hour out when invites can go out", async () => {
+    vi.stubEnv("ALERT_INVITES", "true");
+    const { JOB_HANDLERS } = await import("@/jobs/registry");
+    const before = Date.now();
+
+    await JOB_HANDLERS.alert_invites({} as never);
+
+    const rows = await (await queued()).rows();
+    expect(rows).toHaveLength(1);
+    const hour = 60 * 60 * 1000;
+    expect(rows[0].runAt.getTime()).toBeGreaterThanOrEqual(before + hour);
+    expect(rows[0].runAt.getTime()).toBeLessThanOrEqual(Date.now() + hour);
   });
 });

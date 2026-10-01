@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Job } from "@/jobs/registry";
 
-const { claim, run } = vi.hoisted(() => ({ claim: vi.fn(), run: vi.fn() }));
+const { claim, run, enqueue, invitesOn } = vi.hoisted(() => ({
+  claim: vi.fn(), run: vi.fn(), enqueue: vi.fn(), invitesOn: vi.fn(),
+}));
 vi.mock("@/jobs/runner", () => ({
   WATCHED_KINDS: ["discovery_initial", "backfill"], claimNextJob: claim, runClaimedJob: run,
 }));
-vi.mock("@/jobs/enqueue", () => ({ enqueueOnce: vi.fn(), lastRunJob: vi.fn() }));
+vi.mock("@/jobs/enqueue", () => ({ enqueueOnce: enqueue, lastRunJob: vi.fn() }));
+vi.mock("@/lib/alerts/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/alerts/config")>()), alertInvitesOn: invitesOn,
+}));
 vi.mock("@/lib/config", () => ({ config: () => ({
   SCHEDULER_WORKERS: 1, SCHEDULER_WATCHED_WORKERS: 1, SCHEDULER_SEED: false,
 }) }));
@@ -73,5 +78,29 @@ describe("scheduler wake-ups during an in-flight claim", () => {
       release();
       cron.stop();
     }
+  });
+});
+
+/** An instance that cannot send the invites books no pass, not even the first. */
+describe("what boot queues", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    enqueue.mockReset().mockResolvedValue(undefined);
+    claim.mockReset().mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, Symbol.for("lurk.scheduler.kick"));
+  });
+
+  it.each([
+    [true, ["retention", "digest", "alert_invites"]],
+    [false, ["retention", "digest"]],
+  ])("with invites able to go out %s, books %j", async (on, kinds) => {
+    invitesOn.mockReturnValue(on);
+    const { startScheduler } = await import("@/jobs/scheduler");
+    startScheduler().stop();
+
+    expect(enqueue.mock.calls.map(([kind]) => kind)).toEqual(kinds);
   });
 });
