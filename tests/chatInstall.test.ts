@@ -14,10 +14,6 @@ const auth = vi.hoisted(() => ({ userId: "" }));
 vi.mock("@/lib/auth", () => ({
   requireLocalUser: async () => ({ id: auth.userId }),
 }));
-vi.mock("@/jobs/enqueue", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/jobs/enqueue")>()),
-  enqueueOnce: vi.fn(),
-}));
 
 async function person() {
   const { db } = await import("@/db");

@@ -50,6 +50,58 @@ describe.skipIf(!process.env.DATABASE_URL)("alerts offer", () => {
     });
   });
 
+  it("knows the address it already sends to when the account's copy has a stray space", async () => {
+    const { db } = await import("@/db");
+    const schema = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { turnOnEmailAlerts } = await import("@/lib/alerts/offer");
+    const { listChannels } = await import("@/lib/alerts/channels");
+    const { user, first, email } = await person();
+    await db().update(schema.users).set({ email: `${email} ` }).where(eq(schema.users.id, user.id));
+
+    await turnOnEmailAlerts(user.id, first.id);
+    await turnOnEmailAlerts(user.id, first.id);
+
+    expect((await listChannels(first.id)).map((one) => one.target)).toEqual([email]);
+  });
+
+  it("refuses a custom webhook past the owner's tier, and the same channel twice", async () => {
+    const { addChannel } = await import("@/lib/alerts/channels");
+    const { TIERS } = await import("@/lib/tiers");
+    const { user, first } = await person();
+    const selfHosted = process.env.SELF_HOSTED;
+    process.env.SELF_HOSTED = "false";
+    try {
+      const hook = (n: number) => ({
+        projectId: first.id,
+        userId: user.id,
+        channel: "webhook" as const,
+        target: `https://example.com/hook/${n}`,
+        cadence: "daily" as const,
+      });
+      for (let n = 0; n < (TIERS.free.customWebhooks ?? 0); n += 1) {
+        await addChannel(hook(n));
+      }
+      await expect(addChannel(hook(99))).rejects.toThrow("custom webhook");
+      const slack = {
+        projectId: first.id,
+        userId: user.id,
+        channel: "slack" as const,
+        target: "https://hooks.slack.com/services/T/B/x",
+        cadence: "daily" as const,
+      };
+      await addChannel(slack);
+      await expect(addChannel(slack)).rejects.toThrow("already on this project");
+      expect((await addChannel({ ...slack, ifMissing: true })).target).toBe(slack.target);
+    } finally {
+      if (selfHosted === undefined) {
+        delete process.env.SELF_HOSTED;
+      } else {
+        process.env.SELF_HOSTED = selfHosted;
+      }
+    }
+  });
+
   it("stops asking on the project it was dismissed on, and only that one", async () => {
     const { alertsOffer, dismissAlertsOffer } = await import("@/lib/alerts/offer");
     const { user, first, second } = await person();

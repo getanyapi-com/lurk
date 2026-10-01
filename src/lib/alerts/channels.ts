@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { alerts, projects } from "@/db/schema";
-import type { TierLimits } from "@/lib/tiers";
+import { tierForUser } from "@/lib/tier";
 import { customWebhookAllowance, isCustomWebhook } from "./select";
 import { CHANNEL_LABELS, type AlertCadence, type AlertChannel } from "./types";
 
@@ -99,22 +99,36 @@ export function describeTarget(
 
 export type AddChannelInput = {
   projectId: string;
+  /** The project's owner, whose tier rations custom webhooks. */
+  userId: string;
   channel: AlertChannel;
   target: string;
   /** Shown in place of the target when set. */
   label?: string | null;
   cadence: AlertCadence;
-  limits: TierLimits | null;
+  /**
+   * Hand back the channel already there instead of refusing it, for a press
+   * that should add nothing the second time.
+   */
+  ifMissing?: boolean;
 };
 
-/** Adds a channel, refusing when the tier's webhook allowance is used up. */
+/**
+ * Adds a channel, refusing one the project already has and a custom webhook
+ * past the tier's allowance. The same channel is the same target once both are
+ * normalised, so a typed address with a stray space is still a duplicate.
+ */
 export async function addChannel(input: AddChannelInput): Promise<ProjectChannel> {
   const target = normalizeTarget(input.channel, input.target);
   const existing = await listChannels(input.projectId);
+  const same = existing.find((one) => one.channel === input.channel && one.target === target);
+  if (same && input.ifMissing) {
+    return same;
+  }
   if (isCustomWebhook(input.channel)) {
     const allowance = customWebhookAllowance(
       existing.map((one) => one.channel),
-      input.limits,
+      (await tierForUser(input.userId)).limits,
     );
     if (allowance.atCap) {
       throw new Error(
@@ -122,7 +136,7 @@ export async function addChannel(input: AddChannelInput): Promise<ProjectChannel
       );
     }
   }
-  if (existing.some((one) => one.channel === input.channel && one.target === target)) {
+  if (same) {
     throw new Error("That channel is already on this project");
   }
   const rows = await db()

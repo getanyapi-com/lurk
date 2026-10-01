@@ -1,12 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { alerts, projects, userActions, users } from "@/db/schema";
 import { PRODUCT_NAME, PRODUCT_NAME_WITH_PROVIDER } from "@/lib/brand";
 import { config } from "@/lib/config";
 import { enqueueOnce } from "@/jobs/enqueue";
 import { hasActiveSearch } from "@/lib/scan/widen";
-import { tierForUser } from "@/lib/tier";
 import { addChannel } from "./channels";
 import { sendEmail, type EmailMessage } from "./email";
 import { leadRow } from "./digest";
@@ -263,31 +262,19 @@ export async function acceptInvite(userId: string): Promise<Accepted | null> {
     .select({ id: projects.id, name: projects.name })
     .from(projects)
     .where(eq(projects.userId, userId));
-  const { limits } = await tierForUser(userId);
   for (const project of owned) {
-    const existing = await db()
-      .select({ id: alerts.id })
-      .from(alerts)
-      .where(
-        and(
-          eq(alerts.projectId, project.id),
-          eq(alerts.channel, "email"),
-          eq(alerts.target, user.email),
-        ),
-      );
     // A project with no searches of its own would mail an empty digest most days.
     if (!(await hasActiveSearch(project.id))) {
       await enqueueOnce("widen_searches", new Date(), project.id);
     }
-    if (existing.length === 0) {
-      await addChannel({
-        projectId: project.id,
-        channel: "email",
-        target: user.email,
-        cadence: "daily",
-        limits,
-      });
-    }
+    await addChannel({
+      projectId: project.id,
+      userId,
+      channel: "email",
+      target: user.email,
+      cadence: "daily",
+      ifMissing: true,
+    });
   }
   await db().insert(userActions).values({ userId, action: INVITE_ACCEPTED });
   return { email: user.email, projectNames: owned.map((project) => project.name) };

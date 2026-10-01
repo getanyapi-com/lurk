@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { enqueueOnce } from "@/jobs/enqueue";
 import { addChannel, channelForProject, removeChannel } from "@/lib/alerts/channels";
 import { sampleDigest } from "@/lib/alerts/fixtures";
 import { CHAT_LEAD_CAP } from "@/lib/alerts/select";
@@ -9,11 +8,10 @@ import { sendToChannel } from "@/lib/alerts/send";
 import { CHANNEL_LABELS, isAlertChannel } from "@/lib/alerts/types";
 import { addMute, isMuteKind, removeMute } from "@/lib/mutes";
 import { requireOwnedProject } from "@/lib/owned";
-import { tierForUser } from "@/lib/tier";
 
 export type TestSendResult = { ok: boolean; message: string };
 
-/** Adds a channel and makes sure the digest job is queued to serve it. */
+/** Adds a channel, which the hourly digest job serves from its next pass. */
 export async function addChannelAction(projectId: string, formData: FormData) {
   const { user } = await requireOwnedProject(projectId);
   const channel = String(formData.get("channel") ?? "");
@@ -21,15 +19,13 @@ export async function addChannelAction(projectId: string, formData: FormData) {
     throw new Error("Pick a channel");
   }
   const cadence = formData.get("cadence") === "hourly" ? "hourly" : "daily";
-  const { limits } = await tierForUser(user.id);
   await addChannel({
     projectId,
+    userId: user.id,
     channel,
     target: String(formData.get("target") ?? ""),
     cadence,
-    limits,
   });
-  await enqueueOnce("digest");
   revalidatePath("/app/settings/alerts");
 }
 

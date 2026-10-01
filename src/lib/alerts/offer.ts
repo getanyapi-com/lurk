@@ -1,8 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, userActions } from "@/db/schema";
-import { enqueueOnce } from "@/jobs/enqueue";
-import { tierForUser } from "@/lib/tier";
 import { addChannel, describeTarget, listChannels } from "./channels";
 import { config } from "@/lib/config";
 import { digestSubject, renderDigestHtml } from "./digest";
@@ -65,20 +63,12 @@ export async function turnOnEmailAlerts(userId: string, projectId: string): Prom
   if (!user?.email) {
     throw new Error("Your account has no email address");
   }
-  const existing = await listChannels(projectId);
-  if (existing.some((one) => one.channel === "email" && one.target === user.email)) {
-    return;
-  }
-  const { limits } = await tierForUser(userId);
-  await addChannel({ projectId, channel: "email", target: user.email, cadence: "daily", limits });
-  await enqueueOnce("digest");
+  await addChannel({ projectId, userId, channel: "email", target: user.email, cadence: "daily", ifMissing: true });
 }
 
 /** Turns on a daily Discord post to a pasted webhook URL. */
 export async function turnOnDiscordAlerts(userId: string, projectId: string, url: string): Promise<void> {
-  const { limits } = await tierForUser(userId);
-  await addChannel({ projectId, channel: "discord", target: url, cadence: "daily", limits });
-  await enqueueOnce("digest");
+  await addChannel({ projectId, userId, channel: "discord", target: url, cadence: "daily" });
 }
 
 /** How many leads each preview carries: enough to show the shape without a wall. */

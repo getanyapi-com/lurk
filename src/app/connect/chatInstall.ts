@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { enqueueOnce } from "@/jobs/enqueue";
 import { addChannel } from "@/lib/alerts/channels";
 import { CHAT_APPS, type ChatInstallState } from "@/lib/alerts/chatApps";
 import type { ChatApp } from "@/lib/alerts/config";
@@ -8,7 +7,6 @@ import { requireLocalUser } from "@/lib/auth";
 import { config } from "@/lib/config";
 import { randomState } from "@/lib/oauth";
 import { projectForUser } from "@/lib/projects";
-import { tierForUser } from "@/lib/tier";
 
 /**
  * The two legs of Add to Slack and Add to Discord, which /connect/slack and
@@ -75,16 +73,14 @@ export async function finishChatInstall(app: ChatApp, request: NextRequest): Pro
   }
   try {
     const install = await exchange(code);
-    const { limits } = await tierForUser(user.id);
     await addChannel({
       projectId: project.id,
+      userId: user.id,
       channel: app,
       target: install.webhookUrl,
       label: install.label,
       cadence: stash.cadence,
-      limits,
     });
-    await enqueueOnce("digest");
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return clearing(NextResponse.redirect(alertsUrl(project.id, `failed:${reason}`)));
