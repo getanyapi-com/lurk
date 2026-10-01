@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   projectCompetitors,
@@ -189,6 +189,19 @@ const NOUNS: Record<ChipKind, string> = {
   competitor: "competitors",
 };
 
+/** The table each kind of chip is a row of, and the column that names it. */
+const CHIPS = {
+  keyword: { table: projectKeywords, column: projectKeywords.keyword },
+  subreddit: { table: projectSubreddits, column: projectSubreddits.name },
+  competitor: { table: projectCompetitors, column: projectCompetitors.name },
+} as const;
+
+/** The one row of a project's plan a chip stands for. */
+function chipRow(kind: ChipKind, projectId: string, value: string) {
+  const { table, column } = CHIPS[kind];
+  return and(eq(table.projectId, projectId), eq(column, value));
+}
+
 /**
  * A row a person typed is theirs: it is marked `user`, which is what makes the
  * next discovery rebuild leave it exactly where it is.
@@ -257,52 +270,25 @@ export async function removeChipAction(
   value: string,
 ) {
   const { project } = await requireOwnedProject(projectId);
-  if (kind === "keyword") {
-    await db()
-      .delete(projectKeywords)
-      .where(
-        and(
-          eq(projectKeywords.projectId, project.id),
-          eq(projectKeywords.keyword, value),
-        ),
-      );
-  } else if (kind === "subreddit") {
-    await db()
-      .delete(projectSubreddits)
-      .where(
-        and(
-          eq(projectSubreddits.projectId, project.id),
-          eq(projectSubreddits.name, value),
-        ),
-      );
-  } else {
-    await db()
-      .delete(projectCompetitors)
-      .where(
-        and(
-          eq(projectCompetitors.projectId, project.id),
-          eq(projectCompetitors.name, value),
-        ),
-      );
+  await db().delete(CHIPS[kind].table).where(chipRow(kind, project.id, value));
+  if (kind === "competitor") {
     await bumpProfileVersion(project.id);
   }
   revalidatePath("/app/product");
   revalidatePath("/app/sources");
 }
 
-/** The rows of one kind a scan may use: everything switched on. */
+/**
+ * The rows of one kind a scan may use: everything switched on, which is the
+ * plan's retrieved states (retrieved() in lib/scan/coverage.ts).
+ */
 async function chipsOn(kind: ChipKind, projectId: string): Promise<number> {
-  const table =
-    kind === "keyword"
-      ? projectKeywords
-      : kind === "subreddit"
-        ? projectSubreddits
-        : projectCompetitors;
-  const rows = await db()
-    .select({ state: table.state })
+  const { table } = CHIPS[kind];
+  const [row] = await db()
+    .select({ count: sql<number>`count(*)::int` })
     .from(table)
-    .where(eq(table.projectId, projectId));
-  return rows.filter((row) => row.state === "active" || row.state === "pinned").length;
+    .where(and(eq(table.projectId, projectId), inArray(table.state, ["active", "pinned"])));
+  return row?.count ?? 0;
 }
 
 /**
@@ -327,36 +313,8 @@ export async function setChipStateAction(
         };
       }
     }
-    if (kind === "keyword") {
-      await db()
-        .update(projectKeywords)
-        .set({ state })
-        .where(
-          and(
-            eq(projectKeywords.projectId, project.id),
-            eq(projectKeywords.keyword, value),
-          ),
-        );
-    } else if (kind === "subreddit") {
-      await db()
-        .update(projectSubreddits)
-        .set({ state })
-        .where(
-          and(
-            eq(projectSubreddits.projectId, project.id),
-            eq(projectSubreddits.name, value),
-          ),
-        );
-    } else {
-      await db()
-        .update(projectCompetitors)
-        .set({ state })
-        .where(
-          and(
-            eq(projectCompetitors.projectId, project.id),
-            eq(projectCompetitors.name, value),
-          ),
-        );
+    await db().update(CHIPS[kind].table).set({ state }).where(chipRow(kind, project.id, value));
+    if (kind === "competitor") {
       await bumpProfileVersion(project.id);
     }
     revalidatePath("/app/product");
