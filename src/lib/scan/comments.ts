@@ -12,6 +12,7 @@ import {
   type StoredJudgement,
 } from "./evaluations";
 import type { Judgement, ScorableItem } from "./judgement";
+import { commentItem } from "./judging";
 import { leadKey } from "./leads";
 import type { ScanProject } from "./project";
 import { judgeItems } from "./score";
@@ -22,8 +23,6 @@ import { judgeItems } from "./score";
  * both. The competitor match is a string match over the customer's own list
  * and costs nothing; discovery spends one model call per new commenter.
  */
-
-const HOUR_MS = 60 * 60 * 1000;
 
 export type ThreadRead = { post: StoredPost; comments: StoredComment[] };
 
@@ -98,20 +97,6 @@ export function representativeComments(thread: ThreadRead): StoredComment[] {
   return [...best.values()];
 }
 
-function discoveryItem(thread: ThreadRead, comment: StoredComment): ScorableItem {
-  return {
-    id: comment.id,
-    title: thread.post.title,
-    subreddit: thread.post.subreddit,
-    body: comment.body ?? "",
-    author: comment.author,
-    ageHours: (Date.now() - comment.createdAt.getTime()) / HOUR_MS,
-    upvotes: comment.score,
-    numComments: thread.post.numComments,
-    parentBody: thread.post.body ?? "",
-  };
-}
-
 export type ThreadJudgements = {
   discovery: { postId: string; comment: StoredComment; judgement: Judgement }[];
   records: EvaluationRecord[];
@@ -144,7 +129,7 @@ export async function judgeThreads(
 
   for (const thread of threads) {
     for (const comment of representativeComments(thread)) {
-      const own = discoveryItem(thread, comment);
+      const own = commentItem(thread.post, comment);
       const hash = contentHash([own.title, own.parentBody, own.body]);
       if (
         commentOf.has(comment.id) ||

@@ -15,10 +15,8 @@ import { readThreads, type ThreadRead } from "@/lib/scan/comments";
 import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy } from "@/lib/settings/types";
+import { evaluationsFor, judgePosts, unjudged } from "@/lib/scan/judging";
 import { requireScanProject, type ScanProject } from "@/lib/scan/project";
-import { readPosts, splitByReading } from "@/lib/scan/reading";
-import { evaluationsFor, postItem, unjudged } from "@/lib/scan/run";
-import { judgeItems } from "@/lib/scan/score";
 import { tierForUser } from "@/lib/tier";
 import { googleQuery, googleSearch } from "./fetch";
 import { redditThread } from "./links";
@@ -159,13 +157,7 @@ async function judgeOpened(project: ScanProject, opened: StoredPost[]): Promise<
   if (candidates.length === 0) {
     return;
   }
-  const sources = candidates.map(postItem);
-  const readings = await readPosts(project.id, sources);
-  const { toJudge, cut } = splitByReading(sources, readings);
-  const judgements = [
-    ...cut,
-    ...(await judgeItems(project.id, project.product, toJudge, readings)),
-  ];
+  const judgements = await judgePosts(project, candidates);
   await writeEvaluations(evaluationsFor(project, candidates, judgements));
 }
 

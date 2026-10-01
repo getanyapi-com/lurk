@@ -5,7 +5,7 @@ import { askJev } from "@/lib/jev";
 import { askInBatches, stateTokens } from "./batches";
 import { READING_BATCH_SIZE } from "./constants";
 import { readingFrom, type ReadingAnswers } from "./derive";
-import { contentHash } from "./evaluations";
+import { postHash } from "./evaluations";
 import { isSentinel } from "./evidence";
 import { judge } from "./gates";
 import type { Assessment, Judgement, ScorableItem } from "./judgement";
@@ -33,11 +33,6 @@ export type Reading = ReadingAnswers;
  */
 export const READING_VERSION = "2026-09-17.1";
 
-/** The hash of the post's own words. Replies do not change who is speaking. */
-export function readingHash(title: string, body: string | null): string {
-  return contentHash([title, body]);
-}
-
 /** True when this reading found a buyer whose own need is not settled. */
 export function isAskingBuyer(reading: Reading): boolean {
   return (
@@ -55,7 +50,9 @@ async function cached(items: ScorableItem[]): Promise<Map<string, Reading>> {
     .select()
     .from(postReadings)
     .where(inArray(postReadings.postId, items.map((item) => item.id)));
-  const wanted = new Map(items.map((item) => [item.id, readingHash(item.title, item.body)]));
+  // A reading is of the post's own words, as a verdict is: replies do not
+  // change who is speaking.
+  const wanted = new Map(items.map((item) => [item.id, postHash(item.title, item.body)]));
   return new Map(
     rows
       .filter(
@@ -79,7 +76,7 @@ async function store(item: ScorableItem, reading: Reading): Promise<void> {
     .values({
       postId: item.id,
       ...reading,
-      contentHash: readingHash(item.title, item.body),
+      contentHash: postHash(item.title, item.body),
       readingVersion: READING_VERSION,
       readAt: new Date(),
     })

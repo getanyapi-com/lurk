@@ -1,46 +1,31 @@
 import { enqueueJob, writeProgress } from "@/jobs/enqueue";
 import { clientForUser } from "@/lib/anyapi";
 import type { FetchContext } from "@/lib/reddit/fetch";
-import { fetchAuthorProfile, fetchPost } from "@/lib/reddit/skus";
-import type { StoredPost } from "@/lib/reddit/store";
+import { fetchPost } from "@/lib/reddit/skus";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import { tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
 import { writeThreadMentions } from "@/lib/competitors/threads";
-import { redditScore } from "@/lib/scoring/weights";
 import { inFlight } from "@/lib/inFlight";
 import { judgeThreads, readLeadThreads } from "./comments";
 import { retrievalBudgets } from "./constants";
-import { isSentinel } from "./evidence";
+import { loadEvaluations, writeEvaluations } from "./evaluations";
 import {
-  alreadyJudged,
-  loadEvaluations,
-  postHash,
-  writeEvaluations,
-  type EvaluationRecord,
-  type StoredJudgement,
-} from "./evaluations";
-import {
-  demoteLeads,
-  leadKey,
-  markThreadsRead,
-  threadsToRead,
-  writeLeads,
-  type LeadRow,
-} from "./leads";
-import { requireScanProject, type ScanProject } from "./project";
+  evaluationsFor,
+  fetchAvatars,
+  judgePosts,
+  toLead,
+  triagedOrder,
+  unjudged,
+} from "./judging";
+import { demoteLeads, leadKey, markThreadsRead, threadsToRead, writeLeads } from "./leads";
+import { requireScanProject } from "./project";
 import { retrieve } from "./retrieve";
 import { creditSources, markCovered, type CandidateSource } from "./sources";
-import type { Judgement, ScorableItem } from "./judgement";
-import { readPosts, splitByReading } from "./reading";
-import { judgeItems, readOrder, triageTitles } from "./score";
 
 const HOUR_MS = 60 * 60 * 1000;
 const RETENTION_MS = RETENTION_DAYS * 24 * HOUR_MS;
-
-/** A Reddit avatar changes rarely, so one lookup covers a whole month. */
-const AUTHOR_MAX_AGE_MS = 30 * 24 * HOUR_MS;
 
 export type ScanOutcome = {
   candidates: number;
@@ -49,99 +34,6 @@ export type ScanOutcome = {
   /** Windows this scan could not finish covering, said in plain words. */
   gaps: string[];
 };
-
-export function toLead(
-  project: ScanProject,
-  judgement: Judgement,
-  postId: string,
-  commentId: string | null,
-): LeadRow {
-  return {
-    projectId: project.id,
-    postId,
-    commentId,
-    kind: "buyer",
-    // The verdict's own score folds the default weights; the lead is ranked
-    // by the ones this project's owner chose.
-    score: redditScore(judgement, project.scoring),
-    quality: judgement.quality,
-    fit: judgement.fit,
-    intent: judgement.intent,
-    engagement: judgement.engagement,
-    stage: judgement.stage,
-    reason: judgement.reason,
-    matchedPhrase: judgement.matchedPhrase,
-  };
-}
-
-export function postItem(post: StoredPost): ScorableItem {
-  return {
-    id: post.id,
-    title: post.title,
-    subreddit: post.subreddit,
-    body: post.body ?? "",
-    author: post.author,
-    ageHours: (Date.now() - post.createdAt.getTime()) / HOUR_MS,
-    upvotes: post.score,
-    numComments: post.numComments,
-    parentBody: null,
-  };
-}
-
-/**
- * Faces for the feed, bought once a month per author. A failure here is not a
- * failed scan: the card falls back to the author's initials.
- */
-export async function fetchAvatars(ctx: FetchContext, usernames: string[]): Promise<void> {
-  await inFlight([...new Set(usernames.filter(Boolean))], async (username) => {
-    try {
-      await fetchAuthorProfile(ctx, username, AUTHOR_MAX_AGE_MS);
-    } catch {
-      // An avatar is decoration; the lead is already written.
-    }
-  });
-}
-
-/**
- * The posts this project has no current verdict on, given what it has read. A
- * post Reddit has taken away is dropped here, before a title is triaged or a
- * body is bought: there is nothing left to read and nobody left to answer.
- */
-export function unjudged(
-  project: ScanProject,
-  stored: Map<string, StoredJudgement>,
-  posts: StoredPost[],
-): StoredPost[] {
-  return posts.filter(
-    (post) =>
-      !isSentinel(post) &&
-      !alreadyJudged(
-        stored,
-        leadKey(post.id, null),
-        project.profileVersion,
-        postHash(post.title, post.body),
-      ),
-  );
-}
-
-export function evaluationsFor(
-  project: ScanProject,
-  posts: StoredPost[],
-  judgements: Judgement[],
-): EvaluationRecord[] {
-  const byId = new Map(posts.map((post) => [post.id, post]));
-  return judgements.map((judgement) => {
-    const post = byId.get(judgement.id) as StoredPost;
-    return {
-      projectId: project.id,
-      postId: post.id,
-      commentId: null,
-      judgement,
-      profileVersion: project.profileVersion,
-      contentHash: postHash(post.title, post.body),
-    };
-  });
-}
 
 /**
  * One scan: run the retrieval plan, triage the titles, read the shortlist in
@@ -185,29 +77,8 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   );
 
   await writeProgress(jobId, `Reading ${candidates.length} titles`);
-  const triage = await triageTitles(
-    projectId,
-    project.product,
-    candidates.map((post) => ({
-      id: post.id,
-      title: post.title,
-      subreddit: post.subreddit,
-      author: post.author,
-      score: post.score,
-      ageHours: (Date.now() - post.createdAt.getTime()) / HOUR_MS,
-    })),
-  );
+  const ordered = await triagedOrder(projectId, project.product, candidates);
   const left = hydration === null ? candidates.length : Math.max(hydration - retrieval.hydrated, 0);
-  const byId = new Map(candidates.map((post) => [post.id, post]));
-  const facts = new Map(
-    candidates.map((post) => [
-      post.id,
-      { ageHours: (Date.now() - post.createdAt.getTime()) / HOUR_MS, upvotes: post.score },
-    ]),
-  );
-  const ordered = readOrder(triage, facts)
-    .map((id) => byId.get(id))
-    .filter((post): post is StoredPost => post !== undefined);
   /**
    * A post whose text a search already carried needs no `reddit.post` call, so
    * it is read for free and the hydration budget is spent only on the posts we
@@ -237,12 +108,9 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
 
   await writeProgress(jobId, `Checking who is asking in ${full.length} posts`);
   const unjudgedPosts = unjudged(project, stored, full);
-  const sources = unjudgedPosts.map(postItem);
-  const readings = await readPosts(projectId, sources);
-  const { toJudge, cut } = splitByReading(sources, readings);
-
-  await writeProgress(jobId, `Scoring ${toJudge.length} of ${sources.length} posts`);
-  const judgements = [...cut, ...(await judgeItems(projectId, project.product, toJudge, readings))];
+  const judgements = await judgePosts(project, unjudgedPosts, [], (judging, read) =>
+    writeProgress(jobId, `Scoring ${judging} of ${read} posts`),
+  );
   const fullById = new Map(unjudgedPosts.map((post) => [post.id, post]));
   /**
    * Only a qualified judgement reaches the feed. The gates in gates.ts settled

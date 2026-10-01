@@ -10,9 +10,16 @@ import { loadEvaluations, writeEvaluations } from "./evaluations";
 import { writeLeads, type LeadRow } from "./leads";
 import { requireScanProject, type ScanProject } from "./project";
 import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
-import { evaluationsFor, fetchAvatars, postItem, toLead, unjudged } from "./run";
+import {
+  evaluationsFor,
+  fetchAvatars,
+  postItem,
+  toLead,
+  triagedOrder,
+  unjudged,
+} from "./judging";
 import type { Judgement } from "./judgement";
-import { judgeItems, readOrder, triageTitles } from "./score";
+import { judgeItems } from "./score";
 import type { StoredJudgement } from "./evaluations";
 import { sweepSearches } from "./searches";
 import { creditSources, keepSearches, markCovered, recordSources, type CandidateSource } from "./sources";
@@ -42,8 +49,6 @@ import { creditSources, keepSearches, markCovered, recordSources, type Candidate
  *            first sweep costs about $0.20 at most.
  *   leads    LEAD_CAP buyer leads, and the sweep stops searching and scoring.
  */
-
-const HOUR_MS = 60 * 60 * 1000;
 
 /** Lead authors a sweep looks up, best leads first. $0.00038 each through `reddit.avatar`, so 2¢. */
 const FACES = 50;
@@ -362,32 +367,12 @@ class Judge {
       chunk.map((post) => ({ postId: post.id, sources: this.sources.get(post.id) ?? [] })),
     );
     this.candidates.push(...chunk);
-    const now = Date.now();
-    const triage = await triageTitles(
+    const ordered = await triagedOrder(
       this.project.id,
       this.project.product,
-      chunk.map((post) => ({
-        id: post.id,
-        title: post.title,
-        subreddit: post.subreddit,
-        author: post.author,
-        score: post.score,
-        ageHours: (now - post.createdAt.getTime()) / HOUR_MS,
-      })),
+      chunk,
+      ASKING_FLOOR,
     );
-    const byId = new Map(chunk.map((post) => [post.id, post]));
-    const facts = new Map(
-      chunk.map((post) => [
-        post.id,
-        { ageHours: (now - post.createdAt.getTime()) / HOUR_MS, upvotes: post.score },
-      ]),
-    );
-    const ordered = readOrder(
-      triage.filter((item) => item.asking >= ASKING_FLOOR),
-      facts,
-    )
-      .map((id) => byId.get(id))
-      .filter((post): post is StoredPost => post !== undefined);
 
     // Every batch of verdicts is committed the moment it lands, so the feed
     // fills while the sweep is still running. A batch whose commit fails is

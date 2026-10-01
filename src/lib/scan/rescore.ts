@@ -2,13 +2,12 @@ import { and, eq, isNull, lt, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { leadEvaluations, leads, redditComments, redditPosts } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
+import type { StoredPost } from "@/lib/reddit/store";
 import { SCORER_VERSION, writeEvaluations, type EvaluationRecord } from "./evaluations";
 import type { Judgement, ScorableItem } from "./judgement";
+import { commentItem, judgePosts, postItem, toLead } from "./judging";
 import { demoteLeads, leadKey, writeLeads } from "./leads";
 import { requireScanProject } from "./project";
-import { readPosts, splitByReading } from "./reading";
-import { judgeItems } from "./score";
-import { toLead } from "./run";
 
 /**
  * Judging every stored verdict again under a new scorer, once. A scorer version
@@ -21,8 +20,6 @@ import { toLead } from "./run";
  * already hold, and the shared reading of a post is cached, so the only spend
  * is the judgement call itself.
  */
-
-const HOUR_MS = 60 * 60 * 1000;
 
 export type RescoreOutcome = {
   /** Candidates re-judged, which is every stale verdict the project held that a scan would judge. */
@@ -43,6 +40,7 @@ type Stale = {
   commentId: string | null;
   profileVersion: number;
   contentHash: string;
+  post: StoredPost;
   item: ScorableItem;
 };
 
@@ -109,29 +107,8 @@ async function staleItems(projectId: string, profileVersion: number): Promise<St
     commentId: row.commentId,
     profileVersion: row.profileVersion,
     contentHash: row.contentHash,
-    item: row.comment
-      ? {
-          id: row.comment.id,
-          title: row.post.title,
-          subreddit: row.post.subreddit,
-          body: row.comment.body ?? "",
-          author: row.comment.author,
-          ageHours: (Date.now() - row.comment.createdAt.getTime()) / HOUR_MS,
-          upvotes: row.comment.score,
-          numComments: row.post.numComments,
-          parentBody: row.post.body ?? "",
-        }
-      : {
-          id: row.post.id,
-          title: row.post.title,
-          subreddit: row.post.subreddit,
-          body: row.post.body ?? "",
-          author: row.post.author,
-          ageHours: (Date.now() - row.post.createdAt.getTime()) / HOUR_MS,
-          upvotes: row.post.score,
-          numComments: row.post.numComments,
-          parentBody: null,
-        },
+    post: row.post,
+    item: row.comment ? commentItem(row.post, row.comment) : postItem(row.post),
   }));
 }
 
@@ -202,14 +179,9 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
 
   await writeProgress(jobId, `Judging ${stale.length} stored verdicts again`);
   const byId = new Map(stale.map((row) => [row.item.id, row]));
-  const posts = stale.filter((row) => row.commentId === null).map((row) => row.item);
+  const posts = stale.filter((row) => row.commentId === null).map((row) => row.post);
   const comments = stale.filter((row) => row.commentId !== null).map((row) => row.item);
-  const readings = await readPosts(projectId, posts);
-  const { toJudge, cut } = splitByReading(posts, readings);
-  const judgements = [
-    ...cut,
-    ...(await judgeItems(projectId, project.product, [...toJudge, ...comments], readings)),
-  ];
+  const judgements = await judgePosts(project, posts, comments);
   const judged = judgements.flatMap((judgement) => {
     const row = byId.get(judgement.id);
     return row ? [{ judgement, stale: row }] : [];
