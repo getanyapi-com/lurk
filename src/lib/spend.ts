@@ -20,34 +20,34 @@ function total(column: AnyColumn) {
  * What the house key has spent on AnyAPI since midnight UTC, across every
  * project, optionally on some SKUs only: the shared runs, plus the calls that
  * produce no shared run at all, which is the product page read. A reused run
- * costs nothing and is stored as no new run, so nothing is counted twice.
+ * costs nothing and is stored as no new run, so nothing is counted twice. Both
+ * sums are one statement, so a cap check holds one pooled connection.
  */
 export async function houseDataSpend({ skus }: { skus?: readonly string[] } = {}): Promise<number> {
   const since = utcDayStart();
-  const [[runs], [unshared]] = await Promise.all([
-    db()
-      .select({ total: total(searchRuns.costUsd) })
-      .from(searchRuns)
-      .where(
-        and(
-          eq(searchRuns.fundedBy, "house"),
-          skus ? inArray(searchRuns.sku, [...skus]) : undefined,
-          gte(searchRuns.fetchedAt, since),
-        ),
+  const runs = db()
+    .select({ total: total(searchRuns.costUsd) })
+    .from(searchRuns)
+    .where(
+      and(
+        eq(searchRuns.fundedBy, "house"),
+        skus ? inArray(searchRuns.sku, [...skus]) : undefined,
+        gte(searchRuns.fetchedAt, since),
       ),
-    db()
-      .select({ total: total(usageLedger.costUsd) })
-      .from(usageLedger)
-      .where(
-        and(
-          eq(usageLedger.fundedBy, "house"),
-          skus ? inArray(usageLedger.sku, [...skus]) : undefined,
-          isNull(usageLedger.searchRunId),
-          gte(usageLedger.at, since),
-        ),
+    );
+  const unshared = db()
+    .select({ total: total(usageLedger.costUsd) })
+    .from(usageLedger)
+    .where(
+      and(
+        eq(usageLedger.fundedBy, "house"),
+        skus ? inArray(usageLedger.sku, [...skus]) : undefined,
+        isNull(usageLedger.searchRunId),
+        gte(usageLedger.at, since),
       ),
-  ]);
-  return Number(runs?.total ?? 0) + Number(unshared?.total ?? 0);
+    );
+  const [row] = await db().execute<{ total: string }>(sql`select (${runs}) + (${unshared}) as total`);
+  return Number(row?.total ?? 0);
 }
 
 /** What one project's AnyAPI lines have cost since a moment, optionally on some SKUs only. */
