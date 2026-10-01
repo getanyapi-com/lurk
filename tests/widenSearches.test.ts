@@ -49,9 +49,11 @@ describe.skipIf(!process.env.DATABASE_URL)("widening a project's searches", () =
     runScan.mockReset().mockResolvedValue({});
   });
 
-  async function project(opts: { keyword?: boolean; discovered?: boolean } = {}) {
+  async function project(opts: { keyword?: boolean; discovered?: boolean; leadPostedDaysAgo?: number } = {}) {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
+    const { upsertPosts } = await import("@/lib/reddit/store");
+    const { ALERT_SCORE_FLOOR } = await import("@/lib/leadFilters");
     const [user] = await db()
       .insert(schema.users)
       .values({ clerkUserId: `test_${randomUUID()}`, email: `w-${randomUUID()}@example.com` })
@@ -69,6 +71,21 @@ describe.skipIf(!process.env.DATABASE_URL)("widening a project's searches", () =
       await db()
         .insert(schema.projectKeywords)
         .values({ projectId: row.id, keyword: "form builder", source: "serp", state: "active" });
+    }
+    if (opts.leadPostedDaysAgo != null) {
+      // A new buyer lead right at the house floor, on a post this many days old.
+      const [post] = await upsertPosts([
+        {
+          id: `p${randomUUID().slice(0, 8)}`,
+          subreddit: "saas",
+          author: "asker",
+          title: "Looking for a form builder",
+          body: "Anyone know one?",
+          permalink: `/r/saas/comments/${randomUUID().slice(0, 6)}/x/`,
+          createdUtc: Math.floor(Date.now() / 1000) - opts.leadPostedDaysAgo * 24 * 3600,
+        },
+      ]);
+      await db().insert(schema.leads).values({ projectId: row.id, postId: post.id, score: ALERT_SCORE_FLOOR });
     }
     return { user, project: row };
   }
@@ -101,7 +118,7 @@ describe.skipIf(!process.env.DATABASE_URL)("widening a project's searches", () =
     expect(runScan).not.toHaveBeenCalled();
   });
 
-  it("owes boot searches only to set-up projects with none, once", async () => {
+  it("owes boot searches only to set-up projects with no searches and no fresh buyer lead, once", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
     const { projectsOwedSearches } = await import("@/lib/scan/widen");
@@ -110,10 +127,13 @@ describe.skipIf(!process.env.DATABASE_URL)("widening a project's searches", () =
     const unset = await project({ discovered: false });
     const widened = await project();
     await db().insert(schema.jobs).values({ kind: "widen_searches", projectId: widened.project.id });
+    const findingBuyers = await project({ leadPostedDaysAgo: 1 });
+    const onlyStaleBuyers = await project({ leadPostedDaysAgo: 31 });
 
     const ids = await projectsOwedSearches(new Date());
     expect(ids).toContain(owed.project.id);
-    for (const skipped of [searching, unset, widened]) {
+    expect(ids).toContain(onlyStaleBuyers.project.id);
+    for (const skipped of [searching, unset, widened, findingBuyers]) {
       expect(ids).not.toContain(skipped.project.id);
     }
   });
