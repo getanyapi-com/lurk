@@ -1,95 +1,20 @@
 /**
  * The X search lane grammar, checked before a lane spends anything.
  *
- * `malformedAlternatives`, `unboundOperators` and `repairQuery` are ported
- * from AnyAPI's eve-agent/lib/x-leads-lane.ts (513a21e73), held to the same
- * vectors (tests/fixtures/x-lane-vectors.json, from server/internal/xquery/
- * testdata). X ANDs bare adjacent words and binds OR tighter, so `(company
- * enrichment OR work email)` is word soup, not two phrases, and it binds an
- * operator trailing an unbracketed OR list to the last alternative only; the
- * gateway refuses both at no charge, and so does this, before the call.
- *
- * `assertLane` is lurk's own, stricter check: a lane lurk sends is one to
- * three AND groups, each a single word or quoted phrase or a parenthesized OR
- * of them, plus the tail operators lurk adds, and nothing else. Anything the
- * compiler did not mean to write is refused here, because on X a malformed
- * query is not an error, it is a billed page of the wrong posts.
+ * X ANDs bare adjacent words and binds OR tighter, so `(company enrichment OR
+ * work email)` is word soup, not two phrases, and it binds an operator
+ * trailing an unbracketed OR list to the last alternative only; AnyAPI's
+ * gateway refuses both at no charge. `assertLane` is stricter, and refuses
+ * them before the call: a lane lurk sends is one to three AND groups, each a
+ * single word or quoted phrase or a parenthesized OR of them, plus the tail
+ * operators lurk adds, and nothing else. Anything the compiler did not mean to
+ * write is refused here, because on X a malformed query is not an error, it
+ * is a billed page of the wrong posts.
  */
 
 import { MAX_QUERY_CHARS } from "./constants";
 
-/** Every alternative in the query that spans more than one bare word. Empty means it means what it says. */
-export function malformedAlternatives(query: string): readonly string[] {
-  const problems: string[] = [];
-  scanLevel(query, problems);
-  return [...new Set(problems)];
-}
-
-/**
- * Every operator trailing the last alternative of an unbracketed OR list, at
- * any level. X applies it to the last alternative only: `Jev OR "TypeSafe AI"
- * OR typesafe.ai -filter:replies` kept the replies matching the first two.
- */
-export function unboundOperators(query: string): readonly string[] {
-  const operators: string[] = [];
-  scanTrailing(query, operators);
-  return [...new Set(operators)];
-}
-
-/**
- * The query with each offending alternative quoted and each OR list with
- * unbound trailing operators bracketed. An alternative that already mixes a
- * quoted phrase with a bare word is left alone: what its author meant is not
- * recoverable.
- */
-export function repairQuery(query: string): string {
-  return bracketUnbound(
-    malformedAlternatives(query)
-      .filter((alternative) => !alternative.includes('"'))
-      .reduce((current, alternative) => current.split(alternative).join(`"${alternative}"`), query),
-  );
-}
-
 type Span = { start: number; end: number };
-
-function scanTrailing(text: string, operators: string[]): void {
-  const tokens = levelTokens(text);
-  for (const token of tokens) {
-    const body = groupBody(text.slice(token.start, token.end));
-    if (body !== undefined) scanTrailing(body, operators);
-  }
-  for (const token of tokens.slice(unboundFrom(text, tokens))) {
-    operators.push(text.slice(token.start, token.end));
-  }
-}
-
-function bracketUnbound(text: string): string {
-  const tokens = levelTokens(text);
-  const from = unboundFrom(text, tokens);
-  let out = "";
-  let cursor = 0;
-  tokens.forEach((token, index) => {
-    out += text.slice(cursor, token.start);
-    if (index === 0 && from < tokens.length) out += "(";
-    let raw = text.slice(token.start, token.end);
-    const body = groupBody(raw);
-    if (body !== undefined) raw = `${raw.slice(0, raw.indexOf("(") + 1)}${bracketUnbound(body)})`;
-    out += raw;
-    if (index === from - 1 && from < tokens.length) out += ")";
-    cursor = token.end;
-  });
-  return out + text.slice(cursor);
-}
-
-/** The index of the first unbound trailing operator at this level, or tokens.length for none. */
-function unboundFrom(text: string, tokens: readonly Span[]): number {
-  const words = tokens.map((token) => text.slice(token.start, token.end));
-  const lastOr = words.lastIndexOf("OR");
-  if (lastOr < 0) return tokens.length;
-  let from = tokens.length;
-  while (from > lastOr + 1 && isOperatorToken(words[from - 1] as string)) from -= 1;
-  return from === tokens.length || from === lastOr + 1 ? tokens.length : from;
-}
 
 /** Splits one level on whitespace, keeping a quoted phrase and a whole group as single tokens. */
 function levelTokens(text: string): Span[] {
@@ -136,50 +61,6 @@ function groupBody(token: string): string | undefined {
 /** A search operator rather than a searched word. A URL's scheme is not an operator. */
 function isOperatorToken(token: string): boolean {
   return /^-?[A-Za-z_][A-Za-z0-9_]*:/u.test(token) && !/^-?[A-Za-z][A-Za-z0-9+.-]*:\/\//u.test(token);
-}
-
-const GROUP_PLACEHOLDER = " ";
-
-function scanLevel(text: string, problems: string[]): void {
-  const { flattened, groups } = extractGroups(text);
-  for (const group of groups) scanLevel(group, problems);
-  if (!/(^|\s)OR(\s|$)/u.test(flattened)) return;
-  for (const alternative of flattened.split(/(?:^|\s)OR(?:\s|$)/u)) {
-    const words = tokenize(alternative).filter((token) => !isOperatorToken(token));
-    if (words.length > 1) problems.push(words.join(" "));
-  }
-}
-
-/** Replaces each top-level parenthesized group with an opaque token and returns the groups. */
-function extractGroups(text: string): { flattened: string; groups: string[] } {
-  const groups: string[] = [];
-  let flattened = "";
-  let depth = 0;
-  let start = 0;
-  let quoted = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text.charAt(index);
-    if (character === '"') quoted = !quoted;
-    if (quoted) {
-      if (depth === 0) flattened += character;
-      continue;
-    }
-    if (character === "(") {
-      if (depth === 0) start = index + 1;
-      depth += 1;
-      continue;
-    }
-    if (character === ")" && depth > 0) {
-      depth -= 1;
-      if (depth === 0) {
-        groups.push(text.slice(start, index));
-        flattened += GROUP_PLACEHOLDER;
-      }
-      continue;
-    }
-    if (depth === 0) flattened += character;
-  }
-  return { flattened, groups };
 }
 
 /** Splits on whitespace, keeping a quoted phrase as one token. */
@@ -252,12 +133,6 @@ export function assertLane(query: string): void {
   }
   if ((query.match(/"/gu) ?? []).length % 2 !== 0) {
     throw new XLaneRefusedError(query, "unbalanced quotes");
-  }
-  if (malformedAlternatives(query).length > 0) {
-    throw new XLaneRefusedError(query, "an OR alternative of several bare words");
-  }
-  if (unboundOperators(query).length > 0) {
-    throw new XLaneRefusedError(query, "an operator bound to one OR alternative");
   }
   const tokens = levelTokens(query).map((span) => query.slice(span.start, span.end));
   let groups = 0;

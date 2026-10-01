@@ -1,33 +1,10 @@
 import { describe, expect, it } from "vitest";
-import vectors from "./fixtures/x-lane-vectors.json";
-import { XLaneRefusedError, assertLane, malformedAlternatives, repairQuery, unboundOperators } from "@/lib/x/grammar";
+import { XLaneRefusedError, assertLane } from "@/lib/x/grammar";
 
 /**
- * The X lane grammar. The first half holds lurk's port to the vectors AnyAPI's
- * gateway and agent are held to (copied from anyapi server/internal/xquery/
- * testdata/lane-test-vectors.json at 513a21e73), so the three cannot drift.
- * The second half is lurk's stricter check, which refuses everything but the
- * shapes the lane compiler writes, before a billed call.
+ * The X lane grammar: lurk's check refuses everything but the shapes the lane
+ * compiler writes, before a billed call.
  */
-describe("X lane grammar, AnyAPI's vectors", () => {
-  it.each(vectors.malformed)("finds the word-soup alternatives in $query", (vector) => {
-    expect([...malformedAlternatives(vector.query)]).toEqual(vector.alternatives);
-    expect(repairQuery(vector.query)).toBe(vector.repaired);
-  });
-
-  it.each(vectors.clean)("leaves a well-formed query alone: %s", (query) => {
-    expect(malformedAlternatives(query)).toEqual([]);
-    expect(unboundOperators(query)).toEqual([]);
-    expect(repairQuery(query)).toBe(query);
-  });
-
-  it.each(vectors.unbound)("finds the operators X binds to one OR alternative in $query", (vector) => {
-    expect([...unboundOperators(vector.query)]).toEqual(vector.operators);
-    expect(repairQuery(vector.query)).toBe(vector.repaired);
-    expect(() => assertLane(vector.query)).toThrow(XLaneRefusedError);
-  });
-});
-
 describe("assertLane", () => {
   const good = '("alternative to calendly" OR "calendly alternative") lang:en -filter:retweets since_time:1790000000';
 
@@ -73,6 +50,14 @@ describe("assertLane", () => {
     ["(alternative OR pricing) lang:en -filter:links", "an operator lurk does not send"],
     ["(alternative OR pricing) lang:en from:calendly", "a from: operator"],
     ["(context.dev OR youcanbook.me) (alternative OR pricing)", "a bare dotted name"],
+    // Measured on X (AnyAPI threads 94b6f435, 93af4985, aa29340d, 329e92c8):
+    // word soup, and operators X bound to the last OR alternative only.
+    ["(company enrichment OR people enrichment OR work email) since_time:1786752000", "word-soup alternatives"],
+    ['Jev OR "TypeSafe AI" OR typesafe.ai -filter:replies', "an operator bound to one alternative"],
+    ["help OR support -filter:replies lang:en", "operators bound to one alternative"],
+    ['scraping OR "scraping API" since_time:1787189936 lang:en', "operators bound to one alternative"],
+    ["alternative OR alternatives (Apify OR Firecrawl OR ScraperAPI OR ScrapingBee) since_time:1787189936 lang:en", "a top-level OR beside a group"],
+    ["(Jev OR typesafe.ai -filter:replies) filter:videos", "an operator inside a group"],
   ])("refuses %s (%s)", (query) => {
     expect(() => assertLane(query)).toThrow(XLaneRefusedError);
   });
