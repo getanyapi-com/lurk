@@ -1,5 +1,6 @@
 import { SubredditChip } from "@/components/SubredditChip";
 import { BrandImage } from "./BrandImage";
+import { BRAND_MARKS } from "./BrandWord";
 import { MockFrame } from "./MockFrame";
 import { MockButton } from "./MockButton";
 import { MOCK_SEO } from "./mockContent";
@@ -13,7 +14,7 @@ export function AppMockSeo() {
     >
       <div className="mock-content mock-seo">
         <div className="mock-section-title">
-          <BrandImage name="Google" src="/brands/google.svg" size={24} />
+          <BrandImage name="Google" src={BRAND_MARKS.Google} size={24} />
           <span>
             free form builder<small>Saved Google results</small>
           </span>
@@ -24,7 +25,7 @@ export function AppMockSeo() {
         {MOCK_SEO.map((thread) => (
           <div className="mock-seo-row" key={thread.url}>
             <div className="mock-rank">
-              <BrandImage name="Google" src="/brands/google.svg" size={18} />#
+              <BrandImage name="Google" src={BRAND_MARKS.Google} size={18} />#
               {thread.position}
             </div>
             <div>

@@ -1,22 +1,7 @@
-import { Bell, Box, Lightbulb, Radar, Receipt, Search, Settings, SlidersHorizontal, Swords, Telescope } from "lucide-react";
-import type { RailIcon } from "@/components/Rail";
-import { XMark } from "@/components/x/XMark";
+import { RAIL_ICONS } from "@/components/railIcons";
 import { BrandImage } from "./BrandImage";
 import { MOCK_RAIL } from "./mockContent";
 
-const ICONS: Record<RailIcon, React.ComponentType<{ className?: string }>> = {
-  radar: Radar,
-  search: Search,
-  lightbulb: Lightbulb,
-  swords: Swords,
-  box: Box,
-  telescope: Telescope,
-  filters: SlidersHorizontal,
-  bell: Bell,
-  receipt: Receipt,
-  settings: Settings,
-  x: XMark,
-};
 const TALLY = { name: "Tally", domain: "tally.so" };
 
 type MockFrameProps = {
@@ -44,7 +29,7 @@ export function MockFrame({ active, project = TALLY, title, actions, children }:
             <div className="mock-rail-group" key={group.label}>
               <small>{group.label}</small>
               {group.items.map((item) => {
-                const Icon = ICONS[item.icon];
+                const Icon = RAIL_ICONS[item.icon];
                 return (
                   <span
                     key={item.name}

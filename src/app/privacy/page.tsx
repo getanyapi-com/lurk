@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/marketing/LegalPage";
-import { PRODUCT_NAME } from "@/lib/brand";
+import { PRODUCT_NAME, SUPPORT_EMAIL } from "@/lib/brand";
 
 export const metadata: Metadata = { title: `Privacy Policy | ${PRODUCT_NAME}` };
 
@@ -12,7 +12,7 @@ export default function PrivacyPage() {
       intro={
         <>
           {PRODUCT_NAME} (lurk.so) is operated by AnyAPI. This policy says what we collect when you use
-          the hosted service, why, and who else handles it. Questions go to support@getanyapi.com.
+          the hosted service, why, and who else handles it. Questions go to {SUPPORT_EMAIL}.
         </>
       }
       sections={[
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
         {
           title: "Retention and your choices",
           body: [
-            "We keep account data while your account is open. Email support@getanyapi.com to access, correct, export or delete your data, or to close your account; we act on these requests within 30 days. You can remove an alert channel or disconnect a wallet or Slack at any time in settings.",
+            `We keep account data while your account is open. Email ${SUPPORT_EMAIL} to access, correct, export or delete your data, or to close your account; we act on these requests within 30 days. You can remove an alert channel or disconnect a wallet or Slack at any time in settings.`,
           ],
         },
         {

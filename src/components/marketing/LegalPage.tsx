@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/Wordmark";
+import { SUPPORT_EMAIL } from "@/lib/brand";
 
 export type LegalSection = { title: string; body: React.ReactNode[] };
 
@@ -33,7 +34,7 @@ export function LegalPage({
       ))}
       <p className="mt-12 opacity-60">
         <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link> ·{" "}
-        <a href="mailto:support@getanyapi.com">support@getanyapi.com</a>
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
       </p>
     </main>
   );

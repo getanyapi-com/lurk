@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     siteName: PRODUCT_NAME_WITH_PROVIDER,
     type: "website",
   },
+  // The large card, which takes its title, description and image from Open
+  // Graph's: opengraph-image.png is the one share image.
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

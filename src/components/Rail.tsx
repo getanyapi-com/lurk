@@ -3,32 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bell, Box, Lightbulb, Menu, Radar, Receipt, Search, Settings, SlidersHorizontal, Swords, Telescope, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { ChannelMark } from "@/components/alerts/ChannelMark";
 import { NEW_PROJECT_PATH } from "@/components/ProjectSwitcher";
+import { RAIL_ICONS, type RailIcon } from "@/components/railIcons";
 import type { AlertChannel } from "@/lib/alerts/types";
 import { cn } from "@/lib/utils";
 import { AnyapiRailCard } from "./AnyapiRailCard";
-import { XMark } from "./x/XMark";
-
-/** One icon per destination, so the rail reads at a glance. */
-const ICONS = {
-  radar: Radar,
-  search: Search,
-  lightbulb: Lightbulb,
-  swords: Swords,
-  box: Box,
-  telescope: Telescope,
-  filters: SlidersHorizontal,
-  bell: Bell,
-  receipt: Receipt,
-  settings: Settings,
-  // X's brand mark, not an icon. The key does not clash with lucide's `X`
-  // imported above, which is the drawer's close button.
-  x: XMark,
-} as const;
-
-export type RailIcon = keyof typeof ICONS;
 
 export type RailItem = {
   href: string;
@@ -124,7 +105,7 @@ export function Rail({ groups, projectId, children }: RailProps) {
             </span>
             {group.items.map((item) => {
               const active = pathname === item.href;
-              const Icon = ICONS[item.icon];
+              const Icon = RAIL_ICONS[item.icon];
               if (creating) {
                 return (
                   <span

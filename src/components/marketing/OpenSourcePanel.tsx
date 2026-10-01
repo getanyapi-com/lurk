@@ -1,9 +1,9 @@
 import { Braces, Code2 } from "lucide-react";
 import { AnyapiLink } from "@/components/AnyapiLink";
-import { REPO_URL } from "./researchContent";
+import { REPO_URL } from "@/lib/brand";
 
 const LINES = [
-  "$ git clone https://github.com/getanyapi-com/lurk.git",
+  `$ git clone ${REPO_URL}.git`,
   "$ cd lurk && cp .env.example .env",
   "$ docker compose up",
   "Applying database migrations",

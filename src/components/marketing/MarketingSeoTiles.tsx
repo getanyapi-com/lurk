@@ -1,7 +1,7 @@
 import { Check, Search, X } from "lucide-react";
 import { SubredditChip } from "@/components/SubredditChip";
 import { BrandImage } from "./BrandImage";
-import { BrandWord } from "./BrandWord";
+import { BRAND_MARKS, BrandWord } from "./BrandWord";
 import { EyebrowLink } from "./EyebrowLink";
 import { MOCK_SEO } from "./mockContent";
 import { SEO_THREADS } from "./researchContent";
@@ -37,13 +37,13 @@ export function MarketingSeoTiles() {
           <div className="pastel-art seo-art-google">
             <div className="google-card">
               <div className="google-query">
-                <BrandImage name="Google" src="/brands/google.svg" size={24} />
+                <BrandImage name="Google" src={BRAND_MARKS.Google} size={24} />
                 <span>{SEO_THREADS[0].keyword}</span>
                 <Search size={16} />
               </div>
               {SEO_THREADS.map((row) => (
                 <div className="google-hit" key={row.url}>
-                  <BrandImage name="Reddit" src="/brands/reddit.svg" size={20} />
+                  <BrandImage name="Reddit" src={BRAND_MARKS.Reddit} size={20} />
                   <span>
                     Reddit / r/{row.subreddit}
                     <strong>{row.title}</strong>

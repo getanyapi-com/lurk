@@ -9,3 +9,9 @@ export const ANYAPI_URL = "https://getanyapi.com/?utm_source=lurk";
 
 /** The name as it reads next to its data provider: headers, titles, agent-facing text. */
 export const PRODUCT_NAME_WITH_PROVIDER = `${PRODUCT_NAME} by AnyAPI`;
+
+/** Where a person writes to reach whoever runs the hosted instance. */
+export const SUPPORT_EMAIL = "support@getanyapi.com";
+
+/** The public source, which the home page, its footer and its clone line all point at. */
+export const REPO_URL = "https://github.com/getanyapi-com/lurk";

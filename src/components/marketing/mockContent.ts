@@ -5,7 +5,6 @@
  * Real r/nocode and r/Entrepreneur icons and the r/nocode sidebar policy came
  * from AnyAPI SDK reddit.subreddit_details on the same date ($0.0012 each).
  * Titles, permalinks, avatars, scores, reasons and phrases are real saved data.
- * Cost lines illustrate a measured call price, not total cost for these leads.
  * Round 3: distinct threads from reddit_posts; measure-* projects have no saved
  * leads. Their unscored examples are labeled, never assigned invented scores.
  * Public avatar/icon enrichment: 8 AnyAPI calls, $0.0096; missing community
@@ -16,7 +15,7 @@
  * gone from here because it is gone from the product's cards: it is a sort
  * order, and no card shows it.
  */
-import type { RailIcon } from "@/components/Rail";
+import type { RailIcon } from "@/components/railIcons";
 
 export type MockLead = {
   author: string;
@@ -82,24 +81,13 @@ export const MOCK_LEADS: MockLead[] = [
 ];
 
 export const MOCK_DETAIL = MOCK_LEADS[0];
-export const MOCK_TIMELINE = [
-  {
-    author: "driftmoose88",
-    avatar:
-      "https://i.redd.it/snoovatar/avatars/844c1f80-3dd6-42e5-9c6b-432481eda424-headshot.png",
-    subreddit: "nocode",
-  },
-  {
-    author: "jordanmiller81",
-    avatar:
-      "https://i.redd.it/snoovatar/avatars/00b115bf-9fbb-4b98-ae27-b1c14663f0d8-headshot.png",
-    subreddit: "nocode",
-  },
+/** Who is asking in the saved thread: the two leads and a third participant. */
+export const MOCK_TIMELINE: Pick<MockLead, "author" | "avatar">[] = [
+  ...MOCK_LEADS.map(({ author, avatar }) => ({ author, avatar })),
   {
     author: "akl773",
     avatar:
       "https://i.redd.it/snoovatar/avatars/755f90a8-7759-4e52-9bf3-f69f7295f175-headshot.png",
-    subreddit: "nocode",
   },
 ];
 export const MOCK_SEO = [

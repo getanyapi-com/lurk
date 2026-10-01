@@ -3,19 +3,8 @@ import { AnyapiMark } from "@/components/AnyapiMark";
 import { ANYAPI_URL } from "@/lib/brand";
 import { ANYAPI_PLATFORMS, ANYAPI_PRICES, ANYAPI_PRICES_OBSERVED } from "@/lib/anyapiCatalog";
 import { BrandImage } from "./BrandImage";
+import { BrandWord } from "./BrandWord";
 import { EyebrowLink } from "./EyebrowLink";
-
-type Platform = { name: string; src?: string; domain?: string };
-
-/** A platform named in running text carries its mark, like BrandWord. */
-function PlatformWord({ platform }: { platform: Platform }) {
-  return (
-    <span className="brand-word">
-      <BrandImage name={platform.name} src={platform.src} domain={platform.domain} />
-      {platform.name}
-    </span>
-  );
-}
 
 const named = (name: string) => ANYAPI_PLATFORMS.find((platform) => platform.name === name)!;
 
@@ -33,12 +22,10 @@ export function MarketingAnyapi() {
         </h2>
         <p>
           Every thread lurk reads comes through <a href={ANYAPI_URL}>AnyAPI</a>. The same key
-          reads <PlatformWord platform={named("TikTok")} />,{" "}
-          <PlatformWord platform={named("Instagram")} />,{" "}
-          <PlatformWord platform={named("YouTube")} />, <PlatformWord platform={named("X")} />,{" "}
-          <PlatformWord platform={named("LinkedIn")} />,{" "}
-          <PlatformWord platform={named("Google Maps")} /> and{" "}
-          <PlatformWord platform={named("Amazon")} />, and about 70 more platforms, as clean JSON.
+          reads <BrandWord {...named("TikTok")} />, <BrandWord {...named("Instagram")} />,{" "}
+          <BrandWord {...named("YouTube")} />, <BrandWord {...named("X")} />,{" "}
+          <BrandWord {...named("LinkedIn")} />, <BrandWord {...named("Google Maps")} /> and{" "}
+          <BrandWord {...named("Amazon")} />, and about 70 more platforms, as clean JSON.
         </p>
       </header>
       <div className="three-up">

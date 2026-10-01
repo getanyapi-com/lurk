@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/marketing/LegalPage";
-import { PRODUCT_NAME } from "@/lib/brand";
+import { PRODUCT_NAME, SUPPORT_EMAIL } from "@/lib/brand";
 
 export const metadata: Metadata = { title: `Terms of Service | ${PRODUCT_NAME}` };
 
@@ -49,7 +49,7 @@ export default function TermsPage() {
         {
           title: "Changes and contact",
           body: [
-            "We may update these terms; continuing to use the service after a change means you accept it. Contact support@getanyapi.com.",
+            `We may update these terms; continuing to use the service after a change means you accept it. Contact ${SUPPORT_EMAIL}.`,
           ],
         },
       ]}

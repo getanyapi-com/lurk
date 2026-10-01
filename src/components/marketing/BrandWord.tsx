@@ -29,11 +29,26 @@ export function BrandStack() {
   );
 }
 
-/** A platform named in running text always carries its mark. */
-export function BrandWord({ name, label }: { name: BrandName; label?: string }) {
+/**
+ * A platform named in running text always carries its mark: its own from
+ * BRAND_MARKS, or the `src` or favicon `domain` given for it, which win when
+ * given, so a platform lurk has no file for still gets one.
+ */
+export function BrandWord({
+  name,
+  label,
+  src,
+  domain,
+}: {
+  name: string;
+  label?: string;
+  src?: string;
+  domain?: string;
+}) {
+  const own = name in BRAND_MARKS ? BRAND_MARKS[name as BrandName] : undefined;
   return (
     <span className="brand-word">
-      <BrandImage name={name} src={BRAND_MARKS[name]} />
+      <BrandImage name={name} src={src ?? (domain ? undefined : own)} domain={domain} />
       {label ?? name}
     </span>
   );

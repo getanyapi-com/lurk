@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AnyapiLink } from "@/components/AnyapiLink";
 import { Wordmark } from "@/components/Wordmark";
+import { REPO_URL, SUPPORT_EMAIL } from "@/lib/brand";
 import { BrandWord } from "./BrandWord";
 
 const COLUMNS: { title: string; links: [React.ReactNode, string, string][] }[] = [
@@ -55,10 +56,10 @@ export function MarketingFooter() {
         ))}
         <div>
           <span>Get started</span>
-          <a href="https://github.com/getanyapi-com/lurk">GitHub / at launch</a>
+          <a href={REPO_URL}>GitHub / at launch</a>
           <Link href="/sign-up">Hosted free</Link>
           <AnyapiLink />
-          <a href="mailto:support@getanyapi.com">Contact</a>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>Contact</a>
         </div>
       </nav>
       <div className="footer-bottom">
