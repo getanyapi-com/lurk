@@ -138,10 +138,11 @@ export async function fetchSubredditPosts(
 
 /**
  * One thread, opened in full. The run is keyed on the post id rather than the
- * URL, the way its comments are: the feed opens a thread by its canonical URL,
- * a scan and the competitor scan by its slugged permalink, and the SEO refresh
- * by the link Google ranked, and all three are one thread bought once. The URL
- * the caller gave is still what Reddit is asked for.
+ * URL, the way its comments are: the feed and the SEO refresh open a thread by
+ * its canonical URL (a Google run stored before results were canonical still
+ * holds Google's own link), and a scan and the competitor scan by its slugged
+ * permalink, and all of them are one thread bought once. The URL the caller
+ * gave is still what Reddit is asked for.
  */
 export async function fetchPost(
   ctx: FetchContext,

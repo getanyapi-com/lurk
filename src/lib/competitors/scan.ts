@@ -107,10 +107,10 @@ async function scanOne(
     .slice(0, MENTION_POSTS_PER_COMPETITOR);
 
   await writeProgress(jobId, `Reading ${fresh.length} posts about ${competitor}`);
-  // Opened together, as a scan opens its shortlist, and kept in the order the
-  // search ranked them. A post Reddit will not hand back is judged on the text
-  // the search carried, so one failure costs that post its full text rather
-  // than stranding the posts beside it.
+  // Opened together, as a scan opens its shortlist, and kept newest first, the
+  // order `fresh` holds, however the posts come back. A post Reddit will not
+  // hand back is judged on the text the search carried, so one failure costs
+  // that post its full text rather than stranding the posts beside it.
   const opened = await inFlight(fresh, async (post) => {
     try {
       const result = await fetchPost(ctx, post.url, RETENTION_MS);

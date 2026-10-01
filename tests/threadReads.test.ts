@@ -5,9 +5,9 @@ import type { StoredPost } from "@/lib/reddit/store";
 /**
  * The competitor scan and the SEO refresh open their posts together rather
  * than one after another. What they write must still come out in the order
- * the search ranked them, and one post Reddit will not hand back must cost
- * only that post. Against a real database, with AnyAPI, Reddit and the models
- * faked.
+ * they handed the posts in, not the order Reddit answered, and one post Reddit
+ * will not hand back must cost only that post. Against a real database, with
+ * AnyAPI, Reddit and the models faked.
  */
 
 const fetchSearch = vi.fn();
@@ -87,7 +87,7 @@ describe.skipIf(!process.env.DATABASE_URL)("posts a job opens together", () => {
     return { db, schema, project, cleanup };
   }
 
-  it("judges a competitor's posts in the search's order, a failed one on the search's text", async () => {
+  it("judges a competitor's posts newest first, not as they open, a failed one on the search's text", async () => {
     const { runCompetitorScan } = await import("@/lib/competitors/scan");
     const { project, cleanup } = await fixture();
     const run = randomUUID().slice(0, 6);
@@ -107,7 +107,8 @@ describe.skipIf(!process.env.DATABASE_URL)("posts a job opens together", () => {
       reused: false,
       costUsd: 0.01,
     });
-    // The newest post answers last, and the middle one not at all.
+    // The search hands the oldest post first. The newest answers last, and the
+    // middle one not at all.
     fetchPost.mockImplementation(async (_ctx: unknown, url: string) => {
       const post = searched.find((one) => one.url === url) as StoredPost;
       if (post === searched[1]) {
@@ -187,6 +188,12 @@ describe.skipIf(!process.env.DATABASE_URL)("posts a job opens together", () => {
 
     const outcome = await runSeoRefresh(project.id, randomUUID());
 
+    // The same key discovery asks Google under, no timeframe and the latency
+    // preference, so a refresh reuses the runs discovery already bought.
+    expect(googleSearch).toHaveBeenCalledTimes(1);
+    expect(googleSearch).toHaveBeenCalledWith(expect.anything(), "best form builder reddit", {
+      preferLatency: true,
+    });
     expect(fetchPostComments.mock.calls.map((call) => call[1])).toEqual([first.id]);
     const rows = await db()
       .select()
