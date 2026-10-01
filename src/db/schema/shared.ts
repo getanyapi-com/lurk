@@ -149,19 +149,29 @@ export const searchRuns = pgTable(
     requestId: text("request_id"),
     fundedBy: text("funded_by").notNull(),
   },
-  (t) => [index("search_runs_kind_query_fetched_at_idx").on(t.kind, t.normalizedQuery, t.fetchedAt)],
+  (t) => [
+    index("search_runs_kind_query_fetched_at_idx").on(t.kind, t.normalizedQuery, t.fetchedAt),
+    // The house's spend today, summed before every call the house pays for.
+    // Not partial on 'house': drizzle sends it as a parameter, which a partial
+    // index only serves under a custom plan.
+    index("search_runs_funded_by_fetched_at_idx").on(t.fundedBy, t.fetchedAt),
+  ],
 );
 
-export const serpResults = pgTable("serp_results", {
-  id: text("id").primaryKey(),
-  searchRunId: text("search_run_id")
-    .notNull()
-    .references(() => searchRuns.id, { onDelete: "cascade" }),
-  position: integer("position").notNull(),
-  url: text("url").notNull(),
-  title: text("title"),
-  snippet: text("snippet"),
-});
+export const serpResults = pgTable(
+  "serp_results",
+  {
+    id: text("id").primaryKey(),
+    searchRunId: text("search_run_id")
+      .notNull()
+      .references(() => searchRuns.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    url: text("url").notNull(),
+    title: text("title"),
+    snippet: text("snippet"),
+  },
+  (t) => [index("serp_results_run_position_idx").on(t.searchRunId, t.position)],
+);
 
 /**
  * Which posts one run returned, so a reused run can hand back exactly the rows

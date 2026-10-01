@@ -368,7 +368,10 @@ export const seoOpportunities = pgTable(
     competitorPresent: boolean("competitor_present").notNull().default(false),
     refreshedAt: timestamp("refreshed_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("seo_opportunities_post_idx").on(t.postId)],
+  (t) => [
+    index("seo_opportunities_post_idx").on(t.postId),
+    index("seo_opportunities_project_keyword_idx").on(t.projectId, t.keyword),
+  ],
 );
 
 export const painThemes = pgTable("pain_themes", {
@@ -468,7 +471,12 @@ export const usageLedger = pgTable(
     reused: boolean("reused").notNull().default(false),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("usage_ledger_project_at_idx").on(t.projectId, t.at)],
+  (t) => [
+    index("usage_ledger_project_at_idx").on(t.projectId, t.at),
+    // The house's spend today, as search_runs_funded_by_fetched_at_idx is.
+    index("usage_ledger_funded_by_at_idx").on(t.fundedBy, t.at),
+    index("usage_ledger_search_run_idx").on(t.searchRunId),
+  ],
 );
 
 /**
@@ -514,16 +522,31 @@ export const llmUsage = pgTable(
   ],
 );
 
-export const jobs = pgTable("jobs", {
-  id: id(),
-  kind: text("kind").notNull(),
-  projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }),
-  runAt: timestamp("run_at", { withTimezone: true }).notNull().defaultNow(),
-  startedAt: timestamp("started_at", { withTimezone: true }),
-  finishedAt: timestamp("finished_at", { withTimezone: true }),
-  progress: text("progress"),
-  error: text("error"),
-});
+/**
+ * The queue. A finished row is kept for a month, and the newest of each kind
+ * for each project for good, since what a project last ran is shown on its
+ * pages (see pruneFinishedJobs).
+ */
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: id(),
+    kind: text("kind").notNull(),
+    projectId: text("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    runAt: timestamp("run_at", { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    progress: text("progress"),
+    error: text("error"),
+  },
+  (t) => [
+    index("jobs_project_kind_idx").on(t.projectId, t.kind),
+    // What the claim reads on every pump: the jobs still to run, by when.
+    index("jobs_unfinished_run_at_idx")
+      .on(t.runAt)
+      .where(sql`${t.finishedAt} is null`),
+  ],
+);
 
 /**
  * Every paid action a user pressed: Scan now, a profile rebuild, a refresh.

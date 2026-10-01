@@ -260,6 +260,13 @@
       "when": 1790791374660,
       "tag": "0036_post_fk_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790879873809,
+      "tag": "0037_queue_and_house_cap_indexes",
+      "breakpoints": true
     }
   ]
 }
