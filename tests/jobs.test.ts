@@ -576,7 +576,10 @@ describeDb("the job queue against a database", () => {
       .insert(projectKeywords)
       .values([project.id, unbriefed.id].map((projectId) => ({ projectId, keyword: "forms" })));
 
-    await seedProjectScans();
+    // Only this test's projects: every other file's are in the same database,
+    // and a job queued on one of them mid-test breaks that file's count.
+    const mine = [project.id, fresh.id, unbriefed.id];
+    await seedProjectScans(mine);
 
     const kinds = async (projectId: string) =>
       (await db().select().from(jobs).where(eq(jobs.projectId, projectId)))
@@ -593,15 +596,13 @@ describeDb("the job queue against a database", () => {
     await db()
       .insert(jobs)
       .values({ kind: "seo_refresh", projectId: project.id, runAt: ran, startedAt: ran, finishedAt: ran });
-    await seedProjectScans();
+    await seedProjectScans(mine);
     expect((await kinds(project.id)).filter((kind) => kind === "seo_refresh")).toHaveLength(2);
     expect(await kinds(project.id)).not.toContain("competitor_scan");
 
-    await db()
-      .delete(jobs)
-      .where(inArray(jobs.projectId, [project.id, fresh.id, unbriefed.id]));
+    await db().delete(jobs).where(inArray(jobs.projectId, mine));
     await db().delete(users).where(eq(users.id, user.id));
-    // It walks every project in the test database, which other files leave behind.
+    // Its stale-verdict and owed-search reads still scan every project in the test database.
   }, 60_000);
 });
 

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Cron } from "croner";
+import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { alertInvitesOn } from "@/lib/alerts/config";
@@ -88,8 +89,12 @@ async function pump(workers: number, watchedWorkers: number): Promise<void> {
  * one at all, so boot is the only place it can pick them up. A project holding
  * verdicts an older scorer made gets one sweep to bring them up to date; once
  * it has run there is nothing stale left, so it is never queued again.
+ *
+ * Boot walks every project. `only` narrows the walk to the projects named: the
+ * test database is shared by every test file at once, and a walk of all of it
+ * would queue jobs on the projects other files are in the middle of checking.
  */
-export async function seedProjectScans(): Promise<void> {
+export async function seedProjectScans(only?: string[]): Promise<void> {
   const rows = await db()
     .select({
       id: projects.id,
@@ -97,9 +102,12 @@ export async function seedProjectScans(): Promise<void> {
       profileVersion: projects.profileVersion,
       briefProfileVersion: projects.briefProfileVersion,
     })
-    .from(projects);
+    .from(projects)
+    .where(only ? inArray(projects.id, only) : undefined);
   const stale = await projectsWithStaleEvaluations();
-  const owedSearches = await projectsOwedSearches(new Date());
+  const owedSearches = (await projectsOwedSearches(new Date())).filter(
+    (projectId) => !only || only.includes(projectId),
+  );
   for (const [index, projectId] of owedSearches.entries()) {
     try {
       await enqueueOnce("widen_searches", new Date(Date.now() + BRIEF_START_MS + index * WIDEN_GAP_MS), projectId);
