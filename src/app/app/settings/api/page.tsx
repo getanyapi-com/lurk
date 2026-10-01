@@ -8,7 +8,7 @@ import { limitsForUser } from "@/lib/tier";
 export default async function ApiSettingsPage() {
   const user = await requireLocalUser();
   const [keys, tier] = await Promise.all([listApiKeys(user.id), limitsForUser(user.id)]);
-  const origin = config().APP_URL.replace(/\/$/, "");
+  const origin = config().APP_URL;
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <div className="flex flex-col gap-1">

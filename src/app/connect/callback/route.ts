@@ -6,7 +6,7 @@ import { exchangeCode } from "@/lib/oauth";
 import { CONNECT_COOKIE } from "../route";
 
 function settingsUrl(status: string): string {
-  return `${config().APP_URL.replace(/\/$/, "")}/app/settings?wallet=${status}`;
+  return `${config().APP_URL}/app/settings?wallet=${status}`;
 }
 
 /** Finishes the flow: verify state, exchange the code, store the encrypted tokens. */

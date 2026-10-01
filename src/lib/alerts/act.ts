@@ -46,7 +46,7 @@ export function actForToken(token: string): AlertAct | null {
 
 /** Where a link in an alert lands. The page, not the visit, does the act (app/alerts/act). */
 export function actUrl(appUrl: string, act: AlertAct): string {
-  return `${appUrl.replace(/\/$/, "")}/alerts/act?t=${encodeURIComponent(actToken(act))}`;
+  return `${appUrl}/alerts/act?t=${encodeURIComponent(actToken(act))}`;
 }
 
 /**

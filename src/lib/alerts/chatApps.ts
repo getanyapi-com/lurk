@@ -42,7 +42,7 @@ export type ChatAppFlow = {
 
 /** Where the service sends the person back to, which each app registers with it. */
 export function chatRedirectUri(app: ChatApp): string {
-  return `${config().APP_URL.replace(/\/$/, "")}/connect/${app}/callback`;
+  return `${config().APP_URL}/connect/${app}/callback`;
 }
 
 function credentials(app: ChatApp): ChatAppCredentials {

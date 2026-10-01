@@ -10,9 +10,23 @@ const blankIsAbsent = (value: unknown) => (value === "" ? undefined : value);
 
 const optional = <T extends z.ZodType>(inner: T) => z.preprocess(blankIsAbsent, inner.optional());
 
+/**
+ * A base URL every link is built on as `${base}/path`, held without its
+ * trailing slash so "https://lurk.so/" cannot make "https://lurk.so//alerts/on".
+ * The transform sits after the default, so zod runs it on the default too.
+ */
+const baseUrl = (fallback: string) =>
+  z.preprocess(
+    blankIsAbsent,
+    z
+      .url()
+      .default(fallback)
+      .transform((url) => url.replace(/\/+$/, "")),
+  );
+
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
-  APP_URL: z.preprocess(blankIsAbsent, z.url().default("http://localhost:3000")),
+  APP_URL: baseUrl("http://localhost:3000"),
   /**
    * Webhooks may only reach public addresses. A self-hosted instance that
    * delivers to its own network says so here.
@@ -21,7 +35,7 @@ const schema = z.object({
   APP_ENCRYPTION_KEY: z.string().min(1),
   SELF_HOSTED: z.preprocess(blankIsAbsent, bool),
 
-  ANYAPI_BASE_URL: z.preprocess(blankIsAbsent, z.url().default("https://api.getanyapi.com")),
+  ANYAPI_BASE_URL: baseUrl("https://api.getanyapi.com"),
   ANYAPI_OAUTH_CLIENT_ID: optional(z.string()),
   ANYAPI_HOUSE_API_KEY: optional(z.string()),
 

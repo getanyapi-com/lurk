@@ -27,7 +27,7 @@ export function randomState(): string {
 }
 
 export function redirectUri(): string {
-  return `${config().APP_URL.replace(/\/$/, "")}/connect/callback`;
+  return `${config().APP_URL}/connect/callback`;
 }
 
 export function authorizeUrl(state: string, challenge: string): string {
@@ -44,11 +44,11 @@ export function authorizeUrl(state: string, challenge: string): string {
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
-  return `${ANYAPI_BASE_URL.replace(/\/$/, "")}/oauth/authorize?${query.toString()}`;
+  return `${ANYAPI_BASE_URL}/oauth/authorize?${query.toString()}`;
 }
 
 async function postToken(form: URLSearchParams): Promise<TokenResponse> {
-  const response = await fetch(`${config().ANYAPI_BASE_URL.replace(/\/$/, "")}/oauth/token`, {
+  const response = await fetch(`${config().ANYAPI_BASE_URL}/oauth/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: form,
@@ -86,7 +86,7 @@ export function refreshTokens(refreshToken: string): Promise<TokenResponse> {
 /** Best effort: a failed revoke must not block disconnecting locally. */
 export async function revokeToken(token: string): Promise<void> {
   try {
-    await fetch(`${config().ANYAPI_BASE_URL.replace(/\/$/, "")}/oauth/revoke`, {
+    await fetch(`${config().ANYAPI_BASE_URL}/oauth/revoke`, {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token }),

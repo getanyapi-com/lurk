@@ -43,7 +43,7 @@ export async function startChatInstall(app: ChatApp, request: NextRequest): Prom
 /** Finishes the install: check the state, take the webhook, add the channel. */
 export async function finishChatInstall(app: ChatApp, request: NextRequest): Promise<NextResponse> {
   const { cookie, exchange } = CHAT_APPS[app];
-  const appUrl = config().APP_URL.replace(/\/$/, "");
+  const appUrl = config().APP_URL;
   // The settings page says how it went, under ?slack= or ?discord=.
   const alertsUrl = (projectId: string | null, status: string) => {
     const query = new URLSearchParams({ [app]: status });

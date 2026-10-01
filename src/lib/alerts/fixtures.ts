@@ -65,7 +65,7 @@ export function sampleDigest(projectName: string, now = new Date()): Digest {
   const appUrl = config().APP_URL;
   // The links are drawn as a real digest draws them, but land on a page that
   // says it was a sample, so testing a channel never mutes a real community.
-  const sampleAct = `${appUrl.replace(/\/$/, "")}/alerts/act?sample=1`;
+  const sampleAct = `${appUrl}/alerts/act?sample=1`;
   return {
     projectName,
     generatedAt: now,
