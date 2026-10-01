@@ -169,7 +169,7 @@ describe.skipIf(!process.env.DATABASE_URL)("replied threads and mutes, read from
   it("marks an X conversation replied and takes it back, every lead in it alike", async () => {
     const { db, schema, projectId } = await fixture();
     const { eq } = await import("drizzle-orm");
-    const { isThreadHandled, markThreadReplied, reopenThread } = await import("@/lib/handled");
+    const { markThreadReplied, reopenThread } = await import("@/lib/handled");
     const conversation = `9${Date.now()}`;
     const ids = [conversation, `${conversation}1`, `8${Date.now()}`];
     await db()
@@ -191,7 +191,9 @@ describe.skipIf(!process.env.DATABASE_URL)("replied threads and mutes, read from
     expect(await statuses()).toEqual(["replied", "replied", "new"]);
     await reopenThread(projectId, "x", conversation);
     expect(await statuses()).toEqual(["new", "new", "new"]);
-    expect(await isThreadHandled(projectId, "x", conversation)).toBe(false);
+    expect(
+      await db().select().from(schema.handledThreads).where(eq(schema.handledThreads.projectId, projectId)),
+    ).toEqual([]);
   });
 
   it("mutes a whole word or phrase and a whole subreddit, and unmuting brings them back", async () => {
