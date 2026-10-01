@@ -80,7 +80,7 @@ export type ApiProjectDetail = ApiProject & {
   competitors: string[];
 };
 
-/** The plan as it is being read: a candidate or an excluded row is not listed. */
+/** One project with the plan it is reading now: a candidate or an excluded row is not listed. */
 export async function getApiProject(project: Project): Promise<ApiProjectDetail> {
   const [keywords, subreddits, competitors, newLeads] = await Promise.all([
     db()
