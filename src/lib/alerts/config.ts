@@ -35,24 +35,29 @@ export function alertInvitesOn(): boolean {
   return config().ALERT_INVITES && emailSender() !== null;
 }
 
-export type SlackApp = { clientId: string; clientSecret: string };
+/** The chat services a person can add a channel from in one click, rather than by pasting a webhook. */
+export type ChatApp = "slack" | "discord";
 
-/** The Slack app behind Add to Slack, or null when only paste-a-URL is on. */
-export function slackApp(): SlackApp | null {
-  const { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } = config();
-  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+export type ChatAppCredentials = { clientId: string; clientSecret: string };
+
+/** The two settings each service's app is made of. */
+export const CHAT_APP_ENV = {
+  slack: { id: "SLACK_CLIENT_ID", secret: "SLACK_CLIENT_SECRET" },
+  discord: { id: "DISCORD_CLIENT_ID", secret: "DISCORD_CLIENT_SECRET" },
+} as const;
+
+/** The app behind Add to Slack or Add to Discord, or null when only paste-a-URL is on. */
+export function chatAppCredentials(app: ChatApp): ChatAppCredentials | null {
+  const env = config();
+  const clientId = env[CHAT_APP_ENV[app].id];
+  const clientSecret = env[CHAT_APP_ENV[app].secret];
+  if (!clientId || !clientSecret) {
     return null;
   }
-  return { clientId: SLACK_CLIENT_ID, clientSecret: SLACK_CLIENT_SECRET };
+  return { clientId, clientSecret };
 }
 
-export type DiscordApp = { clientId: string; clientSecret: string };
-
-/** The Discord app behind Add to Discord, or null when only paste-a-URL is on. */
-export function discordApp(): DiscordApp | null {
-  const { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET } = config();
-  if (!DISCORD_CLIENT_ID || !DISCORD_CLIENT_SECRET) {
-    return null;
-  }
-  return { clientId: DISCORD_CLIENT_ID, clientSecret: DISCORD_CLIENT_SECRET };
+/** Whether the screens offer Add to Slack or Add to Discord at all. */
+export function chatAppConfigured(app: ChatApp): boolean {
+  return chatAppCredentials(app) !== null;
 }

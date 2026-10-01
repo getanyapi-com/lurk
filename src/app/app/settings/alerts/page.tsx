@@ -3,7 +3,7 @@ import { AddChannelForm } from "@/components/alerts/AddChannelForm";
 import { AlertChannelList, type ChannelRow } from "@/components/alerts/AlertChannelList";
 import { MuteList } from "@/components/alerts/MuteList";
 import { describeTarget, listChannels } from "@/lib/alerts/channels";
-import { discordApp, slackApp } from "@/lib/alerts/config";
+import { chatAppConfigured } from "@/lib/alerts/config";
 import { customWebhookAllowance, customWebhookCapText } from "@/lib/alerts/select";
 import { requireLocalUser } from "@/lib/auth";
 import { listMutes } from "@/lib/mutes";
@@ -81,8 +81,8 @@ export default async function AlertsPage({ searchParams }: AlertsPageProps) {
         projectId={project.id}
         customWebhooksAtCap={allowance.atCap}
         hourlyAllowed={limits?.alertCadence !== "daily"}
-        slackInstall={slackApp() !== null}
-        discordInstall={discordApp() !== null}
+        slackInstall={chatAppConfigured("slack")}
+        discordInstall={chatAppConfigured("discord")}
       />
       <div className="flex flex-col gap-1">
         <h2 className="text-h3" style={{ fontWeight: 500 }}>

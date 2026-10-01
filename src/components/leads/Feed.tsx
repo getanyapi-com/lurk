@@ -14,7 +14,7 @@ import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { buildStream, rowExcerpt, toCard } from "@/components/leads/stream";
 import { entryHref, requestedEntry, selectEntry, type Selection } from "@/components/leads/workspace";
-import { discordApp, slackApp } from "@/lib/alerts/config";
+import { chatAppConfigured } from "@/lib/alerts/config";
 import { alertsOffer, offerPreview } from "@/lib/alerts/offer";
 import { requireLocalUser } from "@/lib/auth";
 import { feedFilter, type FeedParams, type LeadStatus, type ReviewItem } from "@/lib/feed";
@@ -212,8 +212,8 @@ export async function Feed({ projectId, params: asked }: FeedProps) {
           projectId={projectId}
           offer={offer}
           preview={preview}
-          slackInstall={slackApp() !== null}
-          discordInstall={discordApp() !== null}
+          slackInstall={chatAppConfigured("slack")}
+          discordInstall={chatAppConfigured("discord")}
         />
       ) : null}
       {/* The pills ride in the strip's top line, so the two cost one row between them. */}
