@@ -228,8 +228,36 @@ describe("the excerpt", () => {
 describe("chat payloads", () => {
   it("puts the headline and every lead in the Slack blocks", () => {
     const payload = payloadFor("slack", digestOf(messageLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP).leads));
-    expect(payload).toMatchObject({ text: "1 new lead for Acme in the last 24 hours." });
+    expect(payload).toMatchObject({ text: "1 new lead for Acme, found in the last 24 hours." });
     expect(JSON.stringify(payload)).toContain("https://www.reddit.com/r/SaaS/comments/x/");
+  });
+
+  /**
+   * Chat lists five; the email lists twenty. Both count every lead the window
+   * held, so a big day reads as the same big day in each, and chat says where
+   * the rest are as the email does.
+   */
+  it("counts every lead the window held in chat, and says where the rest are", () => {
+    const rows = Array.from({ length: 8 }, (_, index) => lead({ id: `l${index}`, score: 90 - index }));
+    const listed = messageLeads(rows, SINCE, CHAT_LEAD_CAP).leads;
+    const digest = { ...digestOf(listed), more: rows.length - listed.length };
+    const slack = payloadFor("slack", digest) as { text: string; attachments: unknown[] };
+    const discord = payloadFor("discord", digest) as { content: string; embeds: Array<{ description?: string }> };
+
+    expect(slack.text).toBe("8 new leads for Acme, found in the last 24 hours.");
+    expect(discord.content).toBe(slack.text);
+    expect(JSON.stringify(slack.attachments.at(-1))).toContain(
+      "And 3 more <https://leads.example.com/app/leads|in the feed>.",
+    );
+    expect(discord.embeds.at(-2)?.description).toBe("And 3 more [in the feed](https://leads.example.com/app/leads).");
+    expect(renderDigestHtml(digest)).toContain("8 new leads for Acme, found in the last 24 hours.");
+    expect(renderDigestText(digest)).toContain("8 new leads for Acme, found in the last 24 hours.");
+    expect(renderDigestText(digest)).toContain("And 3 more in the feed.");
+  });
+
+  it("says one lead in the singular in the email's plain part", () => {
+    const text = renderDigestText(digestOf(messageLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP).leads));
+    expect(text.split("\n\n")[0]).toBe("1 new lead for Acme, found in the last 24 hours.");
   });
 
   it("shows a Slack lead as its linked title over the author's words, not the rubric", () => {
@@ -242,7 +270,7 @@ describe("chat payloads", () => {
     expect(first.color).toBe("#e49e22");
     expect(blocks[0]).toMatchObject({
       text: {
-        text: "*<https://www.reddit.com/r/SaaS/comments/x/|Scraper &lt;help&gt; &amp; advice>*\nWe are paying too much for a scraper that breaks. What are people switching to?",
+        text: "*<https://www.reddit.com/r/SaaS/comments/x/|Scraper &lt;help&gt; &amp; advice>*\n“paying too much”",
       },
     });
     expect(JSON.stringify(blocks[1])).toContain(
@@ -251,10 +279,35 @@ describe("chat payloads", () => {
     expect(JSON.stringify(payload)).not.toContain("Names the tool and the price.");
   });
 
-  it("says when the lead is a comment, and falls back to the phrase with no body", () => {
+  /**
+   * One quote rule for every channel and both parts of an email: the matched
+   * line, unless it only repeats the title, and the author's own words then.
+   */
+  it("quotes the same words in chat and in both parts of the email", () => {
+    const phrase = digestOf(messageLeads([lead({ id: "a" })], SINCE, EMAIL_LEAD_CAP).leads);
+    const echo = digestOf(
+      messageLeads(
+        [lead({ id: "a", body: "Intro text.", matchedPhrase: "Paying too much for a scraper!" })],
+        SINCE,
+        EMAIL_LEAD_CAP,
+      ).leads,
+    );
+
+    expect(renderDigestHtml(phrase)).toContain("&ldquo;paying too much&rdquo;");
+    expect(renderDigestText(phrase)).toContain("\n“paying too much”\n");
+    expect(JSON.stringify(payloadFor("slack", phrase))).toContain("\\n“paying too much”");
+    expect(renderDigestText(phrase)).not.toContain("What are people switching to?");
+
+    expect(renderDigestHtml(echo)).toContain("Intro text.");
+    expect(renderDigestText(echo)).toContain("\nIntro text.\n");
+    expect(JSON.stringify(payloadFor("slack", echo))).toContain("\\nIntro text.");
+    expect(JSON.stringify(payloadFor("discord", echo))).not.toContain("Paying too much for a scraper!");
+  });
+
+  it("says when the lead is a comment, and quotes its phrase with no body", () => {
     const one = lead({ id: "a", body: null, isComment: true });
     const payload = JSON.stringify(payloadFor("slack", digestOf(messageLeads([one], SINCE, EMAIL_LEAD_CAP).leads)));
-    expect(payload).toContain("\\npaying too much");
+    expect(payload).toContain("\\n“paying too much”");
     expect(payload).toContain("comment by u/ella_builds");
   });
 
@@ -265,7 +318,7 @@ describe("chat payloads", () => {
         {
           author: { name: "u/ella_builds" },
           title: "Paying too much for a scraper",
-          description: expect.stringContaining("paying too much for a scraper that breaks"),
+          description: "“paying too much”",
           color: 0xe49e22,
           fields: [
             { name: "Score", value: "70" },

@@ -1,32 +1,27 @@
 import { PRODUCT_NAME } from "@/lib/brand";
 import { shortAge } from "@/lib/format";
 import { postJson } from "./outbound";
-import { actLinksOf, handleOf, PLATFORM_NAME, repliesPhrase, showsScore, venueOf, X_ASK_LABEL } from "./platform";
+import {
+  actLinksOf,
+  FEED_PATH,
+  handleOf,
+  headlineOf,
+  MORE_LINK,
+  moreLine,
+  PLATFORM_NAME,
+  quoteText,
+  repliesPhrase,
+  showsScore,
+  venueOf,
+  X_ASK_LABEL,
+} from "./platform";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
 import { EMAIL_COLORS, scoreColor } from "./tokens";
 import type { Digest, DigestLead } from "./types";
 
-function headline(digest: Digest): string {
-  const count = digest.leads.length;
-  const window = digest.cadence === "hourly" ? "in the last hour" : "in the last 24 hours";
-  return `${count} new ${count === 1 ? "lead" : "leads"} for ${digest.projectName} ${window}.`;
-}
-
 /** Slack reads these three as markup wherever they appear, a Reddit title included. */
 function slackEscape(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-/**
- * What the author wrote, or the matched phrase when there is no body to quote.
- * The rubric sentence in `reason` reads the same on every lead, so an alert
- * leaves it to the feed and spends the room on the thread.
- */
-function quoted(lead: DigestLead): string | null {
-  if (lead.excerpt) {
-    return lead.excerpt;
-  }
-  return lead.matchedPhrase && lead.matchedPhrase !== lead.title ? lead.matchedPhrase : null;
 }
 
 /** Where the lead sits: the subreddit or X, who wrote it, how old, how busy the thread is. */
@@ -61,7 +56,7 @@ function discordDescription(lead: DigestLead): string | undefined {
   const acts = actLinksOf(lead)
     .map((link) => `[${link.label}](${link.url})`)
     .join(" · ");
-  const quote = quoted(lead);
+  const quote = quoteText(lead);
   const text = [quote, acts].filter((part): part is string => !!part).join("\n\n");
   return text || undefined;
 }
@@ -70,10 +65,12 @@ function discordDescription(lead: DigestLead): string | undefined {
  * One lead as a Slack attachment, the only Slack shape with a coloured stripe:
  * the stripe is the score badge's colour, the byline carries the author's face.
  * No button, because a link button makes Slack call an interactivity endpoint
- * the incoming-webhook app does not have, and shows the reader a warning.
+ * the incoming-webhook app does not have, and shows the reader a warning. The
+ * words under the title are the email's (`quoteOf`), never the rubric sentence
+ * in `reason`, which reads the same on every lead.
  */
 function slackLead(lead: DigestLead, now: Date) {
-  const quote = quoted(lead);
+  const quote = quoteText(lead);
   const title = `*<${lead.url}|${slackEscape(lead.title)}>*`;
   const face = lead.avatarUrl
     ? [{ type: "image", image_url: lead.avatarUrl, alt_text: handleOf(lead) }]
@@ -97,17 +94,20 @@ function slackLead(lead: DigestLead, now: Date) {
 }
 
 /**
- * Slack: a headline, then one attachment per lead with the linked title over
- * the author's own words and a quiet byline saying where it is.
+ * Slack: a headline counting every lead the window held, then one attachment
+ * per lead it lists with the linked title over the author's own words and a
+ * quiet byline saying where it is, then where the rest are.
  */
 export function slackPayload(digest: Digest) {
+  const more = moreLine(digest, (platform) => `<${digest.appUrl}${FEED_PATH[platform]}|${MORE_LINK[platform]}>`);
   return {
-    text: headline(digest),
-    blocks: [{ type: "header", text: { type: "plain_text", text: headline(digest) } }],
+    text: headlineOf(digest),
+    blocks: [{ type: "header", text: { type: "plain_text", text: headlineOf(digest) } }],
     attachments: [
       ...digest.leads.map((lead) => slackLead(lead, digest.generatedAt)),
       {
         blocks: [
+          ...(more ? [{ type: "section", text: { type: "mrkdwn", text: more } }] : []),
           {
             type: "context",
             elements: [
@@ -124,16 +124,17 @@ export function slackPayload(digest: Digest) {
 }
 
 /**
- * Discord embeds, one per lead, so each carries its own clickable title. The
- * AnyAPI line is its own embed after them: Discord allows ten, and the digest
- * carries five leads.
+ * Discord embeds, one per lead, so each carries its own clickable title. Where
+ * the rest are and the AnyAPI line are their own embeds after them: Discord
+ * allows ten, and the digest carries five leads.
  */
 export function discordPayload(digest: Digest) {
+  const more = moreLine(digest, (platform) => `[${MORE_LINK[platform]}](${digest.appUrl}${FEED_PATH[platform]})`);
   return {
     // A webhook posts under whatever name it was made with; this keeps it lurk.
     username: PRODUCT_NAME,
     avatar_url: `${digest.appUrl}/email/lurk-discord.png`,
-    content: headline(digest),
+    content: headlineOf(digest),
     embeds: [
       ...digest.leads.map((lead) => ({
         author: {
@@ -158,6 +159,7 @@ export function discordPayload(digest: Digest) {
               : repliesPhrase(lead.numComments, lead.platform),
         },
       })),
+      ...(more ? [{ description: more }] : []),
       {
         description: `${ANYAPI_PLUG} [${ANYAPI_PLUG_CTA}](${anyapiAlertUrl("discord")})`,
       },

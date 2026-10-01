@@ -14,32 +14,29 @@ import {
   actLinksOf,
   FEED_PATH,
   handleOf,
+  headlineOf,
+  MORE_LINK,
+  moreLine,
+  newLeadsPhrase,
   PLATFORM_ICON,
   PLATFORM_NAME,
   platformsOf,
+  quoteOf,
+  quoteText,
   repliesPhrase,
   showsScore,
+  totalOf,
   venueOf,
+  windowPhrase,
 } from "./platform";
 import { ANYAPI_PLUG, ANYAPI_PLUG_CTA, anyapiAlertUrl } from "./plug";
-import { sameWords } from "./select";
 import type { Digest, DigestLead, LeadPlatform } from "./types";
 
 const WIDTH = 600;
 const AXIS_MARKS = [0, 6, 12, 18];
 
-function windowPhrase(digest: Digest): string {
-  return digest.cadence === "hourly" ? "in the last hour" : "in the last 24 hours";
-}
-
-/** Every lead the window held, listed or not. */
-function totalOf(digest: Digest): number {
-  return digest.leads.length + (digest.more ?? 0);
-}
-
 export function digestSubject(digest: Digest): string {
-  const count = totalOf(digest);
-  return `${count} new ${count === 1 ? "lead" : "leads"} for ${digest.projectName}`;
+  return `${newLeadsPhrase(totalOf(digest))} for ${digest.projectName}`;
 }
 
 /**
@@ -79,9 +76,7 @@ function headerRow(digest: Digest): string {
 }
 
 function headlineRow(digest: Digest): string {
-  const count = totalOf(digest);
-  const noun = count === 1 ? "new lead" : "new leads";
-  return `<tr><td style="padding:24px 24px 8px;font-family:${EMAIL_FONT};font-size:20px;line-height:1.3;font-weight:500;color:${C.fg}">${count} ${noun} for ${escapeHtml(digest.projectName)}, found ${windowPhrase(digest)}.</td></tr>`;
+  return `<tr><td style="padding:24px 24px 8px;font-family:${EMAIL_FONT};font-size:20px;line-height:1.3;font-weight:500;color:${C.fg}">${escapeHtml(headlineOf(digest))}</td></tr>`;
 }
 
 function earlierPills(leads: DigestLead[], today: number): string {
@@ -143,19 +138,15 @@ function commentsPhrase(count: number | null, platform: LeadPlatform): string[] 
   return count == null ? [] : [repliesPhrase(count, platform)];
 }
 
-/** What the person wrote: the line that made it a lead, or the start of it. */
+/** What the person wrote, as `quoteOf` picks it: the phrase set as a quote, the excerpt as muted text. */
 function wordsOf(lead: DigestLead, size: number): string {
-  // The quote stands in for the excerpt, unless it only repeats the title.
-  const quote =
-    lead.matchedPhrase && !sameWords(lead.matchedPhrase, lead.title)
-      ? lead.matchedPhrase
-      : null;
-  if (quote) {
-    return `<div style="margin-top:6px;padding:6px 10px;border-radius:${EMAIL_RADIUS.control};background:${C.surface2};font-family:${EMAIL_FONT};font-size:${size}px;color:${C.fg}">&ldquo;${escapeHtml(quote)}&rdquo;</div>`;
+  const quote = quoteOf(lead);
+  if (!quote) {
+    return "";
   }
-  return lead.excerpt
-    ? `<div style="margin-top:6px;font-family:${EMAIL_FONT};font-size:${size}px;line-height:1.5;color:${C.fgMuted}">${escapeHtml(lead.excerpt)}</div>`
-    : "";
+  return quote.kind === "phrase"
+    ? `<div style="margin-top:6px;padding:6px 10px;border-radius:${EMAIL_RADIUS.control};background:${C.surface2};font-family:${EMAIL_FONT};font-size:${size}px;color:${C.fg}">&ldquo;${escapeHtml(quote.text)}&rdquo;</div>`
+    : `<div style="margin-top:6px;font-family:${EMAIL_FONT};font-size:${size}px;line-height:1.5;color:${C.fgMuted}">${escapeHtml(quote.text)}</div>`;
 }
 
 /**
@@ -266,32 +257,15 @@ ${feeds}<a href="${escapeHtml(digest.appUrl)}/app/settings/alerts" style="color:
 &middot; ${escapeHtml(PRODUCT_NAME_WITH_PROVIDER)}</td></tr>`;
 }
 
-const MORE_LINK: Record<LeadPlatform, string> = { reddit: "in the feed", x: "in X leads" };
-
-/**
- * Where "the rest" are listed: the tab of each platform the message left leads
- * out on, which is not always one it lists. A digest built without that says
- * the platforms it lists.
- */
-function leftoverPlatforms(digest: Digest): LeadPlatform[] {
-  return digest.morePlatforms?.length ? digest.morePlatforms : platformsOf(digest.leads);
-}
-
-/** Each of those as `place` writes it, joined by "and": "in the feed and in X leads". */
-function morePlaces(digest: Digest, place: (platform: LeadPlatform) => string): string {
-  return leftoverPlatforms(digest).map(place).join(" and ");
-}
-
 function moreRow(digest: Digest): string {
-  if (!digest.more) {
-    return "";
-  }
-  const places = morePlaces(
+  const line = moreLine(
     digest,
     (platform) =>
       `<a href="${escapeHtml(digest.appUrl)}${FEED_PATH[platform]}" style="color:${C.fg};text-decoration:underline">${MORE_LINK[platform]}</a>`,
   );
-  return `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:14px;color:${C.fgMuted}">And ${digest.more} more ${places}.</td></tr>`;
+  return line
+    ? `<tr><td style="padding:0 24px 24px;font-family:${EMAIL_FONT};font-size:14px;color:${C.fgMuted}">${line}</td></tr>`
+    : "";
 }
 
 function emptyRow(digest: Digest): string {
@@ -313,14 +287,15 @@ export function renderDigestHtml(digest: Digest): string {
 export function renderDigestText(digest: Digest): string {
   const lines = digest.leads.map(
     (lead) =>
-      `${showsScore(lead) ? `${lead.score} - ` : ""}${lead.isComment ? "Reply in: " : ""}${lead.title} (${venueOf(lead)}, ${handleOf(lead)}, ${leadAge(lead.createdAt, digest.generatedAt)})\n${lead.excerpt ?? lead.matchedPhrase ?? ""}\n${lead.url}${actLinksOf(lead)
+      `${showsScore(lead) ? `${lead.score} - ` : ""}${lead.isComment ? "Reply in: " : ""}${lead.title} (${venueOf(lead)}, ${handleOf(lead)}, ${leadAge(lead.createdAt, digest.generatedAt)})\n${quoteText(lead) ?? ""}\n${lead.url}${actLinksOf(lead)
         .map((link) => `\n${link.label}: ${link.url}`)
         .join("")}`,
   );
+  const more = moreLine(digest, (platform) => MORE_LINK[platform]);
   return [
-    `${totalOf(digest)} new leads for ${digest.projectName}, found ${windowPhrase(digest)}.`,
+    headlineOf(digest),
     ...lines,
-    ...(digest.more ? [`And ${digest.more} more ${morePlaces(digest, (platform) => MORE_LINK[platform])}.`] : []),
+    ...(more ? [more] : []),
     ...linkedPlatforms(digest).map((platform) => `${digest.appUrl}${FEED_PATH[platform]}`),
     `${ANYAPI_PLUG} ${anyapiAlertUrl("email")}`,
   ].join("\n\n");
