@@ -12,7 +12,6 @@ import { redditScore } from "@/lib/scoring/weights";
 import { judgeThreads, readLeadThreads } from "./comments";
 import { hydrationCap, inFlight } from "./constants";
 import { isSentinel } from "./evidence";
-import { routeLead, type LeadKind } from "./gates";
 import {
   alreadyJudged,
   loadEvaluations,
@@ -55,13 +54,12 @@ export function toLead(
   judgement: Judgement,
   postId: string,
   commentId: string | null,
-  kind: LeadKind,
 ): LeadRow {
   return {
     projectId: project.id,
     postId,
     commentId,
-    kind,
+    kind: "buyer",
     // The verdict's own score folds the default weights; the lead is ranked
     // by the ones this project's owner chose.
     score: redditScore(judgement, project.scoring),
@@ -73,28 +71,6 @@ export function toLead(
     reason: judgement.reason,
     matchedPhrase: judgement.matchedPhrase,
   };
-}
-
-/**
- * Only a qualified judgement reaches the feed. The gates in gates.ts settled
- * that; the project's own minimum score is applied when the feed is read, so
- * moving it never has to mean scanning again.
- */
-function qualified<T extends { judgement: Judgement }>(items: T[]): T[] {
-  return items.filter((item) => item.judgement.decision === "qualify");
-}
-
-/**
- * The posts that reach the feed, each with the lane it belongs in. A buyer is
- * the lead the project asked for; a thread the product plainly fits where
- * nobody is asking is kept as context, because a comment there is still worth
- * writing. Everything gates.ts rejects outright is dropped here.
- */
-export function routed<T extends { judgement: Judgement }>(items: T[]): (T & { kind: LeadKind })[] {
-  return items.flatMap((item) => {
-    const kind = routeLead(item.judgement);
-    return kind === null ? [] : [{ ...item, kind }];
-  });
 }
 
 export function postItem(post: StoredPost): ScorableItem {
@@ -269,11 +245,15 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
 
   await writeProgress(jobId, `Scoring ${toJudge.length} of ${sources.length} posts`);
   const judgements = [...cut, ...(await judgeItems(projectId, project.product, toJudge, readings))];
-  const scored = judgements.map((judgement) => ({ judgement }));
   const fullById = new Map(unjudgedPosts.map((post) => [post.id, post]));
-  const postLeads = routed(scored).map((item) =>
-    toLead(project, item.judgement, item.judgement.id, null, item.kind),
-  );
+  /**
+   * Only a qualified judgement reaches the feed. The gates in gates.ts settled
+   * that; the project's own minimum score is applied when the feed is read, so
+   * moving it never has to mean scanning again.
+   */
+  const postLeads = judgements
+    .filter((judgement) => judgement.decision === "qualify")
+    .map((judgement) => toLead(project, judgement, judgement.id, null));
   await writeLeads(postLeads);
   /**
    * A post this run judged again and no longer routes anywhere loses its lead.
@@ -304,8 +284,9 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   const { threads } = await readLeadThreads(ctx, threadPosts);
   await writeThreadMentions(projectId, project.competitors, threads);
   const judged = await judgeThreads(project, threads, stored);
-  const commentLeads = qualified(judged.discovery).map((item) =>
-    toLead(project, item.judgement, item.postId, item.comment.id, "buyer"),
+  const askers = judged.discovery.filter((item) => item.judgement.decision === "qualify");
+  const commentLeads = askers.map((item) =>
+    toLead(project, item.judgement, item.postId, item.comment.id),
   );
   await writeLeads(commentLeads);
   await writeEvaluations(judged.records);
@@ -320,7 +301,7 @@ export async function runScan(projectId: string, jobId: string): Promise<ScanOut
   await writeProgress(jobId, "Looking up who posted");
   await fetchAvatars(ctx, [
     ...postLeads.map((lead) => fullById.get(lead.postId)?.author ?? ""),
-    ...qualified(judged.discovery).map((item) => item.comment.author ?? ""),
+    ...askers.map((item) => item.comment.author ?? ""),
   ]);
 
   await creditSources(

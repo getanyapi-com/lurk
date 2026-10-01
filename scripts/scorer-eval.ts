@@ -19,7 +19,6 @@ if (existsSync(".env")) {
 const { db } = await import("../src/db");
 const { projects } = await import("../src/db/schema");
 const { judgeItems } = await import("../src/lib/scan/score");
-const { routeLead } = await import("../src/lib/scan/gates");
 type ProductFacts = import("../src/lib/product").ProductFacts;
 
 type Gold = "lead" | "weak" | "not";
@@ -42,7 +41,7 @@ const only = flag("only")?.split(",");
 const [local] = await db().select({ id: projects.id }).from(projects).limit(1);
 if (!local) throw new Error("the local database has no project to bill the calls to");
 
-type Row = { project: string; id: string; gold: Gold; was: string; shown: "buyer" | "context" | null; code: string; fit: number | null; intent: number | null; score: number };
+type Row = { project: string; id: string; gold: Gold; was: string; shown: "buyer" | null; code: string; fit: number | null; intent: number | null; score: number };
 
 async function run(project: LabelledProject): Promise<Row[]> {
   const items = project.items.map((item) => ({
@@ -61,7 +60,7 @@ async function run(project: LabelledProject): Promise<Row[]> {
   return project.items.flatMap((item) => {
     const verdict = byId.get(item.id);
     if (!verdict) return [];
-    return [{ project: project.name, id: item.id, gold: item.gold, was: item.was, shown: routeLead(verdict), code: verdict.reasonCode, fit: verdict.fit, intent: verdict.intent, score: verdict.score }];
+    return [{ project: project.name, id: item.id, gold: item.gold, was: item.was, shown: verdict.decision === "qualify" ? "buyer" : null, code: verdict.reasonCode, fit: verdict.fit, intent: verdict.intent, score: verdict.score }];
   });
 }
 
@@ -80,7 +79,7 @@ await Promise.all(
   }),
 );
 
-function tally(kind: "buyer" | "context") {
+function tally(kind: "buyer") {
   const shown = rows.filter((row) => row.shown === kind);
   const count = (gold: Gold) => shown.filter((row) => row.gold === gold).length;
   const pct = (n: number) => (shown.length === 0 ? "-" : `${Math.round((100 * n) / shown.length)}%`);
@@ -90,8 +89,7 @@ function tally(kind: "buyer" | "context") {
 const leads = rows.filter((row) => row.gold === "lead");
 console.log(`judged ${rows.length} of ${chosen.reduce((n, project) => n + project.items.length, 0)} across ${chosen.length} projects`);
 tally("buyer");
-tally("context");
-console.log(`recall   ${leads.filter((row) => row.shown === "buyer").length} of ${leads.length} labelled leads shown as buyer, ${leads.filter((row) => row.shown === "context").length} as context`);
+console.log(`recall   ${leads.filter((row) => row.shown === "buyer").length} of ${leads.length} labelled leads shown as buyer`);
 const codes = new Map<string, number>();
 for (const row of leads.filter((row) => row.shown !== "buyer")) codes.set(row.code, (codes.get(row.code) ?? 0) + 1);
 console.log(`lost leads by code: ${[...codes].map(([code, n]) => `${code} ${n}`).join(", ") || "none"}`);

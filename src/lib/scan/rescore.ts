@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { leadEvaluations, leads, redditComments, redditPosts } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
 import { SCORER_VERSION, writeEvaluations, type EvaluationRecord } from "./evaluations";
-import { routeLead, type LeadKind } from "./gates";
 import type { Judgement, ScorableItem } from "./judgement";
 import { demoteLeads, leadKey, writeLeads } from "./leads";
 import { loadScanProject } from "./project";
@@ -150,7 +149,7 @@ async function leadStatuses(projectId: string): Promise<Map<string, string>> {
 }
 
 type Reconciled = {
-  write: { judgement: Judgement; stale: Stale; kind: LeadKind }[];
+  write: { judgement: Judgement; stale: Stale }[];
   demote: { postId: string; commentId: string | null }[];
   promoted: number;
   unchanged: number;
@@ -172,14 +171,13 @@ export function reconcile(
     if (status !== undefined && status !== "new") {
       continue;
     }
-    const kind = routeLead(judgement);
-    if (kind === null) {
+    if (judgement.decision !== "qualify") {
       if (status === "new") {
         out.demote.push({ postId: stale.postId, commentId: stale.commentId });
       }
       continue;
     }
-    out.write.push({ judgement, stale, kind });
+    out.write.push({ judgement, stale });
     if (status === "new") {
       out.unchanged += 1;
     } else {
@@ -223,7 +221,7 @@ export async function runRescore(projectId: string, jobId: string): Promise<Resc
   const outcome = reconcile(judged, await leadStatuses(projectId));
   await writeLeads(
     outcome.write.map((entry) =>
-      toLead(project, entry.judgement, entry.stale.postId, entry.stale.commentId, entry.kind),
+      toLead(project, entry.judgement, entry.stale.postId, entry.stale.commentId),
     ),
   );
   const demoted = await demoteLeads(projectId, outcome.demote);

@@ -10,7 +10,7 @@ import { loadEvaluations, writeEvaluations } from "./evaluations";
 import { writeLeads, type LeadRow } from "./leads";
 import { loadScanProject, type ScanProject } from "./project";
 import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
-import { evaluationsFor, fetchAvatars, postItem, routed, toLead, unjudged } from "./run";
+import { evaluationsFor, fetchAvatars, postItem, toLead, unjudged } from "./run";
 import type { Judgement } from "./judgement";
 import { judgeItems, readOrder, triageTitles } from "./score";
 import type { StoredJudgement } from "./evaluations";
@@ -295,7 +295,7 @@ class Judge {
 
   /** True once the sweep holds LEAD_CAP buyer leads; nothing more is searched or scored. */
   get full(): boolean {
-    return this.leads.filter((lead) => lead.kind === "buyer").length >= LEAD_CAP;
+    return this.leads.length >= LEAD_CAP;
   }
 
   /** Posts a page just carried; only the ones with no verdict are queued. */
@@ -395,9 +395,9 @@ class Judge {
     // judgeItems returns.
     const committed = new Set<string>();
     const commit = async (batch: Judgement[]): Promise<void> => {
-      const written = routed(batch.map((judgement) => ({ judgement }))).map((item) =>
-        toLead(this.project, item.judgement, item.judgement.id, null, item.kind),
-      );
+      const written = batch
+        .filter((judgement) => judgement.decision === "qualify")
+        .map((judgement) => toLead(this.project, judgement, judgement.id, null));
       // Leads first: a stored verdict stops a post being judged again, so it
       // must never exist without the lead it stands for.
       await writeLeads(written);
@@ -499,7 +499,7 @@ export async function runBackfill(projectId: string, jobId?: string): Promise<Ba
   await judge.settle();
   /** Buyer leads among the posts this walk has been handed, as the sweep stands now. */
   const buyersOf = (item: Walk): number => {
-    const buyers = new Set(judge.leads.filter((lead) => lead.kind === "buyer").map((lead) => lead.postId));
+    const buyers = new Set(judge.leads.map((lead) => lead.postId));
     return [...item.walked].filter((id) => buyers.has(id)).length;
   };
   const deeper = plan
