@@ -45,13 +45,22 @@ export function discoveryBudget(limits: TierLimits | null) {
   };
 }
 
-type RoundOutcome = { labels: ThreadLabel[]; newRelevant: number; costUsd: number };
+type RoundOutcome = {
+  labels: ThreadLabel[];
+  /** Threads this round saw that nothing had labelled before it. */
+  fresh: number;
+  newRelevant: number;
+  costUsd: number;
+};
 
 /**
- * One round: buy the queries, label the threads none of the earlier rounds had
- * seen, and file each verdict against every row that saw that thread.
+ * One round: buy the queries, label the threads `labelled` does not already
+ * hold, and file each verdict against every row that saw that thread. The
+ * opening pass and the weekly delta both learn through it: the pass hands it
+ * the threads its earlier rounds labelled, the delta every thread the project
+ * already holds evidence on.
  */
-async function runRound(
+export async function runRound(
   ctx: FetchContext,
   product: ProductFacts,
   destinations: Destination[],
@@ -78,6 +87,7 @@ async function runRound(
   await applyRelevances(ctx.projectId, labels);
   return {
     labels,
+    fresh: fresh.length,
     newRelevant: labels.filter((label) => label.relevance === "relevant").length,
     costUsd,
   };

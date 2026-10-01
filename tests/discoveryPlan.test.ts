@@ -23,14 +23,14 @@ const PLAN: DiscoveryPlan = {
 };
 
 describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => {
-  it("files a round in one trip with the same destinations and verdicts as individual writes", async () => {
+  it("files a round in one trip, each thread's last verdict and last place named on every row", async () => {
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const { applyRelevance, applyRelevances, loadEvidence, writeObservations } = await import("@/lib/discovery/store");
+    const { applyRelevances, loadEvidence, writeObservations } = await import("@/lib/discovery/store");
     const { eq } = await import("drizzle-orm");
     const [user] = await db().insert(schema.users).values({ clerkUserId: `test_${randomUUID()}` }).returning();
     const projects = await db().insert(schema.projects).values(
-      ["serial", "batch", "untouched"].map((name) => ({ userId: user.id, name })),
+      ["batch", "untouched"].map((name) => ({ userId: user.id, name })),
     ).returning();
     try {
       for (const project of projects) {
@@ -46,20 +46,30 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
         { id: "a", relevance: "relevant", destination: "Las Vegas", entities: [] },
         { id: "b", relevance: "irrelevant", destination: null, entities: [] },
         { id: "c", relevance: "plausible", destination: "", entities: [] },
-        // Even a repeated id has the serial write's last verdict and last
-        // nonempty destination, rather than UPDATE FROM choosing one at random.
+        // A repeated id keeps its last verdict and its last nonempty place,
+        // rather than UPDATE FROM choosing one of the two at random.
         { id: "a", relevance: "plausible", destination: null, entities: [] },
       ];
-      for (const label of labels) {
-        await applyRelevance(projects[0].id, label.id, label.relevance, label.destination);
-      }
-      await applyRelevances(projects[1].id, labels);
-      await applyRelevances(projects[1].id, []);
-      const read = async (id: string) => (await loadEvidence(id))
-        .map((row) => [row.postId, row.query, row.relevance, row.destination])
-        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-      expect(await read(projects[1].id)).toEqual(await read(projects[0].id));
-      expect((await loadEvidence(projects[2].id)).every((row) => row.relevance === "unlabeled")).toBe(true);
+      await applyRelevances(projects[0].id, labels);
+      await applyRelevances(projects[0].id, []);
+      const sorted = (rows: (string | null)[][]) =>
+        rows.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      const read = async (id: string) =>
+        sorted((await loadEvidence(id)).map((row) => [row.postId, row.query, row.relevance, row.destination]));
+      // A place the model named replaces the query's own; no place leaves it standing.
+      expect(await read(projects[0].id)).toEqual(
+        sorted([
+          ["a", "broad", "plausible", "Las Vegas"],
+          ["a", "Miami", "plausible", "Las Vegas"],
+          ["b", "broad", "irrelevant", null],
+          ["b", "Miami", "irrelevant", "Miami"],
+          ["c", "broad", "plausible", null],
+          ["c", "Miami", "plausible", "Miami"],
+          ["d", "broad", "unlabeled", null],
+          ["d", "Miami", "unlabeled", "Miami"],
+        ]),
+      );
+      expect((await loadEvidence(projects[1].id)).every((row) => row.relevance === "unlabeled")).toBe(true);
     } finally {
       await db().delete(schema.users).where(eq(schema.users.id, user.id));
     }
@@ -186,7 +196,7 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
     process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32).toString("base64");
     const { db } = await import("@/db");
     const schema = await import("@/db/schema");
-    const { applyRelevance, loadEvidence, writeObservations } = await import(
+    const { applyRelevances, loadEvidence, writeObservations } = await import(
       "@/lib/discovery/store"
     );
     const { eq } = await import("drizzle-orm");
@@ -215,7 +225,9 @@ describe.skipIf(!process.env.DATABASE_URL)("publishing a discovery plan", () => 
       { ...seen, query: "vegas" },
     ]);
     await writeObservations(project.id, [{ ...seen, query: "broad" }]);
-    await applyRelevance(project.id, seen.postId, "relevant", "Las Vegas");
+    await applyRelevances(project.id, [
+      { id: seen.postId, relevance: "relevant", destination: "Las Vegas", entities: [] },
+    ]);
 
     const rows = await loadEvidence(project.id);
     expect(rows).toHaveLength(2);

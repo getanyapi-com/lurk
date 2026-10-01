@@ -2,7 +2,7 @@ import { enqueueJob, writeProgress } from "@/jobs/enqueue";
 import { clientForUser } from "@/lib/anyapi";
 import { labelThreads } from "@/lib/discovery/label";
 import {
-  applyRelevance,
+  applyRelevances,
   loadEvidenceForPosts,
   UNLABELED,
   writeObservations,
@@ -218,9 +218,7 @@ export async function judgeUnseen(project: ScanProject, seen: Seen[]): Promise<v
         snippet: thread.snippet ?? "",
       })),
   });
-  for (const label of labels) {
-    await applyRelevance(project.id, label.id, label.relevance, label.destination);
-  }
+  await applyRelevances(project.id, labels);
 }
 
 /**

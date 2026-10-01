@@ -6,25 +6,16 @@ import { clientForUser } from "@/lib/anyapi";
 import { productFacts, productText } from "@/lib/product";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { limitsForUser } from "@/lib/tier";
-import { labelThreads } from "./label";
 import { expandDiscoveryQueries, type DiscoveryQuery } from "./queries";
 import {
   competitorsFrom,
   coverageFrom,
-  dedupeThreads,
   isDestinationQuery,
   mergeCompetitors,
   type CompetitorRank,
 } from "./rank";
-import { runDiscoveryQueries } from "./serp";
-import {
-  applyRelevance,
-  loadEvidence,
-  parseDestinations,
-  parseTextList,
-  UNLABELED,
-} from "./store";
-import { discoveryBudget, publishFromEvidence } from "./run";
+import { loadEvidence, parseDestinations, parseTextList } from "./store";
+import { discoveryBudget, publishFromEvidence, runRound } from "./run";
 
 /**
  * The weekly delta. Discovery does not run again from nothing: it buys a few
@@ -115,30 +106,18 @@ export async function runDiscoveryRefresh(
   await writeProgress(jobId, `Asking Google ${queries.length} more questions`);
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs };
-  const found = await runDiscoveryQueries(ctx, queries);
-  const known = new Set(evidence.map((row) => row.postId));
-  const fresh = dedupeThreads(found.observations.map((row) => ({ ...row, relevance: UNLABELED })))
-    .filter((thread) => !known.has(thread.postId));
-
   const standing = await existingCompetitors(projectId);
   const facts = productFacts(
     project,
     standing.map((row) => row.name),
   );
-  const labels = await labelThreads({
-    projectId,
-    product: facts,
-    destinations: destinations.map((place) => place.name),
-    candidates: fresh.map((thread) => ({
-      id: thread.postId,
-      subreddit: thread.subreddit,
-      title: thread.title,
-      snippet: thread.snippet,
-    })),
-  });
-  for (const label of labels) {
-    await applyRelevance(projectId, label.id, label.relevance, label.destination);
-  }
+  const round = await runRound(
+    ctx,
+    facts,
+    destinations,
+    queries,
+    new Set(evidence.map((row) => row.postId)),
+  );
 
   await writeProgress(jobId, "Republishing the plan");
   await publishFromEvidence({
@@ -146,10 +125,10 @@ export async function runDiscoveryRefresh(
     rows: await loadEvidence(projectId),
     destinations,
     limits,
-    competitors: mergeCompetitors(standing, competitorsFrom(labels)),
+    competitors: mergeCompetitors(standing, competitorsFrom(round.labels)),
     productTexts: [productText(facts), ...problemPhrasings],
     phrasings: problemPhrasings,
   });
   await enqueueJob("discovery_refresh", projectId, new Date(Date.now() + maxAgeMs));
-  return { queries: queries.length, threads: fresh.length, costUsd: found.costUsd };
+  return { queries: queries.length, threads: round.fresh, costUsd: round.costUsd };
 }

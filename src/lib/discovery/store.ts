@@ -56,28 +56,13 @@ export async function writeObservations(
 }
 
 /**
- * Files the model's verdict on a thread against every row that saw it, and the
- * place it named where no query supplied one.
- */
-export async function applyRelevance(
-  projectId: string,
-  postId: string,
-  relevance: Relevance,
-  destination: string | null,
-): Promise<void> {
-  await db()
-    .update(discoveryEvidence)
-    .set(destination ? { relevance, destination } : { relevance })
-    .where(and(eq(discoveryEvidence.projectId, projectId), eq(discoveryEvidence.postId, postId)));
-}
-
-/**
- * Files a whole round's labels in one database trip. Initial discovery spent
- * 4-6 seconds on the 2026-09-25 signup path; its old per-thread await added a
- * round trip for every label before the next Google round or the sweep could
- * start. The verdicts and destinations are unchanged, and every observation
- * of a thread still gets its verdict. A missing destination leaves the query's
- * own place standing, just as applyRelevance does.
+ * Files the model's verdict on each thread against every row that saw it, and
+ * the place it named where no query supplied one, for a whole round of labels
+ * in one database trip. Initial discovery spent 4-6 seconds on the 2026-09-25
+ * signup path; a per-thread await added a round trip for every label before
+ * the next Google round or the sweep could start. A thread labelled twice
+ * keeps its last verdict and its last place named, and a missing place leaves
+ * the query's own standing.
  */
 export async function applyRelevances(projectId: string, labels: ThreadLabel[]): Promise<void> {
   const kept = new Map<string, { relevance: Relevance; destination: string | null }>();
