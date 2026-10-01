@@ -8,7 +8,7 @@ import { TRIAGE_BATCH_SIZE } from "./constants";
 import { retrieved, type PlanRow } from "./coverage";
 import { loadEvaluations, writeEvaluations } from "./evaluations";
 import { writeLeads, type LeadRow } from "./leads";
-import { loadScanProject, type ScanProject } from "./project";
+import { requireScanProject, type ScanProject } from "./project";
 import { SMALL_SWEEP, smallSweep, spread } from "@/lib/sweepScale";
 import { evaluationsFor, fetchAvatars, postItem, toLead, unjudged } from "./run";
 import type { Judgement } from "./judgement";
@@ -425,10 +425,7 @@ class Judge {
 
 /** One backfill: sweep a year, judge what has no verdict, write the leads. */
 export async function runBackfill(projectId: string, jobId?: string): Promise<BackfillOutcome> {
-  const project = await loadScanProject(projectId);
-  if (!project) {
-    throw new Error("This project no longer exists");
-  }
+  const project = await requireScanProject(projectId);
   // These reads supply nothing to the search-writing model. On 2026-09-25
   // that call took 11-15 seconds at the median; use that wait to prepare the
   // client and the held verdicts, then start exactly the same walks together.

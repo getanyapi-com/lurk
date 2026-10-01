@@ -6,7 +6,7 @@ import { clientForUser } from "@/lib/anyapi";
 import type { FetchContext } from "@/lib/reddit/fetch";
 import { fetchPost, fetchSearch } from "@/lib/reddit/skus";
 import type { StoredPost } from "@/lib/reddit/store";
-import { loadScanProject } from "@/lib/scan/project";
+import { requireScanProject } from "@/lib/scan/project";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { capped, tierForUser } from "@/lib/tier";
 import { RETENTION_DAYS } from "@/lib/tiers";
@@ -131,10 +131,7 @@ export async function runCompetitorScan(
   projectId: string,
   jobId: string,
 ): Promise<CompetitorScanOutcome> {
-  const project = await loadScanProject(projectId);
-  if (!project) {
-    throw new Error("That project no longer exists");
-  }
+  const project = await requireScanProject(projectId);
   const { limits, settings } = await tierForUser(project.userId);
   const cadence = cadenceFor(settings.settings.cadence);
   // The tier decides how many competitors a project may watch.

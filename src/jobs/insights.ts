@@ -1,4 +1,3 @@
-import type { jobs } from "@/db/schema";
 import { writeProgress } from "@/jobs/enqueue";
 import { clusterLeads, clusterableLeads, replaceThemes } from "@/lib/insights/themes";
 
@@ -20,12 +19,4 @@ export async function runInsights(projectId: string, jobId: string): Promise<Ins
   await replaceThemes(projectId, themes);
   await writeProgress(jobId, "Finished");
   return { leads: items.length, themes: themes.length };
-}
-
-/** The registry entry for insights. */
-export async function runInsightsJob(job: typeof jobs.$inferSelect): Promise<void> {
-  if (!job.projectId) {
-    throw new Error("An insights job needs a project");
-  }
-  await runInsights(job.projectId, job.id);
 }

@@ -28,6 +28,12 @@ vi.mock("@/jobs/enqueue", async (importOriginal) => {
   return { ...actual, enqueueOnce: vi.fn(actual.enqueueOnce) };
 });
 
+/**
+ * A kind that does nothing, for the queue tests that need a job of no kind in
+ * particular. The app has no such kind; only these tests run one.
+ */
+JOB_HANDLERS.noop = async () => {};
+
 describe("request identity", () => {
   it("gives each call its own request id and never the previous one", async () => {
     const withHeader = await withRequestId(async () => {

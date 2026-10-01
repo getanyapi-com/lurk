@@ -29,7 +29,7 @@ import {
   writeLeads,
   type LeadRow,
 } from "./leads";
-import { loadScanProject, type ScanProject } from "./project";
+import { requireScanProject, type ScanProject } from "./project";
 import { retrieve } from "./retrieve";
 import { creditSources, markCovered, type CandidateSource } from "./sources";
 import type { Judgement, ScorableItem } from "./judgement";
@@ -153,10 +153,7 @@ export function evaluationsFor(
  * that point, so a thread we cannot read costs a scan nothing.
  */
 export async function runScan(projectId: string, jobId: string): Promise<ScanOutcome> {
-  const project = await loadScanProject(projectId);
-  if (!project) {
-    throw new Error("This project no longer exists");
-  }
+  const project = await requireScanProject(projectId);
   const { limits, settings } = await tierForUser(project.userId);
   const cadence = cadenceFor(settings.settings.cadence);
   const funded = await clientForUser(project.userId);

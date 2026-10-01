@@ -126,3 +126,15 @@ export async function loadScanProject(projectId: string): Promise<ScanProject | 
     product: productFacts(row, competitorNames),
   };
 }
+
+/**
+ * The project a job that cannot do anything without it is about. A project
+ * deleted while its job waited fails that job rather than passing it.
+ */
+export async function requireScanProject(projectId: string): Promise<ScanProject> {
+  const project = await loadScanProject(projectId);
+  if (!project) {
+    throw new Error("This project no longer exists");
+  }
+  return project;
+}

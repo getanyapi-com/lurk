@@ -15,7 +15,7 @@ import { readThreads, type ThreadRead } from "@/lib/scan/comments";
 import { loadEvaluations, writeEvaluations } from "@/lib/scan/evaluations";
 import { threadPolicyFor } from "@/lib/settings/threadPolicy";
 import type { ThreadPolicy } from "@/lib/settings/types";
-import { loadScanProject, type ScanProject } from "@/lib/scan/project";
+import { requireScanProject, type ScanProject } from "@/lib/scan/project";
 import { readPosts, splitByReading } from "@/lib/scan/reading";
 import { evaluationsFor, postItem, unjudged } from "@/lib/scan/run";
 import { judgeItems } from "@/lib/scan/score";
@@ -237,10 +237,7 @@ export async function runSeoRefresh(
   projectId: string,
   jobId: string,
 ): Promise<SeoRefreshOutcome> {
-  const project = await loadScanProject(projectId);
-  if (!project) {
-    throw new Error("This project no longer exists");
-  }
+  const project = await requireScanProject(projectId);
   const { limits, settings: scanSettings } = await tierForUser(project.userId);
   const settings = seoSettings(limits, project.phrasings);
   const maxAgeMs = settings.refreshDays * DAY_MS;

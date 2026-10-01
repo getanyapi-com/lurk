@@ -10,22 +10,22 @@ import { briefFromPage, writeBrief } from "@/lib/brief";
 import { readSite } from "@/lib/profile";
 import { deleteExpiredPosts } from "@/lib/retention";
 import { discoveryBudget } from "@/lib/discovery/run";
+import { runCompetitorScan } from "@/lib/competitors/scan";
 import { runBackfill } from "@/lib/scan/backfill";
 import { loadScanProject } from "@/lib/scan/project";
 import { runRescore } from "@/lib/scan/rescore";
 import { runScan } from "@/lib/scan/run";
 import { widenSearches } from "@/lib/scan/widen";
+import { runSeoRefresh } from "@/lib/seo/refresh";
 import { deleteExpiredXData } from "@/lib/x/retention";
 import { cadenceFor } from "@/lib/settings/cadence";
 import { PRESETS } from "@/lib/settings/presets";
 import { settingsForUser } from "@/lib/settings/resolve";
 import type { ScanCadence } from "@/lib/settings/types";
 import { tierForUser } from "@/lib/tier";
-import { runCompetitorsJob } from "./competitors";
 import { runDigest } from "./digest";
-import { runInsightsJob } from "./insights";
+import { runInsights } from "./insights";
 import { enqueueOnce } from "./enqueue";
-import { runSeoRefreshJob } from "./seo";
 
 export type Job = typeof jobs.$inferSelect;
 export type JobHandler = (job: Job) => Promise<void>;
@@ -33,15 +33,22 @@ export type JobHandler = (job: Job) => Promise<void>;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
+/**
+ * The handler for a kind that is about one project: a job queued without one
+ * is a bug in whatever queued it, so it fails rather than doing nothing.
+ */
+function perProject(run: (projectId: string, jobId: string) => Promise<unknown>): JobHandler {
+  return async (job) => {
+    if (!job.projectId) {
+      throw new Error(`A ${job.kind} job needs a project`);
+    }
+    await run(job.projectId, job.id);
+  };
+}
+
 /** Every job kind the scheduler knows how to run. */
 export const JOB_HANDLERS: Record<string, JobHandler> = {
-  noop: async () => {},
-  scan: async (job) => {
-    if (!job.projectId) {
-      throw new Error("A scan job needs a project");
-    }
-    await runScan(job.projectId, job.id);
-  },
+  scan: perProject(runScan),
   /**
    * The one-time year sweep a new project starts with. It queues nothing after
    * itself when it finishes: the scan keeps the feed fresh from then on. When
@@ -49,35 +56,20 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
    * again one scan interval later, like a scan, and resumes from what it
    * already bought and judged.
    */
-  backfill: async (job) => {
-    if (!job.projectId) {
-      throw new Error("A backfill needs a project");
-    }
-    await runBackfill(job.projectId, job.id);
-  },
+  backfill: perProject(runBackfill),
   /**
    * The one job a brand new project starts with. Creating a project reads the
    * product page and nothing else, so this is where the plan comes from: the
    * whole first discovery, the communities it names, and the first jobs of the
    * project's life. It queues them once, whatever else queues it.
    */
-  discovery_initial: async (job) => {
-    if (!job.projectId) {
-      throw new Error("An initial discovery needs a project");
-    }
-    await runInitialDiscovery(job.projectId, job.id);
-  },
+  discovery_initial: perProject(runInitialDiscovery),
   /**
    * One sweep over every verdict an older scorer made, queued at boot for a
    * project that holds any. It runs once and queues nothing after itself: when
    * it succeeds the project has no stale verdict left to find.
    */
-  rescore: async (job) => {
-    if (!job.projectId) {
-      throw new Error("A rescore needs a project");
-    }
-    await runRescore(job.projectId, job.id);
-  },
+  rescore: perProject(runRescore),
   /**
    * The brief for a project whose profile it was not written against: every
    * project made before briefs existed, queued at boot, and any whose profile
@@ -85,11 +77,8 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
    * the profile may not, and the verdicts are then judged again with it. An
    * unreadable site still gets a brief from the profile alone.
    */
-  brief: async (job) => {
-    if (!job.projectId) {
-      throw new Error("A brief needs a project");
-    }
-    const project = await loadScanProject(job.projectId);
+  brief: perProject(async (projectId) => {
+    const project = await loadScanProject(projectId);
     if (!project) {
       return;
     }
@@ -103,27 +92,20 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
     );
     await writeBrief(project.id, brief, project.profileVersion);
     await enqueueOnce("rescore", new Date(), project.id);
-  },
+  }),
   /**
    * The sweep's best searches for a project that has none, and one scan with
    * them. It runs once per project and is never held, so a project nobody
    * attends still gets the leads its invite is built from.
    */
-  widen_searches: async (job) => {
-    if (!job.projectId) {
-      throw new Error("Widening searches needs a project");
-    }
-    await widenSearches(job.projectId, job.id);
-  },
-  discovery_refresh: async (job) => {
-    if (!job.projectId) {
-      throw new Error("A discovery refresh needs a project");
-    }
-    await runDiscoveryRefresh(job.projectId, job.id);
-  },
-  insights: runInsightsJob,
-  competitor_scan: runCompetitorsJob,
-  seo_refresh: runSeoRefreshJob,
+  widen_searches: perProject(widenSearches),
+  discovery_refresh: perProject(runDiscoveryRefresh),
+  /** Groups a project's recent leads into pain themes. */
+  insights: perProject(runInsights),
+  /** One project's competitors, one pass. */
+  competitor_scan: perProject(runCompetitorScan),
+  /** Which Reddit threads Google ranks for this project. */
+  seo_refresh: perProject(runSeoRefresh),
   digest: runDigest,
   /**
    * Asks people with leads and no alert channel, once each, whether they want
@@ -152,26 +134,28 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
    * The pipeline is loaded on first use, so nothing X imports is on the path
    * every Reddit job loads.
    */
-  x_scan: async (job) => {
-    if (!job.projectId) {
-      throw new Error("An X scan needs a project");
-    }
+  x_scan: perProject(async (projectId, jobId) => {
     const { runXScan } = await import("@/lib/x/run");
-    await runXScan(job.projectId, job.id);
-  },
+    await runXScan(projectId, jobId);
+  }),
 };
 
 export function handlerFor(kind: string): JobHandler | null {
   return JOB_HANDLERS[kind] ?? null;
 }
 
-/** How this project's scans are spaced, which its settings decide. */
-async function scanCadenceFor(projectId: string): Promise<ScanCadence> {
+/** Who owns this project, or null once it is gone. */
+async function ownerOf(projectId: string): Promise<string | null> {
   const rows = await db()
     .select({ userId: projects.userId })
     .from(projects)
     .where(eq(projects.id, projectId));
-  const userId = rows[0]?.userId;
+  return rows[0]?.userId ?? null;
+}
+
+/** How this project's scans are spaced, which its settings decide. */
+async function scanCadenceFor(projectId: string): Promise<ScanCadence> {
+  const userId = await ownerOf(projectId);
   const cadence = userId
     ? (await settingsForUser(userId)).settings.cadence
     : PRESETS.connected.cadence;
@@ -180,11 +164,7 @@ async function scanCadenceFor(projectId: string): Promise<ScanCadence> {
 
 /** Days between this project's discovery deltas, which its tier decides. */
 async function discoveryRefreshDaysFor(projectId: string): Promise<number> {
-  const rows = await db()
-    .select({ userId: projects.userId })
-    .from(projects)
-    .where(eq(projects.id, projectId));
-  const userId = rows[0]?.userId;
+  const userId = await ownerOf(projectId);
   return discoveryBudget(userId ? (await tierForUser(userId)).limits : null).refreshDays;
 }
 

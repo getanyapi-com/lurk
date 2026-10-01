@@ -5,7 +5,7 @@ import { writeProgress } from "@/jobs/enqueue";
 import { SCORER_VERSION, writeEvaluations, type EvaluationRecord } from "./evaluations";
 import type { Judgement, ScorableItem } from "./judgement";
 import { demoteLeads, leadKey, writeLeads } from "./leads";
-import { loadScanProject } from "./project";
+import { requireScanProject } from "./project";
 import { readPosts, splitByReading } from "./reading";
 import { judgeItems } from "./score";
 import { toLead } from "./run";
@@ -194,10 +194,7 @@ export function reconcile(
  * model call here either.
  */
 export async function runRescore(projectId: string, jobId: string): Promise<RescoreOutcome> {
-  const project = await loadScanProject(projectId);
-  if (!project) {
-    throw new Error("This project no longer exists");
-  }
+  const project = await requireScanProject(projectId);
   const stale = await staleItems(projectId, project.profileVersion);
   if (stale.length === 0) {
     return NOTHING;
