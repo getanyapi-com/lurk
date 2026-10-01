@@ -3,8 +3,7 @@ import { db } from "@/db";
 import { leads } from "@/db/schema";
 import { enqueueJob, lastRunJob } from "@/jobs/enqueue";
 import { kickScheduler } from "@/jobs/scheduler";
-import { requireLocalUser } from "@/lib/auth";
-import { projectForUser } from "@/lib/projects";
+import { requireOwnedProject } from "@/lib/owned";
 import { smallSweep } from "@/lib/sweepScale";
 
 /**
@@ -14,10 +13,7 @@ import { smallSweep } from "@/lib/sweepScale";
  * link buys nothing.
  */
 export async function startOnOpen(kind: "seo_refresh" | "competitor_scan", projectId: string): Promise<boolean> {
-  const user = await requireLocalUser();
-  if (!(await projectForUser(user.id, projectId))) {
-    throw new Error("That project is not yours");
-  }
+  await requireOwnedProject(projectId);
   // A trial-size project buys its sweep and nothing after it.
   if (smallSweep() || (await lastRunJob(kind, projectId))) {
     return false;
@@ -33,10 +29,7 @@ export async function startOnOpen(kind: "seo_refresh" | "competitor_scan", proje
  * through the API), so grouping after every scan paid for themes nobody saw.
  */
 export async function regroupOnOpen(projectId: string): Promise<boolean> {
-  const user = await requireLocalUser();
-  if (!(await projectForUser(user.id, projectId))) {
-    throw new Error("That project is not yours");
-  }
+  await requireOwnedProject(projectId);
   const last = await lastRunJob("insights", projectId);
   if (last && !last.finishedAt) {
     return false;

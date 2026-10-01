@@ -1,5 +1,5 @@
 import { AnyapiLink } from "@/components/AnyapiLink";
-import { openInsightsAction, refreshInsightsAction } from "@/app/app/insights/actions";
+import { openInsightsAction, refreshInsightsAction } from "@/app/app/jobs";
 import { StartOnOpen } from "@/components/StartOnOpen";
 import { EmptyState } from "@/components/EmptyState";
 import { CommunitiesTable } from "@/components/insights/CommunitiesTable";

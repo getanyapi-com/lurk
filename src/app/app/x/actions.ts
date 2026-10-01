@@ -2,26 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { kickScheduler } from "@/jobs/scheduler";
-import { requireLocalUser } from "@/lib/auth";
 import { markThreadReplied, reopenThread } from "@/lib/handled";
-import { projectForUser } from "@/lib/projects";
+import { requireXProject } from "@/lib/owned";
 import { pressForJob } from "@/lib/throttle";
-import { xEnabledFor } from "@/lib/x/enabled";
 import { openX } from "@/lib/x/open";
 import { markLanesDue } from "@/lib/x/run";
 import { setXLeadStatus, xLeadConversation } from "@/lib/x/write";
-
-/** The caller's user, once the project is theirs and X is on for them. */
-async function ownedXProject(projectId: string) {
-  const user = await requireLocalUser();
-  if (!xEnabledFor(user.id)) {
-    throw new Error("X leads is not turned on");
-  }
-  if (!(await projectForUser(user.id, projectId))) {
-    throw new Error("That project is not yours");
-  }
-  return user;
-}
 
 /**
  * The tab is on screen: the first open queues the first check, later opens
@@ -29,7 +15,7 @@ async function ownedXProject(projectId: string) {
  * so a prefetched link buys nothing.
  */
 export async function openXAction(projectId: string) {
-  await ownedXProject(projectId);
+  await requireXProject(projectId);
   if ((await openX(projectId)) !== "none") {
     kickScheduler();
     revalidatePath("/app", "layout");
@@ -41,7 +27,7 @@ export async function openXAction(projectId: string) {
  * budget. The press is taken first, so a refused press changes nothing.
  */
 export async function scanXNowAction(projectId: string) {
-  const user = await ownedXProject(projectId);
+  const { user } = await requireXProject(projectId);
   await pressForJob(user.id, "x_scan_now", "x_scan", projectId);
   await markLanesDue(projectId);
   kickScheduler();
@@ -53,7 +39,7 @@ export async function scanXNowAction(projectId: string) {
  * and stays under Replied, and no alert channel carries an ask from it again.
  */
 export async function repliedXLeadAction(projectId: string, leadId: string) {
-  await ownedXProject(projectId);
+  await requireXProject(projectId);
   // The whole conversation: other asks in it, and later ones, are the same thread answered.
   const conversation = await xLeadConversation(projectId, leadId);
   if (conversation) {
@@ -64,7 +50,7 @@ export async function repliedXLeadAction(projectId: string, leadId: string) {
 
 /** Takes Replied back: the conversation's leads are new again, and later ones arrive as before. */
 export async function reopenXLeadAction(projectId: string, leadId: string) {
-  await ownedXProject(projectId);
+  await requireXProject(projectId);
   const conversation = await xLeadConversation(projectId, leadId);
   if (conversation) {
     await reopenThread(projectId, "x", conversation);
@@ -73,13 +59,13 @@ export async function reopenXLeadAction(projectId: string, leadId: string) {
 }
 
 export async function hideXLeadAction(projectId: string, leadId: string) {
-  await ownedXProject(projectId);
+  await requireXProject(projectId);
   await setXLeadStatus(projectId, leadId, "hidden", null);
   revalidatePath("/app", "layout");
 }
 
 export async function notFitXLeadAction(projectId: string, leadId: string, formData: FormData) {
-  await ownedXProject(projectId);
+  await requireXProject(projectId);
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 80);
   if (!reason) {
     throw new Error("Pick a reason before marking a lead as not a fit");

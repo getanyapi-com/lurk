@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Feed } from "@/components/leads/Feed";
 import { ListSkeleton, PillsSkeleton, Skeleton } from "@/components/Skeleton";
 import { PaidButton } from "@/components/PaidButton";
-import { scanNowAction } from "@/app/app/scan";
+import { scanNowAction } from "@/app/app/jobs";
 import { requireLocalUser } from "@/lib/auth";
 import type { FeedParams } from "@/lib/feed";
 import { requireActiveProject } from "@/lib/projects";

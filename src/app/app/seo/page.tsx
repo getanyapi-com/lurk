@@ -1,4 +1,4 @@
-import { openSeoAction, refreshSeoAction } from "@/app/app/seo/actions";
+import { openSeoAction, refreshSeoAction } from "@/app/app/jobs";
 import { EmptyState } from "@/components/EmptyState";
 import { StartOnOpen } from "@/components/StartOnOpen";
 import { NoPhrasings } from "@/components/seo/NoPhrasings";

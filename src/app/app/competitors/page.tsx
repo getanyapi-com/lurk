@@ -1,4 +1,4 @@
-import { openCompetitorsAction, scanCompetitorsAction } from "@/app/app/competitors/actions";
+import { openCompetitorsAction, scanCompetitorsAction } from "@/app/app/jobs";
 import { StartOnOpen } from "@/components/StartOnOpen";
 import { MentionCard } from "@/components/competitors/MentionCard";
 import { MentionsBar } from "@/components/competitors/MentionsBar";

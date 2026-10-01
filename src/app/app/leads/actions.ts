@@ -2,27 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { dismissAlertsOffer, turnOnDiscordAlerts, turnOnEmailAlerts } from "@/lib/alerts/offer";
-import { requireLocalUser } from "@/lib/auth";
 import { toRow } from "@/components/leads/stream";
 import { FEED_PAGE_SIZE, feedFilter, type FeedRow } from "@/lib/feed";
 import { markThreadReplied, redditLeadThread, reopenThread } from "@/lib/handled";
 import { leadInSubreddit, listLeads, setLeadStatus } from "@/lib/leads";
 import { addMute } from "@/lib/mutes";
 import { promoPolicyFor } from "@/lib/reddit/skus";
-import { projectForUser } from "@/lib/projects";
+import { requireOwnedProject } from "@/lib/owned";
 import { sweepStatus, type SweepStatus } from "@/lib/sweep";
-
-async function ownedProject(projectId: string) {
-  const user = await requireLocalUser();
-  if (!(await projectForUser(user.id, projectId))) {
-    throw new Error("That project is not yours");
-  }
-  return user;
-}
 
 /** Takes a lead out of the feed without saying anything about why. */
 export async function hideLeadAction(projectId: string, leadId: string) {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   await setLeadStatus(projectId, leadId, "hidden", null);
   revalidatePath("/app", "layout");
 }
@@ -32,7 +23,7 @@ export async function hideLeadAction(projectId: string, leadId: string) {
  * the rail's count and every alert channel, and stay under Replied.
  */
 export async function repliedLeadAction(projectId: string, leadId: string) {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   const thread = await redditLeadThread(projectId, leadId);
   if (thread) {
     await markThreadReplied(projectId, "reddit", thread);
@@ -42,7 +33,7 @@ export async function repliedLeadAction(projectId: string, leadId: string) {
 
 /** Takes Replied back: the thread's leads are new again, and later ones arrive as before. */
 export async function reopenLeadAction(projectId: string, leadId: string) {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   const thread = await redditLeadThread(projectId, leadId);
   if (thread) {
     await reopenThread(projectId, "reddit", thread);
@@ -52,14 +43,14 @@ export async function reopenLeadAction(projectId: string, leadId: string) {
 
 /** Nothing from this community again, in the feed or in any alert, until the mute is taken off. */
 export async function muteSubredditAction(projectId: string, subreddit: string) {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   await addMute(projectId, "subreddit", subreddit);
   revalidatePath("/app", "layout");
 }
 
 /** Records that a lead was a miss, with the reason the user picked. */
 export async function markNotFitAction(projectId: string, leadId: string, formData: FormData) {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   const reason = String(formData.get("reason") ?? "").trim();
   if (!reason) {
     throw new Error("Pick a reason before marking a lead as not a fit");
@@ -79,7 +70,7 @@ export async function moreLeadsAction(
   search: string,
   offset: number,
 ): Promise<FeedRow[]> {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   const params = Object.fromEntries(new URLSearchParams(search));
   const page = { limit: FEED_PAGE_SIZE, offset: Math.max(0, Math.trunc(offset)) };
   const rows = await listLeads(projectId, feedFilter(params), page);
@@ -88,7 +79,7 @@ export async function moreLeadsAction(
 
 /** The first sweep as it stands, for the line that reports it while it runs. */
 export async function sweepAction(projectId: string): Promise<SweepStatus | null> {
-  await ownedProject(projectId);
+  await requireOwnedProject(projectId);
   return sweepStatus(projectId);
 }
 
@@ -102,7 +93,7 @@ export async function promoPolicyAction(
   projectId: string,
   subreddit: string,
 ): Promise<string | null> {
-  const user = await ownedProject(projectId);
+  const { user } = await requireOwnedProject(projectId);
   if (!(await leadInSubreddit(projectId, subreddit))) {
     return null;
   }
@@ -111,21 +102,21 @@ export async function promoPolicyAction(
 
 /** The offer's "Email me daily": a daily digest to the person's own address. */
 export async function emailAlertsAction(projectId: string) {
-  const user = await ownedProject(projectId);
+  const { user } = await requireOwnedProject(projectId);
   await turnOnEmailAlerts(user.id, projectId);
   revalidatePath("/app", "layout");
 }
 
 /** The offer's Discord field: a daily post to the pasted webhook. */
 export async function discordAlertsAction(projectId: string, url: string) {
-  const user = await ownedProject(projectId);
+  const { user } = await requireOwnedProject(projectId);
   await turnOnDiscordAlerts(user.id, projectId, url);
   revalidatePath("/app", "layout");
 }
 
 /** The offer's "Not now". */
 export async function dismissAlertsOfferAction(projectId: string) {
-  const user = await ownedProject(projectId);
+  const { user } = await requireOwnedProject(projectId);
   await dismissAlertsOffer(user.id, projectId);
   revalidatePath("/app", "layout");
 }
