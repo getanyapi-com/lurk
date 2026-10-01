@@ -32,8 +32,7 @@ export type ScreenReason =
   | "listicle"
   | "vendor_promo"
   | "vendor_hook"
-  | "no_visible_term"
-  | "no_ask";
+  | "no_visible_term";
 
 export type ScreenInput = {
   post: XPost;
@@ -57,8 +56,6 @@ export type ScreenInput = {
   authorPostsOnPage?: number;
   /** A finance or crypto product, whose buyers write cashtags. */
   financeProduct?: boolean;
-  /** Pilot arm: also drop top-level posts with no ask in them. */
-  requireAsk?: boolean;
   /**
    * The lane is a venue (build-vs-buy, workflow): its posts are read for being
    * worth a reply, not for an ask. Their words may be sentences apart ("1)
@@ -187,8 +184,8 @@ export function isVendorHook(text: string): boolean {
   return /https?:\/\//u.test(text) || /(^|\s)#\w/u.test(text) || containsAny(normalized, HOOK_TELLS);
 }
 
-/** Whether the post's own words carry an ask. Only the pilot's no_ask arm reads it. */
-export function hasAsk(text: string): boolean {
+/** Whether the post's own words carry an ask. */
+function hasAsk(text: string): boolean {
   const normalized = normalizeText(text);
   return normalized.includes("?") || containsAny(normalized, ASK_MARKERS);
 }
@@ -357,9 +354,6 @@ export function freeScreen(input: ScreenInput): ScreenResult {
   }
   if (input.laneTerms.length > 0 && !shownTerms(post, input.laneTerms, input.venue)) {
     return { pass: false, reason: "no_visible_term" };
-  }
-  if (input.requireAsk && !post.isReply && !hasAsk(own)) {
-    return { pass: false, reason: "no_ask" };
   }
   return { pass: true };
 }

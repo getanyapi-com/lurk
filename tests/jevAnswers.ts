@@ -89,18 +89,6 @@ export function triageAnswers(specs: TriageSpec[], prefix = "c"): Answers {
   return answers;
 }
 
-/** The candidate keys one call asked about, in order, from its questions. */
-export function askedKeys(questions: Record<string, unknown>, prefix = "p"): string[] {
-  const keys = new Set<string>();
-  for (const name of Object.keys(questions)) {
-    const [key] = name.split("__");
-    if (key.startsWith(prefix)) {
-      keys.add(key);
-    }
-  }
-  return [...keys];
-}
-
 /** A product every test judges against, with each fact the questions point at. */
 export const product: ProductFacts = {
   name: "Formcraft",

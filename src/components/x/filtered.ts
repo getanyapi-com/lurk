@@ -38,7 +38,6 @@ const SCREEN: Record<string, Words> = {
     sentence:
       "The words lurk searched for are not together in one sentence the author wrote: X matched it on words sentences apart, or on something the author did not write, such as a username, a link card or a quoted post.",
   },
-  no_ask: { word: "no ask", sentence: "Nothing in it asks for anything." },
 };
 
 const JUDGED: Record<string, string> = {

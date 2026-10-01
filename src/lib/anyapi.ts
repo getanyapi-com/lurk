@@ -48,6 +48,12 @@ export function captureRequestId(response: Response): void {
   }
 }
 
+/** The endpoint a gateway request runs, such as `twitter.search`, or null when it runs none. */
+function runSlug(url: string): string | null {
+  const slug = /\/v1\/run\/([^/?#]+)/.exec(url)?.[1];
+  return slug ? decodeURIComponent(slug) : null;
+}
+
 /** Raised before the request is sent, so nothing is bought. */
 export class SeoEndpointRefusedError extends Error {
   constructor(slug: string) {
@@ -63,9 +69,9 @@ export class SeoEndpointRefusedError extends Error {
  * one seam every request to the gateway goes through.
  */
 export function refuseSeoEndpoint(url: string): void {
-  const slug = /\/v1\/run\/([^/?#]+)/.exec(url)?.[1];
-  if (slug && decodeURIComponent(slug).toLowerCase().startsWith("seo.")) {
-    throw new SeoEndpointRefusedError(decodeURIComponent(slug));
+  const slug = runSlug(url);
+  if (slug?.toLowerCase().startsWith("seo.")) {
+    throw new SeoEndpointRefusedError(slug);
   }
 }
 
@@ -87,8 +93,8 @@ const X_PRICE_CAPS: Record<string, string> = {
 /** The same request with a price cap when it is a capped twitter.* call; anything else is returned untouched. */
 export function withXPriceCap(input: RequestInfo | URL): RequestInfo | URL {
   const url = input instanceof Request ? input.url : String(input);
-  const slug = /\/v1\/run\/([^/?#]+)/.exec(url)?.[1];
-  const cap = slug ? X_PRICE_CAPS[decodeURIComponent(slug)] : undefined;
+  const slug = runSlug(url);
+  const cap = slug ? X_PRICE_CAPS[slug] : undefined;
   if (!cap) {
     return input;
   }

@@ -84,10 +84,6 @@ export async function hasWorkInFlight(projectId: string, now = new Date()): Prom
   return row !== undefined;
 }
 
-export function isBusy(activity: ProjectActivity): boolean {
-  return activity.active.length > 0;
-}
-
 /**
  * Whether a new project is still being set up or swept for the first time.
  * Scan now has nothing to add then: the sweep is already reading everything a

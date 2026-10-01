@@ -1,8 +1,14 @@
+import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { decryptSecret, encryptSecret, generateEncryptionKey } from "@/lib/crypto";
+import { decryptSecret, encryptSecret } from "@/lib/crypto";
+
+/** A key the way the README makes one: 32 random bytes, base64. */
+function freshKey(): string {
+  return randomBytes(32).toString("base64");
+}
 
 describe("crypto", () => {
-  const key = generateEncryptionKey();
+  const key = freshKey();
 
   it("round-trips a refresh token", () => {
     const token = "aa_rt_example_refresh_token";
@@ -24,6 +30,6 @@ describe("crypto", () => {
   });
 
   it("rejects the right ciphertext under the wrong key", () => {
-    expect(() => decryptSecret(encryptSecret("secret", key), generateEncryptionKey())).toThrow();
+    expect(() => decryptSecret(encryptSecret("secret", key), freshKey())).toThrow();
   });
 });

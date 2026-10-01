@@ -317,13 +317,3 @@ export async function runClaimedJob(job: Job): Promise<void> {
     stop();
   }
 }
-
-/** Runs one due job if there is one. Returns whether it ran anything. */
-export async function runDueJob(): Promise<boolean> {
-  const job = await claimNextJob();
-  if (!job) {
-    return false;
-  }
-  await runClaimedJob(job);
-  return true;
-}

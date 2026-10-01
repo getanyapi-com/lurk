@@ -1,4 +1,4 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { redditComments, redditPosts, searchRunPosts, searchRuns } from "@/db/schema";
 
@@ -234,11 +234,4 @@ export async function upsertComments(
 
 export async function commentsOfPost(postId: string): Promise<StoredComment[]> {
   return db().select().from(redditComments).where(eq(redditComments.postId, postId));
-}
-
-export async function postsByIds(ids: string[]): Promise<StoredPost[]> {
-  if (ids.length === 0) {
-    return [];
-  }
-  return db().select().from(redditPosts).where(inArray(redditPosts.id, ids));
 }

@@ -107,26 +107,6 @@ export async function settleRepliedThreads(projectIds: Iterable<string>): Promis
     );
 }
 
-/** Whether the owner already answered this thread. */
-export async function isThreadHandled(
-  projectId: string,
-  platform: ThreadPlatform,
-  threadId: string,
-): Promise<boolean> {
-  const rows = await db()
-    .select({ id: handledThreads.id })
-    .from(handledThreads)
-    .where(
-      and(
-        eq(handledThreads.projectId, projectId),
-        eq(handledThreads.platform, platform),
-        eq(handledThreads.threadId, threadId),
-      ),
-    )
-    .limit(1);
-  return rows.length > 0;
-}
-
 /** The Reddit thread a lead sits in, or null when the lead is not this project's. */
 export async function redditLeadThread(projectId: string, leadId: string): Promise<string | null> {
   const [row] = await db()

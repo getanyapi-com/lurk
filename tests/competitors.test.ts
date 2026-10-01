@@ -11,7 +11,8 @@ const { OTHER_COMPETITORS, mentionSeries, stackMentions, topCompetitors } = awai
   "@/lib/competitors/read",
 );
 const { classifyMentions } = await import("@/lib/competitors/classify");
-const { competitorsToScan, keepMentions } = await import("@/lib/competitors/scan");
+const { keepMentions } = await import("@/lib/competitors/scan");
+const { capped } = await import("@/lib/tier");
 const { competitorsNamed, quoteNaming } = await import("@/lib/competitors/match");
 const { threadMentions, competitorsInThread } = await import("@/lib/competitors/threads");
 
@@ -19,13 +20,14 @@ describe("competitor cap", () => {
   const names = ["Typeform", "Jotform", "Tally", "Fillout"];
 
   it("watches only as many competitors as the free tier allows", () => {
-    expect(competitorsToScan(names, TIERS.free)).toEqual(["Typeform", "Jotform", "Tally"]);
+    expect(capped(names, TIERS.free.competitors)).toEqual(["Typeform", "Jotform", "Tally"]);
     expect(TIERS.free.competitors).toBe(3);
   });
 
   it("caps nothing for a connected wallet or a self-hosted instance", () => {
-    expect(competitorsToScan(names, TIERS.connected)).toEqual(names);
-    expect(competitorsToScan(names, null)).toEqual(names);
+    expect(capped(names, TIERS.connected.competitors)).toEqual(names);
+    // A self-hosted instance has no limits at all, so the cap it reads is undefined.
+    expect(capped(names, undefined)).toEqual(names);
   });
 });
 

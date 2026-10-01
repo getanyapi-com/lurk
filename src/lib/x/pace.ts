@@ -37,8 +37,3 @@ export async function paced<T>(fn: () => Promise<T>): Promise<T> {
     }
   }
 }
-
-/** For tests: how many calls hold a slot and how many wait. */
-export function xPaceSnapshot(): { inFlight: number; waiting: number } {
-  return { inFlight, waiting: waiting.length };
-}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityFrom, activitySentence, isBusy } from "@/lib/projectActivity";
+import { activityFrom, activitySentence } from "@/lib/projectActivity";
 import type { JobRow } from "@/jobs/enqueue";
 
 /**
@@ -29,7 +29,6 @@ describe("what a project is doing", () => {
       NOW,
     );
 
-    expect(isBusy(activity)).toBe(true);
     expect(activity.active).toEqual([
       { kind: "discovery_initial", running: false, progress: null },
     ]);
@@ -51,7 +50,9 @@ describe("what a project is doing", () => {
       NOW,
     );
 
-    expect(isBusy(activity)).toBe(true);
+    expect(activity.active).toEqual([
+      { kind: "backfill", running: true, progress: "Judging 40 of 120 posts" },
+    ]);
     expect(activitySentence(activity)).toBe("Reading the past year: Judging 40 of 120 posts.");
   });
 
@@ -70,7 +71,6 @@ describe("what a project is doing", () => {
       NOW,
     );
 
-    expect(isBusy(activity)).toBe(false);
     expect(activity.active).toEqual([]);
     expect(activity.nextScan?.runAt).toEqual(later);
     expect(activitySentence(activity)).toContain("Next scan");
@@ -104,7 +104,7 @@ describe("what a project is doing", () => {
       NOW,
     );
 
-    expect(isBusy(activity)).toBe(false);
+    expect(activity.active).toEqual([]);
     expect(activitySentence(activity)).toBe(
       "Setting your project up stopped: Google returned 502.",
     );

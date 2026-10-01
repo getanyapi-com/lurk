@@ -173,12 +173,6 @@ export function bodyOf(terms: string[][], lang: string, filters: LaneFilters = {
   return `${groups.join(" ")} ${tail.join(" ")}`;
 }
 
-/** The filters a stored lane body carries, read back from its tail. */
-export function filtersOf(body: string): LaneFilters {
-  const faves = body.match(/ min_faves:(\d+)/u);
-  return { topLevelOnly: body.includes(" -filter:replies"), ...(faves ? { minFaves: Number(faves[1]) } : {}) };
-}
-
 /**
  * A term the way a lane can hold it, or null: lowercase, straight quotes, one
  * to four words, nothing X would read as an operator or a group, and letters

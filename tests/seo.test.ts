@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import { describe, expect, it, vi } from "vitest";
-import { competitorNamed } from "@/lib/competitors/match";
+import { competitorsNamed } from "@/lib/competitors/match";
 import { seoSettings } from "@/lib/seo/limits";
 import { redditResults, redditThread } from "@/lib/seo/links";
 import { TIERS } from "@/lib/tiers";
@@ -45,19 +45,17 @@ describe("Reddit thread links", () => {
 
 describe("competitor match", () => {
   it("finds a name in the title or the body whatever its case", () => {
-    expect(competitorNamed(["Typeform"], "Is TYPEFORM worth it?", null)).toBe(true);
-    expect(competitorNamed(["Typeform"], "Best form tool", "we moved off typeform")).toBe(true);
+    expect(competitorsNamed(["Typeform"], "Is TYPEFORM worth it?")).toEqual(["Typeform"]);
+    expect(competitorsNamed(["Typeform"], "Best form tool\nwe moved off typeform")).toEqual(["Typeform"]);
   });
 
   it("says no when no competitor is named", () => {
-    expect(competitorNamed(["Typeform", "Tally"], "Best form tool", "google forms is fine")).toBe(
-      false,
-    );
+    expect(competitorsNamed(["Typeform", "Tally"], "Best form tool\ngoogle forms is fine")).toEqual([]);
   });
 
   it("ignores an empty competitor rather than matching everything", () => {
-    expect(competitorNamed(["  "], "Best form tool", "anything")).toBe(false);
-    expect(competitorNamed([], "Best form tool", "anything")).toBe(false);
+    expect(competitorsNamed(["  "], "Best form tool\nanything")).toEqual([]);
+    expect(competitorsNamed([], "Best form tool\nanything")).toEqual([]);
   });
 });
 

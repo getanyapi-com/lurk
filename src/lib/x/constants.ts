@@ -115,14 +115,8 @@ export const MAX_RIVALS_PER_LANE = 6;
 export const MAX_LANE_BODY_CHARS = 380;
 export const MAX_QUERY_CHARS = 450;
 
-/** What one twitter.* call may cost before the gateway must refuse it, in USD. */
-export const SEARCH_MAX_COST_USD = 0.001;
-export const LOOKUP_MAX_COST_USD = 0.0005;
-
 /** The llm_usage purposes X writes, which the X LLM sub-cap sums. */
 export const X_PURPOSES = ["x_seeds", "x_score", "x_final", "x_reply"] as const;
-/** The search_runs kinds X writes, which X retention and the X data sub-cap read. */
-export const X_FETCH_KINDS = ["x_search", "x_tweet", "x_profile"] as const;
 /** The twitter.* SKUs X buys. */
 export const X_SKUS = ["twitter.search", "twitter.tweet", "twitter.profile"] as const;
 

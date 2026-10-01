@@ -40,7 +40,7 @@ export function XMaybeSection({
   }
   const selected = held.some((item) => item.entryId === selectedId) || worth.some((item) => item.entryId === selectedId);
   return (
-    <XGroupDetails selected={selected} defaultOpen>
+    <XGroupDetails selected={selected}>
       <GroupSummary label="Maybe" count={held.length + filtered.worth} warm />
       <p className="text-small border-t px-3 py-2 text-fg-muted">Could be leads, but lurk isn&apos;t sure. Worth a quick look.</p>
       {held.map((item) => (
@@ -82,7 +82,7 @@ export function XLeftOutSection({
   }
   const total = filtered.judged + filtered.screened + filtered.unfinished - filtered.worth;
   return (
-    <XGroupDetails selected={items.some((item) => item.entryId === selectedId)} defaultOpen>
+    <XGroupDetails selected={items.some((item) => item.entryId === selectedId)}>
       <GroupSummary label="Left out" count={total} />
       <p className="text-small border-t px-3 py-2 text-fg-muted">{filteredSummary(filtered)}</p>
       {items.map((item) => filteredRow(item, params, selectedId))}

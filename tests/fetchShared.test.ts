@@ -1,25 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { isFreshEnough } from "@/lib/reddit/fetch";
-
-describe("reuse decision", () => {
-  const now = new Date("2026-09-05T12:00:00Z");
-
-  it("reuses a run inside the caller's cadence window", () => {
-    const fetchedAt = new Date(now.getTime() - 30 * 60 * 1000);
-    expect(isFreshEnough(fetchedAt, 60 * 60 * 1000, now)).toBe(true);
-  });
-
-  it("refetches once the window has passed", () => {
-    const fetchedAt = new Date(now.getTime() - 90 * 60 * 1000);
-    expect(isFreshEnough(fetchedAt, 60 * 60 * 1000, now)).toBe(false);
-  });
-
-  it("treats a run exactly at the boundary as fresh", () => {
-    const fetchedAt = new Date(now.getTime() - 60 * 60 * 1000);
-    expect(isFreshEnough(fetchedAt, 60 * 60 * 1000, now)).toBe(true);
-  });
-});
 
 /**
  * The reuse path touches four tables, so it is proven against a real database

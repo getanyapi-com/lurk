@@ -305,7 +305,6 @@ const worthSql = sql<boolean>`(${unfinishedSql} or ${closeCallSql} or (${xEvalua
 const RULE_ORDER = [
   "no_visible_term",
   "stale",
-  "no_ask",
   "too_long",
   "listicle",
   "bare_link",

@@ -9,7 +9,7 @@ import type { StoredPost } from "@/lib/reddit/store";
 import { loadScanProject } from "@/lib/scan/project";
 import { cadenceFor } from "@/lib/settings";
 import { capped, tierForUser } from "@/lib/tier";
-import { RETENTION_DAYS, type TierLimits } from "@/lib/tiers";
+import { RETENTION_DAYS } from "@/lib/tiers";
 import { classifyMentions, type MentionCandidate, type Verdict } from "./classify";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -25,11 +25,6 @@ export type CompetitorScanOutcome = {
   skipped: number;
   costUsd: number;
 };
-
-/** The tier decides how many competitors a project may watch. */
-export function competitorsToScan(names: string[], limits: TierLimits | null): string[] {
-  return capped(names, limits?.competitors);
-}
 
 /** Posts this project already holds a mention of, for this competitor. */
 async function knownMentionPosts(projectId: string, competitor: string): Promise<Set<string>> {
@@ -142,7 +137,8 @@ export async function runCompetitorScan(
   }
   const { limits, settings } = await tierForUser(project.userId);
   const cadence = cadenceFor(settings.settings.cadence);
-  const names = competitorsToScan(project.competitors, limits);
+  // The tier decides how many competitors a project may watch.
+  const names = capped(project.competitors, limits?.competitors);
   if (names.length === 0) {
     await writeProgress(jobId, "No competitors to watch yet");
     // The next pass is booked all the same. Without one waiting, every boot

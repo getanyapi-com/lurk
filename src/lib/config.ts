@@ -15,7 +15,6 @@ const schema = z.object({
   APP_URL: z.preprocess(blankIsAbsent, z.url().default("http://localhost:3000")),
   APP_ENCRYPTION_KEY: z.string().min(1),
   SELF_HOSTED: z.preprocess(blankIsAbsent, bool),
-  RUN_SCHEDULER: z.preprocess(blankIsAbsent, bool),
 
   ANYAPI_BASE_URL: z.preprocess(blankIsAbsent, z.url().default("https://api.getanyapi.com")),
   ANYAPI_OAUTH_CLIENT_ID: optional(z.string()),
@@ -54,12 +53,6 @@ const schema = z.object({
   DISCORD_CLIENT_SECRET: optional(z.string()),
 
   /**
-   * How many jobs the scheduler runs at once. Three is a starting hypothesis,
-   * not a tuned number: it keeps one slow scan from holding up the retention
-   * and digest jobs, and stays well inside the ten-connection pool in
-   * src/db/index.ts. Move it once real queue delay has been measured.
-   */
-  /**
    * Whether boot queues the jobs every project is missing. Production wants
    * that: it is how a project whose job died gets scanned again. A dev database
    * is shared and full of fixtures, and there it queued a discovery for each of
@@ -78,6 +71,12 @@ const schema = z.object({
   SWEEP_SCALE: z.preprocess(blankIsAbsent, z.enum(["full", "small"]).default("full")),
   /** How many new-project setups and first sweeps run at once, on top of the routine workers. */
   SCHEDULER_WATCHED_WORKERS: z.coerce.number().int().positive().default(8),
+  /**
+   * How many jobs the scheduler runs at once. Three is a starting hypothesis,
+   * not a tuned number: it keeps one slow scan from holding up the retention
+   * and digest jobs, and stays well inside the ten-connection pool in
+   * src/db/index.ts. Move it once real queue delay has been measured.
+   */
   SCHEDULER_WORKERS: z.coerce.number().int().positive().default(3),
 
   /**

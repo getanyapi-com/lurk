@@ -17,11 +17,6 @@ export function competitorsNamed(competitors: string[], text: string): string[] 
   });
 }
 
-/** Whether any competitor is named in a thread's own title and body. */
-export function competitorNamed(competitors: string[], title: string, body: string | null): boolean {
-  return competitorsNamed(competitors, `${title}\n${body ?? ""}`).length > 0;
-}
-
 /**
  * The sentence that named the competitor, as the card's evidence. Sentences
  * end at a full stop, a question or exclamation mark, or a line break; the

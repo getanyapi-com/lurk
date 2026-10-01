@@ -41,11 +41,6 @@ type SharedFetch<T> = {
 
 export type SharedResult<T> = { value: T; reused: boolean; costUsd: number };
 
-/** A stored run may serve the caller when it is younger than their cadence. */
-export function isFreshEnough(fetchedAt: Date, maxAgeMs: number, now = new Date()): boolean {
-  return now.getTime() - fetchedAt.getTime() <= maxAgeMs;
-}
-
 type RunKey = {
   kind: FetchKind;
   sku: string;

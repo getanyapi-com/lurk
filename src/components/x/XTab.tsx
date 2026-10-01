@@ -48,8 +48,6 @@ const NOTHING_FILTERED: XFiltered = { items: [], judged: 0, screened: 0, unfinis
 
 export type XParams = { project?: string; days?: string; status?: string; at?: string; lead?: string };
 
-/** A count the way X shows one: 950, 1.2k, 38k, 1.4M. */
-
 /**
  * What a row says after its age: how many had seen the post at lurk's last
  * fetch of it (X's count then, never an estimate; the pane says when), for

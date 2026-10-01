@@ -13,7 +13,6 @@ import {
   compileLanes,
   compileRivalLanes,
   compileStackLane,
-  filtersOf,
   lanesInputHash,
   orderLanes,
   rivalPhrases,
@@ -177,7 +176,6 @@ describe("X build-vs-buy and workflow lanes", () => {
     expect(lane?.family).toBe("stack");
     expect(lane?.terms).toEqual([HARNESS_WORDS, ["round robin", "booking link", "scheduling"]]);
     expect(lane?.body.endsWith(` lang:en -filter:retweets -filter:replies min_faves:${STACK_MIN_FAVES}`)).toBe(true);
-    expect(filtersOf(lane!.body)).toEqual({ topLevelOnly: true, minFaves: STACK_MIN_FAVES });
     expect(() => assertLane(`${lane?.body} since_time:1790000000`)).not.toThrow();
   });
 

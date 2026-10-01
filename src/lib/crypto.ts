@@ -34,8 +34,3 @@ export function decryptSecret(payload: string, base64Key: string): string {
     "utf8",
   );
 }
-
-/** A fresh base64 key of the right length, for the operator setup command. */
-export function generateEncryptionKey(): string {
-  return randomBytes(KEY_BYTES).toString("base64");
-}

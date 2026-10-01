@@ -1,12 +1,6 @@
 import type { Question } from "@/lib/jev";
 import type { ProductBrief } from "@/lib/brief";
-import {
-  INTENT_LEVELS,
-  briefQuestions,
-  judgeQuestions,
-  readingQuestions,
-  signalQuestions,
-} from "@/lib/scan/questions";
+import { briefQuestions, judgeQuestions, readingQuestions, signalQuestions } from "@/lib/scan/questions";
 
 /**
  * Every question the X judge asks about one post, in one file. Each request
@@ -210,5 +204,3 @@ export function xQuestions(
   }
   return questions;
 }
-
-export { INTENT_LEVELS };
