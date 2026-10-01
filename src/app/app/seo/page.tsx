@@ -95,6 +95,7 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
   const threads = orderThreads(scoreThreads(rows.map(toThread)), order);
   const href = linker(params);
   const selected = threads.find((thread) => thread.id === params.thread) ?? threads[0] ?? null;
+  const asked = selected !== null && selected.id === params.thread;
 
   // Keyed so switching projects mounts StartOnOpen again for the new one.
   return (
@@ -135,7 +136,8 @@ export default async function SeoPage({ searchParams }: SeoPageProps) {
             <SplitView
               threads={threads}
               selected={selected}
-              asked={selected !== null && selected.id === params.thread}
+              asked={asked}
+              pane={view === "split" || asked}
               backHref={href({ thread: undefined })}
               hrefFor={(id) => href({ thread: id })}
               competitors={competitors}

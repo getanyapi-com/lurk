@@ -35,6 +35,7 @@ export function SplitView({
   threads,
   selected,
   asked,
+  pane,
   backHref,
   hrefFor,
   competitors,
@@ -43,6 +44,12 @@ export function SplitView({
   selected: ScoredThread | null;
   /** Whether the URL names the thread, rather than it being the first one. */
   asked: boolean;
+  /**
+   * Whether the thread's pane is drawn at all. Under the table view this list
+   * is what a phone sees, and there a thread nobody asked for stays hidden, so
+   * its body and rules would cross the wire to be drawn nowhere.
+   */
+  pane: boolean;
   /** This list with no thread named, which is where Back goes. */
   backHref: string;
   /** Where a row goes: this tab with that thread open. */
@@ -83,7 +90,7 @@ export function SplitView({
           </Link>
         ))}
       </div>
-      {selected ? (
+      {pane && selected ? (
         <div
           className={cn(
             COLUMN,
