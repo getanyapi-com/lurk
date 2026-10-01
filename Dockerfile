@@ -31,7 +31,10 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/drizzle ./drizzle
+# The migrator reads the journal and the SQL it lists; the schema snapshots
+# beside them are only for drizzle-kit.
+COPY --from=builder /app/drizzle/*.sql ./drizzle/
+COPY --from=builder /app/drizzle/meta/_journal.json ./drizzle/meta/_journal.json
 COPY --from=builder /app/migrate.mjs ./migrate.mjs
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh && chown -R app:app /app

@@ -10,3 +10,7 @@ README.md
 AGENTS.md
 CLAUDE.md
 docker-compose.yml
+.context
+marketing
+scripts
+tests
