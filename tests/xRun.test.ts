@@ -41,6 +41,20 @@ vi.mock("@/lib/anyapi", async (importOriginal) => ({
 
 const HOUR = 3_600_000;
 
+describe("audit backfill validation", () => {
+  it("rejects unbounded or malformed limits before starting a scan", async () => {
+    const { runXScan } = await import("@/lib/x/run");
+    for (const backfill of [
+      { windowHours: Infinity, pagesPerLane: 10 },
+      { windowHours: 0, pagesPerLane: 10 },
+      { windowHours: 168, pagesPerLane: Infinity },
+      { windowHours: 168, pagesPerLane: 0 },
+      { windowHours: 168, pagesPerLane: 1.5 },
+    ]) await expect(runXScan("no-project", null, backfill)).rejects.toThrow("audit backfill requires");
+    expect(search).not.toHaveBeenCalled();
+  });
+});
+
 /** A rival name no other test, or test file, searches for, so no paid page is shared between them. */
 function uniqueRival(): string {
   const letters = Array.from({ length: 8 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");

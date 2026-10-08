@@ -464,7 +464,17 @@ async function expireStale(projectId: string, now: Date) {
     );
 }
 
-export async function runXScan(projectId: string, jobId: string | null): Promise<void> {
+/**
+ * An audit's backfill (scripts/x-audit.ts): read a past window no scan reads,
+ * paging each search up to `pagesPerLane`, with no daily caps. Never set by
+ * the app.
+ */
+export type XBackfill = { windowHours: number; pagesPerLane: number };
+
+export async function runXScan(projectId: string, jobId: string | null, backfill?: XBackfill): Promise<void> {
+  if (backfill && (!Number.isFinite(backfill.windowHours) || backfill.windowHours <= 0 || !Number.isSafeInteger(backfill.pagesPerLane) || backfill.pagesPerLane <= 0)) {
+    throw new Error("audit backfill requires a positive finite window and positive integer page limit");
+  }
   const now = new Date();
   const [project] = await db()
     .select({ id: projects.id, userId: projects.userId, name: projects.name, url: projects.url, scoring: projects.scoring })
@@ -491,7 +501,10 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
     return;
   }
   const tier = await limitsForUser(project.userId);
-  const x = sized(xLimitsFor(tier.limits));
+  const sizedLimits = sized(xLimitsFor(tier.limits));
+  const x: XLimits = backfill
+    ? { ...sizedLimits, pagesPerLane: backfill.pagesPerLane, pagesPerDay: null, parentsPerDay: null, judgedPerDay: null, profilesPerDay: null, replyChecksPerDay: null }
+    : sizedLimits;
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs: 0 };
   const product: ProductFacts = scanProject.product;
@@ -543,7 +556,7 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
   await expireStale(projectId, now);
   // A quiet product is checked weekly, so each check reads the whole week since the last.
   const quietBefore = await xQuiet(projectId, now);
-  const maxWindowHours = quietBefore.quiet ? QUIET_RECHECK_DAYS * 24 + OVERLAP_HOURS : MAX_WINDOW_HOURS;
+  const maxWindowHours = backfill?.windowHours ?? (quietBefore.quiet ? QUIET_RECHECK_DAYS * 24 + OVERLAP_HOURS : MAX_WINDOW_HOURS);
 
   const counts: XRunCounts = emptyCounts();
   const pools = await poolsFor(projectId, x, bigFirstLook, poolsSince);
