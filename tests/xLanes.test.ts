@@ -14,6 +14,7 @@ import {
   cleanTerm,
   compileDiyLane,
   compileLanes,
+  compileRequestLane,
   compileRivalLanes,
   compileStackLane,
   lanesInputHash,
@@ -219,8 +220,8 @@ describe("X lane order and inputs", () => {
     const slots: SeedSlots = { artifacts: ["scraping api"], topics: ["scraping", "scraper"] };
     const rivals = ["apify", "bright data", "firecrawl", "oxylabs", "proxycurl", "rapidapi", "scraperapi", "loom"];
     const lanes = compileLanes({ rivals, slots, ownNames: ["AnyAPI"] });
-    expect(lanes.slice(0, 3).map((lane) => lane.family)).toEqual(["rival", "diy", "stack"]);
-    expect(lanes.slice(3).every((lane) => lane.family === "rival")).toBe(true);
+    expect(lanes.slice(0, 4).map((lane) => lane.family)).toEqual(["rival", "request", "diy", "stack"]);
+    expect(lanes.slice(4).every((lane) => lane.family === "rival")).toBe(true);
     expect(orderLanes([], null, null)).toEqual([]);
     expect(compileLanes({ rivals: [], slots: null, ownNames: [] })).toEqual([]);
   });
@@ -270,5 +271,18 @@ describe("X lane order and inputs", () => {
     expect(JSON.parse(prompt).language).toBe("en");
     expect(Object.keys(JSON.parse(prompt)).at(-1)).toBe("language");
     expect(seedsKey(prompt)).toBe(createHash("sha256").update(JSON.stringify({ v: X_SEEDS_VERSION, prompt: stored })).digest("hex"));
+  });
+});
+
+describe("X category request lane", () => {
+  it("requires a specific category and request words, without granting venue privileges", () => {
+    const lane = compileRequestLane({ artifacts: ["app", "geo", "ai visibility tracker", "ai visibility trackers", "calendly clone"], topics: ["geo"] }, ["calendly"], []);
+    expect(lane?.terms[0]).toEqual(["ai visibility tracker", "ai visibility trackers"]);
+    expect(lane?.family).toBe("request");
+    expect(VENUE_FAMILIES.has(lane!.family)).toBe(false);
+    expect(() => assertLane(lane!.body)).not.toThrow();
+    expect(lane!.body.length).toBeLessThanOrEqual(380);
+    expect(compileRequestLane({ artifacts: ["tool", "scraping"], topics: ["scraping"] }, [], [])).toBeNull();
+    expect(compileRequestLane(null, [], [])).toBeNull();
   });
 });

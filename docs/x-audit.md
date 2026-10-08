@@ -6,6 +6,10 @@ evidence (`insufficient`) remain separate. Model-generated labels are not
 human ground truth. AnyAPI is a development/tuning product and excluded from
 the validation aggregate by default.
 
+The concrete runtime optimization and its saved-answer tradeoffs are recorded
+in [the pipeline candidate](x-pipeline-candidate.md). Do not confuse its
+in-sample gate/retrieval diagnostics with a passed rollout trial.
+
 ## Reanalyse existing evidence without spending
 
 The original corpus lives in ignored `.context/x-audit/<tag>/`. Raw customer

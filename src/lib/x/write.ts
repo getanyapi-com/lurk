@@ -65,7 +65,7 @@ export async function claimForVenue(row: {
         eq(xEvaluations.tweetId, row.tweetId),
         eq(xEvaluations.stage, "free_rejected"),
         // A thread's walk screens by the rule of the reply's lane, whichever family that was.
-        sql`(${xEvaluations.laneId} is null or ${xEvaluations.laneId} in (select id from x_lanes where family = 'rival') or ${xEvaluations.context} ? 'via')`,
+        sql`(${xEvaluations.laneId} is null or ${xEvaluations.laneId} in (select id from x_lanes where family in ('rival', 'request')) or ${xEvaluations.context} ? 'via')`,
       ),
     )
     .returning();

@@ -14,7 +14,7 @@ import { isAmbiguous, normalizeEntity, slug } from "./words";
  * and the words never do, so a model fills the words (seeds.ts) and this file
  * fills the shapes.
  *
- * Three families, from what a live probe of seven unlike products found on
+ * The original three families came from a live probe of seven unlike products on
  * 2026-09-27 (.context/x-general: 48 searches, 521 posts, labelled and
  * skeptic-checked):
  * - rival: someone leaving, weighing or stuck on a named rival. The buyers:
@@ -27,10 +27,12 @@ import { isAmbiguous, normalizeEntity, slug } from "./words";
  *   to plug his product on were this kind of post or a price gripe, not asks.
  * Price complaints on their own (0 of 51), open calls (0 of 29), hiring and
  * opening posts (0 of 36) and pain phrasing without a named system found
- * nothing, and are not lanes.
+ * nothing, and are not lanes. The October 7 candidate adds one specific
+ * category-plus-request lane; its saved-corpus reach is diagnostic, not a
+ * fresh validation of search yield.
  */
 
-export type LaneFamily = "rival" | "diy" | "stack";
+export type LaneFamily = "rival" | "request" | "diy" | "stack";
 
 /** The families whose posts may be worth a reply though nobody in them is shopping: a venue, not a buyer. */
 export const VENUE_FAMILIES: ReadonlySet<string> = new Set<LaneFamily>(["diy", "stack"]);
@@ -87,6 +89,9 @@ export const DIY_WORDS = [
   "replacing",
   "vibecoded",
 ];
+
+/** Requests for something to use, not bare categories or generic how-to posts. */
+export const REQUEST_WORDS = ["looking for", "recommend", "recommendations", "suggest", "suggestions", "need", "alternative", "alternatives"];
 
 /**
  * The tools and phrases a workflow post is written in. The founder's best
@@ -371,6 +376,28 @@ function seedTerms(slots: SeedSlots, ownNames: string[], rivals: string[]) {
 }
 
 /**
+ * One bounded category/request lane. Reuses the saved noun slots, never a
+ * broad single-word topic ("geo", "leads", "scraping") or a common-word rival.
+ * It gets normal buyer screening/judging, not the venue family's privileges.
+ */
+export function compileRequestLane(slots: SeedSlots | null, rivals: string[], ownNames: string[]): CompiledLane | null {
+  if (!slots) return null;
+  const { artifacts, topics } = seedTerms(slots, ownNames, rivals);
+  // Interleave category nouns and concrete jobs so plural variants of one
+  // noun cannot crowd every other job out of a length-bounded query.
+  const nouns: string[] = [];
+  for (let i = 0; i < Math.max(artifacts.length, topics.length); i += 1) {
+    for (const term of [artifacts[i], topics[i]]) {
+      if (term?.includes(" ") && !nouns.includes(term)) nouns.push(term);
+    }
+  }
+  return laneOf("request", [nouns, REQUEST_WORDS], ([kept]) => ({
+    label: `Asking for ${listed(distinctForms(kept), 2)}`,
+    seeds: [],
+  }));
+}
+
+/**
  * The harness words a project may search in: none that is the product itself
  * or a rival ("n8n" for an automation tool whose rivals are Zapier and Make),
  * comparing a domain name without its suffix, so "make.com" meets "make".
@@ -449,13 +476,13 @@ export function compileStackLane(slots: SeedSlots | null, rivals: string[], ownN
 
 /**
  * A project's lanes in rank order, which a run capped to its first few (a
- * trial-size dev run) takes them in: the first rival lane (the buyers), then
- * build-vs-buy, then the workflow lane, then the other rival lanes. Three
- * lanes so hold one of each family.
+ * trial-size dev run) takes them in: the first rival lane, the category/request
+ * candidate, build-vs-buy, workflow, then the other rival lanes. Request
+ * retrieval shares existing page/judge budgets; it has no new allowance.
  */
-export function orderLanes(rival: CompiledLane[], diy: CompiledLane | null, stack: CompiledLane | null): CompiledLane[] {
+export function orderLanes(rival: CompiledLane[], diy: CompiledLane | null, stack: CompiledLane | null, request: CompiledLane | null = null): CompiledLane[] {
   const [first, ...rest] = rival;
-  return [first, diy, stack, ...rest].filter((lane): lane is CompiledLane => Boolean(lane));
+  return [first, request, diy, stack, ...rest].filter((lane): lane is CompiledLane => Boolean(lane));
 }
 
 /** Every lane for a project, compiled and ordered. */
@@ -465,6 +492,7 @@ export function compileLanes(input: { rivals: string[]; slots: SeedSlots | null;
     compileRivalLanes(rivals, slots?.ordinaryWordRivals ?? []),
     compileDiyLane(slots, rivals, ownNames),
     compileStackLane(slots, rivals, ownNames),
+    compileRequestLane(slots, rivals, ownNames),
   );
 }
 

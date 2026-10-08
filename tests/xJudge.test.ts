@@ -57,6 +57,7 @@ describe("X gates, in their fixed order", () => {
     [{ promoting: 0.8 }, "complete", "review", "seller_only"],
     [{ canUse: 0.2 }, "complete", "review", "wrong_audience"],
     [{ intent: 1 }, "complete", "review", "no_active_need"],
+    [{ intent: 2 }, "complete", "review", "no_active_need"],
     [{ ownNeed: 0.2, curiosity: 0.9 }, "complete", "reject", "no_active_need"],
     [{}, "complete", "qualify", "supported_open_need"],
   ] as const)("%o at %s is %s (%s)", (over, level, decision, code) => {
@@ -131,6 +132,8 @@ function answersFor(over: Record<string, number | string> = {}): Answers {
   );
   answers.intent = { type: "score", score: typeof over.intent === "number" ? over.intent : 3 };
   answers.need_quote = { type: "choice", choice: typeof over.need_quote === "string" ? over.need_quote : "s0" };
+  answers.wants_offering = { type: "noul", noul: typeof over.wants_offering === "number" ? over.wants_offering : 0.9 };
+  answers.hard_requirement = { type: "choice", choice: typeof over.hard_requirement === "string" ? over.hard_requirement : "met" };
   return answers;
 }
 
@@ -181,6 +184,61 @@ describe("the X judge's request and verdict", () => {
     expect(noQuote).toMatchObject({ stage: "review", code: "insufficient_evidence" });
     const forged = assess(answersFor(), candidate(), { s0: "Someone else wants a new CRM." }, "complete", now);
     expect(forged).toMatchObject({ stage: "review", code: "insufficient_evidence" });
+  });
+
+  it("holds unsupported product requirements without converting them into conversation cards", () => {
+    const sentences = candidateState(product, candidate(), "complete").sentences;
+    for (const venue of [false, true]) {
+      for (const [requirement, code] of [["unknown", "requirement_unknown"], ["unmet", "requirement_unmet"], ["bad-option", "requirement_unknown"]]) {
+        expect(assess(answersFor({ hard_requirement: requirement, founder_would_reply: 0.9 }), candidate({ venue }), sentences, "complete"))
+          .toMatchObject({ stage: "review", code });
+      }
+    }
+    const missing = answersFor();
+    delete missing.hard_requirement;
+    expect(assess(missing, candidate(), sentences, "complete").stage).toBe("review");
+    delete missing.wants_offering;
+    expect(assess(missing, candidate(), sentences, "complete")).toMatchObject({ stage: "review", code: "insufficient_evidence" });
+    expect(assess(answersFor({ wants_offering: 0.2 }), candidate(), sentences, "complete"))
+      .toMatchObject({ stage: "review", code: "not_product_seeking" });
+    expect(assess(answersFor({ hard_requirement: "none_stated" }), candidate(), sentences, "complete").stage).toBe("lead");
+  });
+
+  it("keeps advice-seeking intent out of buyer cards while retaining the checked-reply path", () => {
+    const sentences = candidateState(product, candidate(), "complete").sentences;
+    expect(assess(answersFor({ intent: 2, founder_would_reply: 0.8 }), candidate(), sentences, "complete"))
+      .toMatchObject({ stage: "pending_reply", code: "no_active_need" });
+    expect(assess(answersFor({ intent: 2 }), candidate(), sentences, "complete", new Date(), false).stage).toBe("review");
+  });
+
+  it("does not let category overlap override the brief's explicit adjacent-job answer", () => {
+    const sentences = candidateState(product, candidate(), "complete").sentences;
+    const answers = answersFor();
+    answers.wanted_kind = { type: "choice", choice: "n0" };
+    expect(assess(answers, candidate(), sentences, "complete"))
+      .toMatchObject({ stage: "review", code: "wrong_job" });
+    answers.wanted_kind = { type: "choice", choice: "this_product" };
+    expect(assess(answers, candidate(), sentences, "complete").stage).toBe("lead");
+    answers.wanted_kind = { type: "choice", choice: "other" };
+    expect(assess(answers, candidate(), sentences, "complete"))
+      .toMatchObject({ stage: "review", code: "insufficient_evidence" });
+  });
+
+  it("recognizes a corroborated author-directed recommendation request without relaxing other gates", () => {
+    const ask = candidate({ text: "recommend/pitch me your appointment scheduling tool", rawText: "recommend/pitch me your appointment scheduling tool" });
+    const sentences = candidateState(product, ask, "complete").sentences;
+    const answers = answersFor({ own_need: 0.32 });
+    answers.wanted_kind = { type: "choice", choice: "this_product" };
+    expect(assess(answers, ask, sentences, "complete")).toMatchObject({ stage: "lead" });
+    expect(assess(answers, ask, sentences, "search")).toMatchObject({ stage: "pending_context" });
+    expect(assess(answers, ask, { s0: "recommend me something another author wanted" }, "complete").stage).not.toBe("lead");
+    for (const [key, value] of [["resolved", 0.9], ["rival_vendor", 0.9], ["same_kind", 0.2], ["automated_account", 0.9]] as const) {
+      const blocked = { ...answers, [key]: { type: "noul" as const, noul: value } };
+      expect(assess(blocked, ask, sentences, "complete").stage).not.toBe("lead");
+    }
+    answers.hard_requirement = { type: "choice", choice: "unknown" };
+    expect(assess(answers, ask, sentences, "complete").stage).not.toBe("lead");
+    expect(assess(answersFor({ own_need: 0.32 }), candidate({ text: "Drop your startup below" }), { s0: "Drop your startup below" }, "complete").stage).not.toBe("lead");
   });
 
   it("routes a no-need post Jev thinks worth a reply to the reply check at either level, ranked by the reply answers", () => {

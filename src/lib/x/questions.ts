@@ -32,7 +32,7 @@ function noul(question: string, focus: string, yes: Criterion, no: Criterion): Q
 function ownNeed(): Question {
   return noul(
     `Does the author of \`${PATH}.text\` have a need, cost or problem of their own that a product or service could answer?`,
-    `Their own work, team, clients or life. \`${PATH}.replying_to\` is only context: what the people they answer need is not theirs.`,
+    `Their own work, team, clients or life. A direct request for a specific kind of tool to use is their own need even without saying "I"; a generic invitation to share startups is not. \`${PATH}.replying_to\` is only context: what the people they answer need is not theirs.`,
     {
       what: "The author states a need, a pain, a cost or a task in progress of their own",
       examples: [
@@ -41,6 +41,7 @@ function ownNeed(): Question {
         "need a booking tool for my studio that handles waitlists",
         "anyone know a Loom alternative I can self host?",
         "someone should build a cheaper Typeform, I'd be your first customer, their pricing is absurd",
+        "recommend an AI visibility tracker to use",
       ],
     },
     {
@@ -166,9 +167,9 @@ function canUse(): Question {
 
 /**
  * The questions for one post. `complete` adds the one only a bio can answer.
- * The brief's questions and three of lurk's judge questions ride along only to
- * be stored: the gates do not read them until the pilot's dev week shows they
- * help, and replaying stored answers costs nothing.
+ * Product-offering/requirement answers and the optional brief's wanted-kind
+ * answer guard buyer cards. Audience and reply-helpfulness answers are still
+ * stored for inspection, not thresholds fitted on the review packet.
  */
 export function xQuestions(
   sentenceIds: string[],
