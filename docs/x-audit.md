@@ -127,7 +127,14 @@ Do not weaken `no_active_need`, remove farm checks, mine the lift table into
 queries, or promote venue conversations into buyer alerts based on these
 diagnostics alone.
 
-## Next fresh validation (not run by this work)
+## Fresh validation status and follow-up
+
+A subsequent five-project test ran actual old/new pipelines and limited
+reference retrieval on a later window, with existing project facts/seed slots
+in isolated local copies. It found a lost model-labelled buyer, so it did not
+establish a rollout win. See [the candidate's fresh-test results](x-pipeline-candidate.md#fresh-five-project-test)
+and preserved `.context/x-audit/fresh1008-5/REPORT.md`. The following is the
+remaining broader validation work, not a claim that no fresh test occurred.
 
 1. Finish the blind adjudication and agree on buyer versus conversation utility.
 2. Freeze a later, untouched time window and validation products. Exclude

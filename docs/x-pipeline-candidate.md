@@ -2,9 +2,10 @@
 
 Implemented on the October 6 saved corpus. The first evaluation replayed saved
 answers; a subsequent bounded evaluation actually re-asked the model on 88
-archived cases. No new X searches, production edits or rollout occurred. This
-is a concrete candidate with regression evidence, not a passed fresh-search
-experiment.
+archived cases. A later five-project fresh test ran real X searches and both
+full pipelines in isolated local copies. No production edits or rollout
+occurred. The fresh test exposed a buyer regression: do not treat the earlier
+regression-set result as a passed rollout experiment.
 
 ## Runtime changes
 
@@ -153,11 +154,57 @@ final candidate outputs, call ledgers, logs, `REPORT.md` and `results.json`.
 The file-only `analyze.py` regenerates the summary without model calls. Paid
 runners refuse existing outputs; do not silently rerun or replace evidence.
 
+## Fresh five-project test
+
+The real old/new pipelines ran on isolated local copies of existing Cal.com,
+Tally, Clipy, Grenseo and Scarlett projects, from October 6 at 23:00 UTC through
+October 8 at 05:54 UTC. One page per lane, with every compiled lane; the audit
+backfill removes normal per-project daily pools. Existing seed slots were
+explicitly pinned, including stale caches. Seed generation and current live
+production configuration were not tested. Actual retrieval, free screens,
+parents, bios, Jev judging, Muse reply checks and local lead writes ran.
+
+The two-arm/reference union contained 404 unique product/posts. A displayed
+card census and deterministic non-displayed sample produced 202 blind cards,
+individually labelled by GPT-6.1-Sol before inspecting their pipeline fates:
+2 asks, 8 conversations, 188 non-leads and 4 insufficient cases. These remain
+model labels, not human truth. The reviewer knew study context and aggregate
+progress. None of the selected cards was in the older labelled sample;
+authors overlapped, so this is not an author-independent holdout.
+
+- Baseline displayed **one buyer, no conversations**; candidate displayed
+  **no buyers, one useful Cal.com conversation**. Neither displayed card was
+  model-labelled false/unknown. With one card per arm, precision is not reliably
+  established; a zero-buyer feed is not a precision win.
+- Clipy's free Screen Studio alternative request was an old-pipeline buyer
+  but became Held/wrong_job. The saved facts support basic recording/editing
+  and a first-recordings trial, while the generated brief calls a general
+  recorder a neighbour. The model selected that neighbour despite same_kind
+  75% and requirement met. This contradiction needs resolving, not a blanket
+  removal of neighbour or constraint checks.
+- A second Clipy request for face-camera recording and editing appeared only
+  in the broader reference: both capped pipelines missed it. This is a miss
+  in the reviewed retrieved sample, not a global-recall estimate.
+- The candidate retrieved a useful Grenseo measurement workflow but its
+  no_visible_term screen stopped it. Reference searches also found Tally
+  creators with form failures and delivery glitches that both arms missed.
+- Recorded data $0.048740 plus models $0.038949 = **$0.087689**, under the
+  announced $1 ceiling. Costs are ledger values, not reconciled invoices;
+  shared query/profile reuse makes arm costs incremental. The interrupted
+  runner resumed unfinished copies without rerunning completed arms.
+
+Frozen evidence is in `.context/x-audit/fresh1008-5/REPORT.md`, with manifest
+`b3cead998ea2`, snapshot `d702048cd844`, blind packet, immutable outcome files,
+labels/provenance and file-only `analyze.py`. No production or live-feed write,
+alert, merge or deployment occurred. The capped reference is not exhaustive;
+two reviewed buyers in one project are too little for a broad quality verdict.
+
 ## Rollout decision
 
 The candidate is reviewable in the PR; it is not merged or deployed. The
-actual model comparison supports cleaner buyer classification on known
-regressions, but not a broad rollout verdict. Before deployment, validate the
-complete retrieval/screens/context/judge/reply pipeline on an untouched window,
-with meaningful new positive cases, an explicitly chosen spend and quality
-target. No fresh X scan or production change was performed in this work.
+archived comparison supports cleaner classification on known regressions, but
+the fresh full-pipeline test exposed a lost buyer and another retrieval miss.
+**Do not ship this candidate on this evidence.** Resolve the contradictory
+product-job descriptions and request coverage, freeze a new candidate, then
+evaluate a new window with more positives. Keep mandatory-requirement, seller
+and context checks; do not tune on these misses and claim independent success.
