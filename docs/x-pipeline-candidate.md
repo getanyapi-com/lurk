@@ -1,8 +1,10 @@
 # Buyer-first pipeline candidate
 
-Implemented on the October 6 saved corpus, without new searches, provider
-calls, model calls, production edits or a rollout. This is a concrete runtime
-candidate, not a claim that the experiment has passed fresh validation.
+Implemented on the October 6 saved corpus. The first evaluation replayed saved
+answers; a subsequent bounded evaluation actually re-asked the model on 88
+archived cases. No new X searches, production edits or rollout occurred. This
+is a concrete candidate with regression evidence, not a passed fresh-search
+experiment.
 
 ## Runtime changes
 
@@ -19,8 +21,10 @@ candidate, not a claim that the experiment has passed fresh validation.
   it. This resolves a contradictory low own-need score without changing that
   raw score or weakening seller, resolved, audience, parent or bio checks.
 - Clarify the own-need prompt: asking for a specific tool to use need not say
-  “I”; a generic invitation to share startups is different. This prompt change
-  has not been re-asked against the saved corpus.
+  “I”; a generic invitation to share startups is different.
+- Distinguish a stand-alone optional feature inquiry from a mandatory adoption
+  constraint. Check every author sentence for constraints, independently of
+  the chosen quote. Never infer a feature's support from category fit.
 - Bump scorer and lane versions. Existing shown cards are not retroactively
   changed; these rules apply when a post is actually judged/re-scored.
 
@@ -29,7 +33,7 @@ brief. The earlier blind packet only supplied a short summary. Its uncertain
 labels therefore do not establish that the runtime was missing product facts.
 Missing endpoint/feature support must not be invented to improve a metric.
 
-## Exact saved-answer result
+## Initial saved-answer result (before prompt validation)
 
 The replay executes the real `assess()` with archived raw answers and context.
 Labels combine original model judgments with the attributed 66-card model
@@ -102,11 +106,58 @@ The command reads files only and writes `candidate/REPORT.md` and
 conversations, changed fates and pending recovered requests. No `.env`, DB or
 network connection is needed. Raw posts/answers remain ignored, outside Git.
 
+## Actual model validation
+
+Both judge versions received identical archived product facts, posts, parents
+and available bios. AnyAPI was excluded; reply checking was disabled to isolate
+buyer assessment. Baseline judge/gates/questions were frozen at `cbdcfd4`.
+There were 55 previously reviewed regression cases and 33 previously unlabelled
+cases. The latter were model-labelled before judge outputs and contained no
+buyer asks. This is not a human-labelled, fresh-window population sample.
+
+The first paired run exposed one mandatory requirement incorrectly treated as
+optional. After tightening that prompt, the candidate was re-asked on all 88
+frozen cases without changing labels. Final scorer: `x-2026-10-08.2`.
+
+| Model label of complete buyer cards | Baseline | Final candidate |
+|---|---:|---:|
+| Buyer ask | 2 | 4 |
+| Useful conversation, not buyer | 3 | 0 |
+| Non-lead | 2 | 0 |
+| Insufficient evidence | 4 | 0 |
+| Total | 11 | 4 |
+
+All complete buyers were regression cases. The candidate retains both existing
+asks and qualifies both Grenseo requests. It keeps the Cal.com switch inquiry
+without claiming forms support, while holding the explicitly required but
+unverified priority-routing feature. Five uncertain regression cases are Held
+and four rejected. Both arms produce zero buyers on the 33 unseen cases; with
+no unseen asks, that sample cannot establish buyer recall or improvement.
+
+Both arms leave one known generic startup-pitch invitation at pending_context.
+It is not displayed as a buyer, but the intermediate error remains. Reply
+checking and its useful-conversation yield are untested. Directly judging the
+two requests still missed by upstream retrieval/screens does not recover them
+end-to-end. Four correct model-labelled buyer cards cannot establish population
+precision, global recall or conversions. This is encouraging development
+evidence, not a guarantee.
+
+Recorded model usage was $0.055396 for 264 successful responses (270 HTTP
+attempts including retries), within the announced $0.10 bound. This is an
+application ledger value, not a reconciled provider invoice. Only local
+`llm_usage` was written. No additional X spend or production write occurred.
+
+Evidence is preserved in `.context/x-audit/wk1006/validation/`: frozen manifest
+`f7f14d255d86`, baseline sources, blind cards and labels, original paired and
+final candidate outputs, call ledgers, logs, `REPORT.md` and `results.json`.
+The file-only `analyze.py` regenerates the summary without model calls. Paid
+runners refuse existing outputs; do not silently rerun or replace evidence.
+
 ## Rollout decision
 
 The candidate is reviewable in the PR; it is not merged or deployed. The
-saved evidence supports removing clearly misrouted buyer cards and examining
-the recovered request, but not a broad rollout verdict. Before deployment,
-validate fresh judging/search on an untouched window with an explicitly agreed
-spend and quality target, including the known Held-buyer tradeoff. No such
-fresh spend or production change was performed in this work.
+actual model comparison supports cleaner buyer classification on known
+regressions, but not a broad rollout verdict. Before deployment, validate the
+complete retrieval/screens/context/judge/reply pipeline on an untouched window,
+with meaningful new positive cases, an explicitly chosen spend and quality
+target. No fresh X scan or production change was performed in this work.

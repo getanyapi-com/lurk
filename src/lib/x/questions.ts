@@ -177,6 +177,7 @@ export function xQuestions(
 ): Record<string, Question> {
   const judge = judgeQuestions(PATH);
   const signals = signalQuestions(PATH);
+  const reading = readingQuestions(PATH, sentenceIds);
   const questions: Record<string, Question> = {
     own_need: ownNeed(),
     same_kind: judge.same_kind,
@@ -187,10 +188,16 @@ export function xQuestions(
     promoting: promoting(),
     can_use: canUse(),
     intent: judge.intent,
-    need_quote: readingQuestions(PATH, sentenceIds).need_quote,
+    need_quote: {
+      ...reading.need_quote,
+      instructions: `${reading.need_quote.instructions} Prefer the sentence stating the author's own task or intended change. A stand-alone feature inquiry is not evidence that product supports that feature.`,
+    },
     wants_offering: judge.wants_offering,
     audience: judge.audience,
-    hard_requirement: judge.hard_requirement,
+    hard_requirement: {
+      ...judge.hard_requirement,
+      instructions: `${judge.hard_requirement.instructions} Inspect ALL of the author's own sentences, not just the chosen need quote. Explicit constraints such as "we need it to", "must", "only if" or "it has to" are hard requirements even when the underlying job fits. General category fit does not establish a specific required feature: answer unknown unless the supplied product facts establish that feature, or unmet if they contradict it. Only a stand-alone inquiry about an extra feature, with no stated dependency or constraint anywhere in their words, is not automatically mandatory; that can be none_stated. Never infer support for an unanswered feature question.`,
+    },
     // Whether the post is worth a reply when nobody is shopping: the Reddit
     // lane's strongest single question (0.757 AUC), verbatim, and its
     // "does the reply need the product" check.
