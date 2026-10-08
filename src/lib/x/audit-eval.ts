@@ -148,13 +148,14 @@ export function armMetrics(posts: SnapshotPost[], labels: Map<string, AuditLabel
   }
   const labelled = shown.length - counts.unlabelled;
   // Unknown labels stay in the denominator; they are NOT silently positive.
-  const noise = counts.not + counts.insufficient;
+  const noise = counts.not;
   return {
     shown: shown.length, ...counts, uniqueBuyerConversations: buyers.size, uniqueUsefulConversations: conversations.size,
     observedBuyerFraction: labelled ? counts.ask / labelled : null,
     buyerInterval: wilson(counts.ask, labelled),
     noiseAmongLabelled: noise,
-    noiseBounds: [noise, noise + counts.unlabelled],
+    unverifiedAmongLabelled: counts.insufficient,
+    noiseBounds: [noise, noise + counts.insufficient + counts.unlabelled],
     // A proxy, not a replay of the tab: same stored scores, only known labels.
     topFiveStoredScore: [...shown].sort((a, b) => (b.arms[arm]?.score ?? -1) - (a.arms[arm]?.score ?? -1) || a.key.localeCompare(b.key))
       .slice(0, 5).map((post) => ({ key: post.key, gold: labels.get(post.key)?.gold ?? "unlabelled" })),

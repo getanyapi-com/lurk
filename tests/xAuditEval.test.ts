@@ -16,7 +16,7 @@ describe("buyer-first audit", () => {
     const posts = [post("1", "lead", "same"), post("2", "lead", "same"), post("3", "reply"), post("4", "reply"), post("5", "lead"), post("6", "pending_reply")];
     const labels = keyed<AuditLabel>([{ key: "p:1", gold: "ask" }, { key: "p:2", gold: "ask" }, { key: "p:3", gold: "reply" }, { key: "p:4", gold: "insufficient" }], "labels");
     expect(armMetrics(posts, labels, "probe")).toMatchObject({ shown: 5, ask: 2, reply: 1, insufficient: 1, unlabelled: 1,
-      uniqueBuyerConversations: 1, uniqueUsefulConversations: 1, observedBuyerFraction: 0.5, noiseBounds: [1, 2] });
+      uniqueBuyerConversations: 1, uniqueUsefulConversations: 1, observedBuyerFraction: 0.5, noiseAmongLabelled: 0, unverifiedAmongLabelled: 1, noiseBounds: [0, 2] });
     expect(armMetrics(posts, labels, "probe", "lead")).toMatchObject({ shown: 3, ask: 2, unlabelled: 1 });
   });
 

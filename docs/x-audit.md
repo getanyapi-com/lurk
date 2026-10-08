@@ -97,6 +97,13 @@ author/conversation clustering. Weighted category ranges sum per-stratum
 descriptive Wilson ranges; they are not a pooled 95% interval. A census has no
 sampling uncertainty within that corpus, but still has labelling uncertainty.
 
+`insufficient` is unverified, not confirmed noise: definite noise counts only
+`not`, while upper noise bounds include insufficient and unlabelled cards.
+Model adjudication can be imported without waiting for human review, as long
+as the reviewer explicitly identifies the model and does not claim human
+ground truth or personal founder willingness. Only the reviewed subset is
+relabelled; the remainder retains its original model judgments.
+
 ## What offline comparisons can establish
 
 - Query-shape comparisons are lexical candidate coverage within the labelled
