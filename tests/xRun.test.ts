@@ -294,6 +294,22 @@ describeDb("the X pipeline against a database", () => {
       .where(orm.and(orm.eq(schema.jobs.projectId, projectId), orm.eq(schema.jobs.kind, kind), orm.isNull(schema.jobs.startedAt)));
   }
 
+  it("stores truncated parent context without splitting an astral Unicode character", async () => {
+    const rival = uniqueRival();
+    const { project } = await fixture([rival]);
+    const parent = item("x".repeat(599) + "𝚗", { authorUsername: "otherperson" });
+    const reply = item(`Looking for an alternative to ${rival}`, { isReply: true, inReplyToId: parent.id });
+    serve("rival", page([reply]));
+    tweet.mockResolvedValue({ output: { found: true, data: { ...parent, authorHandle: "otherperson" } }, costUsd: 0.00022 });
+    await openX(project.id);
+    await run.runXScan(project.id, null);
+    const [evaluation] = await db().select().from(schema.xEvaluations)
+      .where(orm.and(orm.eq(schema.xEvaluations.projectId, project.id), orm.eq(schema.xEvaluations.tweetId, reply.id as string)));
+    expect(evaluation.context).toMatchObject({ replyingTo: ["@otherperson: " + "x".repeat(599)] });
+    const [scan] = await db().select().from(schema.xRuns).where(orm.eq(schema.xRuns.projectId, project.id));
+    expect(scan.partialReason).toBeNull();
+  });
+
   it("reads the last month on first open: screens, walks a reply's parent and judges it too, writes leads and books the next scan", async () => {
     const rival = uniqueRival();
     const { project } = await fixture([rival]);
