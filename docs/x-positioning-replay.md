@@ -60,8 +60,11 @@ filled in. The helper is used only by the offline script/tests.
   are automatically qualified; the fresh request already exists in Maybe.
 - Removing the neighbour answer outright would qualify all five: the fresh
   model-labelled ask, **three archived model-labelled non-leads and one
-  conversation**. This is evidence against treating removal as a free recall
-  win. The original model labels remain disputed, not human ground truth.
+  conversation** according to the old labels. GPT-6 Astra inspected the
+  underlying posts and found real recording-tool requests in that group.
+  These disputed labels do **not** establish that those cases are noise.
+  Product-fit policy and unknown requirements must be judged from actual text
+  and capabilities, not from the old classification alone.
 - The final archived 88-case replay has **no changes** and matches its saved
   stage outcomes before the hypothetical policy. Its four regression buyers
   remain four; this is a regression check, not fresh validation.
@@ -95,11 +98,21 @@ and `results.json`, including every changed assessment, neighbour/capability
 review flag, source-file SHA-256, skipped rows and original stored stage.
 Raw customer evidence remains ignored and is not committed.
 
-## Decision
+## Historical offline decision
 
-Keep PR #131 draft and the runtime unchanged. The offline conflict reason
+At the end of this offline check, the recommendation was to keep PR #131 draft and the runtime unchanged. The offline conflict reason
 offers a clearer explanation, **not better buyer recall**. Before implementing
 a gate exception, settle Clipy's intended buyer segment and inspect the older
 false-positive examples. Retrieval depth/question coverage is a separate
 unimplemented hypothesis. Validate any frozen runtime changes in a different
 window; this replay cannot establish global X recall or conversions.
+
+## Subsequent actual-inbox test
+
+GPT-6 Astra's review led to a frozen basic-job eligibility and retrieval
+candidate, followed by a capped seven-day comparison on the same five real
+projects. [The actual inbox result](x-prospect-comparison.md) supersedes the
+offline recommendation: two additional supported prospects across only two
+projects, no gain in supported qualified cards, and Maybe growing from 35
+to 64. Keep the PR draft; no deployment or reliable general utility claim.
+The lexical replay remains offline diagnostics, not a runtime policy.

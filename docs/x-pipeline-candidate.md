@@ -224,3 +224,34 @@ the fresh full-pipeline test exposed a lost buyer and another retrieval miss.
 product-job descriptions and request coverage, freeze a new candidate, then
 evaluate a new window with more positives. Keep mandatory-requirement, seller
 and context checks; do not tune on these misses and claim independent success.
+
+## October 9 actual prospect-inbox comparison
+
+[The seven-day comparison](x-prospect-comparison.md) supersedes the rollout
+recommendation above. Candidate `2c121fd` allows a narrower neighbour when a
+fresh judgement says the supplied product explicitly performs the core job,
+while retaining other checks; splits two specific category request lanes;
+and adds generic question phrasing. A second full recurring request page is
+allowed inside existing daily budgets. Scorer/lanes version October 9.1.
+
+Actual Leads + Maybe yielded four supported prospects vs two for original
+`cbdcfd4`, but only Clipy and Grenseo gained a prospect. Supported qualified
+cards stay two in both arms; Maybe grows from 35 to 64, two newly qualified
+Mac requests lack platform evidence, and all four supported cases were
+already in a development corpus. Cal.com's qualified top-of-inbox noise
+worsens. This is a narrow shortlist gain, not reliable generalized utility.
+
+GPT-6 Astra also corrected the earlier offline inference: old labels calling
+three archived Clipy examples non-leads do not prove they are noise; the text
+contains real recorder requests. No ground truth is manufactured from those
+labels. The original immutable evidence remains unchanged.
+
+A Unicode truncation bug interrupted Clipy. Execution-only patch `80d1319`
+resumed pending evaluations in the same copy without search pages or policy
+changes. Recorded total $0.188848; conservative accounting $0.198848238
+including a $0.01 reserve for one failed fetch, under $1.
+
+**Keep PR #131 draft. Do not merge/deploy on this evidence; stop this bounded
+evaluation without another retuning run.** No source project/production
+changes, notifications or outreach. Raw evidence stays ignored under
+`.context/x-audit/prospects1009-5/`; the linked actual inbox is the deliverable.
