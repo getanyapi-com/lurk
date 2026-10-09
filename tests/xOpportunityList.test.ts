@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { XOpportunityList } from "@/components/x/XOpportunityList";
 import type { XHeldCard, XOpportunity } from "@/lib/x/read";
+import { XOpportunityBadge } from "@/components/x/XOpportunityBadge";
 
 function opportunity(id: string, priority: number | null): XOpportunity {
   const card: XHeldCard = {
@@ -21,13 +22,36 @@ it("renders uncertain opportunities in one stream, selects them, and keeps weake
     params: {}, selectedId: "held-strong",
   }));
   expect(html).toContain('aria-current="true"');
-  expect(html).toContain("priority 55");
+  expect(html).toContain(">Check fit<");
+  expect(html).not.toMatch(/priority \d+/u);
   expect(html).toContain("Check requirements");
   expect(html.match(/Weaker matches below/gu)).toHaveLength(1);
   expect(html.indexOf("Request strong")).toBeLessThan(html.indexOf("Weaker matches below"));
   expect(html.indexOf("Weaker matches below")).toBeLessThan(html.indexOf("Request weak"));
   expect(html).toContain("Request unknown");
-  expect(html).toContain("unscored");
+  expect(html).toContain(">Weaker match<");
+  expect(html).toContain(">Unassessed<");
   expect(html).not.toContain(">Maybe<");
   expect(html).not.toContain(">Left out<");
+});
+
+it("does not let an old high-fit lead badge override weak ranked evidence, but preserves it in history", () => {
+  const held = opportunity("qualified", 0.2);
+  if (held.entry.kind !== "held") throw new Error("Expected held fixture");
+  const qualified: XOpportunity = {
+    ...held,
+    entry: { kind: "lead", lead: {
+      ...held.entry.item, id: "qualified", kind: "ask", moment: null, reach: 0, fresh: true,
+      foundAt: new Date("2026-10-09"), score: 90, quote: null, status: "new", fit: 4, intent: 4,
+    } },
+    checks: [],
+  };
+  const ranked = renderToStaticMarkup(createElement(XOpportunityBadge, { opportunity: qualified }));
+  expect(ranked).toContain(">Weaker match<");
+  expect(ranked).not.toContain("Strong lead");
+  const history = renderToStaticMarkup(createElement(XOpportunityBadge, { opportunity: { ...qualified, priority: null }, ranked: false }));
+  expect(history).toContain("Strong lead");
+  expect(history).not.toContain("Unassessed");
+  const strong = renderToStaticMarkup(createElement(XOpportunityBadge, { opportunity: { ...qualified, priority: 0.8 } }));
+  expect(strong).toContain("Strong lead");
 });

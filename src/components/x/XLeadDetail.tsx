@@ -8,6 +8,7 @@ import { Meter } from "@/components/leads/Meter";
 import { Block, Called, Pane, Title } from "@/components/leads/pane";
 import { accountAge } from "@/components/leads/workspace";
 import { XReplyChip } from "@/components/x/XReplyChip";
+import { XOpportunityBadge } from "@/components/x/XOpportunityBadge";
 import { XThread } from "@/components/x/XThread";
 import { filteredSentence } from "@/components/x/filtered";
 import { fullCount, relativeAge, shortAge } from "@/lib/format";
@@ -175,14 +176,14 @@ export function XLeadDetail({
     const item = selection.item;
     const filtered = selection.kind === "filtered" ? selection.item : null;
     const warm = !filtered || filtered.band === "worth";
-    const badge = opportunity ? "Check fit" : warm ? "Maybe" : "Left out";
+    const badge = warm ? "Maybe" : "Left out";
     return (
       <Pane>
         <header className="flex flex-col gap-2 border-b p-4">
           <Title
             text={item.headline}
             badge={
-              <span className={`text-small ${warm ? "text-score-warm" : "text-fg-muted"}`} style={{ fontWeight: 500 }}>
+              opportunity ? <XOpportunityBadge opportunity={{ entry: selection, ...opportunity }} /> : <span className={`text-small ${warm ? "text-score-warm" : "text-fg-muted"}`} style={{ fontWeight: 500 }}>
                 {badge}
               </span>
             }
@@ -222,7 +223,7 @@ export function XLeadDetail({
   return (
     <Pane>
       <header className="flex flex-col gap-2 border-b p-4">
-        <Title text={lead.headline} badge={reply ? <XReplyChip moment={lead.moment} /> : <VerdictBadge fit={lead.fit} intent={lead.intent} />} />
+        <Title text={lead.headline} badge={opportunity ? <XOpportunityBadge opportunity={{ entry: selection, ...opportunity }} /> : reply ? <XReplyChip moment={lead.moment} /> : <VerdictBadge fit={lead.fit} intent={lead.intent} />} />
         <div className="flex flex-wrap items-center gap-2">
           <AuthorAvatar name={lead.authorName ?? lead.authorUsername} src={lead.authorImage} size={24} platform="x" />
           <span className="text-small text-fg-muted">@{lead.authorUsername}</span>
