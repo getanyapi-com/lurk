@@ -945,6 +945,29 @@ describeDb("the X pipeline against a database", () => {
     expect(xRun.replyChecks).toBeGreaterThanOrEqual(2);
   });
 
+  it("restores a held candidate's buyer score when its reply check fails", async () => {
+    process.env.OPENROUTER_API_KEY = "test";
+    const rival = uniqueRival();
+    const { project } = await fixture([rival], { brief: true });
+    const post = item(`reply-me: ${rival} could be cheaper, its pricing doubled again and I rebooked every client by hand today.`);
+    serve("rival", page([post]));
+    askJev.mockImplementation(async (call) => ({ ...answerAll(call),
+      same_kind: { type: "noul", noul: 0.8 }, intent: { type: "score", score: 1.45 },
+    }));
+    modelAnswers((call) => {
+      if (call.purpose !== "x_reply") throw new Error("no seed words here");
+      return worthy(false);
+    });
+    await openX(project.id);
+    await run.runXScan(project.id, null);
+    const held = (await evaluationsOf(project.id)).find((row) => row.tweetId === post.id);
+    expect(held).toMatchObject({ stage: "review", intent: 1, fit: 3 });
+    expect((held?.signals as { reply: { worth_reply: boolean } }).reply.worth_reply).toBe(false);
+    // Pre-check reply priority is 80+; a held buyer with intent 1 must not retain it.
+    expect(held?.score).toBeLessThan(70);
+    expect(await leadsOf(project.id)).toHaveLength(0);
+  });
+
   it("checks at most the day's reply allowance, and nothing at all without a brief", async () => {
     process.env.OPENROUTER_API_KEY = "test";
     const rival = uniqueRival();

@@ -17,7 +17,8 @@
     "anyapi:register": "tsx scripts/register-oauth-client.ts",
     "scorer:eval": "tsx scripts/scorer-eval.ts",
     "x:audit": "tsx scripts/x-audit.ts",
-    "x:scout-prototype": "tsx scripts/x-scout-prototype.ts"
+    "x:scout-prototype": "tsx scripts/x-scout-prototype.ts",
+    "x:ranking-replay": "tsx scripts/x-ranking-replay.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.87",

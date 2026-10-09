@@ -57,7 +57,7 @@ export type ScoreQuestion = { type: "score"; instructions: Entry; criteria: Entr
 export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 
 const noulAnswer = z.object({ type: z.literal("noul"), noul: z.number() });
-/** The Gateway leaves out probabilities and confidence; nothing downstream reads either. */
+/** The Gateway may omit probabilities; priority falls back to the unrounded score. */
 const choiceAnswer = z.object({
   type: z.literal("choice"),
   choice: z.string(),

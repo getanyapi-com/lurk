@@ -46,7 +46,7 @@ import { semaphore } from "./pace";
 import { checkReply } from "./reply";
 import { emptyCounts, finishXRun, markFirstLead, startXRun, type XRunCounts } from "./report";
 import { freeScreen, isListicle, isOwnOrRivalAccount, isVendorHook, matchedLaneTerms, PITCH_REASONS } from "./screen";
-import { venueScore, type XSignals } from "./gates";
+import { foldScore, venueScore, type XSignals } from "./gates";
 import { searched, xQuiet } from "./quiet";
 import { reachScore } from "./reach";
 import { scoreScreened } from "./rescore";
@@ -605,7 +605,11 @@ export async function runXScan(projectId: string, jobId: string | null, backfill
   const settleCandidate = async (evaluation: XEvaluation, post: StoredXPost, reply: Record<string, unknown>) => {
     const held = evaluation.decision === "review";
     const signals = { ...((evaluation.signals as Record<string, unknown> | null) ?? {}), reply };
-    await updateEvaluation(evaluation.id, { stage: held ? "review" : "rejected", signals });
+    // The reply hypothesis is over. Restore the buyer fold rather than leave
+    // its pre-check reply score on an ordinary held/rejected post.
+    const score = evaluation.fit !== null && evaluation.intent !== null && evaluation.engagement !== null
+      ? foldScore(evaluation.fit, evaluation.intent, evaluation.engagement) : null;
+    await updateEvaluation(evaluation.id, { stage: held ? "review" : "rejected", signals, score });
     await withdrawLead(projectId, post.id);
     if (held) {
       counts.reviews += 1;

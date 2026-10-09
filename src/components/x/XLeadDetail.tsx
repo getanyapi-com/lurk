@@ -13,7 +13,7 @@ import { filteredSentence } from "@/components/x/filtered";
 import { fullCount, relativeAge, shortAge } from "@/lib/format";
 import { intentWord, judgementSentence } from "@/lib/scan/words";
 import { STALE_BADGE_HOURS } from "@/lib/x/constants";
-import type { XFilteredCard, XHeldCard, XLeadCard, XThread as XThreadData } from "@/lib/x/read";
+import type { XFilteredCard, XHeldCard, XLeadCard, XOpportunity, XThread as XThreadData } from "@/lib/x/read";
 
 export type XSelection =
   | { kind: "lead"; lead: XLeadCard }
@@ -162,18 +162,20 @@ export function XLeadDetail({
   projectId,
   thread = null,
   now = new Date(),
+  opportunity,
 }: {
   selection: XSelection;
   projectId: string;
   /** The stored thread around the post, drawn as X draws it; without it the post's own words stand alone. */
   thread?: XThreadData | null;
   now?: Date;
+  opportunity?: Pick<XOpportunity, "priority" | "checks">;
 }) {
   if (selection.kind !== "lead") {
     const item = selection.item;
     const filtered = selection.kind === "filtered" ? selection.item : null;
     const warm = !filtered || filtered.band === "worth";
-    const badge = warm ? "Maybe" : "Left out";
+    const badge = opportunity ? "Check fit" : warm ? "Maybe" : "Left out";
     return (
       <Pane>
         <header className="flex flex-col gap-2 border-b p-4">
@@ -193,8 +195,9 @@ export function XLeadDetail({
         </header>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
+            {opportunity?.checks.length ? <Called label="Before replying" sentence={opportunity.checks.join(" · ")} /> : null}
             <Called
-              label={warm ? "Why lurk is unsure" : "Why lurk left it out"}
+              label={opportunity ? "Fit notes" : warm ? "Why lurk is unsure" : "Why lurk left it out"}
               sentence={filtered ? filteredSentence(filtered) : item.reason}
             />
             {thread ? (
@@ -238,6 +241,7 @@ export function XLeadDetail({
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
+          {opportunity?.checks.length ? <Called label="Before replying" sentence={opportunity.checks.join(" · ")} /> : null}
           {thread ? (
             <XThread thread={thread} quote={lead.quote} now={now} />
           ) : (
