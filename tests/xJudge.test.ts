@@ -224,6 +224,29 @@ describe("the X judge's request and verdict", () => {
       .toMatchObject({ stage: "review", code: "insufficient_evidence" });
   });
 
+  it("accepts a supported basic job despite narrow positioning, without inferring requirements or relaxing seller checks", () => {
+    const raw = answersFor();
+    raw.wanted_kind = { type: "choice", choice: "n0" };
+    raw.supported_job = { type: "noul", noul: 0.9 };
+    const post = candidate();
+    const sentences = candidateState(product, post, "complete").sentences;
+    expect(assess(raw, post, sentences, "complete").stage).toBe("lead");
+    raw.hard_requirement = { type: "choice", choice: "unknown" };
+    expect(assess(raw, post, sentences, "complete").code).toBe("requirement_unknown");
+    raw.hard_requirement = { type: "choice", choice: "unmet" };
+    expect(assess(raw, post, sentences, "complete").code).toBe("requirement_unmet");
+    raw.hard_requirement = { type: "choice", choice: "met" };
+    raw.rival_vendor = { type: "noul", noul: 0.9 };
+    expect(assess(raw, post, sentences, "complete").code).toBe("seller_only");
+    raw.rival_vendor = { type: "noul", noul: 0.1 };
+    raw.supported_job = { type: "noul", noul: 0.2 };
+    expect(assess(raw, post, sentences, "complete").code).toBe("wrong_job");
+    raw.supported_job = { type: "noul", noul: 0.9 };
+    raw.wanted_kind = { type: "choice", choice: "nothing" };
+    expect(assess(raw, post, sentences, "complete").code).toBe("not_product_seeking");
+    expect(xQuestions(["s0"], { complete: true, brief: null })).toHaveProperty("supported_job");
+  });
+
   it("recognizes a corroborated author-directed recommendation request without relaxing other gates", () => {
     const ask = candidate({ text: "recommend/pitch me your appointment scheduling tool", rawText: "recommend/pitch me your appointment scheduling tool" });
     const sentences = candidateState(product, ask, "complete").sentences;

@@ -165,10 +165,12 @@ export function assess(
   const offering = answers.wants_offering;
   const requirement = answers.hard_requirement;
   const wantedKind = answers.wanted_kind;
+  const supportedJob = answers.supported_job;
   const held = buyerEvidenceGate({
     wantsOffering: offering?.type === "noul" ? offering.noul : null,
     requirement: requirement?.type === "choice" ? requirement.choice : null,
     ...(wantedKind ? { wantedKind: wantedKind.type === "choice" ? wantedKind.choice : null } : {}),
+    supportedJob: supportedJob?.type === "noul" ? supportedJob.noul : null,
   });
   const verbatim = Boolean(needQuote && isVerbatim(needQuote, [candidate.text, candidate.rawText].map(plainTypography)));
   // A literal "recommend me/us" request with corroborated product fit is

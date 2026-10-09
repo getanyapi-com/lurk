@@ -15,6 +15,7 @@ import {
   compileDiyLane,
   compileLanes,
   compileRequestLane,
+  compileRequestLanes,
   compileRivalLanes,
   compileStackLane,
   lanesInputHash,
@@ -275,6 +276,13 @@ describe("X lane order and inputs", () => {
 });
 
 describe("X category request lane", () => {
+  it("separates two primary categories without letting plural variants consume both lanes", () => {
+    const lanes = compileRequestLanes({ artifacts: ["screen recorder", "screen recorders", "screen recording", "screen recordings", "bug report video"], topics: ["ui bug"] }, [], []);
+    expect(lanes.map((lane) => lane.terms[0])).toEqual([["screen recorder", "screen recorders"], ["screen recording", "screen recordings"]]);
+    expect(lanes.every((lane) => lane.terms[1].includes("best") && lane.terms[1].includes("which"))).toBe(true);
+    expect(lanes.every((lane) => !lane.terms[1].includes("need"))).toBe(true);
+    expect(compileRequestLanes({ artifacts: ["tool", "scraping"], topics: [] }, [], [])).toEqual([]);
+  });
   it("requires a specific category and request words, without granting venue privileges", () => {
     const lane = compileRequestLane({ artifacts: ["app", "geo", "ai visibility tracker", "ai visibility trackers", "calendly clone"], topics: ["geo"] }, ["calendly"], []);
     expect(lane?.terms[0]).toEqual(["ai visibility tracker", "ai visibility trackers"]);

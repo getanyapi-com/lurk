@@ -180,7 +180,14 @@ export function xQuestions(
   const reading = readingQuestions(PATH, sentenceIds);
   const questions: Record<string, Question> = {
     own_need: ownNeed(),
-    same_kind: judge.same_kind,
+    same_kind: {
+      ...judge.same_kind,
+      instructions: `${judge.same_kind.instructions} A specialised positioning or differentiator does not exclude a basic job the supplied product facts explicitly support. Compare the author's actual requested job, not whether they mention the differentiator.`,
+    },
+    supported_job: {
+      type: "noul",
+      instructions: `Does the supplied product explicitly do the core job the author of \`${PATH}.text\` wants to accomplish? Use \`product.what_it_does\`, \`product.capabilities\` and \`product.does_not\`, not assumptions from a brand or category. A narrower differentiator in \`product.kind\` does not exclude a supported basic job. Merely sharing a topic, consuming the product's output, or having one peripheral feature in common is not enough. Do not infer missing platform, price or feature support; hard requirements are assessed separately.${DATA}`,
+    },
     rival_vendor: rivalVendor(),
     resolved: resolved(),
     offers_services: signals.offers_services,

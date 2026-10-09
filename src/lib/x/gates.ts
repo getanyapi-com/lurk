@@ -183,12 +183,17 @@ export function buyerEvidenceGate(evidence: {
   requirement: string | null;
   /** Absent when the optional product brief was not asked. */
   wantedKind?: string | null;
+  /** Fresh explicit capability-based job evidence; absent in older scores. */
+  supportedJob?: number | null;
 }): { decision: "review"; code: XReasonCode } | null {
-  // The brief distinguishes a product from adjacent jobs. Do not allow a
-  // broad same_kind probability to override its explicit neighbour answer.
+  // A specialised brief is not an exclusion of a basic job the product
+  // explicitly supports. Old scores without that evidence remain held.
   if (evidence.wantedKind === "nothing") return { decision: "review", code: "not_product_seeking" };
-  if (/^n\d+$/u.test(evidence.wantedKind ?? "")) return { decision: "review", code: "wrong_job" };
-  if (evidence.wantedKind !== undefined && evidence.wantedKind !== "this_product") {
+  const neighbour = /^n\d+$/u.test(evidence.wantedKind ?? "");
+  const supportedJob = evidence.supportedJob !== null && evidence.supportedJob !== undefined &&
+    Number.isFinite(evidence.supportedJob) && evidence.supportedJob >= YES;
+  if (neighbour && !supportedJob) return { decision: "review", code: "wrong_job" };
+  if (evidence.wantedKind !== undefined && evidence.wantedKind !== "this_product" && !neighbour) {
     return { decision: "review", code: "insufficient_evidence" };
   }
   if (evidence.wantsOffering === null || !Number.isFinite(evidence.wantsOffering)) {

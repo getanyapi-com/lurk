@@ -91,7 +91,7 @@ export const DIY_WORDS = [
 ];
 
 /** Requests for something to use, not bare categories or generic how-to posts. */
-export const REQUEST_WORDS = ["looking for", "recommend", "recommendations", "suggest", "suggestions", "need", "alternative", "alternatives"];
+export const REQUEST_WORDS = ["looking for", "recommend", "recommendations", "suggest", "suggestions", "need a", "need an", "alternative", "alternatives", "best", "which", "anyone know", "what do you use"];
 
 /**
  * The tools and phrases a workflow post is written in. The founder's best
@@ -398,6 +398,28 @@ export function compileRequestLane(slots: SeedSlots | null, rivals: string[], ow
 }
 
 /**
+ * Separate the first two specific saved category nouns so one broad OR group
+ * cannot consume both result pages. Keep supplied singular/plural variants
+ * together; no new model seeds or product-specific test phrases are added.
+ */
+export function compileRequestLanes(slots: SeedSlots | null, rivals: string[], ownNames: string[]): CompiledLane[] {
+  if (!slots) return [];
+  const { artifacts, topics } = seedTerms(slots, ownNames, rivals);
+  const groups = new Map<string, string[]>();
+  for (const term of [...artifacts, ...topics]) {
+    if (!term.includes(" ")) continue;
+    const key = term.endsWith("s") && !term.endsWith("ss") ? term.slice(0, -1) : term;
+    const group = groups.get(key);
+    if (group) { if (!group.includes(term)) group.push(term); }
+    else if (groups.size < 2) groups.set(key, [term]);
+  }
+  return [...groups.values()].flatMap((nouns) => {
+    const lane = laneOf("request", [nouns, REQUEST_WORDS], ([kept]) => ({ label: `Asking for ${kept[0]}`, seeds: [] }));
+    return lane ? [lane] : [];
+  });
+}
+
+/**
  * The harness words a project may search in: none that is the product itself
  * or a rival ("n8n" for an automation tool whose rivals are Zapier and Make),
  * comparing a domain name without its suffix, so "make.com" meets "make".
@@ -480,9 +502,9 @@ export function compileStackLane(slots: SeedSlots | null, rivals: string[], ownN
  * candidate, build-vs-buy, workflow, then the other rival lanes. Request
  * retrieval shares existing page/judge budgets; it has no new allowance.
  */
-export function orderLanes(rival: CompiledLane[], diy: CompiledLane | null, stack: CompiledLane | null, request: CompiledLane | null = null): CompiledLane[] {
+export function orderLanes(rival: CompiledLane[], diy: CompiledLane | null, stack: CompiledLane | null, request: CompiledLane | CompiledLane[] | null = null): CompiledLane[] {
   const [first, ...rest] = rival;
-  return [first, request, diy, stack, ...rest].filter((lane): lane is CompiledLane => Boolean(lane));
+  return [first, ...(Array.isArray(request) ? request : [request]), diy, stack, ...rest].filter((lane): lane is CompiledLane => Boolean(lane));
 }
 
 /** Every lane for a project, compiled and ordered. */
@@ -492,7 +514,7 @@ export function compileLanes(input: { rivals: string[]; slots: SeedSlots | null;
     compileRivalLanes(rivals, slots?.ordinaryWordRivals ?? []),
     compileDiyLane(slots, rivals, ownNames),
     compileStackLane(slots, rivals, ownNames),
-    compileRequestLane(slots, rivals, ownNames),
+    compileRequestLanes(slots, rivals, ownNames),
   );
 }
 

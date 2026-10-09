@@ -944,7 +944,10 @@ export async function runXScan(projectId: string, jobId: string | null, backfill
     const firstRun = lane.runs === 0;
     const since = windowStart(firstRun ? { coveredUntil: null, createdAt: now } : lane, now, firstRun ? FIRST_LOOK_HOURS : maxWindowHours);
     // A lane's first run on the project's first look may read the month page by page.
-    const maxPages = firstRun && bigFirstLook ? firstLookPages : x.pagesPerLane;
+    // A full category-request page may hide yesterday's asks. The extra page
+    // still consumes the existing daily pool; audit limits remain explicit.
+    const recurringPages = lane.family === "request" && !backfill ? Math.max(2, x.pagesPerLane) : x.pagesPerLane;
+    const maxPages = firstRun && bigFirstLook ? firstLookPages : recurringPages;
     const sinceSec = Math.floor(since.getTime() / 1000);
     const posts: StoredXPost[] = [];
     let pages = 0;
