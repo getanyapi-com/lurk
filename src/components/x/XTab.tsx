@@ -19,6 +19,7 @@ import { limitsForUser } from "@/lib/tier";
 import { DAY_MS } from "@/lib/time";
 import { QUIET_RECHECK_DAYS } from "@/lib/x/constants";
 import { X_PRIORITY_FLOOR } from "@/lib/x/priority";
+import { xPreviewOnly } from "@/lib/x/preview";
 import { allowanceFor } from "@/lib/throttle";
 import { withParams } from "@/lib/url";
 import {
@@ -203,6 +204,7 @@ function emptySentence(
  * checks the switch and the owner; this only draws.
  */
 export async function XTab({ userId, project, params }: { userId: string; project: { id: string; name: string }; params: XParams }) {
+  const preview = xPreviewOnly();
   const filter: XFeedFilter = {
     days: params.days === "1" ? 1 : params.days === "7" ? 7 : 30,
     status: (X_STATUSES as readonly string[]).includes(params.status ?? "") ? (params.status as XStatusFilter) : "new",
@@ -237,13 +239,13 @@ export async function XTab({ userId, project, params }: { userId: string; projec
       key={project.id}
       className="flex flex-col gap-1 lg:h-[calc(100dvh_-_var(--header-height)_-_var(--page-gutter)_*_2)]"
     >
-      <StartOnOpen start={openXAction.bind(null, project.id)} />
+      {preview ? null : <StartOnOpen start={openXAction.bind(null, project.id)} />}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h2 className="text-h3 flex items-baseline gap-2" style={{ fontWeight: 500 }}>
           {project.name}
           <span className="text-mono tracking-wide text-fg-muted uppercase">X leads · beta</span>
         </h2>
-        {firstCheck ? null : (
+        {preview || firstCheck ? null : (
           <form action={scanXNowAction.bind(null, project.id)}>
             <PaidButton label="Scan now" allowance={allowance} note="beside" />
           </form>
@@ -251,10 +253,12 @@ export async function XTab({ userId, project, params }: { userId: string; projec
       </div>
 
       <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1">
-        <ScanState status={status} now={new Date()} />
+        {preview ? (
+          <p className="text-small text-fg-muted">Saved-data preview · Scans disabled. These are archived results, not a fresh scan.</p>
+        ) : <ScanState status={status} now={new Date()} />}
         <div className="flex flex-wrap items-baseline gap-x-1.5">
-          {status.running ? null : <p className="text-small text-fg-muted">{statusLine(status)}</p>}
-          {tier.name === "free" && tier.limits && !firstCheck && activeLanes.length > 0 && !status.quiet.quiet ? (
+          {preview || status.running ? null : <p className="text-small text-fg-muted">{statusLine(status)}</p>}
+          {!preview && tier.name === "free" && tier.limits && !firstCheck && activeLanes.length > 0 && !status.quiet.quiet ? (
             <p className="text-small text-fg-muted">
               Free checks X once a day; a connected wallet checks every search hourly,
               about ${projectedWalletCostPerDay(activeLanes).toFixed(2)} a day from your own balance at this project&apos;s
@@ -282,11 +286,11 @@ export async function XTab({ userId, project, params }: { userId: string; projec
             list={
               <>
                 <GroupHeader label={filter.status === "new" ? "Opportunities" : "Leads"} count={opportunities.total} />
-                {opportunities.items.length === 0 && firstCheck && (status.running || !status.lastFailure) && filter.status === "new" ? (
+                {opportunities.items.length === 0 && !preview && firstCheck && (status.running || !status.lastFailure) && filter.status === "new" ? (
                   <ArrivingLeads />
                 ) : opportunities.items.length === 0 ? (
                   <p className="text-small p-3 text-fg-muted">
-                    {emptySentence(filter, status, lanes.length, activeLanes.length, project.name, !allowance.spent)}
+                    {preview ? "No archived opportunities match this window and your filters." : emptySentence(filter, status, lanes.length, activeLanes.length, project.name, !allowance.spent)}
                   </p>
                 ) : (
                   <>

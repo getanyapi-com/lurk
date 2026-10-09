@@ -66,3 +66,11 @@ Before inspecting the next corpus, retain the ranker hash, version, .4 floor and
 7. Track actual conversations and adoption later; they are different outcomes from willingness to investigate.
 
 The packet/protocol are prepared. **No unseen corpus has been collected or owner review completed yet.** The PR stays draft pending that evidence.
+
+## Inspecting the actual app locally
+
+Use an isolated local preview database populated from the frozen snapshot, not an empty real project. Start `next dev` with `LURK_X_PREVIEW_ONLY=true`, `X_LEADS=true` and `RUN_SCHEDULER=false`; leave retrieval/model/email keys blank. Do not change `.env` or point this preview at production.
+
+The development-only flag suppresses the X tab's start-on-open, rejects its Scan now action before queueing or charging an allowance, hides the scan button/status, and labels the page as archived data. It does not affect production. The regular project picker, date/status filters, ranked reader, styling and detail pane still work.
+
+The Oct 9 local preview uses a separate database with all 415 archived candidate evaluations across five copied projects; no original project or frozen audit row is replaced. Verify its jobs, X runs and usage tables remain empty after opening/selecting/refreshing. This is UI verification, not fresh lead-quality validation.
