@@ -201,6 +201,22 @@ two reviewed buyers in one project are too little for a broad quality verdict.
 
 ## Rollout decision
 
+### Offline follow-up after independent review
+
+[The positioning replay](x-positioning-replay.md) checks saved briefs and
+7,519 stored answer sets without new calls or runtime changes. A hypothetical
+`positioning_conflict` reason keeps five Clipy cases unqualified; removing the
+neighbour veto outright would instead qualify one fresh model-labelled ask,
+three archived model-labelled non-leads and one conversation. The final
+88-case regression replay is unchanged. These are development diagnostics,
+not a fresh win or a shipped fix.
+
+The fresh counts above refer to qualified cards only: the candidate also has
+two user-visible **Maybe** cards, one model-labelled ask and one unlabelled.
+The Clipy request was demoted, not hidden. Claude Opus 5.5 disputed several
+conversation labels; the original blind labels remain preserved, not silently
+changed after observing outcomes. Do not loosen screens on those labels alone.
+
 The candidate is reviewable in the PR; it is not merged or deployed. The
 archived comparison supports cleaner classification on known regressions, but
 the fresh full-pipeline test exposed a lost buyer and another retrieval miss.
