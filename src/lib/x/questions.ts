@@ -32,7 +32,7 @@ function noul(question: string, focus: string, yes: Criterion, no: Criterion): Q
 function ownNeed(): Question {
   return noul(
     `Does the author of \`${PATH}.text\` have a need, cost or problem of their own that a product or service could answer?`,
-    `Their own work, team, clients or life. \`${PATH}.replying_to\` is only context: what the people they answer need is not theirs.`,
+    `Their own work, team, clients or life. A direct request for a specific kind of tool to use is their own need even without saying "I"; a generic invitation to share startups is not. \`${PATH}.replying_to\` is only context: what the people they answer need is not theirs.`,
     {
       what: "The author states a need, a pain, a cost or a task in progress of their own",
       examples: [
@@ -41,6 +41,7 @@ function ownNeed(): Question {
         "need a booking tool for my studio that handles waitlists",
         "anyone know a Loom alternative I can self host?",
         "someone should build a cheaper Typeform, I'd be your first customer, their pricing is absurd",
+        "recommend an AI visibility tracker to use",
       ],
     },
     {
@@ -166,9 +167,9 @@ function canUse(): Question {
 
 /**
  * The questions for one post. `complete` adds the one only a bio can answer.
- * The brief's questions and three of lurk's judge questions ride along only to
- * be stored: the gates do not read them until the pilot's dev week shows they
- * help, and replaying stored answers costs nothing.
+ * Product-offering/requirement answers and the optional brief's wanted-kind
+ * answer guard buyer cards. Audience and reply-helpfulness answers are still
+ * stored for inspection, not thresholds fitted on the review packet.
  */
 export function xQuestions(
   sentenceIds: string[],
@@ -176,9 +177,17 @@ export function xQuestions(
 ): Record<string, Question> {
   const judge = judgeQuestions(PATH);
   const signals = signalQuestions(PATH);
+  const reading = readingQuestions(PATH, sentenceIds);
   const questions: Record<string, Question> = {
     own_need: ownNeed(),
-    same_kind: judge.same_kind,
+    same_kind: {
+      ...judge.same_kind,
+      instructions: `${judge.same_kind.instructions} A specialised positioning or differentiator does not exclude a basic job the supplied product facts explicitly support. Compare the author's actual requested job, not whether they mention the differentiator.`,
+    },
+    supported_job: {
+      type: "noul",
+      instructions: `Does the supplied product explicitly do the core job the author of \`${PATH}.text\` wants to accomplish? Use \`product.what_it_does\`, \`product.capabilities\` and \`product.does_not\`, not assumptions from a brand or category. A narrower differentiator in \`product.kind\` does not exclude a supported basic job. Merely sharing a topic, consuming the product's output, or having one peripheral feature in common is not enough. Do not infer missing platform, price or feature support; hard requirements are assessed separately.${DATA}`,
+    },
     rival_vendor: rivalVendor(),
     resolved: resolved(),
     offers_services: signals.offers_services,
@@ -186,10 +195,16 @@ export function xQuestions(
     promoting: promoting(),
     can_use: canUse(),
     intent: judge.intent,
-    need_quote: readingQuestions(PATH, sentenceIds).need_quote,
+    need_quote: {
+      ...reading.need_quote,
+      instructions: `${reading.need_quote.instructions} Prefer the sentence stating the author's own task or intended change. A stand-alone feature inquiry is not evidence that product supports that feature.`,
+    },
     wants_offering: judge.wants_offering,
     audience: judge.audience,
-    hard_requirement: judge.hard_requirement,
+    hard_requirement: {
+      ...judge.hard_requirement,
+      instructions: `${judge.hard_requirement.instructions} Inspect ALL of the author's own sentences, not just the chosen need quote. Explicit constraints such as "we need it to", "must", "only if" or "it has to" are hard requirements even when the underlying job fits. General category fit does not establish a specific required feature: answer unknown unless the supplied product facts establish that feature, or unmet if they contradict it. Only a stand-alone inquiry about an extra feature, with no stated dependency or constraint anywhere in their words, is not automatically mandatory; that can be none_stated. Never infer support for an unanswered feature question.`,
+    },
     // Whether the post is worth a reply when nobody is shopping: the Reddit
     // lane's strongest single question (0.757 AUC), verbatim, and its
     // "does the reply need the product" check.

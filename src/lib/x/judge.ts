@@ -11,6 +11,8 @@ import { assertXLlmUnderCap } from "./budget";
 import { BIO_CHARS, BODY_CHARS, type XPurpose } from "./constants";
 import {
   decide,
+  buyerEvidenceGate,
+  isDirectRequest,
   fitFrom,
   replyRoute,
   replyScore,
@@ -160,11 +162,25 @@ export function assess(
   const signals = signalsFrom(answers, level);
   const picked = choice(answers, "need_quote").choice;
   const needQuote = picked === NO_QUOTE ? null : (sentences[picked] ?? null);
-  let { decision, code } = decide(signals, level, candidate.chainIncomplete);
-  if (
-    decision === "qualify" &&
-    (!needQuote || !isVerbatim(needQuote, [candidate.text, candidate.rawText].map(plainTypography)))
-  ) {
+  const offering = answers.wants_offering;
+  const requirement = answers.hard_requirement;
+  const wantedKind = answers.wanted_kind;
+  const supportedJob = answers.supported_job;
+  const held = buyerEvidenceGate({
+    wantsOffering: offering?.type === "noul" ? offering.noul : null,
+    requirement: requirement?.type === "choice" ? requirement.choice : null,
+    ...(wantedKind ? { wantedKind: wantedKind.type === "choice" ? wantedKind.choice : null } : {}),
+    supportedJob: supportedJob?.type === "noul" ? supportedJob.noul : null,
+  });
+  const verbatim = Boolean(needQuote && isVerbatim(needQuote, [candidate.text, candidate.rawText].map(plainTypography)));
+  // A literal "recommend me/us" request with corroborated product fit is
+  // stronger own-need evidence than an inconsistent probability. Preserve
+  // the raw score; every other gate, parent/bio check and budget still applies.
+  const directRequestEvidence = verbatim && needQuote !== null && isDirectRequest(needQuote) && !held &&
+    wantedKind?.type === "choice" && wantedKind.choice === "this_product" && signals.intent >= 3;
+  let { decision, code } = decide(signals, level, candidate.chainIncomplete, directRequestEvidence);
+  if (decision === "qualify" && held) ({ decision, code } = held);
+  if (decision === "qualify" && !verbatim) {
     decision = "review";
     code = "insufficient_evidence";
   }
@@ -176,7 +192,9 @@ export function assess(
   // model reads it with the author's bio before anything is shown.
   const turnedAway = stage === "rejected" || stage === "review";
   const route =
-    replies && !candidate.chainIncomplete && turnedAway ? replyRoute(signals, code, decision, Boolean(candidate.venue)) : null;
+    replies && !candidate.chainIncomplete && turnedAway &&
+    !["requirement_unknown", "requirement_unmet", "not_product_seeking", "insufficient_evidence"].includes(code)
+      ? replyRoute(signals, code, decision, Boolean(candidate.venue)) : null;
   if (route) {
     stage = "pending_reply";
   }

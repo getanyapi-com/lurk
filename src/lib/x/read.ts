@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { jobs, projects, xAuthors, xEvaluations, xLanes, xLeads, xPosts, xProjects, xRuns } from "@/db/schema";
-import { xShownWhere } from "@/lib/leadFilters";
+import { handledThreads, jobs, projects, xAuthors, xEvaluations, xLanes, xLeads, xPosts, xProjects, xRuns } from "@/db/schema";
+import { xShownWhere, xWordsWhere } from "@/lib/leadFilters";
 import { atBounds, grainOf, type LeadFace } from "@/lib/feed";
 import { nextQueuedJob } from "@/jobs/enqueue";
 import { HOUR_MS, daysAgo, utcDayStart } from "@/lib/time";
@@ -14,11 +14,12 @@ import {
   FIRST_LOOK_HOURS,
   PENDING_STAGES,
 } from "./constants";
-import { xLeadNotMuted } from "@/lib/mutes";
+import { notMuted, xLeadNotMuted } from "@/lib/mutes";
 import { canonicalUrl, ownWords } from "./map";
 import { xQuiet, type XQuiet } from "./quiet";
 import { reachScore, replyWindowOpen } from "./reach";
 import type { XVia } from "./store";
+import { rankXOpportunities } from "./priority";
 
 /** What the X tab reads. Nothing here joins a Reddit table. The project's own filters (lib/leadFilters.ts) hold here as on Reddit. */
 
@@ -423,6 +424,66 @@ export type XEvaluationEntry =
   | { kind: "filtered"; item: XFilteredCard }
   | { kind: "lead"; lead: XLeadCard };
 
+export type XOpportunity = { entry: XEvaluationEntry; priority: number | null; checks: string[] };
+export type XOpportunityFeed = { items: XOpportunity[]; total: number; posts: number };
+
+export function xOpportunityCard(entry: XEvaluationEntry): XLeadCard | XHeldCard | XFilteredCard {
+  return entry.kind === "lead" ? entry.lead : entry.item;
+}
+
+/**
+ * A display-only stream of stored evidence, not the alert/qualification reader.
+ * Rank the entire time window before deduplication and the display cap; applying
+ * the old group caps first would still bury an older strong screened request.
+ * No judge, lookup, stage write or change to the operational quiet rules here.
+ */
+export async function listXOpportunities(
+  projectId: string,
+  filter: XFeedFilter = { days: FEED_WINDOW_DAYS, status: "new" },
+  now = new Date(),
+  includeReplies = true,
+): Promise<XOpportunityFeed> {
+  if (filter.status !== "new") {
+    const leads = (await listXLeads(projectId, filter, now)).filter((lead) => includeReplies || lead.kind !== "reply");
+    // History retains every marked post; author deduplication is for attention, not history.
+    return { items: leads.map((lead) => ({ entry: { kind: "lead", lead }, priority: null, checks: [] })), total: leads.length, posts: leads.length };
+  }
+  const rows = await db()
+    .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, lead: xLeads, closeCall: closeCallSql, worth: worthSql })
+    .from(xEvaluations)
+    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+    .innerJoin(projects, eq(projects.id, xEvaluations.projectId))
+    .leftJoin(xAuthors, authorJoin)
+    .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
+    .where(and(
+      eq(xEvaluations.projectId, projectId), isNull(xPosts.unavailableAt), whenWhere(filter), xWordsWhere(),
+      notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
+      or(
+        and(eq(xLeads.status, "new"), xShownWhere(), includeReplies ? undefined : eq(xLeads.kind, "ask")),
+        and(isNull(xLeads.id), or(
+          inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
+          unfinishedSql,
+          and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
+        )),
+      ),
+      // Answered conversations must not reappear through unqualified sibling posts.
+      sql`not exists (select 1 from ${handledThreads} h where h.project_id = ${xEvaluations.projectId}
+        and h.platform = 'x' and (h.thread_id = ${xPosts.conversationId} or h.thread_id = ${xPosts.id}))`,
+    ));
+  const candidates = rows.map((row) => {
+    const { evaluation, post, author, lead } = row;
+    const entry: XEvaluationEntry = lead
+      ? { kind: "lead", lead: leadCard({ lead, post, author, context: evaluation.context, foundBy: evaluation.matchedPhrase }, now) }
+      : ["review", "pending_context", "pending_reply"].includes(evaluation.stage)
+        ? { kind: "held", item: heldCard(row) }
+        : { kind: "filtered", item: filteredCard(row) };
+    return { entry, key: post.id, author: post.authorUsername, postedAt: post.createdAt, engagement: evaluation.engagement,
+      signals: evaluation.signals, level: evaluation.level };
+  });
+  const ranked = rankXOpportunities(candidates);
+  return { items: ranked.slice(0, 200).map(({ entry, priority, checks }) => ({ entry, priority, checks })), total: ranked.length, posts: rows.length };
+}
+
 /**
  * A held or filtered-out post by its evaluation, whatever the window or the
  * list's cap, for the pane: the post the URL names stays open when a scan
@@ -437,7 +498,7 @@ export async function xEvaluationEntry(projectId: string, evaluationId: string, 
     return null;
   }
   const { stage } = row.evaluation;
-  if (stage === "review") {
+  if (stage === "review" || (["pending_context", "pending_reply"].includes(stage) && row.evaluation.signals !== null)) {
     return { kind: "held", item: heldCard(row) };
   }
   if (stage === "rejected" || stage === "free_rejected" || (stage === "expired" && ["qualify", "review"].includes(row.evaluation.decision ?? ""))) {

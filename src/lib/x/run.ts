@@ -46,7 +46,7 @@ import { semaphore } from "./pace";
 import { checkReply } from "./reply";
 import { emptyCounts, finishXRun, markFirstLead, startXRun, type XRunCounts } from "./report";
 import { freeScreen, isListicle, isOwnOrRivalAccount, isVendorHook, matchedLaneTerms, PITCH_REASONS } from "./screen";
-import { venueScore, type XSignals } from "./gates";
+import { foldScore, venueScore, type XSignals } from "./gates";
 import { searched, xQuiet } from "./quiet";
 import { reachScore } from "./reach";
 import { scoreScreened } from "./rescore";
@@ -464,7 +464,17 @@ async function expireStale(projectId: string, now: Date) {
     );
 }
 
-export async function runXScan(projectId: string, jobId: string | null): Promise<void> {
+/**
+ * An audit's backfill (scripts/x-audit.ts): read a past window no scan reads,
+ * paging each search up to `pagesPerLane`, with no daily caps. Never set by
+ * the app.
+ */
+export type XBackfill = { windowHours: number; pagesPerLane: number };
+
+export async function runXScan(projectId: string, jobId: string | null, backfill?: XBackfill): Promise<void> {
+  if (backfill && (!Number.isFinite(backfill.windowHours) || backfill.windowHours <= 0 || !Number.isSafeInteger(backfill.pagesPerLane) || backfill.pagesPerLane <= 0)) {
+    throw new Error("audit backfill requires a positive finite window and positive integer page limit");
+  }
   const now = new Date();
   const [project] = await db()
     .select({ id: projects.id, userId: projects.userId, name: projects.name, url: projects.url, scoring: projects.scoring })
@@ -491,7 +501,10 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
     return;
   }
   const tier = await limitsForUser(project.userId);
-  const x = sized(xLimitsFor(tier.limits));
+  const sizedLimits = sized(xLimitsFor(tier.limits));
+  const x: XLimits = backfill
+    ? { ...sizedLimits, pagesPerLane: backfill.pagesPerLane, pagesPerDay: null, parentsPerDay: null, judgedPerDay: null, profilesPerDay: null, replyChecksPerDay: null }
+    : sizedLimits;
   const funded = await clientForUser(project.userId);
   const ctx: FetchContext = { projectId, funded, maxAgeMs: 0 };
   const product: ProductFacts = scanProject.product;
@@ -543,7 +556,7 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
   await expireStale(projectId, now);
   // A quiet product is checked weekly, so each check reads the whole week since the last.
   const quietBefore = await xQuiet(projectId, now);
-  const maxWindowHours = quietBefore.quiet ? QUIET_RECHECK_DAYS * 24 + OVERLAP_HOURS : MAX_WINDOW_HOURS;
+  const maxWindowHours = backfill?.windowHours ?? (quietBefore.quiet ? QUIET_RECHECK_DAYS * 24 + OVERLAP_HOURS : MAX_WINDOW_HOURS);
 
   const counts: XRunCounts = emptyCounts();
   const pools = await poolsFor(projectId, x, bigFirstLook, poolsSince);
@@ -592,7 +605,11 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
   const settleCandidate = async (evaluation: XEvaluation, post: StoredXPost, reply: Record<string, unknown>) => {
     const held = evaluation.decision === "review";
     const signals = { ...((evaluation.signals as Record<string, unknown> | null) ?? {}), reply };
-    await updateEvaluation(evaluation.id, { stage: held ? "review" : "rejected", signals });
+    // The reply hypothesis is over. Restore the buyer fold rather than leave
+    // its pre-check reply score on an ordinary held/rejected post.
+    const score = evaluation.fit !== null && evaluation.intent !== null && evaluation.engagement !== null
+      ? foldScore(evaluation.fit, evaluation.intent, evaluation.engagement) : null;
+    await updateEvaluation(evaluation.id, { stage: held ? "review" : "rejected", signals, score });
     await withdrawLead(projectId, post.id);
     if (held) {
       counts.reviews += 1;
@@ -931,7 +948,10 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
     const firstRun = lane.runs === 0;
     const since = windowStart(firstRun ? { coveredUntil: null, createdAt: now } : lane, now, firstRun ? FIRST_LOOK_HOURS : maxWindowHours);
     // A lane's first run on the project's first look may read the month page by page.
-    const maxPages = firstRun && bigFirstLook ? firstLookPages : x.pagesPerLane;
+    // A full category-request page may hide yesterday's asks. The extra page
+    // still consumes the existing daily pool; audit limits remain explicit.
+    const recurringPages = lane.family === "request" && !backfill ? Math.max(2, x.pagesPerLane) : x.pagesPerLane;
+    const maxPages = firstRun && bigFirstLook ? firstLookPages : recurringPages;
     const sinceSec = Math.floor(since.getTime() / 1000);
     const posts: StoredXPost[] = [];
     let pages = 0;

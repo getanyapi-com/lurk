@@ -48,6 +48,9 @@ export type XReasonCode =
   | "asks_about_others"
   | "wrong_audience"
   | "insufficient_evidence"
+  | "not_product_seeking"
+  | "requirement_unknown"
+  | "requirement_unmet"
   | "worth_reply";
 
 export type XStage = "rejected" | "pending_context" | "pending_reply" | "lead" | "review";
@@ -149,8 +152,9 @@ export function decide(
   signals: XSignals,
   level: XLevel,
   chainIncomplete = false,
+  directRequestEvidence = false,
 ): { decision: XDecision; code: XReasonCode } {
-  if (signals.ownNeed < YES) return { decision: "reject", code: "no_active_need" };
+  if (signals.ownNeed < YES && !directRequestEvidence) return { decision: "reject", code: "no_active_need" };
   if (signals.sameKind < YES) return { decision: "reject", code: "wrong_job" };
   if (signals.rivalVendor >= YES) return { decision: "reject", code: "seller_only" };
   if (signals.resolved >= YES) return { decision: "reject", code: "resolved" };
@@ -161,9 +165,46 @@ export function decide(
   if (signals.curiosity >= YES) return { decision: "review", code: "asks_about_others" };
   if (signals.promoting >= YES) return { decision: "review", code: "seller_only" };
   if (signals.canUse < YES) return { decision: "review", code: "wrong_audience" };
-  if (signals.intent < 2) return { decision: "review", code: "no_active_need" };
+  // Level 2 is advice/exploration, not an ask for something to use. Those
+  // posts can still take the separate reply path; they are not buyer cards.
+  if (signals.intent < 3) return { decision: "review", code: "no_active_need" };
   if (chainIncomplete) return { decision: "review", code: "insufficient_evidence" };
   return { decision: "qualify", code: "supported_open_need" };
+}
+
+/** Narrow author-directed request grammar, not generic calls to share startups. */
+export function isDirectRequest(quote: string): boolean {
+  return /^(?:(?:please|can anyone|could someone)\s+)?(?:recommend|suggest|pitch)(?:\s+|\/[a-z]+\s+)(?:me|us)\b/iu.test(quote.trim());
+}
+
+/** Already-collected product evidence; missing legacy answers are unknown. */
+export function buyerEvidenceGate(evidence: {
+  wantsOffering: number | null;
+  requirement: string | null;
+  /** Absent when the optional product brief was not asked. */
+  wantedKind?: string | null;
+  /** Fresh explicit capability-based job evidence; absent in older scores. */
+  supportedJob?: number | null;
+}): { decision: "review"; code: XReasonCode } | null {
+  // A specialised brief is not an exclusion of a basic job the product
+  // explicitly supports. Old scores without that evidence remain held.
+  if (evidence.wantedKind === "nothing") return { decision: "review", code: "not_product_seeking" };
+  const neighbour = /^n\d+$/u.test(evidence.wantedKind ?? "");
+  const supportedJob = evidence.supportedJob !== null && evidence.supportedJob !== undefined &&
+    Number.isFinite(evidence.supportedJob) && evidence.supportedJob >= YES;
+  if (neighbour && !supportedJob) return { decision: "review", code: "wrong_job" };
+  if (evidence.wantedKind !== undefined && evidence.wantedKind !== "this_product" && !neighbour) {
+    return { decision: "review", code: "insufficient_evidence" };
+  }
+  if (evidence.wantsOffering === null || !Number.isFinite(evidence.wantsOffering)) {
+    return { decision: "review", code: "insufficient_evidence" };
+  }
+  if (evidence.wantsOffering < YES) return { decision: "review", code: "not_product_seeking" };
+  if (evidence.requirement === "unmet") return { decision: "review", code: "requirement_unmet" };
+  if (!["met", "none_stated"].includes(evidence.requirement ?? "")) {
+    return { decision: "review", code: "requirement_unknown" };
+  }
+  return null;
 }
 
 /**
@@ -229,6 +270,12 @@ export function reasonFrom(code: XReasonCode, signals: XSignals, chainIncomplete
       return `Probably outside who or where the product serves (${percent(signals.canUse)} could buy).`;
     case "worth_reply":
       return "Worth a reply: talking about the problem your product solves, not shopping yet.";
+    case "not_product_seeking":
+      return "A product is not a supported answer to what this author asks.";
+    case "requirement_unknown":
+      return "A required feature or limit is not established by the saved product facts.";
+    case "requirement_unmet":
+      return "A stated requirement is outside the saved product facts.";
     case "insufficient_evidence":
       return chainIncomplete
         ? "Replies to a post X no longer shows, so what they ask for can't be read in full."

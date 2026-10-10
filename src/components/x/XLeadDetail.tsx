@@ -8,12 +8,13 @@ import { Meter } from "@/components/leads/Meter";
 import { Block, Called, Pane, Title } from "@/components/leads/pane";
 import { accountAge } from "@/components/leads/workspace";
 import { XReplyChip } from "@/components/x/XReplyChip";
+import { XOpportunityBadge } from "@/components/x/XOpportunityBadge";
 import { XThread } from "@/components/x/XThread";
 import { filteredSentence } from "@/components/x/filtered";
 import { fullCount, relativeAge, shortAge } from "@/lib/format";
 import { intentWord, judgementSentence } from "@/lib/scan/words";
 import { STALE_BADGE_HOURS } from "@/lib/x/constants";
-import type { XFilteredCard, XHeldCard, XLeadCard, XThread as XThreadData } from "@/lib/x/read";
+import type { XFilteredCard, XHeldCard, XLeadCard, XOpportunity, XThread as XThreadData } from "@/lib/x/read";
 
 export type XSelection =
   | { kind: "lead"; lead: XLeadCard }
@@ -162,12 +163,14 @@ export function XLeadDetail({
   projectId,
   thread = null,
   now = new Date(),
+  opportunity,
 }: {
   selection: XSelection;
   projectId: string;
   /** The stored thread around the post, drawn as X draws it; without it the post's own words stand alone. */
   thread?: XThreadData | null;
   now?: Date;
+  opportunity?: Pick<XOpportunity, "priority" | "checks">;
 }) {
   if (selection.kind !== "lead") {
     const item = selection.item;
@@ -180,7 +183,7 @@ export function XLeadDetail({
           <Title
             text={item.headline}
             badge={
-              <span className={`text-small ${warm ? "text-score-warm" : "text-fg-muted"}`} style={{ fontWeight: 500 }}>
+              opportunity ? <XOpportunityBadge opportunity={{ entry: selection, ...opportunity }} /> : <span className={`text-small ${warm ? "text-score-warm" : "text-fg-muted"}`} style={{ fontWeight: 500 }}>
                 {badge}
               </span>
             }
@@ -193,8 +196,9 @@ export function XLeadDetail({
         </header>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
+            {opportunity?.checks.length ? <Called label="Before replying" sentence={opportunity.checks.join(" · ")} /> : null}
             <Called
-              label={warm ? "Why lurk is unsure" : "Why lurk left it out"}
+              label={opportunity ? "Fit notes" : warm ? "Why lurk is unsure" : "Why lurk left it out"}
               sentence={filtered ? filteredSentence(filtered) : item.reason}
             />
             {thread ? (
@@ -219,7 +223,7 @@ export function XLeadDetail({
   return (
     <Pane>
       <header className="flex flex-col gap-2 border-b p-4">
-        <Title text={lead.headline} badge={reply ? <XReplyChip moment={lead.moment} /> : <VerdictBadge fit={lead.fit} intent={lead.intent} />} />
+        <Title text={lead.headline} badge={opportunity ? <XOpportunityBadge opportunity={{ entry: selection, ...opportunity }} /> : reply ? <XReplyChip moment={lead.moment} /> : <VerdictBadge fit={lead.fit} intent={lead.intent} />} />
         <div className="flex flex-wrap items-center gap-2">
           <AuthorAvatar name={lead.authorName ?? lead.authorUsername} src={lead.authorImage} size={24} platform="x" />
           <span className="text-small text-fg-muted">@{lead.authorUsername}</span>
@@ -238,6 +242,7 @@ export function XLeadDetail({
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
+          {opportunity?.checks.length ? <Called label="Before replying" sentence={opportunity.checks.join(" · ")} /> : null}
           {thread ? (
             <XThread thread={thread} quote={lead.quote} now={now} />
           ) : (
