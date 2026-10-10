@@ -22,7 +22,7 @@ it("renders uncertain opportunities in one stream, selects them, and keeps weake
     params: {}, selectedId: "held-strong",
   }));
   expect(html).toContain('aria-current="true"');
-  expect(html).toContain(">Check fit<");
+  expect(html).toContain(">Potential match<");
   expect(html).not.toMatch(/priority \d+/u);
   expect(html).toContain("Check requirements");
   expect(html.match(/Weaker matches below/gu)).toHaveLength(1);
@@ -35,7 +35,7 @@ it("renders uncertain opportunities in one stream, selects them, and keeps weake
   expect(html).not.toContain(">Left out<");
 });
 
-it("does not let an old high-fit lead badge override weak ranked evidence, but preserves it in history", () => {
+it("uses ranked evidence rather than old lead verdicts in New, but preserves verdicts in history", () => {
   const held = opportunity("qualified", 0.2);
   if (held.entry.kind !== "held") throw new Error("Expected held fixture");
   const qualified: XOpportunity = {
@@ -53,5 +53,9 @@ it("does not let an old high-fit lead badge override weak ranked evidence, but p
   expect(history).toContain("Strong lead");
   expect(history).not.toContain("Unassessed");
   const strong = renderToStaticMarkup(createElement(XOpportunityBadge, { opportunity: { ...qualified, priority: 0.8 } }));
-  expect(strong).toContain("Strong lead");
+  expect(strong).toContain(">Potential match<");
+  expect(strong).not.toContain("Strong lead");
+  const heldBadge = renderToStaticMarkup(createElement(XOpportunityBadge, { opportunity: opportunity("held", 0.8) }));
+  expect(heldBadge).toContain(">Potential match<");
+  expect(heldBadge).toContain("Check requirements");
 });
