@@ -751,6 +751,81 @@ interactive result HTML, LISTWISE_PROTOCOL_R62.md, prepare-listwise-r62.py,
 listwise-plan-r62.json and live catalog artifact in ignored evidence. Owner
 choices remain optional.
 
+#### Pre-purchase listwise amendment r64 — same bounded hypothesis
+
+Fable's completed r63 design audit verifies source/control/request hashes and
+flags output-cap risk: allowed rationales/quotes can exceed4000tokens. Root
+preserves original proposal/implementation/test bytes and raises cap8192 before
+any output. Exact ten-request diff verifies ONLYmax_tokens changes; messages,
+rubric, full productfacts, boundedsource andpriceguards identical. Published
+full-context/max-output conservative reserve remains$0.360448, localexposure
+$0.47, settledspendSTOP$0.10, same$5cumulative cap. No ten-centbillguarantee.
+
+Stability now concerns graded evidence rather than arbitrary weak-card order:
+at most1 known two-or-more-level grade flip/project and3overall acrossorders;
+positive-setJaccard>=.5 only when union>=3. Unknown transitions remain unknown;
+whole-pooltau/toptenoverlap diagnostic only. These are preregistered experimental
+consistency guards, not validated user-value thresholds. Identicaltext/bio/context
+Helpinpair's within-call grade/actionsplit prevents auditedsuccess;24minute
+snapshot timestamp difference is not a material coarse-gradefact. Different
+metadata duplicates are not automatically equaljudgment. Separate source audit
+still needed; exact quotes cannot establish semanticentailment.
+
+The selected-pool oracle ceiling is low, computed from frozen references before
+outputs, not new candidate results. Fable Clipy cannot improve known ordinal
+utility. Fable Cal's maximum known gain1 is smaller than the[-3,0] uncertainty
+penalty from excluding its unknown-destination card. Therefore a blockedhurdle
+can reflect missing knowledge, not proven worsejudgment. Predeclared descriptors:
+robust improvement only if bothseed/bothreviewer/bothbaseline pairedhurdlespass;
+complete known no-loss/tie is not a win or statisticalnoninferiority;
+unknown-straddling results uncertainty-limited; knownnegativebounds reference
+loss; budget-stopped incomplete is NOTcandidatefamilyfailure. No post-output
+retuning or unknownfill. These ceilings apply onlyselected78, notfull131/415.
+
+Astra's original r63 offline implementation passed34fake-fetch executor and
+16synthetic analyzer checks, zeroactualcalls. It now harmonizes the8192 and
+stability amendments with fresh meaningfulfixtures; oldhashes/reviews not
+certification of changedbytes. Final source/private/reference/protocol/plan/
+prompt/catalog/helper/executor/analyzer/test/fixturereport hashes andallten
+requesthashes must be verified beforepurchase; catalog rechecked beforePOST.
+At that pre-purchase checkpoint there were no outputs or charges. The actual
+result follows; no fresh X, production/config/DB/outreach/merge/deploy changes.
+Owner review remains optional.
+
+#### Actual listwise Lite probe r64/r65 — stopped after one invalid output
+
+Fresh offline verification passed 36 executor and 29 comparison checks before
+the final freeze. The first Grenseo request then cost **$0.00322875**, returned
+16 rows, and completed normally (`stop`, zero reported reasoning tokens).
+It was not truncated. Output validation failed: extra card field, missing
+required positive evidence, a mistyped foreign handle, and a non-exact quote.
+The executor settled the receipt before rejecting the response and stopped
+without retries; the other nine requests were not purchased. Zero usable
+rankings means the five-project comparison remains incomplete, not a ranking
+win or proof that listwise ranking cannot work.
+
+Astra's independent actual-source audit verifies both freezes, exact request,
+receipt and journal. Correction to root's initial review brief: the non-exact
+quote normalized a double newline to a space; it did **not** invent the hardware
+excerpt or factual content. The citation contract still fails. Separately,
+“explicitly solves” overstates crawler-read-to-answer attribution. An agency
+bio can evidence ongoing citation work, so promotion or lack of an explicit
+shopping request does not disprove a conditional opportunity; “prime target”
+certainty remains unsupported. Do not introduce a procurement-only gate.
+
+Current cumulative budget: **$0.207271814 known receipts + $0.866048 reserved
+unknown charges; $3.926680186 unencumbered** under the same $5 overall cap.
+The cheap failed call is not a successful-ranking cost estimate. Raw output,
+errors, actual diagnostic and hashes remain preserved in ignored evidence;
+no near-matching handles, quote repair or relabeling. Astra recommends one
+unchanged higher-tier diagnostic, not resuming the batch. Fable's completed independent actual review reproduces the contract and billing
+findings and also recommends exactly one same-input higher-tier diagnostic.
+One pass or repeated failure cannot causally isolate reader capacity versus
+format. Its hypothetical scoring of rejected output is not an accepted result,
+and handle enums alone would not enforce exactly-once coverage. A new one-call
+harness is being prepared offline;
+no further purchase has occurred at this checkpoint.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
