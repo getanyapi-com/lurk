@@ -386,10 +386,12 @@ not excuse the diagnostic error or prove every frame bad.
 **Close r40/r42 as rejected under the frozen development criterion.** The
 remaining 21 calls are not bought: they cannot restore all 24 usable responses
 or remove the already-observed critical source error. No paid output,
-expectation or criterion is patched to salvage a pass. Astra's actual-output
-audit is still pending at this checkpoint. This is neither an architecture
-verdict nor a ranking/owner-utility result; there is no second-stage scoring
-call or production integration.
+expectation or criterion is patched to salvage a pass. Astra's completed r43
+audit independently confirms both decisive errors and the exact three-call
+accounting. It also records the first Clipy frame's overstatement of no AI slop
+as a ban on AI features, without retrofitting a new rejection threshold on a
+retained control. This is neither an architecture verdict nor a ranking/owner-
+utility result; there is no second-stage scoring call or production integration.
 
 A zero-purchase r44 design proposal compares a quote-only variance rerun,
 source-only task extraction followed by separate product mapping, and a
@@ -397,10 +399,64 @@ one-call typed-claim revision. The latter two would distinguish stated facts
 from inference per claim rather than hide uncertainty in a catch-all field.
 Source-only extraction would withhold product facts to test contamination;
 removing compatibility fields would leave that class **untested**, not passed.
-Fixed source-ID citations would remove model-written quotation-length failures
-without purporting to fix entailment. Astra and Fable are independently
-reviewing the alternatives, concrete acceptance, cost and path back to ranking.
-No next formulation has been selected or purchased.
+Fixed source-ID citations remove model-written quotation-length failures
+without purporting to fix entailment. Fable's completed r44 design review
+chooses source-only extraction and withdraws its earlier quote-only rerun
+recommendation. Per-claim uncertainty is needed because every earlier catch-all
+unresolved field was merely unknown; product removal alone cannot repair a
+person/state misreading. Its claim that a failure establishes brief/retrieval,
+not reader, as the cause is not accepted: that does not follow from this probe.
+
+A new **r45 source-only candidate is prepared, not purchased**: five tasks,
+typed stated/inferred/unknown basis on named actor/operation/state/condition
+claims, task-local requirements and fixed source-pointer enums. A direct author
+request needs no I/my; authoring advice is not personally executing its advice.
+These are source-entailment rules, not lexical pronoun gates. All 24 own/context/
+bio maps remain unchanged. The 122 original expectation items remain immutable;
+routing yields 53 source-only, 43 mixed and 26 product-only. Mixed source facets
+are reviewed and product support remains untested; fact-cited budget boilerplate
+still cannot license invented author conditions or commercial intent.
+
+Twenty-five isolated fake-fetch fixtures pass: **66 simulated POSTs, zero real
+calls**, exercising durable reservations, unknown billing, receipt/model/token/
+reasoning guards, source-only payloads, fixed pointers, all flags despite shape
+errors, catalog price drift, pre-existing lock/journal refusal and near-cap stop.
+The dry run verifies 15 frozen artifacts and performs zero network requests.
+This is executor preparation proof, not semantic or ranking evidence. Astra's
+completed independent r44 design review instead recommends the smaller complete
+one-call typed-claim test, retaining product support/relation challenges. Root
+selects that **joint C** test first. Fable's product-priming and reuse objections
+remain valid risks; no review is represented as unanimous. Both variants are
+prompt/schema bundles with stochastic variance, so neither pass would establish
+sequencing causality. The r45 source-only preparation is preserved unbought, and
+its exact-executor review r46 is cancelled as superseded, not failed or approved.
+
+The new **r47 joint candidate is prepared, not purchased**: same 24 full source
+maps and original expectations, per-claim basis/pointers, nested task-local
+condition/necessity/support and separately qualified operation relations. No
+catch-all unqualified summary/adoption slot; relation/support explanations are
+audited under their claim basis. Product facts remain available, while the same
+brief is not sent again in a redundant top-level product object. Twenty-six
+fake-fetch fixtures pass with **24 simulated POSTs, zero real calls**. Fifteen
+artifacts are frozen and zero-network dry run passes. Fable's new r48 exact
+executor review is pending; older hashes' reviews are not new approvals.
+
+Only **three initial regression calls** can execute under this prepared runner,
+then it pauses for independent actual-source audit before any of the remaining
+21. A clean cohort is not a full24 pass, source error rate, architecture proof
+or ranking result. A critical source failure ends the candidate. The first
+cohort order deliberately includes the two retained controls and known Cal
+failure; all are development regressions, not a fresh holdout.
+
+Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
+exposure cap**. A separate **$0.10 recorded-spend stop** prevents another call
+once receipts reach it; this is not a guaranteed ten-cent total, because the last
+outstanding reserved response may cross that stop level. The same $5 cumulative
+cap and historical unknown reserves remain unchanged. No retry/reuse, stage-two
+purchase or production integration. After this first-stage formulation and at
+most one separately reviewed mapping formulation, recurring determinate errors
+end prompt tuning on these 24 inspected cases. No successful development pass
+would establish ranking value or owner preferences.
 
 At this checkpoint cumulative recorded scoring receipts are **$0.183936564**,
 plus unchanged **$0.145152 unknown-charge reservations**, leaving
@@ -410,7 +466,8 @@ Evidence: `FRAME_AMENDMENT_R42.md`, both preserved purchase journals/freezes,
 `frame-execution-results-r40.json`, `frame-execution-results-r42.json`, and
 `frame-partial-analysis-r43.json`, `frame-closure-r43.json`, completed
 `fable-frame-smoke-r43.md` and proposal `FRAME_NEXT_DESIGN_R44.md` in the ignored
-folder. Pending reviews are not represented as approvals.
+folder, plus r45 source-only protocol/plan/routing/fixtures/freeze. Pending
+reviews are not represented as approvals.
 
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
