@@ -863,6 +863,46 @@ rejected outputs, exact diagnostics and freezes remain unchanged in ignored
 evidence. No fresh X, production/config/DB writes, outreach, merge or deployment;
 model evaluation continues without mandatory owner labels.
 
+#### Completed r68 source reviews and compact-ordering proposal r69
+
+Both actual-source audits verify the S receipt/request/freezes and identify
+material positive-rationale defects beyond transcription: audience-to-author
+need transfer on fork advice, and a publisher's statistical argument described
+as its own clear unmet need. An adjacent vendor or publisher can still have a
+conditional ongoing use; bio/context may establish genuine work. Do not turn
+this into a universal competitor/publisher/bio-only rejection rule. Fable's
+illustrative scoring of the invalid order is not an accepted protocol result,
+and cross-format order correlation is not unchanged-configuration stability.
+
+Root chooses Astra's compact output proposal over Fable's source-span selectors:
+the product job is graded ordering, while original text is already held for
+rendering and audit. Pinpoint evidence generation is not currently required.
+The new request returns only ordered handle/grade/action. Exact same Grenseo A
+source, product facts, input order, S model and rubric prefix; only the final
+output paragraph and strict schema change. Failed prior contracts stay failed,
+not repaired or relabeled. Output explanations are not invented afterward.
+
+The new one-call harness passes **53 meaningful offline executor checks**;
+the project-local comparison has **17 synthetic checks**, freshly rerun by root.
+Strict enums do not replace exactly-once coverage checks. Valid new output only
+can receive paired unknown-preserving metrics under both frozen reviewers
+against both baselines. Advance requires strictly positive lower bounds in all
+four comparisons AND independent all16 source/grade audit with no serious
+unsupported positive assignment. Reasonable adjacent ambiguity remains allowed;
+reviewers cannot infer absent model reasoning. A schema pass or tie is not a
+win. If no useful local signal appears, stop further Grenseo format variants
+and retain baseline, not declare universal architecture failure. Full five-
+project/two-permutation criterion remains unchanged and untested.
+
+The S actual freeze's historical ledger bytes are preserved as an immutable
+post-S snapshot; live accounting is not incorrectly pinned to its old hash.
+All52 immutable provenance hashes match. Same full reserve$0.720896, local
+exposure$0.83, known-spend stop$0.10 and cumulative$5 cap; no guaranteed bill
+or projected useful-output cost. No compact scoring call yet. Fable r70
+independent design review is active before final freeze/purchase. Current
+known/unknown/remaining totals are unchanged. No fresh X, production/config/DB,
+outreach, merge or deployment; owner review remains optional.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
