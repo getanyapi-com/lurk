@@ -223,6 +223,53 @@ The task contract remains offline; no revised factor is enabled in production.
 The previously recorded full source check passed 979 tests across 107 files;
 that historical software check is not new API or usefulness proof.
 
+### Standalone direct-attention experiment, Oct 11
+
+The next first-principles hypothesis judged worthwhile investigation directly,
+instead of replacing a marginal factor. Both independent preparation reviews
+found the same blocker: mixing a standalone scalar on grounded posts with a
+legacy product on ungrounded posts. This was corrected **before purchase**:
+every valid scalar, including zero with `none` citations, drives need attention;
+locators are diagnostics only. The unbought r30 is preserved and superseded by
+r32. A subsequent native amendment review was interrupted without a completed
+approval; none is inferred. Root verified the correction and frozen hashes;
+seven isolated fake-fetch fixtures passed, including zero with absent task
+linkage, with zero real API calls.
+
+All **131 cached replay-pool cards** received three fresh calls: identical
+baseline A/B and candidate containing the same 20 baseline questions plus one
+holistic NOUL and three primary-task/role/fact locators. Actual app input
+construction and body equivalence across the preparation amendment were
+verified. The candidate reads a supplied fact map; this is a bundle comparison,
+not an isolated causal estimate of a single question. No old intent/fit/
+promotion/resolution multipliers are applied to the holistic scalar. Existing
+checked-conversation provenance remains required. No display-floor,
+qualification, alerts or production integration changed.
+
+The 393 requests all returned usable responses, with **$0.097261374** recorded
+cost and no new unknown charges. Candidate reference-useful first-ten counts
+are **4/0/8/2/0 (14 total)**, versus **4/0/9/2/1 (16)** in both controls. Tally's
+first model-reference useful case moves 16th→21st; Scarlett's moves 3rd/4th→11th.
+The candidate loses one useful first-page case each on Clipy and Scarlett.
+It **fails** the frozen more-useful/fewer-Skip/no-project-loss criteria. The
+same conclusion holds with the predeclared bounded-source sensitivity treating
+one fuller-text Tally reference as Unknown. Unknown reference cards cannot
+establish a win by merely replacing Skips.
+
+Evidence: `HOLISTIC_PROTOCOL_R32.md`, `holistic-freeze-r32.json`,
+`purchases-holistic-r32.jsonl`, `holistic-results-r32.json` and the unchanged
+per-case raw answers in the ignored evidence directory. Actual-failure reviews
+by Astra and Fable are requested; pending reviews are not approvals. A count
+regression against model references alone does not prove every disputed
+opportunity is worthless. The candidate is **not integrated**.
+
+Cumulative recorded scoring API charges after this test: **$0.179988564**,
+plus **$0.145152 reserved** for two earlier unknown charges. The same $5 overall
+cap leaves **$4.674859436 unencumbered** at this checkpoint. Model-review
+subscription usage is not represented as scoring API receipts. Cheap execution
+has been measured; useful lead recovery has not. No fresh X retrieval,
+production changes, owner review, unseen validation or conversions occurred.
+
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
 1. Export the next same-format local audit snapshot on the five existing projects. No run is scheduled or new spending authorized by this document. If comparing scout retrieval too, keep its budget and pool provenance separate; $.153 was an observed past experiment, not a guaranteed future cost.
