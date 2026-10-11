@@ -438,8 +438,16 @@ catch-all unqualified summary/adoption slot; relation/support explanations are
 audited under their claim basis. Product facts remain available, while the same
 brief is not sent again in a redundant top-level product object. Twenty-six
 fake-fetch fixtures pass with **24 simulated POSTs, zero real calls**. Fifteen
-artifacts are frozen and zero-network dry run passes. Fable's new r48 exact
-executor review is pending; older hashes' reviews are not new approvals.
+artifacts were frozen and zero-network dry run passed. Fable's r48 exact
+executor review found no blocking defect; Astra's independently completed review
+reproduced two receipt-validation blockers before any purchase. Falsey parsed
+JSON bypassed object validation, and nonstring reasoning could throw before
+response journaling. Both were fixed before execution: every parsed value is
+schema-checked, metadata types become ordinary rejection errors, and full known-
+charge receipt evidence is fsynced before interpretation with a narrow exception
+boundary. Thirty-four zero-call checks passed (32 fake POSTs); request/prompt/
+source/expectation bytes unchanged and affected freeze hashes renewed. Older
+readiness reviews are not represented as approval of changed executor hashes.
 
 Only **three initial regression calls** can execute under this prepared runner,
 then it pauses for independent actual-source audit before any of the remaining
@@ -447,6 +455,84 @@ then it pauses for independent actual-source audit before any of the remaining
 or ranking result. A critical source failure ends the candidate. The first
 cohort order deliberately includes the two retained controls and known Cal
 failure; all are development regressions, not a fresh holdout.
+
+#### Actual joint attempt and provider-format diagnostics
+
+The r47 first physical POST returned **Google HTTP400 INVALID_ARGUMENT**, no
+model frame and no cost receipt. It stopped immediately; the other two planned
+cohort calls were not made. Its **$0.360448** worst-case charge remains reserved,
+not assumed paid or free. A separately declared one-call r50 wire diagnostic
+removed repeated pointer enums while retaining the executable whitelist. The
+same400 occurred, again no frame/receipt, another **$0.360448** reserved. Enum
+removal alone did not fix the rejection; the generic error does not identify
+which constraint caused it. Google's official structured-output documentation
+notes large/deep schemas may be rejected, but that is only a possible explanation.
+
+A separately frozen one-call r51 diagnostic used JSON-object mode with the same
+typed contract supplied in system text and strictly validated locally. It
+returned **one actual frame for $0.00148175**, complete stop and zero reported
+reasoning. It was **mechanically unusable**: bare s0/s1 and generic fact pointers
+failed the unchanged exact namespaced-source contract. No IDs were patched,
+frame accepted, or other case bought. The raw frame's interpretation of no AI
+slop and its different-operation verdict based on specialized positioning are
+independently audited by Fable r52; Astra r52 is still pending at this checkpoint. Fable confirms semantic failures beyond pointers: a which-tool request becomes a stated recording/video-output task, no AI slop loses its quality qualifier and becomes a stated required ban, face cam/editing are omitted, and positioning overrides supplied capabilities. The honest unknown AI support does not erase these failures. No output is rehabilitated.
+
+Thus **three new physical requests across three declared variants**, two without
+any frame/cost receipt and one known-cost unusable frame—not three completed
+regressions, zero accepted frames and no full24 or ranking comparison. Current
+candidate/provider-wire changes are stopped pending actual reviews. Neither
+receipt failure nor a citation-shape failure is proof that the architecture
+cannot work. The original r40/r42 paid failures and all unbought preparations
+remain preserved.
+
+Cumulative known receipts now **$0.185418314**, unknown reservations
+**$0.866048**, leaving **$3.948533686** under the same $5 cap. Incremental known
+cost is $0.00148175 and new uncertainty reserve $0.720896; the reserve is not
+reported spend. Ledger/run sums reconcile, no pending lock remains. Each format
+diagnostic had its own declared local exposure bound; the stopped tranche's
+unknown charge was never ignored or silently reused. No fresh X, DB/production/
+config/display, outreach or deploy occurred. Evidence: both r48 reviews,
+`JOINT_RECEIPT_AMENDMENT_R49.md`, r47/r50/r51 frozen plans, execution logs,
+purchase journals, wire protocols, `joint-partial-result-r52.json` and current
+budget. Fable actual r52 review is completed and preserved; Astra actual r52 remains pending.
+
+
+#### Controlled reader comparison prepared; not purchased
+
+Fable identifies the mechanical representation defect: r50 removed the only
+literal namespaced-ID enum, and r51 showed nested namespace/key fields instead
+of the `own:s0` strings required locally. The new r53 model input uses a single
+flat `{id,text}` list with every literal pointer; all source text/maps, schema,
+semantic instructions and original expectations are unchanged. The pointer
+sentence changes to name the literal ID field. Both arms also newly disable
+provider fallback; this common routing safeguard is disclosed, not described as
+an unchanged wire bundle versus r51. Within pairs messages and parameters are
+byte-identical except model ID and necessary published provider price guards.
+
+Maximum **six serial fresh calls** on the same three inspected cases, counter-
+balanced L,S / S,L / L,S. L is Gemini3.1FlashLite; S is Gemini3FlashPreview, a
+higher-priced non-Lite candidate, not proved stronger on this task. Same JSON-
+object contract, temperature0, reasoning off, 3500 output cap; receipts must
+prove zero reasoning. L full published context/output reserve **$0.360448**,
+local hard exposure **$0.50**; S reserve **$0.720896**, explicitly raised local
+hard exposure **$1.00**. Overall $5 unchanged, all unknowns retained. Recorded
+spend stop $0.10 per arm is not a hard ten-cent limit. Global mechanical/receipt/
+budget stop, no retry/reuse/remaining21 purchase. Source audits after complete
+six receipts, never an automatic semantic pass. Thirty-six offline fixtures,
+46 simulated POSTs, zero paid calls passed; 13 artifact hashes and zero-network
+dry run verified. Exact-executor Fable readiness review is active.
+
+Original critical failure criteria and immutable r40 expectations remain.
+Both control failures close this typed-joint tuning line on these cases, not
+all architectures. A passing S with failing L supports a candidate-reader
+bundle on three development cases, not a general causal bottleneck. A passing
+arm can justify a separately frozen remaining21 test, not immediate131 replay,
+owner usefulness or ranking improvement. No owner choices have been collected.
+No new scoring purchase was made for this preparation; budget above unchanged.
+Evidence: `READER_PAIR_PROTOCOL_R53.md`, paired plan/executor/fixtures/freeze,
+public catalog snapshot and completed Fable r52 source report.
+
+#### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
 exposure cap**. A separate **$0.10 recorded-spend stop** prevents another call
