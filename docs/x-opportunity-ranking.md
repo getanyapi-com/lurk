@@ -685,6 +685,72 @@ costs are not invented or included as scoring API receipts. Artifacts:
 `MODEL_ATTENTION_PROTOCOL_R60.md`, public packet, both freeze files, analyzer,
 synthetic checks and separate model label/validation files in ignored evidence.
 
+#### Actual graded model comparison r60; root review r61
+
+Both independent 78-card outputs are now preserved at hashes Astra
+`1a29e0d8dbdfc2df53e2db7ff03515e7b94fc756aeb669b04e569bae7cbd73ed`
+and Fable `ad97f10b66594823edd3a8932da954635aea42e2438525b84ba3be7ffccb3503`.
+Coverage/project/enum/bound/exact-excerpt validation passes, then ranks unblinded.
+No label altered to settle a disagreement. Actual comparison tests pass;
+Astra independently recomputes the saved output exactly in completed r61 audit.
+
+| Reviewer | Baseline A Strong+Plausible / 50 | Baseline B | Rejected r32 revision |
+|---|---:|---:|---:|
+| Astra | 19 | 18 | 16 |
+| Fable | 13 | 13 | 12 |
+
+Strong counts unchanged (Astra7/Fable5); revision loses plausible cards. The
+frozen graded-win criterion fails under both reviewers; r32 remains rejected.
+Proxy attention counts are Astra35/35/30 and Fable19/19/16, but12 Weak/Weak
+cards have AstraSave/FableSkip: different attention policies, not calibrated
+value. Exact grade agreement56/78,19 adjacent differences,2 two-level differences,
+0 three-level,1 involving unknown; action agreement50/78. No averaging into
+fake certainty. This compares an experimental scorer with cached controls,
+not a production/UI functionality test or general live discovery performance.
+
+Root/source review qualifies frozen rationale errors: duplicate Scarlett
+Helpin wording does not prove coordination/payment/authenticity; the generic
+Cal “you can dump Calendly” does not establish the author's completed switch;
+Clipy competitor membership does not establish Mac support; Grenseo page-read
+tracking does not prove causal answer attribution. Fable's11 Tally non-opportunity
+labels are not11 form respondents (some are publishers/business discussion).
+Intake pain and basic recording remain valid conditional opportunities; no
+new procurement-only or human-review gate. Original labels stay intact.
+
+Astra proposes the next distinct hypothesis: direct-source listwise ordering
+of exactly these78 cards, two input permutations across allfiveprojects,
+no scores/ranks/labels/diagnosticframes supplied. Original restricted controls
+retain their full firsttens. This isolates a selected-pool representation probe,
+not full131/415 coverage or unseen validation. A new pre-output protocol can
+use paired difference intervals so a shared unknown cancels when selected
+identically; do not rewrite r60's conservative separate bounds or failed verdict.
+Both reviewers' paired aggregate lower must improve, no project decline, against
+both controls in both complete input-order runs. Input-order changes also include
+ordinary model variation, not isolated position-bias causality.
+
+Both actual-result r61 reviews are complete and reproduce the saved results.
+Root corrects review overclaims: Astra Grenseo+1 utility disproves a blanket
+“not better anywhere”; Fable Tally+1 versus baselineA, tie versusB; genericCal
+advice ISin top10 at10/10/5 despite Fable review saying absent. None changes
+the failed aggregate verdict. Fable favors full131+53extra labels; root selects
+Astra's bounded78probe first, avoiding missing-reference uncertainty.
+
+Concrete r62 protocol/tenrequest plan prepared with full productbrief, fresh
+opaque handles, unchanged bounded text/bio/context/date; explicit author/URL
+metadata withheld and masking disclosed. Paired unknown criterion specified
+before outputs. Whole-pool rank-stability thresholds remain a pre-output
+design question because weak/nonopportunity ties can reorder without changing
+usefulness. Astra implements the offline harness/meaningful zero-paid fixtures;
+Fable exact-design r63 review is active. No new scoring purchase. Candidate's conservative Lite reserve$0.360448
+cannot fit a ten-cent HARD exposure ceiling. Proposed$0.47 local exposure and
+$0.10 recorded-spend STOP are separate; a call could cross that stop threshold.
+Actual cost-effectiveness unmeasured. No freshX/production/config/DB/outreach/
+merge/deploy. Same cumulative$5 budget unchanged. Artifacts: both r60 model
+labels/reports/freezes, results, rootdecisionr61, Astra actualreviewr61 and
+interactive result HTML, LISTWISE_PROTOCOL_R62.md, prepare-listwise-r62.py,
+listwise-plan-r62.json and live catalog artifact in ignored evidence. Owner
+choices remain optional.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
