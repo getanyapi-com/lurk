@@ -258,9 +258,18 @@ establish a win by merely replacing Skips.
 
 Evidence: `HOLISTIC_PROTOCOL_R32.md`, `holistic-freeze-r32.json`,
 `purchases-holistic-r32.jsonl`, `holistic-results-r32.json` and the unchanged
-per-case raw answers in the ignored evidence directory. Actual-failure reviews
-by Astra and Fable are requested; pending reviews are not approvals. A count
-regression against model references alone does not prove every disputed
+per-case raw answers in the ignored evidence directory. Fable's completed
+actual-result review independently verified all 12 hashes, 393 unique usable
+responses and the recorded receipts, and rejected the candidate. Its source
+audit identifies wrong-operation, helper and promotional uplifts; it also
+disputes several development reference actions. Neither those disputed actions
+nor cross-scale replicated score differences establish owner truth or statistical
+significance. Grenseo's reported AUC was tied, not worse. Astra's completed actual-result
+review also independently verifies the execution and rejects r32. It distinguishes
+source errors from debatable preferences and proposes a small sequential
+coherent-frame diagnostic with explicit source-entailment contrasts, not an
+accepted fix.
+A count regression against model references alone does not prove every disputed
 opportunity is worthless. The candidate is **not integrated**.
 
 Cumulative recorded scoring API charges after this test: **$0.179988564**,
@@ -269,6 +278,54 @@ cap leaves **$4.674859436 unencumbered** at this checkpoint. Model-review
 subscription usage is not represented as scoring API receipts. Cheap execution
 has been measured; useful lead recovery has not. No fresh X retrieval,
 production changes, owner review, unseen validation or conversions occurred.
+
+### Preference diagnostic and next mechanism preparation, Oct 11
+
+A zero-cost blinded preference packet is prepared, not completed. Its reproduced
+selection is the union of 19 model-reference-useful cards, 34 distinct first-ten
+boundary movers against either control (two useful overlaps), and four unknown
+references: **55 unique archived cards**, not the reviewer's approximate 42.
+The packet hides previous grades, positions, reference actions and model
+attribution. Exact bounded author words, supplied context, bios and product
+briefs remain available. Save / Investigate / Reply / Skip / Not sure and optional
+rationale export locally; missing and unsure choices remain unknown. Kevin's
+choices are proxy preferences unless the project-owner identity is established.
+They do not authorize outreach or measure conversion. Selection is conditioned
+on prior results, not unseen validation; because not every first-ten position is
+included, do not derive full precision@10 from this packet. Desktop/mobile
+render and isolated interaction/export checks passed with zero external calls.
+No choices have been collected or automatically transmitted.
+
+Artifacts: `OWNER_PROTOCOL_R35.md`, `owner-freeze-r35.json`,
+`owner-review-r35.html` and separate public/private packet JSON in the ignored
+evidence directory. The HTML contains no previous scores or private mappings.
+
+A separate **24-case coherent task-frame extraction probe** is concretely
+prepared for independent review, not bought: 16 named development failure/
+disagreement cases plus eight deterministically selected positive-retention
+controls. It asks a cheap structured-output model to describe actor, exact
+operation/object/output, concurrent tasks, task-local temporal state, adoption
+openness and explicit versus unknown requirements, with source quotations.
+There are no lead labels, scalar grades or fitted coefficients. Existing
+same-call independent locators did not test conditioning a second call on such
+a frame. Mechanical citations still do not establish entailment; every frame
+must pass an independent source audit before preparing a later paired scorer.
+No edited successful frames may be selectively passed onward. A successful
+extraction probe alone would not establish ranking usefulness or owner demand.
+
+`FRAME_PROTOCOL_R36.md` and the preserved `frame-plan-r36.json` record the initial
+preparation. The pre-purchase r38 amendment replaces two redundant publication
+probes with startup-description parent context and crawler-access/answer-causality
+contrasts from Astra's completed review; `frame-plan-r38.json` and separate hashes
+preserve that amended preparation. No case response has been purchased. The proposed 24 serial attempts
+have a $0.50 local ceiling inside the same $5 cumulative cap, retaining earlier
+unknown reservations. This is a preparation ceiling, **not spend or a promised
+run cost**; model price/capabilities and executor budget/response/fault fixtures
+must be verified before purchase. There is no executor or second-stage scoring
+request yet. Fable's independent r37 protocol review of the original r36 is pending; its
+findings must be applied to the amendment, and no approval of different hashes
+is inferred. Nothing here
+changes retrieval, production, display thresholds or the current ranker.
 
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
