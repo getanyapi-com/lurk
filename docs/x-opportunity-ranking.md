@@ -374,12 +374,33 @@ A wider quotation limit has been inspected **offline only**, not promoted to
 primary acceptance or used to call a completed trial.
 
 Exactly **three actual unique frames**, not 24, were bought for **$0.003948**.
-Their interpreted task, completion and requirement assertions are now under
-independent Astra/Fable source audit against the immutable expectations. That
-will distinguish genuine source errors from permitted inference before further
-purchases. The formal full-trial pass cannot be met by these partial outputs;
-two-stage architecture or ranking efficacy has not been disproved or proven.
-There is no second-stage scoring call or production integration.
+Fable's completed independent r43 audit verifies receipts, reuse, all 16 r42
+freeze hashes and exact source quotations. It confirms a critical diagnostic
+source failure: advice that booking pages let someone replace Calendly became
+an unqualified completed personal migration, and current Google subscription
+became a mandatory integration allegedly supported by Cal.com without a fact
+citation. The source permits a qualified migration inference, not a definite
+completion claim. Both Clipy controls retain their actual requests; that does
+not excuse the diagnostic error or prove every frame bad.
+
+**Close r40/r42 as rejected under the frozen development criterion.** The
+remaining 21 calls are not bought: they cannot restore all 24 usable responses
+or remove the already-observed critical source error. No paid output,
+expectation or criterion is patched to salvage a pass. Astra's actual-output
+audit is still pending at this checkpoint. This is neither an architecture
+verdict nor a ranking/owner-utility result; there is no second-stage scoring
+call or production integration.
+
+A zero-purchase r44 design proposal compares a quote-only variance rerun,
+source-only task extraction followed by separate product mapping, and a
+one-call typed-claim revision. The latter two would distinguish stated facts
+from inference per claim rather than hide uncertainty in a catch-all field.
+Source-only extraction would withhold product facts to test contamination;
+removing compatibility fields would leave that class **untested**, not passed.
+Fixed source-ID citations would remove model-written quotation-length failures
+without purporting to fix entailment. Astra and Fable are independently
+reviewing the alternatives, concrete acceptance, cost and path back to ranking.
+No next formulation has been selected or purchased.
 
 At this checkpoint cumulative recorded scoring receipts are **$0.183936564**,
 plus unchanged **$0.145152 unknown-charge reservations**, leaving
@@ -387,8 +408,9 @@ plus unchanged **$0.145152 unknown-charge reservations**, leaving
 charge occurred; no fresh X, DB/production/config, retrieval or display change.
 Evidence: `FRAME_AMENDMENT_R42.md`, both preserved purchase journals/freezes,
 `frame-execution-results-r40.json`, `frame-execution-results-r42.json`, and
-`frame-partial-analysis-r43.json` in the ignored folder. Actual-source reviews
-are pending and are not represented as approvals.
+`frame-partial-analysis-r43.json`, `frame-closure-r43.json`, completed
+`fable-frame-smoke-r43.md` and proposal `FRAME_NEXT_DESIGN_R44.md` in the ignored
+folder. Pending reviews are not represented as approvals.
 
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
