@@ -963,6 +963,45 @@ mapped originals separately; fresh rank-blind full-evidence model references
 must be frozen before candidate outputs, preserving old references unchanged.
 No new paid call, relabeling of prior evidence or broader batch has occurred.
 
+#### Next bounded project test r73 — unexpanded Tally, two fixed orders
+
+Fable's completed r71 audit independently reproduces the accepted compact
+receipt, 70+7 hashes, all four ties and grade assessments. Both reviewers
+support the Grenseo stop and flag existing-workflow false-negative concerns.
+Root selects Fable's unexpanded Tally A/B diagnostic before Astra's prepared
+source-completeness alternative; Astra agrees this preserves the simpler
+source/reference question. Tally has more measured reference headroom than
+Grenseo. Seven of baseline A's ten are Not opportunity under both references
+(with another Not opportunity under Fable); this is a selected-development
+opportunity to test ordering, not a general quality estimate.
+
+The source-completeness data/protocol package is exact-source verified and
+unbought/unlabelled. It is not an automatic next purchase. The new Tally
+compact plan preserves both original source strings/input orders, full facts,
+compact rubric, model and controls. No full-text append, score/label/example,
+desired-card hint or changed eligibility rule enters the scorer. Root verifies
+all78 immutable provenance hashes and both request identities. Fresh offline
+checks pass: **63 executor + 20 comparison fixtures**, zero candidate calls.
+
+Only two sequential physical requests maximum under one journal/lock and
+phase-wide exposure cap; first unknown/invalid stops before B, accepted A is
+preserved if B fails. Same cumulative$5 approval, known floor$0.220158814,
+unknown floor$0.866048, full reserve$0.720896, local exposure$0.83 and recorded
+stop$0.10. No per-call renewal or guaranteed price. Independent Fable r74 design
+review is active before root's final freeze/purchase; no Tally call yet.
+
+Each complete permutation must have positive paired lower bounds versus both
+baselines under both frozen reviewers (eight comparisons). Grade stability:
+maximum1 known two-level change, known-positive Jaccard>=.5 only when union>=3;
+unknown transitions separate. Independent all16 source/grade audits in each
+order consider material positive AND negative mismatches without inventing
+reasons. No tax-preparer-specific promotion requirement, respondent quota or
+weak-card rank-overlap gate; those overfit inspected examples or harmless
+reshuffling. A complete non-pass stops this unexpanded Tally branch and retains
+baseline, not rejects all listwise approaches. Incomplete budget/billing stops
+are not hypothesis failure. A pass is one-project provisional evidence, not
+automatic full-batch spending, production integration or unseen/conversion proof.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
