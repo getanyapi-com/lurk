@@ -65,6 +65,114 @@ Independent conversation handling changes **zero cards in this archived corpus**
 
 ## Prospective review protocol — previous freeze superseded
 
+### Oct 11 experimental task-reading contract (offline only)
+
+`src/lib/x/taskReading.ts` is a separate experimental contract, version
+`x-task-reading-2026-10-11.1`. **It is not called by judgeX or the display
+ranker.** No historical signals are rewritten. It asks for the particular
+product-linked task, author ownership/state, and author/fact citations, so a
+completed recording cannot be confused with an unresolved app-review problem.
+Personal, community and free use remain valid; missing product support stays
+unknown, not incompatible. Parents cannot supply an author's own need.
+
+Seven independent choice questions replace the existing requirement question
+and add six others. Source maps contain the actual normalized/truncated author
+sentences and exact supplied fact fields. A cited requirement verdict remains
+provisional: citation existence cannot prove the inference, and one fact cannot
+establish support for every restriction. Invalid requirement citations degrade
+to unknown without changing the raw answers.
+
+For a valid task-relation distribution, the experimental task factor is
+`P(own_open) + P(own_evaluating) + P(unknown) × legacyTaskFactor`, where the
+legacy factor is `own_need × (1−promoting) × (1−resolved)`. Missing/malformed
+distributions or invalid citation IDs retain the legacy factor. Uncited
+relation mass backs off to unknown; absent task linkage moves all own-task mass
+to unknown while retaining grounded non-adopter mass. The selected label alone
+cannot change the numerical result for the same distribution and citations.
+No one-hot probabilities are fabricated from reviewer choices.
+
+The source-blinded development probe freezes 100 archived posts (first 15
+retained-author cards plus five seeded remaining cards per project). Astra's
+independent reference is separate from the candidate extraction. Fable's
+extraction and implementation reviews failed at the provider; a fresh blinded
+Astra session continues extraction, explicitly a same-model-family surrogate,
+not a Fable result. Agreement is not owner utility or Jev accuracy. Without actual new Jev
+probabilities, the experimental numerical sort cannot be evaluated. The
+acceptance criterion remains fewer determinate evidence errors, no new
+determinate false closures, and no project losing useful first-ten cards; an
+inconclusive result or unchanged sort is **not a win**. Evidence and model
+disagreements are retained in `.context/x-audit/evidence1011/`.
+
+Reproduce a source-only export (no environment, DB or model-client imports):
+
+```
+npx tsx scripts/x-task-contract.ts SOURCE_PACKET NEW_OUTPUT.json
+```
+
+Existing output is refused. The measured complete-question block grows from
+20 to 26 questions, with a median 4,774 additional serialized question bytes
+(about 30%) and a median 1,144-byte extra fact map on this sample. These are
+local payload measurements, **not billed tokens, dollars, latency or real
+provider adherence**. Same call count does not imply unchanged cost.
+
+#### Development probe result and next hypothesis
+
+The 100-card categorical probe is **inconclusive, not an improvement**.
+The two blinded Astra passes agreed on 91 task classes, left five inconclusive,
+and disagreed on four potentially useful but ambiguous questions. Those four
+are not proven missed adopters. Requirement-label differences fell from 38 to
+nine, but different definitions of core job, hard restriction and optional
+interest prevent interpreting that as 29 corrected errors. No actual Jev
+probabilities were produced; no numerical ranking improvement was measured.
+One reference quote in a long Tally post was outside the scorer's bounded
+head/tail input; full-text reference is not automatically identical evidence.
+
+The separate reference pass over all 114 cached Tally posts found 112 Skips,
+one Investigate and one Insufficient. The investigation is an ambiguous
+complaint about CPA intake forms, not a clear open request to create a form.
+This is a weak cached retrieval pool, not evidence that Tally lacks demand.
+Free and personal use were not excluded. Ranking alone cannot create missing
+prospects; the saved earlier scout already tried some basic job/first-person
+queries, so those are not unexplored retrieval ideas.
+
+The next separately versioned hypothesis is `x-open-task-2026-10-11.2`:
+`xOpenTaskQuestions` adds a genuine joint NOUL for a still-open author adoption
+task, with source/fact diagnostics; `xOpenTaskFactor` uses it only with valid
+citations and a non-unknown relation. Missing or ambiguous evidence retains
+the old graded factor. It does not turn a chosen label into certainty. This
+hypothesis remains **offline and not enabled in production**. The pure
+OpenRouter wire serializer/parser is shared with the app in `jevWire.ts`;
+Gateway adherence is not established by an OpenRouter-route comparison.
+
+Forty paired requests are frozen (six nonoverlap and two declared diagnostics
+per project), with exact app `candidateOf`/state/question parity verified.
+The input correction strips a leading reply handle in one case; earlier
+artifacts remain preserved. A separate source-blinded Astra reference labels
+these 40 as two Reply, four Investigate, 30 Skip and four Insufficient. These
+are proxy judgments, not owner choices or unseen validation.
+
+The prepared comparison sorts a fixed 131-card context, overlaying the same
+40 fresh pairs in both arms while leaving 91 cached cards equal. Diagnostics
+also get an excluded sensitivity comparison. Incomplete pairs remain cached
+in both arms and an incomplete trial cannot establish a win. Raw answers and
+archived checked-reply provenance are preserved. Joint-factor coverage,
+unchanged-question drift, requirements, first-ten movements and actual billing
+must all be reported. The executor and evaluator check frozen hashes and
+request/journal provenance. Six isolated fake-fetch billing/error fixtures
+pass; these do not measure API behavior or actual cost.
+
+Actual paid comparison is **prepared, not run**: at most 80 serial scoring
+requests and a proposed $0.10 ceiling, with no fresh retrieval or production
+writes. It awaits the separately requested spending authorization. Final
+prepared artifacts are `paired-plan-r10.json`, `paired-freeze-r12.json`,
+`PAIRED_PROTOCOL_R12.md`, `run-paired-r12.ts` and `evaluate-paired-r12.ts` in
+`.context/x-audit/evidence1011/`. Earlier r8/r10 executables are superseded.
+Astra reviewed the implementation and found concrete input/evaluation issues
+that were corrected. Fable completed the design review, but subsequent
+extraction and implementation attempts failed at the provider; no completion
+or approval is inferred from those failures. Fresh source checks pass 979
+tests across 107 files; that is software verification, not utility proof.
+
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
 1. Export the next same-format local audit snapshot on the five existing projects. No run is scheduled or new spending authorized by this document. If comparing scout retrieval too, keep its budget and pool provenance separate; $.153 was an observed past experiment, not a guaranteed future cost.

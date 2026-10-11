@@ -1,6 +1,7 @@
 import { GatewayError, createGateway } from "@ai-sdk/gateway";
 import { RetryError, experimental_evaluate as evaluate } from "ai";
 import { z } from "zod";
+import { noulAnswer, choiceAnswer, scoreAnswer, responseSchema, withoutNullCriteria } from "./jevWire";
 import { config } from "./config";
 import { assertUnderLlmCap, recordLlmUsage, withCallTimeout } from "./llm";
 
@@ -56,31 +57,6 @@ export type ChoiceQuestion = {
 export type ScoreQuestion = { type: "score"; instructions: Entry; criteria: Entry[] };
 export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 
-const noulAnswer = z.object({ type: z.literal("noul"), noul: z.number() });
-/** The Gateway may omit probabilities; priority falls back to the unrounded score. */
-const choiceAnswer = z.object({
-  type: z.literal("choice"),
-  choice: z.string(),
-  probabilities: z.record(z.string(), z.number()).optional(),
-  confidence: z.number().optional(),
-});
-const scoreAnswer = z.object({
-  type: z.literal("score"),
-  score: z.number(),
-  legend: z.record(z.string(), z.string()).optional(),
-  probabilities: z.record(z.string(), z.number()).optional(),
-  confidence: z.number().optional(),
-});
-const responseSchema = z.object({
-  model: z.string(),
-  answers: z.record(z.string(), z.discriminatedUnion("type", [noulAnswer, choiceAnswer, scoreAnswer])),
-  provider: z.string().optional(),
-  usage: z.object({
-    input_tokens: z.number(),
-    output_tokens: z.number(),
-    cost: z.number().optional(),
-  }),
-});
 
 export type NoulAnswer = z.infer<typeof noulAnswer>;
 export type ChoiceAnswer = z.infer<typeof choiceAnswer>;
@@ -352,26 +328,6 @@ function mentionsTooLarge(error: unknown): boolean {
   const cause = (error as { cause?: { responseBody?: unknown } }).cause;
   const text = `${error instanceof Error ? error.message : ""} ${String(cause?.responseBody ?? "")}`;
   return text.includes("max_tokens_exceeded");
-}
-
-/**
- * TypeSafe reads a null choice criterion as an option with no description;
- * OpenRouter's schema refuses null and takes "" for the same thing.
- */
-function withoutNullCriteria(questions: Record<string, Question>): Record<string, Question> {
-  return Object.fromEntries(
-    Object.entries(questions).map(([key, question]) => [
-      key,
-      question.type === "choice"
-        ? {
-            ...question,
-            criteria: Object.fromEntries(
-              Object.entries(question.criteria).map(([option, text]) => [option, text ?? ""]),
-            ),
-          }
-        : question,
-    ]),
-  );
 }
 
 /** The answer under `key`, as the type it was asked as. */
