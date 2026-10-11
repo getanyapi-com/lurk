@@ -644,7 +644,46 @@ Corrected artifact `owner-comparison-r59.html` with local choice export,
 `OWNER_DISPLAY_AMENDMENT_R59.md` and14artifact input freeze. Freeze SHA256:
 `0b9500c8018f7bdc2724414edb4df21b3aa3ce5ad91ba5d7d9aacd52fddebd19`. No additional API spend; budget unchanged. Current age/fit
 facts remain supplied archived information, not freshly verified product claims.
-Source/ranking/utility remain unvalidated pending actual choices; PR draft.
+Source/ranking/utility remain unvalidated at this historical checkpoint; PR draft.
+Owner choices are optional preference calibration, not a gate on further
+independent model-based evaluation (see r60 below).
+
+#### Independent graded model evaluation r60 — owner review is optional
+
+Kevin explicitly authorized continuing model-based evaluation instead of making
+him label the packet. Astra and Fable independently judge the same 78 archived
+cards without ranks, scores, earlier per-card labels or each other's judgments.
+The existing three-arm top-ten union (68 cards) plus ten seeded below-ten cards
+is unchanged; all supplied product facts and limitations remain available.
+The rubric is Strong / Plausible / Weak / Not opportunity / Insufficient,
+with separate proxy Save / Investigate / Reply / Skip / Not sure actions.
+Personal/community/free/basic use remains potentially useful, not an automatic
+negative. These are model judgments, never owner choices or conversion proof.
+
+The fixed protocol reports each original arm's graded/action top-ten and top-three
+composition per project, with disagreements visible. Auxiliary ordinal weights
+3/2/1/0 and unknown intervals are illustrative evaluation units, not calibrated
+value or public lead scores. Candidate wins require beating both baseline
+upper bounds without a project decline under both reviewers; no averaging away
+disagreements or post-output rule changes. Existing failed r32 and task-frame
+experiments remain rejected unless new evidence specifically supports otherwise.
+
+Initial packet/protocol/eight input hashes were frozen before labelling. The
+comparison implementation was authored before returned labels but its separate
+hash addendum was recorded after Astra completed, before root inspected label
+content or computed rank comparisons. Mechanical validation covers all 78 IDs,
+matching projects, bounds and exact supplied excerpts; this does not certify
+semantic entailment. Synthetic checks cover unknowns, ties, adverse reviewer
+judgments and achievable wins. Astra's 78-card output passes the mechanical
+check; Fable remains active. No comparative result is claimed yet. Root does not
+unblind ranks for analysis until both completed label sets are preserved.
+
+No fresh X scans, production/config/DB writes, outreach or scoring API purchases.
+Same budget: $0.204043064 known receipts plus $0.866048 reserved unknown charges,
+$3.929908936 unencumbered under the $5 cumulative scoring cap. T3 review-account
+costs are not invented or included as scoring API receipts. Artifacts:
+`MODEL_ATTENTION_PROTOCOL_R60.md`, public packet, both freeze files, analyzer,
+synthetic checks and separate model label/validation files in ignored evidence.
 
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
@@ -674,12 +713,12 @@ The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze i
 1. Export the next same-format local audit snapshot on the five existing projects. No run is scheduled or new spending authorized by this document. If comparing scout retrieval too, keep its budget and pool provenance separate; $.153 was an observed past experiment, not a guaranteed future cost.
 2. Run the offline CLI with `--validation-after <new-frozen-window-start>`. It rejects earlier included posts. This date check **does not prove nobody has seen them**; record prior inspection and author/thread overlaps separately.
 3. The packet interleaves old group order and new ranked order with deterministic seeded starting sides, deduplicating posts/authors. Hide attribution until choices are collected. Review the first ten per project and then skim remaining posts for misses. Do not equate interleaving credit with a directly measured standalone precision@10; separately report each ranker's retained top-ten positions against the choices.
-4. Actual project-owner preferences are primary. Record Kevin's proxy choices separately. Mark Save / Investigate / Reply / Skip; model reviews cannot replace these choices or measure conversion.
+4. Optional preference calibration: record actual project-owner preferences and Kevin's proxy choices separately. Mark Save / Investigate / Reply / Skip. Independent model judgments can evaluate provisional ranking usefulness without waiting for these choices, but do not stand in for anyone's personal preferences or measure conversion.
 5. Report useful choices in the displayed ten, first useful rank, useful cards below the floor/outside ten, duplicate reduction and review time. Count scout-only useful opportunities separately from ordering recovery. Missing/unreviewed choices are unknown, not skips.
 6. Decision rule: if independently found/missed useful opportunities exceed the ordering recovery, prioritize retrieval. If coverage misses are near zero and owner usefulness improves, keep the simple ranking and stop adding ranking machinery. Do not call an ambiguous/tied comparison a win. A single small week is directional, not statistical assurance.
 7. Track actual conversations and adoption later; they are different outcomes from willingness to investigate.
 
-The packet/protocol are prepared. **No unseen corpus has been collected or owner review completed yet.** The PR stays draft pending that evidence.
+The packet/protocol are prepared. **No unseen corpus has been collected or owner review completed yet.** Owner review is optional, not required for continued iteration. The PR stays draft; model-based provisional usefulness, unseen generalization and actual conversion remain distinct outcomes.
 
 ## Inspecting the actual app locally
 
