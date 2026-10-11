@@ -826,6 +826,43 @@ and handle enums alone would not enforce exactly-once coverage. A new one-call
 harness is being prepared offline;
 no further purchase has occurred at this checkpoint.
 
+#### Actual same-input higher-tier probe r66 — partial compliance, still rejected
+
+Both completed r65 reviews recommended one unchanged Grenseo A call on Gemini
+3 Flash Preview. The new harness passed 45 meaningful offline checks, freshly
+rerun by root; all 34 original provenance hashes and exact request equality
+were verified. Only model and price guard changed. The final pre-purchase
+freeze covers 45 artifacts, including the unchanged source-audit criteria.
+No failed output, examples, reference grades or review advice entered the input.
+
+The single actual call cost **$0.0092835**, with 4,377 input / 2,365 output tokens,
+zero reported reasoning tokens and normal `stop`. It returned all exact handles,
+required fields and positive evidence, but failed three citation checks: two
+quotes join separated excerpts with ellipses; a third uses an exact phrase from
+`product.what_it_does` while attributing it to `product.capabilities`. Correction
+to root's initial actual-review brief: that third error is wrong-field
+attribution, not invented punctuation or factual content. Billing was settled
+before rejection, no new unknown reserve arose, and the one-call runner ended
+without retries. Zero accepted rankings; no full batch or ranking-win claim.
+
+This narrower error set does not causally prove a generic model-capacity or
+format bottleneck. Separately, the rationale treating a founder's forking advice
+as an opportunity to pitch an imagined audience may transfer audience need to
+the author. Publisher statistics do not prove the publisher's own unmet need;
+the supplied business bio can nevertheless support a conditional ongoing job.
+Source selectors could eliminate free-form quote transcription without curing
+these judgment issues. Independent Astra/Fable actual-source reviews are active
+before choosing the next distinct experiment. No further wording retry or
+mechanics-only success is being promoted to lead utility.
+
+Cumulative known receipts **$0.216555314**, historical unknown reservations
+**$0.866048**, remaining **$3.917396686**, same $5 overall cap. The two measured
+listwise calls together cost $0.01251225 and produced zero accepted rankings;
+neither measures scaled successful-ranking economics. Both original receipts,
+rejected outputs, exact diagnostics and freezes remain unchanged in ignored
+evidence. No fresh X, production/config/DB writes, outreach, merge or deployment;
+model evaluation continues without mandatory owner labels.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
