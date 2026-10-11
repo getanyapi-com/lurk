@@ -574,6 +574,78 @@ journal/current verified pricing, `reader-pair-actual-freeze-r56.json`, and
 public/private r56 source-review packets. No fresh X, production/config/display,
 outreach, merge or deployment. PR remains draft.
 
+#### Independent reader reviews and next owner comparison
+
+Both actual r56 reviews are complete and verify all six raw receipts/freeze
+hashes/accounting. Fable grades L1/3 and S3/3 with qualified Cal basis/condition
+and omitted-advice gaps; Astra grades L0/3 and S2/3, rejecting S Cal's stated
+actor/operation migration and required/stated affordability. Root keeps that
+Cal failure under the ORIGINAL per-claim rule: inferred completion in two fields
+does not qualify unsupported stated claims elsewhere. No forgiving the original
+criterion after seeing a better-looking model. L short-question operation
+exclusion remains disputed; functional recording abstraction is allowed without
+a new literal-select verb gate. Fable's changed no-AI-content paraphrase grading
+is not adopted; a bio mentioning AI is also not proof of acceptance of a specific
+target's AI use. Both independent reports remain intact.
+
+Root verdict: **S passes the controls but not all three**. Neither all3 unlock
+nor bothfailcontrol closure branch is met. No remaining21/42call buy or new typed-
+joint prompt revision now. This pauses this purchase line; it does not disprove
+joint architectures or establish a generally solved reader bottleneck. Observed
+higher-tier source improvements cannot repair rejected r32 ranking utility.
+
+Prepared **r57 zero-API owner attention comparison** on the already frozen131
+pool: ALL top-ten union from baseline_a/b/rejectedr32 candidate,68unique cards,
+plus exactly two seeded cards outside all three top tens per project,10more.
+Total78: Cal15/Tally16/Clipy13/Grenseo16/Scarlett18. Unlike original r35diagnostic55,
+this includes every common top-ten card and can support exact original first-ten
+owner counts if reviewed. Original r35 is preserved; neither packet has collected
+choices. No model-reference-label selection, scores, ranks, model labels or
+selection reasons appear publicly. Opaque seeded order, original bounded source/
+context/bio/product facts, per-project filter, local-only five-action choices and
+rationale/export. No automatic chat or production ingestion claimed.
+
+Save/Investigate/Reply/Skip/unresolved are reported separately. Auxiliary
+attention counts have known lower / known+unknown upper bounds. Candidate wins
+this bounded comparison only if aggregate lower exceeds BOTH baseline uppers
+AND each project's lower does not fall below baseline upper; unknown choices
+cannot be assigned conveniently. First known attention rank and only sampled
+attention outside first ten are separate, not global recall/conversion or
+calibrated probabilities. Do not retune frozen orders while choices arrive.
+
+Meaningful synthetic analyzer checks passed: missing/Not sure remain unknown,
+allSkip counts, ties not wins, partial asymmetric mapping, invalid versions/
+IDs/duplicates/project/actions rejected, complete unique union/no public grades.
+Desktop728/mobile360 HTML renders and temporary synthetic filter/navigation/
+action/note/export checks passed; zero real choices. Twelve artifact hashes
+freeze original ranks, sources, packet/analyzer/protocol and prior reports.
+Both independent r58 packet reviews completed: selection/blinding/analyzer checks pass. Astra caught an actual visible-brief omission; Fable did not identify it. Root fixed it before showing cards. Sources
+remain overlapping development archives; Kevin's proxy choices are not verified
+independent project-owner identities. No new API charge; budget remains known
+$0.204043064 + reserved $0.866048, unencumbered $3.929908936. Evidence:
+`reader-pair-root-decision-r57.json`, both r56 reports, ownercomparison r57
+protocol/public/private/html/analyzer/tests/freeze. PR remains draft.
+
+#### Corrected owner presentation r59 — ready for choices
+
+Original r57 embedded all supplied product fields but its visible brief omitted
+`does_not`. Astra caught missing Scarlett WhatsApp/GoogleCalendar requirements,
+MXN pricing/no-free-plan and Grenseo no-automatic-publishing/no-free-plan. Before
+any real choice/publication, root preserved r57 and made a presentation-only r59
+correction: every supplied product field is displayed, absent/empty fields only
+skipped. Original78cards, IDs, source/product objects, private selection/shuffle,
+all131orders and metric logic unchanged; packet/storage/export version changes.
+Both r58 reviews concern original bytes; focused root equality/synthetic tests
+and desktop/mobile/all-five-full-brief DOM checks verify amended presentation.
+No source/model/score retrieval or owner choice was generated. Zero choices;
+choices must come from Kevin, not a model pretending to know his preferences.
+
+Corrected artifact `owner-comparison-r59.html` with local choice export,
+`OWNER_DISPLAY_AMENDMENT_R59.md` and14artifact input freeze. Freeze SHA256:
+`0b9500c8018f7bdc2724414edb4df21b3aa3ce5ad91ba5d7d9aacd52fddebd19`. No additional API spend; budget unchanged. Current age/fit
+facts remain supplied archived information, not freshly verified product claims.
+Source/ranking/utility remain unvalidated pending actual choices; PR draft.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
