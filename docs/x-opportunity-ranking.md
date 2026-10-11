@@ -161,17 +161,67 @@ must all be reported. The executor and evaluator check frozen hashes and
 request/journal provenance. Six isolated fake-fetch billing/error fixtures
 pass; these do not measure API behavior or actual cost.
 
-Actual paid comparison is **prepared, not run**: at most 80 serial scoring
-requests and a proposed $0.10 ceiling, with no fresh retrieval or production
-writes. It awaits the separately requested spending authorization. Final
-prepared artifacts are `paired-plan-r10.json`, `paired-freeze-r12.json`,
-`PAIRED_PROTOCOL_R12.md`, `run-paired-r12.ts` and `evaluate-paired-r12.ts` in
-`.context/x-audit/evidence1011/`. Earlier r8/r10 executables are superseded.
-Astra reviewed the implementation and found concrete input/evaluation issues
-that were corrected. Fable completed the design review, but subsequent
-extraction and implementation attempts failed at the provider; no completion
-or approval is inferred from those failures. Fresh source checks pass 979
-tests across 107 files; that is software verification, not utility proof.
+### Authorized paid scoring results, Oct 11
+
+Kevin authorized **$5 cumulative testing spend**, not $5 per run. This does
+not authorize fresh X scans or production changes. Historical audit costs are
+separate. Every new attempt is journalled; unresolved charges retain a full
+conservative reservation against the total.
+
+The 40 paired actual Jev comparison completed with 80 usable responses and
+$0.021785988 recorded cost. A dated model alias initially stopped execution;
+the first response was retained once after verifying the exact alias. The
+joint factor activated on only 2/40 cases. First-ten model-reference useful
+counts did not improve on any project. Astra and Fable's saved independent
+reviews found no accepted win; Fable's T3 task was subsequently cancelled by a
+server restart, so its surviving written review is not a terminal approval.
+The diagnostic-excluded sample was mostly below the head, limiting its ability
+to reveal first-page effects.
+
+A 30-response locator-option text diagnostic cost $0.009568272 and did not
+improve role citation/joint coverage. A separate 20-response role-instruction
+probe cost $0.006258: role citations rose 1/10 to 8/10 and joint activation
+1/10 to 6/10. This fixes a mechanical evidence-locator problem, not owner
+utility. It also exposes joint replacement raising some publishers.
+
+A predeclared 60-card cached-head comparison then used two identical baseline
+controls and the role-wording candidate, comparing both joint replacement and
+a conservative fold retaining existing promotion/resolution suppression.
+All 180 usable responses were obtained across 182 attempts. Two transport
+failures remain unknown-cost; their combined $0.145152 reservation is retained.
+Successful responses were reused unchanged through two separately journalled
+continuations, with request/hash provenance. The second continuation extended
+only the network timeout; prompts, labels, formulas and acceptance criteria
+were unchanged. This head test recorded $0.045114930.
+
+All four rankings retain the same model-reference useful first-ten counts:
+Cal.com 4, Tally 0, Clipy 9, Grenseo 2, Scarlett 1. Joint activation rose to
+42/60, but **neither candidate met the predeclared improvement criterion**.
+Valid citation IDs do not prove entailment. Content-scheduling/appointment
+scope confusion and crawler-access/causal-attribution support errors persist.
+The conservative fold reduces some publisher uplifts by construction, not as
+independent evidence of better understanding.
+
+The fixed **131-card replay context**, not the full 415-post corpus, contains
+known-reference useful totals of 4/1/11/2/1. Its known-label first-ten ceiling
+is 18 against the measured 16; four unresolved reference cases remain unknown.
+Three projects have no additional known-useful card to recover within this
+context. Tally's ambiguous intake complaint and two Clipy cases remain below
+the first ten. This is neither a global retrieval ceiling nor owner truth.
+
+At completion of the head test, cumulative known cost is **$0.082727190**,
+plus **$0.145152 reserved** for unknown charges. The authoritative continuing
+ledger is `.context/x-audit/evidence1011/testing-budget.json`; this paragraph
+is a dated checkpoint, not the remaining budget for later runs.
+
+Artifacts: `actual-comparison-r17.json`, `binding-results-r20.json`,
+`role-results-r22.json`, `head-results-r29.json`, all purchase journals and
+continuation amendments in the ignored evidence folder. Source-blinded model
+references remain development proxies, not human preferences, unseen
+validation, calibrated probabilities, conversions or measured global recall.
+The task contract remains offline; no revised factor is enabled in production.
+The previously recorded full source check passed 979 tests across 107 files;
+that historical software check is not new API or usefulness proof.
 
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
