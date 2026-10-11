@@ -963,7 +963,7 @@ mapped originals separately; fresh rank-blind full-evidence model references
 must be frozen before candidate outputs, preserving old references unchanged.
 No new paid call, relabeling of prior evidence or broader batch has occurred.
 
-#### Next bounded project test r73 — unexpanded Tally, two fixed orders
+#### Tally compact r73 — prepared protocol, followed by actual outcome below
 
 Fable's completed r71 audit independently reproduces the accepted compact
 receipt, 70+7 hashes, all four ties and grade assessments. Both reviewers
@@ -980,15 +980,17 @@ unbought/unlabelled. It is not an automatic next purchase. The new Tally
 compact plan preserves both original source strings/input orders, full facts,
 compact rubric, model and controls. No full-text append, score/label/example,
 desired-card hint or changed eligibility rule enters the scorer. Root verifies
-all78 immutable provenance hashes and both request identities. Fresh offline
-checks pass: **63 executor + 20 comparison fixtures**, zero candidate calls.
+all78 immutable provenance hashes and both request identities. Pre-purchase
+offline checks passed: **63 executor + 22 comparison fixtures**, zero candidate
+calls at that checkpoint (two input-position diagnostic checks added before
+the final freeze).
 
 Only two sequential physical requests maximum under one journal/lock and
 phase-wide exposure cap; first unknown/invalid stops before B, accepted A is
 preserved if B fails. Same cumulative$5 approval, known floor$0.220158814,
 unknown floor$0.866048, full reserve$0.720896, local exposure$0.83 and recorded
 stop$0.10. No per-call renewal or guaranteed price. Independent Fable r74 design
-review is active before root's final freeze/purchase; no Tally call yet.
+review completed without blockers before root's final freeze/purchase.
 
 Each complete permutation must have positive paired lower bounds versus both
 baselines under both frozen reviewers (eight comparisons). Grade stability:
@@ -1001,6 +1003,110 @@ reshuffling. A complete non-pass stops this unexpanded Tally branch and retains
 baseline, not rejects all listwise approaches. Incomplete budget/billing stops
 are not hypothesis failure. A pass is one-project provisional evidence, not
 automatic full-batch spending, production integration or unseen/conversion proof.
+
+#### Actual Tally r73 / independent r78 audit — ordering gain, full failure
+
+Both physical calls completed for **$0.007913 total** ($0.0039565 each), with
+known receipts and no new unknown reservation. Both return all16 exact
+grade/action records; no quotes, repair, retry or fallback. All eight paired
+ordering comparisons pass: Astra +4 versus each baseline in each permutation;
+Fable +3 versus A and +2 versus B in each permutation. Grade stability also
+passes: no two-level flips and positive-set Jaccard5/7. These remain frozen
+model-proxy ordering gains on selected archived development posts.
+
+**Full source-audited success fails; retain baseline and stop this unexpanded
+Tally compact branch.** The first Astra audit and a fresh source-first Astra
+audit independently reject unsupported Strong assignments: another actor's
+workflow, category commentary and a completed replacement are not established
+strong author opportunities. The fresh reviewer also disputes several
+Plausible assignments; adjacent boundary disagreements are explicit, not
+forced into consensus. Both consider all32 assignments and establish no
+decisive material negative in these observed outputs. This is not a future
+license to suppress uncertainty or basic/community usefulness.
+
+There is only one Astra-reference Plausible and no Fable-reference
+Strong/Plausible in the candidate top10. The measured gain mainly substitutes
+Weak for Not opportunity; it is not a useful good-lead shortlist, improved
+retrieval, adoption or conversion proof. Original analysis/freezes stay intact;
+the separate root closure records full failure without rewriting their pending
+audit fields.
+
+Fable's design review is complete, **but no actual Tally Fable audit completed**:
+two configured Claude accounts ended in rate limits and the Cursor provider
+ended in “Provider turn failed.” All terminal results were read, with no pending
+child runs. Bounded retries stop; these errors contain no quality verdict and
+do not replace frozen Fable references. Current scoring budget is
+**$0.228071814 known + $0.866048 historical unknown reservations**, leaving
+**$3.905880186** under the cumulative$5 approval. Review-account costs are not
+represented as scoring receipts.
+
+Evidence in the ignored folder: `tally-compact-analysis-r73.json`, immutable
+actual diagnostic/freeze r75, original Astra actual r75, fresh independent
+`tally-source-independent-astra-r78.md`, and root closure r78.
+
+#### One independent ordinal-grade experiment r79 — protocol and incomplete attempt
+
+The fresh Astra review supports one bounded test of grade/action assessment
+without a comparative-order objective. Same16 unexpanded sources, complete
+product facts and verbatim grade/general-condition rubric; one deterministic
+shuffle and fresh opaque handles. No prior grades, ranks, reference labels,
+critiques, corrected examples or case-specific hints enter the grader. Earlier
+relative orders remain fixed privately; output must preserve supplied input
+order. No numeric public score or positive quota, and no first-person/purchasing
+gate. Same model/settings/provider-price controls, one POST maximum with full
+reserve, exclusive journal/global lock and no repair/retry/fallback.
+
+Require clean independent all16 source audit for material unsupported positives
+**and negatives**, plus four strict all16 ordinal-error improvements: each
+frozen reference versus each prior A/B grade vector. Positions3/2/1/0 are an
+evaluation convention, not measured cardinal utility. Unknowns use paired
+intervals with shared reference uncertainty; upper new-minus-old loss must be
+negative in every comparison. Action disagreement is diagnostic. All-Weak is
+not a count-based failure, but unsupported collapse still fails source audit.
+
+Offline **73 executor + 38 analyzer checks** pass, including all125 grade triples.
+Exact independent implementation/design review resolved a release-gate omission;
+the runner now requires fresh analyzer fixtures and the actual review/root
+decision. All120 pre-output hashes were bound and dry readiness passed before
+the single POST. Success could establish
+only a grade-layer improvement, not a new ranking win, repair of the failed
+experiment, unseen/owner/conversion proof or production rollout. Nonsignal,
+uncertainty or failure stops this one-shot branch without tuning until it passes.
+
+**Actual attempt: incomplete, no grade-quality verdict.** Google returned HTTP400
+`INVALID_ARGUMENT` through OpenRouter, without usage/cost or model grades. The
+executor correctly stopped after exactly one POST, retained the full
+**$0.720896 unknown-cost reservation**, and did not retry, repair or fall back.
+All four comparisons remain unset; no source audit can assess nonexistent
+output. This is not a semantic failure or evidence that independent grading
+does not work. The frozen request remains unmodified and the branch is stopped.
+
+An offline exact comparison finds unchanged model/settings/provider controls and
+schema structure; changed messages, schema name and opaque handle strings/order.
+The generic error does not identify a cause. Longer handle strings or schema
+complexity are hypotheses, not established causes. No fresh attempt follows
+merely because a shorter schema seems plausible.
+
+Current cumulative scoring ledger after this attempt: **$0.228071814 known +
+$1.586944 reserved unknown**, leaving **$3.184984186** under the same cumulative
+$5 cap. No bill is inferred as zero from an error or an absent receipt. Seven
+immutable actual-snapshot hashes preserve the request/error, journal, execution,
+analysis and post-attempt ledger snapshot. Root keeps live ledger outside all
+freezes. Evidence: `cardinal-grades-actual-diagnostic-r81.json`, actual freeze r81,
+and completed design review r80, actual Astra review r81 and root closure r81 in
+the ignored folder. The actual review verifies all120+7 hashes, independently
+recomputes incomplete comparison fields and identifies no causal request field.
+
+Root followed through on read-only transport diagnosis. Official generation
+metadata/content requires a generation ID that the retained error lacks;
+response headers were not saved, so no header-only correlation can be recovered
+from this attempt. Aggregate completed-day analytics is not per-attempt proof.
+The configured Aside preview is unavailable in T3 mode; a bounded native default
+profile check reached OpenRouter Sign In, not logs, and its new tab was closed.
+No install/login/account change, external message or new model POST was made.
+Present accessible evidence cannot identify the invalid field or reconcile its
+bill. Future transport work needs new field-specific/correlation/billing
+evidence, not a renamed prompt retry. No app/ranking/production change follows.
 
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
