@@ -313,19 +313,82 @@ must pass an independent source audit before preparing a later paired scorer.
 No edited successful frames may be selectively passed onward. A successful
 extraction probe alone would not establish ranking usefulness or owner demand.
 
-`FRAME_PROTOCOL_R36.md` and the preserved `frame-plan-r36.json` record the initial
-preparation. The pre-purchase r38 amendment replaces two redundant publication
-probes with startup-description parent context and crawler-access/answer-causality
-contrasts from Astra's completed review; `frame-plan-r38.json` and separate hashes
-preserve that amended preparation. No case response has been purchased. The proposed 24 serial attempts
-have a $0.50 local ceiling inside the same $5 cumulative cap, retaining earlier
-unknown reservations. This is a preparation ceiling, **not spend or a promised
-run cost**; model price/capabilities and executor budget/response/fault fixtures
-must be verified before purchase. There is no executor or second-stage scoring
-request yet. Fable's independent r37 protocol review of the original r36 is pending; its
-findings must be applied to the amendment, and no approval of different hashes
-is inferred. Nothing here
-changes retrieval, production, display thresholds or the current ranker.
+`FRAME_PROTOCOL_R36.md` and r36/r38 plans are preserved as unbought preparations.
+Fable's completed r37 review supports a source-mechanism probe, with concrete
+pre-purchase gaps: fixed source expectations/threshold, output/reasoning bounds,
+a genuine Grenseo control, citable background and no example-answer leakage.
+The r40 preparation addresses those classes. Its eight controls include a real
+Grenseo tracker request; the system prompt uses generalized operation rules;
+all supplied brief fields and bio are citable. This uses Gemini rather than Jev,
+so even a pass would be a model/design-bundle result, not proof that sequential
+architecture alone helped.
+
+The review also exposed earlier reviewer overclaims. The Microsoft/SSO post
+actually discusses booking pages and Calendly; a completed switch is plausible,
+not uniquely established. Grenseo's supplied brief explicitly mentions citations
+driving AI answers; exact answer-specific attribution remains unknown rather
+than proved absent. One evaluator p0 can concatenate an author's self-thread:
+the saved recorder inquiry is separate from its earlier traffic invitation.
+The extractor still sees only the bounded combined input and must not invent
+chronology. Preserve these alternatives in the pre-purchase expectation sheet.
+
+`FRAME_PROTOCOL_R40.md`, `frame-plan-r40.json` and ignored `run-frame-r40.mjs`
+provide concrete serial mechanics, with no second-stage scorer prepared. Sixteen
+isolated fake-fetch fixtures pass (36 simulated POSTs, **zero real calls**),
+including durable pending reservations, reasoning/token cap failures, malformed
+JSON, exact quotations, shape bounds, tamper detection and near-cap rejection.
+The executor defaults to no-network dry run. Explicit reasoning off is enforced
+in the request and must be proved by actual usage before a response is usable;
+missing reasoning usage stops rather than becoming zero. Array limits are in the
+schema; executable validation additionally enforces bounded free strings.
+
+The 24-attempt local ceiling is **$0.50 within the same $5 cumulative cap**.
+The pending reserve is widened conservatively to the full published input AND
+provider output maximum, including reasoning: **$0.360448 per pending attempt**,
+not expected spend. Previous unknown charges remain reserved. Public catalog
+price/context/capabilities must match frozen metadata, requests have provider
+price/parameter guards, and any uncertain failure stops without automatic retry.
+Astra completed 24 pre-purchase expectation rows containing 122 source rules
+and 261 exact citations, all independently checked before a 12-artifact freeze.
+Fable's completed r41 mechanics review found no concrete budget/security defect;
+its earlier snapshot lacked the expectations/freeze that subsequently landed.
+That review is not approval of later changed hashes or evidence of utility.
+
+#### Actual frame smoke and stopped continuation
+
+The r40 first call returned billing and zero reported reasoning tokens, but a
+validator incorrectly classified signature-only Google metadata as thought
+content. It stopped after **one call, $0.0015295**. The raw response, source and
+frozen expectations remain unchanged. A narrow r42 representation amendment
+allows recognized signature-only metadata only when usage reports zero thinking;
+nonblank thought text remains rejected. Eighteen zero-call fixtures pass, including
+both metadata cases. It also requests explicit usage receipts, as Fable advised.
+
+The continuation reused that already-paid response with journal/request hashes
+and proof its charge was already in the cumulative ledger; it did **not** retry
+or charge it twice. Two fresh responses cost **$0.0024185**. The second stopped
+on two exact source quotations exceeding the frozen 160-code-point limit (the longest
+was 202 points). No source text or generated frame was shortened or patched.
+The stop is a mechanical length failure, not itself proof of bad understanding.
+A wider quotation limit has been inspected **offline only**, not promoted to
+primary acceptance or used to call a completed trial.
+
+Exactly **three actual unique frames**, not 24, were bought for **$0.003948**.
+Their interpreted task, completion and requirement assertions are now under
+independent Astra/Fable source audit against the immutable expectations. That
+will distinguish genuine source errors from permitted inference before further
+purchases. The formal full-trial pass cannot be met by these partial outputs;
+two-stage architecture or ranking efficacy has not been disproved or proven.
+There is no second-stage scoring call or production integration.
+
+At this checkpoint cumulative recorded scoring receipts are **$0.183936564**,
+plus unchanged **$0.145152 unknown-charge reservations**, leaving
+**$4.670911436 unencumbered** under the same $5 overall cap. No new uncertain
+charge occurred; no fresh X, DB/production/config, retrieval or display change.
+Evidence: `FRAME_AMENDMENT_R42.md`, both preserved purchase journals/freezes,
+`frame-execution-results-r40.json`, `frame-execution-results-r42.json`, and
+`frame-partial-analysis-r43.json` in the ignored folder. Actual-source reviews
+are pending and are not represented as approvals.
 
 The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
 
