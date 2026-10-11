@@ -424,7 +424,7 @@ export type XEvaluationEntry =
   | { kind: "filtered"; item: XFilteredCard }
   | { kind: "lead"; lead: XLeadCard };
 
-export type XOpportunity = { entry: XEvaluationEntry; priority: number | null; checks: string[] };
+export type XOpportunity = { entry: XEvaluationEntry; priority: number | null; checks: string[]; notes?: string[] };
 export type XOpportunityFeed = { items: XOpportunity[]; total: number; posts: number };
 
 export function xOpportunityCard(entry: XEvaluationEntry): XLeadCard | XHeldCard | XFilteredCard {
@@ -478,10 +478,10 @@ export async function listXOpportunities(
         ? { kind: "held", item: heldCard(row) }
         : { kind: "filtered", item: filteredCard(row) };
     return { entry, key: post.id, author: post.authorUsername, postedAt: post.createdAt, engagement: evaluation.engagement,
-      signals: evaluation.signals, level: evaluation.level };
+      signals: evaluation.signals, level: evaluation.level, replyVerdictCode: evaluation.reasonCode };
   });
   const ranked = rankXOpportunities(candidates);
-  return { items: ranked.slice(0, 200).map(({ entry, priority, checks }) => ({ entry, priority, checks })), total: ranked.length, posts: rows.length };
+  return { items: ranked.slice(0, 200).map(({ entry, priority, checks, notes }) => ({ entry, priority, checks, notes })), total: ranked.length, posts: rows.length };
 }
 
 /**

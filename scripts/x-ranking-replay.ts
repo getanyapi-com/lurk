@@ -24,7 +24,7 @@ const archived = z.object({ products: z.array(z.object({
   name: z.string(), copies: z.object({ candidate: z.string() }), facts: z.unknown(),
   posts: z.array(z.object({ id: z.string(), author_username: z.string(), text: z.string(), created_at: z.string(), unavailable_at: z.string().nullable().optional() })),
   evaluations: z.array(z.object({ project_id: z.string(), tweet_id: z.string(), stage: z.string(), level: z.string().nullable(), signals: z.unknown(),
-    engagement: z.number().nullable(), context: z.unknown(), decision: z.string().nullable() })),
+    engagement: z.number().nullable(), context: z.unknown(), decision: z.string().nullable(), reason_code: z.string().nullable().optional() })),
   leads: z.array(z.object({ project_id: z.string(), tweet_id: z.string(), status: z.string() })),
   inbox: z.object({ candidate: z.object({ qualified: z.array(z.object({ tweetId: z.string() })), maybe: z.array(z.object({ tweetId: z.string() })) }) }),
 })) }).parse(JSON.parse(source));
@@ -47,7 +47,7 @@ const products = archived.products.map((product) => {
     const postedAt = new Date(post.created_at);
     if (!Number.isFinite(postedAt.getTime()) || (bound && postedAt < bound)) throw new Error(`Post ${post.id} is outside the declared validation period`);
     const context = e.context as { replyingTo?: unknown } | null;
-    return { key: post.id, author: post.author_username, postedAt, engagement: e.engagement, level: e.level, signals: e.signals,
+    return { key: post.id, author: post.author_username, postedAt, engagement: e.engagement, level: e.level, signals: e.signals, replyVerdictCode: e.reason_code,
       text: post.text, parents: Array.isArray(context?.replyingTo) ? context.replyingTo.filter((x): x is string => typeof x === "string") : [] };
   });
   const ranked = rankXOpportunities(inputs);
@@ -78,7 +78,7 @@ const products = archived.products.map((product) => {
     reviewed.add(selected); drafted.push({ id: selected, credit: team === 0 ? "old" : "new" }); team = 1 - team;
   }
   return { name: product.name, facts: product.facts, posts: inputs.length, oldOrder,
-    newOrder: ranked.map(({ key, priority, checks }) => ({ id: key, priority, checks })),
+    newOrder: ranked.map(({ key, priority, needPriority, conversationPriority, checks, notes }) => ({ id: key, priority, needPriority, conversationPriority, checks, notes })),
     top10: drafted.map(({ id }) => inputCards.get(id)!), credit: drafted,
     rest: ranked.filter((card) => !reviewed.has(card.key)),
     aboveFloor: ranked.filter((card) => card.priority !== null && card.priority >= X_PRIORITY_FLOOR).length,

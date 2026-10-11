@@ -18,14 +18,14 @@ describeDb("the ranked X window", () => {
   }
   async function add(projectId: string, name: string, options: {
     stage?: string; level?: string; ageDays?: number; gone?: boolean; signals?: unknown; text?: string;
-    status?: string; leadScore?: number; conversationId?: string; author?: string;
+    status?: string; leadScore?: number; conversationId?: string; author?: string; reasonCode?: string; kind?: string;
   } = {}) {
     const id = newId("8");
     await db().insert(xPosts).values({ id, text: options.text ?? `${name} recorder`, createdAt: new Date(Date.now() - (options.ageDays ?? 1) * 86_400_000),
       authorUsername: options.author ?? `author${id}`, unavailableAt: options.gone ? new Date() : null, conversationId: options.conversationId });
     await db().insert(xEvaluations).values({ projectId, tweetId: id, stage: options.stage ?? "free_rejected", freeReject: "no_visible_term", score: 65,
-      level: options.level ?? "search", signals: options.signals === undefined ? good : options.signals, engagement: 3 });
-    if (options.status) await db().insert(xLeads).values({ projectId, tweetId: id, status: options.status, score: options.leadScore ?? 90, authorUsername: `author${id}` });
+      level: options.level ?? "search", reasonCode: options.reasonCode, signals: options.signals === undefined ? good : options.signals, engagement: 3 });
+    if (options.status) await db().insert(xLeads).values({ projectId, tweetId: id, status: options.status, kind: options.kind ?? "ask", score: options.leadScore ?? 90, authorUsername: `author${id}` });
     return id;
   }
 
@@ -74,5 +74,24 @@ describeDb("the ranked X window", () => {
     expect(feed.items).toHaveLength(200);
     expect(feed.total).toBe(206);
     expect(xOpportunityCard(feed.items[0].entry).tweetId).toBe(strong);
+  });
+
+  it("uses the persisted final reply verdict, not a raw positive, independently of buyer-only signals", async () => {
+    const project = await fixture();
+    const signals = { ...good, own_need: null, intent: null, promoting: null, resolved: null,
+      founder_would_reply: { type: "noul", noul: 0.98 }, reply: { worth_reply: true } };
+    const stored = { stage: "reply", status: "new", kind: "reply", signals };
+    const positive = await add(project.id, "checked venue", { ...stored, reasonCode: "worth_reply" });
+    const rawOnly = await add(project.id, "raw model positive", stored);
+    const failed = await add(project.id, "failed quote check", { ...stored, reasonCode: "worth_reply",
+      signals: { ...signals, reply: { worth_reply: true, code: "not_reply_worthy" } } });
+    const feed = await listXOpportunities(project.id, { days: 7, status: "new" });
+    const cards = new Map(feed.items.map((item) => [xOpportunityCard(item.entry).tweetId, item]));
+    expect(cards.get(positive)?.priority).toBeCloseTo(0.5 * 0.98 * 0.9 * 0.95);
+    expect(cards.get(positive)?.checks).toEqual(["Check requirements", "Adoption assessment incomplete"]);
+    expect(cards.get(rawOnly)?.priority).toBeNull();
+    expect(cards.get(failed)?.priority).toBeNull();
+    expect(cards.get(failed)?.checks).toContain("Public reply not recommended");
+    expect(await db().select().from(llmUsage).where(eq(llmUsage.projectId, project.id))).toHaveLength(0);
   });
 });

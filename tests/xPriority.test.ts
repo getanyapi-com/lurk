@@ -32,11 +32,10 @@ describe("cached X attention priority", () => {
     expect(complete.priority).toBeGreaterThan(0.4);
   });
 
-  it("demotes promotions, solved needs and failed reply checks despite high intent/fit", () => {
+  it("demotes promotions, solved needs and unmet requirements despite high intent/fit", () => {
     const good = xPriority({ signals: signals(), level: "complete" }).priority!;
     for (const over of [
       { rival_vendor: noul(0.99) }, { promoting: noul(0.99) }, { resolved: noul(0.99) },
-      { reply: { worth_reply: false, code: "not_reply_worthy" } },
       { hard_requirement: { type: "choice", choice: "unmet" } },
     ]) expect(xPriority({ signals: signals(over), level: "complete" }).priority!).toBeLessThan(good / 2);
   });
@@ -44,7 +43,48 @@ describe("cached X attention priority", () => {
   it("retains checked public reply venues without treating an unverified high reply signal as enough", () => {
     const venue = signals({ own_need: noul(0), promoting: noul(0.9), founder_would_reply: noul(0.98) });
     expect(xPriority({ signals: venue, level: "search" }).priority).toBe(0);
-    expect(xPriority({ signals: { ...venue, reply: { worth_reply: true } }, level: "search" }).priority).toBeGreaterThan(0.4);
+    expect(xPriority({ signals: { ...venue, reply: { worth_reply: true } }, level: "search" }).priority).toBe(0);
+    expect(xPriority({ signals: { ...venue, reply: { worth_reply: true } }, level: "search", replyVerdictCode: "worth_reply" }).priority).toBeGreaterThan(0.4);
+  });
+
+  it("a failed public-reply assessment does not erase an independent adoption/investigation opportunity", () => {
+    const base = xPriority({ signals: signals(), level: "complete" });
+    for (const reply of [{ worth_reply: false }, { worth_reply: true, code: "not_reply_worthy" }]) {
+      const failed = xPriority({ signals: signals({ reply }), level: "complete", replyVerdictCode: "worth_reply" });
+      expect(failed.priority).toBe(base.priority);
+      expect(failed.conversationPriority).toBeNull();
+      expect(failed.checks).toContain("Public reply not recommended");
+    }
+  });
+
+  it("ranks a completed conversation independently of missing buyer-only signals, but not missing conversation evidence", () => {
+    const raw = signals({ own_need: null, intent: null, promoting: null, resolved: null, founder_would_reply: noul(0.98), reply: { worth_reply: true } });
+    const verified = { signals: raw, level: "search", replyVerdictCode: "worth_reply" };
+    const result = xPriority(verified);
+    expect(result.needPriority).toBeNull();
+    expect(result.priority).toBeGreaterThan(0.4);
+    expect(result.checks).toContain("Adoption assessment incomplete");
+    expect(xPriority({ ...verified, replyVerdictCode: undefined }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, founder_would_reply: null } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, rival_vendor: null } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, same_kind: null, supported_job: null } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, reply: { worth_reply: false } } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, reply: { worth_reply: true, code: "not_reply_worthy" } } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, reply: { worth_reply: true, code: "unexpected" } } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, founder_would_reply: noul(0) } }).priority).toBe(0);
+    expect(xPriority({ ...verified, signals: { ...raw, hard_requirement: { type: "choice", choice: "unmet" } } }).conversationPriority).toBeCloseTo(result.conversationPriority! * 0.2);
+    expect(xPriority({ ...verified, signals: { ...raw, own_need: noul(0.9) } }).checks).toContain("Adoption assessment incomplete");
+  });
+
+  it("labels no extracted requirements as unverified fit without inventing a constraint or score penalty", () => {
+    const none = xPriority({ signals: signals(), level: "complete" });
+    const unknown = xPriority({ signals: signals({ hard_requirement: { type: "choice", choice: "unknown" } }), level: "complete" });
+    expect(none.checks).not.toContain("Check product fit");
+    expect(none.notes).toEqual(["No specific requirement identified. Product compatibility is unverified."]);
+    expect(none.priority).toBe(unknown.priority);
+    for (const hard_requirement of [{ type: "choice" }, { type: "choice", choice: "bad" }, { type: "choice", choice: ["met"] }]) {
+      expect(xPriority({ signals: signals({ hard_requirement }), level: "complete" }).checks).toContain("Check requirements");
+    }
   });
 
   it("ranks before author dedupe, keeps unknown scores last, and keeps every history post", () => {

@@ -170,7 +170,7 @@ export function XLeadDetail({
   /** The stored thread around the post, drawn as X draws it; without it the post's own words stand alone. */
   thread?: XThreadData | null;
   now?: Date;
-  opportunity?: Pick<XOpportunity, "priority" | "checks">;
+  opportunity?: Pick<XOpportunity, "priority" | "checks" | "notes">;
 }) {
   if (selection.kind !== "lead") {
     const item = selection.item;
@@ -197,6 +197,7 @@ export function XLeadDetail({
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
           <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
             {opportunity?.checks.length ? <Called label="Before replying" sentence={opportunity.checks.join(" · ")} /> : null}
+            {opportunity?.notes?.length ? <Called label="Product fit" sentence={opportunity.notes.join(" · ")} /> : null}
             <Called
               label={opportunity ? "Fit notes" : warm ? "Why lurk is unsure" : "Why lurk left it out"}
               sentence={filtered ? filteredSentence(filtered) : item.reason}
@@ -243,6 +244,7 @@ export function XLeadDetail({
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4 xl:flex-row">
         <div className="flex min-w-0 flex-col gap-3 xl:flex-1">
           {opportunity?.checks.length ? <Called label="Before replying" sentence={opportunity.checks.join(" · ")} /> : null}
+          {opportunity?.notes?.length ? <Called label="Product fit" sentence={opportunity.notes.join(" · ")} /> : null}
           {thread ? (
             <XThread thread={thread} quote={lead.quote} now={now} />
           ) : (
