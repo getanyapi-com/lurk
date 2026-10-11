@@ -903,6 +903,66 @@ independent design review is active before final freeze/purchase. Current
 known/unknown/remaining totals are unchanged. No fresh X, production/config/DB,
 outreach, merge or deployment; owner review remains optional.
 
+#### Actual compact test r71 — feasible and inexpensive once, no local improvement
+
+Fable's completed r70 design review found no concrete blocker and reproduced
+both offline suites and preparation. Root's final pre-purchase freeze covers
+70 artifacts, including comparison code/tests/fixture reports and both loaded
+helpers. Correction to review wording: a rejected request without a finite
+receipt does not prove zero charge; the full unknown reserve would be retained.
+The comparison CLI requires an actual one-attempt execution and verifies the
+freeze, while explicitly synthetic fixtures use the pure test function.
+
+One real compact request returned all16 exact handles, valid grades/actions,
+no extra fields, normal stop and zero reported reasoning tokens. Receipt:
+**4,789 input / 403 output tokens, $0.0036035**, settled before validation.
+No retry, repair or new unknown charge. This is the first mechanically accepted
+listwise order, not a useful-ranking verdict. The legitimate new-order paired
+analysis gives **[0,0] versus each baseline under each reviewer**: four ties.
+Top-ten Strong/Plausible remains Astra4 and Fable2, same as controls. Independent
+all16 source/grade audits are active; no absent model rationale is reconstructed.
+
+The predeclared positive-local-signal rule therefore fails. **Stop further
+Grenseo format variants and do not buy a broad compact batch just because JSON
+works.** Retain the baseline. This one inspected near-ceiling project does not
+establish behavior on other projects, reject every listwise architecture, or
+prove a causal compactness benefit. No full five-project/two-order comparison,
+unseen generalization, owner preference or conversion claim.
+
+Current cumulative receipts **$0.220158814 known**, **$0.866048 historical unknown
+reservations**, **$3.913793186 remaining**, same overall$5 cap. The three recent
+listwise probes cost $0.01611575 combined. One valid compact receipt is a measured
+price point, not a scaled useful-ranking cost guarantee. New actual evidence
+uses an immutable post-compact budget snapshot, not a pinned live ledger.
+
+A zero-network cached-source census finds all78 judged posts in the415 archived
+snapshot. Longer raw text exists for23 selected posts (Cal4, Tally8, Clipy5,
+Grenseo3, Scarlett3); length alone does not establish a source superset because
+some supplied inputs combine self-thread text. No missing selected bio is already
+available within the same project's profile cache. Only three selected cards
+have additional same-author posts in that project cache; one Scarlett reply
+lacks supplied context. These are availability counts, not proof enrichment
+improves ranking. The next distinct experiment awaits the actual-source reviews;
+no fresh X, production/config/DB write, outreach, merge or deployment.
+
+Astra's completed r71 audit independently recomputes all four ties, verifies
+70+7 hashes and audits every assigned grade without reconstructing reasons.
+No serious unsupported positive is established from grades alone; categorical
+dismissals of existing own citation workflows/happy setups remain substantive
+undergrading concerns. Compactness did not cure judgment. It recommends a
+different Tally source-completeness pilot: eight longer raw texts reduce to
+three substantive omitted middles, while five differences are mostly mentions/
+punctuation. One omission describes the client's poor CPA form and separate
+document, NOT control of the CPA's tool. Another restores application-process
+constraints and a no-feedback-request statement; another is general founder
+discussion. These motivate information fidelity, not desired positive grades.
+
+Only data/protocol preparation is underway while Fable's actual r71 review
+completes. Any pilot retains the supplied combined self-thread and appends exact
+mapped originals separately; fresh rank-blind full-evidence model references
+must be frozen before candidate outputs, preserving old references unchanged.
+No new paid call, relabeling of prior evidence or broader batch has occurred.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
