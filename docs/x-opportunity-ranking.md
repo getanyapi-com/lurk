@@ -475,7 +475,7 @@ reasoning. It was **mechanically unusable**: bare s0/s1 and generic fact pointer
 failed the unchanged exact namespaced-source contract. No IDs were patched,
 frame accepted, or other case bought. The raw frame's interpretation of no AI
 slop and its different-operation verdict based on specialized positioning are
-independently audited by Fable r52; Astra r52 is still pending at this checkpoint. Fable confirms semantic failures beyond pointers: a which-tool request becomes a stated recording/video-output task, no AI slop loses its quality qualifier and becomes a stated required ban, face cam/editing are omitted, and positioning overrides supplied capabilities. The honest unknown AI support does not erase these failures. No output is rehabilitated.
+independently audited by both Fable and Astra r52. Both reject the frame; Astra accepts its functional recording abstraction alongside request communication, unlike Fable. That source-reading disagreement is preserved, not made a mandatory verb gate. Fable confirms semantic failures beyond pointers: a which-tool request becomes a stated recording/video-output task, no AI slop loses its quality qualifier and becomes a stated required ban, face cam/editing are omitted, and positioning overrides supplied capabilities. The honest unknown AI support does not erase these failures. No output is rehabilitated.
 
 Thus **three new physical requests across three declared variants**, two without
 any frame/cost receipt and one known-cost unusable frame—not three completed
@@ -494,7 +494,7 @@ unknown charge was never ignored or silently reused. No fresh X, DB/production/
 config/display, outreach or deploy occurred. Evidence: both r48 reviews,
 `JOINT_RECEIPT_AMENDMENT_R49.md`, r47/r50/r51 frozen plans, execution logs,
 purchase journals, wire protocols, `joint-partial-result-r52.json` and current
-budget. Fable actual r52 review is completed and preserved; Astra actual r52 remains pending.
+budget. Both independent r52 actual-source reviews are completed and preserved. Astra prefers a zero-API owner comparison next; Fable proposes the controlled reader probe. Root selected the bounded mechanism question, not consensus on utility.
 
 
 #### Controlled reader comparison prepared; not purchased
@@ -520,7 +520,7 @@ spend stop $0.10 per arm is not a hard ten-cent limit. Global mechanical/receipt
 budget stop, no retry/reuse/remaining21 purchase. Source audits after complete
 six receipts, never an automatic semantic pass. Thirty-six offline fixtures,
 46 simulated POSTs, zero paid calls passed; 13 artifact hashes and zero-network
-dry run verified. Exact-executor Fable readiness review is active.
+dry run verified. Both exact-executor r54 reviews completed: no current-catalog blocker reproduced, but the request-fee guard was omitted when rebuilding max_price. Root restored request:0 and added livecatalog rejection of nonzero/invalid request fees in a separately preserved r55 billing-only amendment.42offlinechecks52fakePOST0paidpassed; source/message/schema/criteria bytes unchanged,16artifactfreeze/dryrunverified. Old r54 reviews concern original r53 bytes, not automatic certification of amended hashes.
 
 Original critical failure criteria and immutable r40 expectations remain.
 Both control failures close this typed-joint tuning line on these cases, not
@@ -528,9 +528,51 @@ all architectures. A passing S with failing L supports a candidate-reader
 bundle on three development cases, not a general causal bottleneck. A passing
 arm can justify a separately frozen remaining21 test, not immediate131 replay,
 owner usefulness or ranking improvement. No owner choices have been collected.
-No new scoring purchase was made for this preparation; budget above unchanged.
+No scoring purchase was made for the original r53 preparation; it remains unbought. The separately frozen r55 amendment was subsequently executed as recorded below.
 Evidence: `READER_PAIR_PROTOCOL_R53.md`, paired plan/executor/fixtures/freeze,
 public catalog snapshot and completed Fable r52 source report.
+
+#### Actual controlled reader execution; semantic reviews pending
+
+The amended r55 runner completed **six fresh serial physical POSTs**, three per
+arm, all mechanically usable with literal source IDs, complete stop and zero
+reported reasoning. No retry/reuse, new unknown charge or extra case purchase.
+The three price-guarded pairs used identical submitted sources/messages/schema
+and semantic parameters except model/necessary published price guard. Original
+r53 remains preserved and unbought. Exact amended plan hash:
+`912ab5398667d6e2e7db9838c735c82baa5787f2b219d542cb4fe60a2acbdee6`.
+
+Observed scoring cost **$0.01862475**: L **$0.00625525**, S **$0.01236950**.
+Cumulative known **$0.204043064**, unknown reserved **$0.866048**, remaining
+**$3.929908936** under the same $5 total. Six reservation/receipt/answer rows
+account for six purchases; raw receipts and answers are not counted twice.
+Ledger/run sums and all preparation hashes reconcile; no pending lock remains.
+Neither model price nor cost on three variable-length cases establishes a
+production budget guarantee.
+
+Mechanical completion is **not a semantic pass**. Initial root inspection finds
+L still broadens no AI slop and mistakes specialized positioning/tool-selection
+communication for a different operation; S retains more concrete capability
+support but appears to overstate author conditions/actions. These are preliminary
+source observations, not settled independent verdicts or a ranking result. All
+soft flags are preserved, including L Cal relation-linkage flags. No acceptable
+arm/full24 result is claimed, and the remaining21 are not bought.
+
+A new opaque-ID shuffled source-only review packet contains all six exact
+frames, sources and flags, hiding model/arm/cost/case identity for first-pass
+reading. The private map and unchanged raw journals are then used for accounting
+and model comparison. This is imperfect model-output blinding, not owner labels
+or unseen validation; review findings are recorded before unmapping. Independent
+Astra/Fable actual r56 reviews are active. Original expectation ambiguities and
+critical criteria stay immutable; no literal-select verb gate or post-output
+relaxation. Source-cleanliness, owner usefulness, ranking and retrieval remain
+separate questions. The owner packet still has zero choices.
+
+Evidence: both completed r54 readiness reports, `READER_PAIR_PROTOCOL_R55.md`,
+r55 plan/executor/fixtures/preparation freeze, execution result/raw purchase
+journal/current verified pricing, `reader-pair-actual-freeze-r56.json`, and
+public/private r56 source-review packets. No fresh X, production/config/display,
+outreach, merge or deployment. PR remains draft.
 
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
