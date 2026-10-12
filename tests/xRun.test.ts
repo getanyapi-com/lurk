@@ -1108,6 +1108,76 @@ describeDb("the X pipeline against a database", () => {
     expect((await leadsOf(project.id))[0]).toMatchObject({ kind: "reply", moment: "workflow" });
   });
 
+  /** A category noun no other test searches for, so the request lane's page is this test's own. */
+  function uniqueNoun(rival: string): string {
+    return `${rival.slice("calendly".length)} page`;
+  }
+
+  /** A post whose category and request words sit sentences apart, which only the rival lane's screen keeps. */
+  function splitAsk(noun: string, rival: string, over: Item = {}): Item {
+    return item(`Our ${noun} keeps breaking every week. Is there an alternative to ${rival}?`, over);
+  }
+
+  it("lets the rival lane judge a post the request lanes of the same run dropped for not showing their words", async () => {
+    wallet.connected = true;
+    const rival = uniqueRival();
+    const noun = uniqueNoun(rival);
+    const { project } = await fixture([rival]);
+    modelAnswers((call) => {
+      if (call.purpose === "x_seeds") return slots({ artifacts: [noun] });
+      throw new Error("no reply check here");
+    });
+    const ask = splitAsk(noun, rival);
+    // The request lanes run first and read it first; the rival lane's page comes back after.
+    search.mockImplementation(async (input: { query: string }) => {
+      const family = familyOfQuery(input.query);
+      if (family === "rival") await new Promise((resolve) => setTimeout(resolve, 200));
+      return page(family === "request" || family === "rival" ? [ask] : []);
+    });
+    await openX(project.id);
+    await run.runXScan(project.id, null);
+    const [evaluation] = await evaluationsOf(project.id);
+    const rivalLane = await laneOf(project.id, "rival");
+    expect(evaluation).toMatchObject({ tweetId: ask.id, laneId: rivalLane.id, stage: "lead", freeReject: null });
+    expect(await leadsOf(project.id)).toHaveLength(1);
+  });
+
+  it("lets the rival lane claim on a later run a post a request lane dropped for its words, but never one dropped for who wrote it", async () => {
+    wallet.connected = true;
+    const rival = uniqueRival();
+    const noun = uniqueNoun(rival);
+    const { project } = await fixture([rival]);
+    modelAnswers((call) => {
+      if (call.purpose === "x_seeds") return slots({ artifacts: [noun] });
+      throw new Error("no reply check here");
+    });
+    const ask = splitAsk(noun, rival);
+    // Three conversations on one page by one author is a farm, whatever the next lane's page shows of them.
+    const farmer = { authorUsername: `farm${ask.id as string}`.slice(0, 15) };
+    const farmed = [splitAsk(noun, rival, farmer), splitAsk(noun, rival, farmer), splitAsk(noun, rival, farmer)];
+    serve("request", page([ask, ...farmed]));
+    await openX(project.id);
+    await run.runXScan(project.id, null);
+    const first = new Map((await evaluationsOf(project.id)).map((row) => [row.tweetId, row]));
+    expect(first.get(ask.id as string)).toMatchObject({ stage: "free_rejected", freeReject: "no_visible_term" });
+    expect(first.get(farmed[0].id as string)).toMatchObject({ stage: "free_rejected", freeReject: "reply_farm" });
+
+    // The next run's rival lane finds the ask and one of the farmed posts, alone on its page.
+    await forgetPages(project.id);
+    await run.markLanesDue(project.id);
+    serve("rival", page([ask, farmed[0]]));
+    await run.runXScan(project.id, null);
+    const rivalLane = await laneOf(project.id, "rival");
+    const second = new Map((await evaluationsOf(project.id)).map((row) => [row.tweetId, row]));
+    expect(second.get(ask.id as string)).toMatchObject({ laneId: rivalLane.id, stage: "lead", freeReject: null });
+    expect(second.get(farmed[0].id as string)).toMatchObject({
+      laneId: first.get(farmed[0].id as string)!.laneId,
+      stage: "free_rejected",
+      freeReject: "reply_farm",
+    });
+    expect((await leadsOf(project.id)).map((lead) => lead.tweetId)).toEqual([ask.id]);
+  });
+
   it("checks weekly once an empty first look read the last month, and daily again after anything is found", async () => {
     // A wallet, so scans in one test day never run out of pages: a run cut short is never quiet.
     wallet.connected = true;
