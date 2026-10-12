@@ -1139,6 +1139,37 @@ evidence on one project's 16 archived sources, model-proxy references, not owner
 preference or conversion. Evidence: `subagent-grades-r82/` and `probe-r82/` in
 the ignored folder.
 
+#### r83 — full-pool blind grading: the ranker helps; the pool is the bottleneck
+
+Opus 5.5 and GPT-6 Astra (subscription subagents, $0) each graded all 415 archived
+posts blind with the r79 rubric, in 28 shuffled single-project batches built with the
+app's own `candidateState`. They agreed exactly on 336/415; 6 disagreements exceed one
+level. Consensus positive (both Strong/Plausible): **14**; consensus Not: 286.
+
+| Project | Posts | Consensus positives | In top 10, #131 | In top 10, old order |
+| --- | --- | --- | --- | --- |
+| Cal.com | 103 | 2 | 2 | 1 (old list has 7 rows) |
+| Tally | 114 | 0 | 0 | 0 |
+| Clipy | 137 | 10 | 9 | 6 |
+| Grenseo | 31 | 2 | 2 | 1 (old list has 3 rows) |
+| Scarlett | 30 | 0 | 0 | 0 |
+| **Total** | 415 | 14 | **13** | **8** |
+
+- No project loses a first-page positive. Every project with positives has them at
+  ranks 1–2 (Clipy 1–9). Tally's and Scarlett's top posts are consensus Not, but all sit
+  below the .4 divider (max priority .10 and .36), so they show as "Weaker match".
+- The one buried positive (Clipy, rank 112) has no cached Jev evidence at all: a
+  missing-evaluation case, not a formula error.
+- Cached Jev fields separate cleanly: mean priority .359 for positives vs .010 for
+  consensus Not; own_need .75 vs .23; expected intent 2.83 vs 0.80.
+- The .4 divider is conservative: 6 consensus positives sit between .2 and .4. Not
+  retuned here (would be fitting to these five projects).
+- **Bottleneck is retrieval:** 14 of 415 posts (3%) are worth showing, and two of five
+  projects have none. Ordering cannot fix that.
+
+Evidence: `full-pool-r83/` (batches, key, orders, labels, `scores.json`) and
+`plan-r83/` (three model plans and the combined plan) in the ignored folder.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
