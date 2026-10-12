@@ -42,7 +42,7 @@ it("uses ranked evidence rather than old lead verdicts in New, but preserves ver
     ...held,
     entry: { kind: "lead", lead: {
       ...held.entry.item, id: "qualified", kind: "ask", moment: null, reach: 0, fresh: true,
-      foundAt: new Date("2026-10-09"), score: 90, quote: null, status: "new", fit: 4, intent: 4,
+      foundAt: new Date("2026-10-09"), score: 90, quote: null, status: "new", fit: 4, intent: 4, conversationId: "qualified",
     } },
     checks: [],
   };

@@ -149,6 +149,34 @@ describeDb("the ranked X window", () => {
     expect(await db().select().from(xLeads).where(eq(xLeads.projectId, project.id))).toHaveLength(0);
   });
 
+  it("keeps a replied post with no lead row in History unless History lists its author's lead in that conversation", async () => {
+    const project = await fixture();
+    // Under the project's ask-score floor, so no list shows this lead.
+    await add(project.id, "unlisted lead", { stage: "lead", status: "new", leadScore: 70, author: "bob", conversationId: "c7" });
+    const sibling = await add(project.id, "sibling", { stage: "review", level: "complete", author: "Bob", conversationId: "c7" });
+    const [evaluation] = await db().select().from(xEvaluations).where(and(eq(xEvaluations.projectId, project.id), eq(xEvaluations.tweetId, sibling)));
+    await markXEvaluationReplied(project.id, evaluation.id, true);
+    const replied = await listXOpportunities(project.id, { days: 7, status: "replied" });
+    expect(replied.items.map((item) => xOpportunityCard(item.entry).tweetId)).toEqual([sibling]);
+    expect(replied.total).toBe(1);
+    // A listed lead by the same author there stands for them instead.
+    const listed = await add(project.id, "listed lead", { stage: "lead", status: "replied", author: "bob", conversationId: "c7" });
+    expect((await listXOpportunities(project.id, { days: 7, status: "replied" })).items.map((item) => xOpportunityCard(item.entry).tweetId)).toEqual([listed]);
+  });
+
+  it("counts and dates every History lead, not only the listed 200", async () => {
+    const project = await fixture();
+    const ids = Array.from({ length: 205 }, () => newId("8"));
+    await db().insert(xPosts).values(ids.map((id, index) => ({ id, text: "recorder request", authorUsername: `h${id}`,
+      createdAt: new Date(Date.now() - (index < 200 ? 1 : 4) * 86_400_000) })));
+    await db().insert(xLeads).values(ids.map((id) => ({ projectId: project.id, tweetId: id, status: "replied", kind: "ask", score: 90, authorUsername: `h${id}`, conversationId: id })));
+    const replied = await listXOpportunities(project.id, { days: 7, status: "replied" });
+    expect(replied.items).toHaveLength(200);
+    expect(replied.total).toBe(205);
+    expect(replied.faces).toHaveLength(205);
+    expect(replied.faces.filter((face) => face.at.getTime() < Date.now() - 3 * 86_400_000)).toHaveLength(5);
+  });
+
   it("agrees on Replied whether the mark sits under the conversation or the post, for hiding, showing and undoing", async () => {
     const project = await fixture();
     const loose = await add(project.id, "no conversation yet");

@@ -87,6 +87,8 @@ export type XLeadCard = XCardCommon & {
   score: number;
   quote: string | null;
   status: string;
+  /** The conversation it sits in, or the post itself: one author's lead per conversation (write.ts writeLead). */
+  conversationId: string;
 };
 
 export type XHeldCard = XCardCommon & {
@@ -249,6 +251,7 @@ function leadCard({ lead, post, author, context, foundBy }: LeadRow, now: Date):
     reason: lead.reason,
     quote: lead.matchedPhrase,
     status: lead.status,
+    conversationId: lead.conversationId ?? lead.tweetId,
   };
 }
 
@@ -256,11 +259,13 @@ export async function listXLeads(
   projectId: string,
   filter: XFeedFilter = { days: FEED_WINDOW_DAYS, status: "new" },
   now = new Date(),
+  /** Null for every one in the filter: History counts and dates them all before its own cap. */
+  limit: number | null = 200,
 ): Promise<XLeadCard[]> {
-  const rows = await leadRows()
+  const query = leadRows()
     .where(and(eq(xLeads.projectId, projectId), eq(xLeads.status, filter.status), isNull(xPosts.unavailableAt), whenWhere(filter), xShownWhere(), xLeadNotMuted()))
-    .orderBy(desc(xPosts.createdAt), desc(xLeads.score))
-    .limit(200);
+    .orderBy(desc(xPosts.createdAt), desc(xLeads.score));
+  const rows = limit === null ? await query : await query.limit(limit);
   const cards = rows.map((row) => leadCard(row, now));
   const asks = cards.filter((card) => card.kind === "ask");
   const replies = cards.filter((card) => card.kind === "reply").sort((a, b) => b.reach - a.reach || b.score - a.score);
@@ -449,7 +454,7 @@ function opportunityFace(id: string, at: Date, priority: number | null, author: 
  * A post New can rank from its stored evidence alone, with no lead row: the
  * one rule New and Replied history share. Requires xLeads joined on the post.
  */
-function evidenceWhere(includeReplies: boolean) {
+function evidenceWhere(includeReplies: boolean, actedOn = true) {
   return and(
     isNull(xLeads.id),
     or(
@@ -462,10 +467,16 @@ function evidenceWhere(includeReplies: boolean) {
     ),
     // The author's lead in this conversation was hidden, called a miss or
     // answered: none of their other posts in it come back through evidence.
-    sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
+    // History instead drops a post only for a lead it actually lists.
+    !actedOn ? undefined : sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
       and lower(s.author_username) = lower(${xPosts.authorUsername}) and s.conversation_id = coalesce(${xPosts.conversationId}, ${xPosts.id})
       and s.status <> 'new')`,
   );
+}
+
+/** One author in one conversation, as writeLead keeps a single lead for. */
+function threadOf(author: string, conversation: string): string {
+  return `${author.toLowerCase()} ${conversation}`;
 }
 
 /** A Replied mark on the post's conversation or on the post itself: New hides by it, Replied history lists by it. */
@@ -476,8 +487,10 @@ const handledSql = sql`(select 1 from ${handledThreads} h where h.project_id = $
  * Posts with no lead row whose conversation the owner marked replied, for
  * Replied history, newest first: a card New ranked from evidence and Replied
  * took away is found and taken back here. Nothing is qualified or written.
+ * Each comes with its author and conversation, so History can leave out one
+ * whose author's lead there it already lists.
  */
-async function listXRepliedEvidence(projectId: string, filter: XFeedFilter, includeReplies: boolean): Promise<XEvaluationEntry[]> {
+async function listXRepliedEvidence(projectId: string, filter: XFeedFilter, includeReplies: boolean): Promise<{ entry: XEvaluationEntry; thread: string }[]> {
   const rows = await db()
     .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, closeCall: closeCallSql, worth: worthSql })
     .from(xEvaluations)
@@ -488,12 +501,13 @@ async function listXRepliedEvidence(projectId: string, filter: XFeedFilter, incl
     .where(and(
       eq(xEvaluations.projectId, projectId), isNull(xPosts.unavailableAt), whenWhere(filter), xWordsWhere(),
       notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
-      evidenceWhere(includeReplies), sql`exists ${handledSql}`,
+      evidenceWhere(includeReplies, false), sql`exists ${handledSql}`,
     ))
-    .orderBy(desc(xPosts.createdAt))
-    .limit(OPPORTUNITY_LIST_LIMIT);
-  return rows.map((row): XEvaluationEntry =>
-    HELD_STAGES.includes(row.evaluation.stage) ? { kind: "held", item: heldCard(row) } : { kind: "filtered", item: filteredCard(row) });
+    .orderBy(desc(xPosts.createdAt));
+  return rows.map((row) => ({
+    entry: HELD_STAGES.includes(row.evaluation.stage) ? { kind: "held", item: heldCard(row) } : { kind: "filtered", item: filteredCard(row) },
+    thread: threadOf(row.post.authorUsername, row.post.conversationId ?? row.post.id),
+  }));
 }
 
 /**
@@ -511,18 +525,22 @@ export async function listXOpportunities(
   includeReplies = true,
 ): Promise<XOpportunityFeed> {
   if (filter.status !== "new") {
-    const [leads, evidence] = await Promise.all([
-      listXLeads(projectId, filter, now),
+    const [all, evidence] = await Promise.all([
+      listXLeads(projectId, filter, now, null),
       // Replied is the one mark a post with no lead row can carry (handled_threads).
       filter.status === "replied" ? listXRepliedEvidence(projectId, filter, includeReplies) : [],
     ]);
+    const leads = all.filter((lead) => includeReplies || lead.kind !== "reply");
+    // History retains every marked post. A post with no lead row gives way only
+    // to its author's lead in that conversation that this list shows.
+    const listed = new Set(leads.map((lead) => threadOf(lead.authorUsername, lead.conversationId)));
     const entries: XEvaluationEntry[] = [
-      ...leads.filter((lead) => includeReplies || lead.kind !== "reply").map((lead): XEvaluationEntry => ({ kind: "lead", lead })),
-      ...evidence,
+      ...leads.map((lead): XEvaluationEntry => ({ kind: "lead", lead })),
+      ...evidence.filter((one) => !listed.has(one.thread)).map((one) => one.entry),
     ];
-    // History retains every marked post; author deduplication is for attention, not history.
+    // Count and date every one; list the first OPPORTUNITY_LIST_LIMIT.
     return {
-      items: entries.map((entry) => ({ entry, priority: null, checks: [] })),
+      items: entries.slice(0, OPPORTUNITY_LIST_LIMIT).map((entry) => ({ entry, priority: null, checks: [] })),
       total: entries.length,
       posts: entries.length,
       faces: entries.map((entry) => {
