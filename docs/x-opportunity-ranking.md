@@ -14,6 +14,8 @@ need priority = own_need × max(same_kind, supported_job)
                 × (1−rival_vendor) × (1−promoting) × (1−resolved)
 ```
 
+PR #133 (`x-attention-2026-10-12.1`) drops `supported_job`: no `xQuestions()` level asks it, so production evidence never carries it, and fit is `same_kind` alone. The r83 snapshot did carry it (405 evaluations, from unmerged commit 2c121fd1); an offline r83 replay with and without it gave identical positive ranks (13/14 consensus positives in the top 10).
+
 Expected intent uses a valid stored 0–4 distribution, normalized for rounding, or the **unrounded raw score** when probabilities are absent/malformed. Missing inputs make the affected path unassessed, not an invented zero. Personal/free use has no automatic commercial penalty; a supported basic job can outrank a specialised-brief neighbour classification.
 
 A completed positive reply check preserves public conversation opportunities with a bounded term `0.5 × founder_would_reply × fit × (1−rival_vendor)`. This path is computed independently: absent adoption-only inputs do not erase an otherwise assessed conversation. It requires the pipeline's final `reasonCode=worth_reply`, raw `reply.worth_reply=true`, no reply failure/code, and valid founder, fit and rival signals. A raw positive alone is insufficient: the pipeline also checks shape/moment, required checks and a verbatim quote. Missing legacy provenance disables only the conversation path. Priority is the maximum of the available paths; neither available means null, while a valid zero stays zero. The marker is provenance, not permission to include merged rows excluded by the reader.
