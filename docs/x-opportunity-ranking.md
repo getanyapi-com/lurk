@@ -1185,7 +1185,7 @@ moves the request lanes to main, ordered first.
     from product facts only;
   - six more request words;
   - a **rival-request** lane: coined rivals AND request words.
-- Spend: X data $0.082 (91 search pages and 150 parent lookups). Graded blind by
+- Spend: X data $0.082 (81 search pages and 150 parent lookups). Graded blind by
   Opus 5.5 and GPT-6 Astra on the subscriptions: 310 screened posts, 215 graded
   identically.
 
