@@ -3,7 +3,9 @@ import { db } from "@/db";
 import { handledThreads, leadMutes, llmUsage, xEvaluations, xLeads, xPosts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import postgres from "postgres";
-import { listXOpportunities, xEvaluationEntry, xEvaluationReplied, xOpportunityCard, type XOpportunityFeed } from "@/lib/x/read";
+import {
+  listXOpportunities, xEvaluationEntry, xEvaluationReplied, xOpportunityCard, type XFilteredCard, type XOpportunityFeed,
+} from "@/lib/x/read";
 import { markXEvaluationReplied } from "@/lib/x/write";
 import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
 
@@ -122,6 +124,31 @@ describeDb("the ranked X window", () => {
     expect(await markXEvaluationReplied(other.id, evaluation.id, true)).toBe(false);
   });
 
+  it("finds an auto-opened card marked Replied under Replied history, where Not replied returns it to New", async () => {
+    const project = await fixture();
+    const screened = await add(project.id, "strongest", { conversationId: "c6" });
+    await add(project.id, "weaker", { signals: { ...good, own_need: { type: "noul", noul: 0.5 } } });
+    const opened = (await listXOpportunities(project.id, { days: 7, status: "new" })).items[0];
+    // With no lead= in the URL the pane opens the strongest card: this one, a post with no lead row.
+    expect(opened.entry.kind).toBe("filtered");
+    const card = xOpportunityCard(opened.entry) as XFilteredCard;
+    expect(card.tweetId).toBe(screened);
+    await markXEvaluationReplied(project.id, card.evaluationId, true);
+    const fresh = await listXOpportunities(project.id, { days: 7, status: "new" });
+    expect(fresh.items.map((item) => xOpportunityCard(item.entry).tweetId)).not.toContain(screened);
+    const replied = await listXOpportunities(project.id, { days: 7, status: "replied" });
+    expect(replied.items.map((item) => xOpportunityCard(item.entry).entryId)).toEqual([card.entryId]);
+    expect(replied.total).toBe(1);
+    expect(replied.faces.map((face) => face.id)).toEqual([card.entryId]);
+    expect(await xEvaluationReplied(project.id, card.evaluationId)).toBe(true);
+    // Hidden and Not a fit hold only leads.
+    expect((await listXOpportunities(project.id, { days: 7, status: "hidden" })).items).toEqual([]);
+    await markXEvaluationReplied(project.id, card.evaluationId, false);
+    expect((await listXOpportunities(project.id, { days: 7, status: "replied" })).items).toEqual([]);
+    expect((await listXOpportunities(project.id, { days: 7, status: "new" })).items[0].entry).toEqual(opened.entry);
+    expect(await db().select().from(xLeads).where(eq(xLeads.projectId, project.id))).toHaveLength(0);
+  });
+
   it("agrees on Replied whether the mark sits under the conversation or the post, for hiding, showing and undoing", async () => {
     const project = await fixture();
     const loose = await add(project.id, "no conversation yet");
@@ -153,14 +180,18 @@ describeDb("the ranked X window", () => {
         // Only the read of the listed cards joins x_authors, so it waits here
         // after the ranking read has run.
         await t`lock table x_authors in access exclusive mode`;
+        const [{ pid }] = await t`select pg_backend_pid() as pid`;
         listing = listXOpportunities(project.id, { days: 7, status: "new" });
-        for (let tries = 0; tries < 500; tries += 1) {
-          // The listing's own connection: it has read handled_threads in this transaction.
+        let blocked = false;
+        for (let tries = 0; tries < 500 && !blocked; tries += 1) {
+          // The listing's own backend: blocked by this lock, after it read handled_threads in its transaction.
           const [{ waiting }] = await t`select count(*)::int as waiting from pg_locks w where w.relation = 'x_authors'::regclass and not w.granted
+            and ${pid} = any(pg_blocking_pids(w.pid))
             and exists (select 1 from pg_locks h where h.pid = w.pid and h.granted and h.relation = 'handled_threads'::regclass)`;
-          if (waiting > 0) break;
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          blocked = waiting > 0;
+          if (!blocked) await new Promise((resolve) => setTimeout(resolve, 10));
         }
+        expect(blocked).toBe(true);
         await t`update x_leads set status = 'hidden' where project_id = ${project.id} and tweet_id = ${lead}`;
       });
       const feed = await listing!;

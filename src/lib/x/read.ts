@@ -446,6 +446,57 @@ function opportunityFace(id: string, at: Date, priority: number | null, author: 
 }
 
 /**
+ * A post New can rank from its stored evidence alone, with no lead row: the
+ * one rule New and Replied history share. Requires xLeads joined on the post.
+ */
+function evidenceWhere(includeReplies: boolean) {
+  return and(
+    isNull(xLeads.id),
+    or(
+      inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
+      unfinishedSql,
+      and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
+      // The legacy score picked which of an author's posts in a conversation
+      // became the lead; the loser's evidence still competes here.
+      and(eq(xEvaluations.stage, "merged"), includeReplies ? undefined : sql`${xEvaluations.reasonCode} is distinct from 'worth_reply'`),
+    ),
+    // The author's lead in this conversation was hidden, called a miss or
+    // answered: none of their other posts in it come back through evidence.
+    sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
+      and lower(s.author_username) = lower(${xPosts.authorUsername}) and s.conversation_id = coalesce(${xPosts.conversationId}, ${xPosts.id})
+      and s.status <> 'new')`,
+  );
+}
+
+/** A Replied mark on the post's conversation or on the post itself: New hides by it, Replied history lists by it. */
+const handledSql = sql`(select 1 from ${handledThreads} h where h.project_id = ${xEvaluations.projectId}
+  and h.platform = 'x' and (h.thread_id = ${xPosts.conversationId} or h.thread_id = ${xPosts.id}))`;
+
+/**
+ * Posts with no lead row whose conversation the owner marked replied, for
+ * Replied history, newest first: a card New ranked from evidence and Replied
+ * took away is found and taken back here. Nothing is qualified or written.
+ */
+async function listXRepliedEvidence(projectId: string, filter: XFeedFilter, includeReplies: boolean): Promise<XEvaluationEntry[]> {
+  const rows = await db()
+    .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, closeCall: closeCallSql, worth: worthSql })
+    .from(xEvaluations)
+    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+    .innerJoin(projects, eq(projects.id, xEvaluations.projectId))
+    .leftJoin(xAuthors, authorJoin)
+    .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
+    .where(and(
+      eq(xEvaluations.projectId, projectId), isNull(xPosts.unavailableAt), whenWhere(filter), xWordsWhere(),
+      notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
+      evidenceWhere(includeReplies), sql`exists ${handledSql}`,
+    ))
+    .orderBy(desc(xPosts.createdAt))
+    .limit(OPPORTUNITY_LIST_LIMIT);
+  return rows.map((row): XEvaluationEntry =>
+    HELD_STAGES.includes(row.evaluation.stage) ? { kind: "held", item: heldCard(row) } : { kind: "filtered", item: filteredCard(row) });
+}
+
+/**
  * A display-only stream of stored evidence, not the alert/qualification reader.
  * Rank the entire time window before deduplication and the display cap; applying
  * the old group caps first would still bury an older strong screened request.
@@ -460,13 +511,24 @@ export async function listXOpportunities(
   includeReplies = true,
 ): Promise<XOpportunityFeed> {
   if (filter.status !== "new") {
-    const leads = (await listXLeads(projectId, filter, now)).filter((lead) => includeReplies || lead.kind !== "reply");
+    const [leads, evidence] = await Promise.all([
+      listXLeads(projectId, filter, now),
+      // Replied is the one mark a post with no lead row can carry (handled_threads).
+      filter.status === "replied" ? listXRepliedEvidence(projectId, filter, includeReplies) : [],
+    ]);
+    const entries: XEvaluationEntry[] = [
+      ...leads.filter((lead) => includeReplies || lead.kind !== "reply").map((lead): XEvaluationEntry => ({ kind: "lead", lead })),
+      ...evidence,
+    ];
     // History retains every marked post; author deduplication is for attention, not history.
     return {
-      items: leads.map((lead) => ({ entry: { kind: "lead", lead }, priority: null, checks: [] })),
-      total: leads.length,
-      posts: leads.length,
-      faces: leads.map((lead) => opportunityFace(lead.entryId, lead.postedAt, null, lead.authorUsername, lead.authorImage)),
+      items: entries.map((entry) => ({ entry, priority: null, checks: [] })),
+      total: entries.length,
+      posts: entries.length,
+      faces: entries.map((entry) => {
+        const card = xOpportunityCard(entry);
+        return opportunityFace(card.entryId, card.postedAt, null, card.authorUsername, card.authorImage);
+      }),
     };
   }
   // One snapshot for both reads: a lead hidden or evidence rejudged between
@@ -488,26 +550,10 @@ export async function listXOpportunities(
         notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
         or(
           and(eq(xLeads.status, "new"), xShownWhere(), includeReplies ? undefined : eq(xLeads.kind, "ask")),
-          and(
-            isNull(xLeads.id),
-            or(
-              inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
-              unfinishedSql,
-              and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
-              // The legacy score picked which of an author's posts in a conversation
-              // became the lead; the loser's evidence still competes here.
-              and(eq(xEvaluations.stage, "merged"), includeReplies ? undefined : sql`${xEvaluations.reasonCode} is distinct from 'worth_reply'`),
-            ),
-            // The author's lead in this conversation was hidden, called a miss or
-            // answered: none of their other posts in it come back through evidence.
-            sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
-              and lower(s.author_username) = lower(${xPosts.authorUsername}) and s.conversation_id = coalesce(${xPosts.conversationId}, ${xPosts.id})
-              and s.status <> 'new')`,
-          ),
+          evidenceWhere(includeReplies),
         ),
         // Answered conversations must not reappear through unqualified sibling posts.
-        sql`not exists (select 1 from ${handledThreads} h where h.project_id = ${xEvaluations.projectId}
-          and h.platform = 'x' and (h.thread_id = ${xPosts.conversationId} or h.thread_id = ${xPosts.id}))`,
+        sql`not exists ${handledSql}`,
       ));
     const ranked = rankXOpportunities(pool.map((row) => ({
       ...row, key: row.tweetId, entryId: row.leadId ? `lead-${row.leadId}` : `${HELD_STAGES.includes(row.stage) ? "held" : "filtered"}-${row.evaluationId}`,
