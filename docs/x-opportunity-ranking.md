@@ -1170,6 +1170,57 @@ level. Consensus positive (both Strong/Plausible): **14**; consensus Not: 286.
 Evidence: `full-pool-r83/` (batches, key, orders, labels, `scores.json`) and
 `plan-r83/` (three model plans and the combined plan) in the ignored folder.
 
+#### r84 — retrieval pilot: asking-about-a-rival and buyer words widen the pool
+
+**Where r83's positives came from:** request lanes 12 of 14, rival lanes 2, and diy
+and stack 0. Request lanes exist only on #131. Projects run 4–7 lanes against a
+30-page allowance, so the lane count, not the budget, limits breadth. Draft PR #134
+moves the request lanes to main, ordered first.
+
+**Live pilot, same window for both arms:**
+- Window: 2026-10-05 to 2026-10-12, five projects, up to 5 pages per lane.
+- Arm A: #131's lanes.
+- Arm B: A's rival, diy and stack lanes, plus:
+  - up to 4 request lanes from a new buyer-words `asks` slot, filled by Opus 5.5
+    from product facts only;
+  - six more request words;
+  - a **rival-request** lane: coined rivals AND request words.
+- Spend: X data $0.082 (91 search pages and 150 parent lookups). Graded blind by
+  Opus 5.5 and GPT-6 Astra on the subscriptions: 310 screened posts, 215 graded
+  identically.
+
+| Project | A good | B good |
+|---|---:|---:|
+| Cal.com | 0 | 1 |
+| Tally | 1 | 3 |
+| Clipy | 5 | 6 |
+| Grenseo | 2 | 3 |
+| Scarlett | 0 | 1 |
+| **Total** | **8** | **14** |
+
+B also improves precision: 5.4% of screened posts are good vs 3.7%. Both arms
+together found 15.
+
+- **The rival-request lane is the find:** it produced a good lead in 4 of 5 projects
+  from 33 screened posts, e.g. "Best self hosted open source calendly, cal?" and
+  "Google forms just wasn't working… suggestions". It accounts for B's only Cal.com
+  and Scarlett hits, a third of B's Tally hits and one of Grenseo's. It is deterministic
+  and needs no new model call.
+- **Buyer words help Tally:** "google form" gave 2 good leads (12 posts where at
+  least one grader said good). "online form" stays dead (0/35 in each arm).
+- **Dead or empty:** the scheduling-*, whatsapp-*, "ai search tracking" and
+  "ai rank tracker" request lanes.
+- **Against the pre-set bar:** the bar was B ≥ 2× A. B reached 1.75×, gained in 5/5
+  projects and lost one A-only post (the "form builder" lane). So the result is
+  directional; counts are around 10, where one post moves any number.
+
+**Next:** add the rival-request lane to PR #134 (no model or cost change, under a
+cent a day). Treat the `asks` slot as a separate step: it changes the seeds prompt.
+Dropping diy and stack still waits for more evidence.
+
+Evidence: `search-r84/` (brief, three plans, combined plan, `asks/`, `lanes.json`,
+`raw/`, `results.json`, `purchases.jsonl`, batches, key, `raw-grades/`, `scores.json`).
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
