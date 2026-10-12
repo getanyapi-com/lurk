@@ -42,10 +42,10 @@ export async function insertSighting(row: {
 }
 
 /**
- * Hands a post to a venue lane when the lane that saw it first was a rival
- * lane whose screen dropped it: the rival screen asks for its words in one
- * sentence and treats numbered steps as a listicle, and a workflow post is
- * both. Only a post nothing was paid for moves. Returns the row to judge, or
+ * Hands a post to a venue lane when the lane that saw it first was a buyer
+ * lane (rival or request) whose screen dropped it: that screen asks for its
+ * words in one sentence and treats numbered steps as a listicle, and a
+ * workflow post is both. Only a post nothing was paid for moves. Returns the row to judge, or
  * null when it is not the venue lane's to take.
  */
 export async function claimForVenue(row: {
@@ -65,7 +65,7 @@ export async function claimForVenue(row: {
         eq(xEvaluations.tweetId, row.tweetId),
         eq(xEvaluations.stage, "free_rejected"),
         // A thread's walk screens by the rule of the reply's lane, whichever family that was.
-        sql`(${xEvaluations.laneId} is null or ${xEvaluations.laneId} in (select id from x_lanes where family = 'rival') or ${xEvaluations.context} ? 'via')`,
+        sql`(${xEvaluations.laneId} is null or ${xEvaluations.laneId} in (select id from x_lanes where family in ('rival', 'request')) or ${xEvaluations.context} ? 'via')`,
       ),
     )
     .returning();

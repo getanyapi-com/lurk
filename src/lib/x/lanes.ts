@@ -33,6 +33,8 @@ import { isAmbiguous, normalizeEntity, slug } from "./words";
  *   grading of 415 archived posts (October 2026) these lanes found 12 of the
  *   14 good leads; diy and stack found none. Buyers, so not a venue family,
  *   and replies are kept: an ask is often a reply in someone else's thread.
+ *   A second request shape names the coined rivals instead of the category
+ *   ("Best self hosted open source calendly, cal?"); see compileRivalRequestLane.
  */
 
 export type LaneFamily = "rival" | "request" | "diy" | "stack";
@@ -326,6 +328,16 @@ export function everydayNames(ordinary: Iterable<string>): Set<string> {
   return names;
 }
 
+function isCommonRival(entity: string, everyday: Set<string>): boolean {
+  return isAmbiguous(entity) || everyday.has(slug(entity));
+}
+
+/** The rivals that may share an OR group, in standing order: coined names that can make a rival lane alone. */
+function coinedRivals(seeds: string[], ordinary: Iterable<string> = []): string[] {
+  const everyday = everydayNames(ordinary);
+  return seeds.filter((entity) => !isCommonRival(entity, everyday) && coinedRivalLane([entity]) !== null);
+}
+
 /**
  * Rival lanes. Coined names share one OR group, up to MAX_RIVALS_PER_LANE and
  * the lane limit, bound to RIVAL_WORDS. A name that is also an everyday word
@@ -335,7 +347,6 @@ export function everydayNames(ordinary: Iterable<string>): Set<string> {
  * cannot make a lane on its own is skipped, so it never sinks the others.
  */
 export function compileRivalLanes(seeds: string[], ordinary: Iterable<string> = []): CompiledLane[] {
-  const everyday = everydayNames(ordinary);
   const lanes: CompiledLane[] = [];
   let current: string[] = [];
   const flush = () => {
@@ -344,20 +355,15 @@ export function compileRivalLanes(seeds: string[], ordinary: Iterable<string> = 
     if (lane) lanes.push(lane);
     current = [];
   };
-  const common: string[] = [];
-  for (const entity of seeds) {
-    if (isAmbiguous(entity) || everyday.has(slug(entity))) {
-      common.push(entity);
-      continue;
-    }
-    if (!coinedRivalLane([entity])) continue;
+  for (const entity of coinedRivals(seeds, ordinary)) {
     const next = [...current, entity];
     const fits = next.length <= MAX_RIVALS_PER_LANE && bodyOf([next, RIVAL_WORDS]).length <= MAX_LANE_BODY_CHARS;
     if (!fits) flush();
     current.push(entity);
   }
   flush();
-  for (const entity of common) {
+  const everyday = everydayNames(ordinary);
+  for (const entity of seeds.filter((seed) => isCommonRival(seed, everyday))) {
     const lane = commonRivalLane(entity);
     if (lane) lanes.push(lane);
   }
@@ -404,6 +410,32 @@ export function compileRequestLanes(slots: SeedSlots | null, rivals: string[], o
     const lane = laneOf("request", [nouns, REQUEST_WORDS], ([kept]) => ({ label: `Asking for ${kept[0]}`, seeds: [] }));
     return lane ? [lane] : [];
   });
+}
+
+/** REQUEST_WORDS without "alternative(s)": a rival named beside those is the rival lane's. */
+export const RIVAL_REQUEST_WORDS = REQUEST_WORDS.filter((term) => term !== "alternative" && term !== "alternatives");
+
+/**
+ * The rival-request lane: the coined rivals (the ones compileRivalLanes puts in
+ * a shared OR group, never an everyday-word rival such as loom or notion), up
+ * to MAX_RIVALS_PER_LANE, ANDed with RIVAL_REQUEST_WORDS. Someone asking which
+ * tool to use, by a rival's name: "Best self hosted open source calendly,
+ * cal?". Rivals are trimmed to fit, never the words. At most one per project.
+ * A request lane, so its posts get buyer screening and replies are kept.
+ *
+ * In live pilot r84 (2026-10-05..12, five projects, both arms on the same
+ * window, blind-graded by Opus 5.5 and GPT-6 Astra) this shape found a
+ * consensus-good lead in 4 of 5 projects from 33 screened posts: Cal.com
+ * ("Best self hosted open source calendly, cal?"), Tally ("Google forms just
+ * wasn't working… suggestions"), Grenseo and Scarlett ("ManyChat as a customer
+ * support bot"), the first good leads in that window for Cal.com and ever for
+ * Scarlett. The new searches overall found 14 consensus-good leads to the
+ * current lanes' 8; a small sample.
+ */
+export function compileRivalRequestLane(rivals: string[], ordinary: Iterable<string> = []): CompiledLane | null {
+  const coined = coinedRivals(rivals, ordinary).slice(0, MAX_RIVALS_PER_LANE);
+  if (coined.length === 0) return null;
+  return laneOf("request", [coined, RIVAL_REQUEST_WORDS], ([kept]) => ({ label: `Asking about ${listed(kept)}`, seeds: kept }));
 }
 
 /**
@@ -486,18 +518,20 @@ export function compileStackLane(slots: SeedSlots | null, rivals: string[], ownN
 /**
  * A project's lanes in rank order, which a run capped to its first few (a
  * trial-size dev run) takes them in: the category/request lanes first (they
- * found 12 of 14 good leads in the October 2026 grading), then the first
- * rival lane (the buyers), build-vs-buy, the workflow lane, then the other
- * rival lanes. Request lanes share the existing page and judge allowances.
+ * found 12 of 14 good leads in the October 2026 grading), the rival-request
+ * lane, then the first rival lane (the buyers), build-vs-buy, the workflow
+ * lane, then the other rival lanes. Request lanes share the existing page and
+ * judge allowances.
  */
 export function orderLanes(
   rival: CompiledLane[],
   diy: CompiledLane | null,
   stack: CompiledLane | null,
   request: CompiledLane[] = [],
+  rivalRequest: CompiledLane | null = null,
 ): CompiledLane[] {
   const [first, ...rest] = rival;
-  return [...request, first, diy, stack, ...rest].filter((lane): lane is CompiledLane => Boolean(lane));
+  return [...request, rivalRequest, first, diy, stack, ...rest].filter((lane): lane is CompiledLane => Boolean(lane));
 }
 
 /** Every lane for a project, compiled and ordered. */
@@ -508,6 +542,7 @@ export function compileLanes(input: { rivals: string[]; slots: SeedSlots | null;
     compileDiyLane(slots, rivals, ownNames),
     compileStackLane(slots, rivals, ownNames),
     compileRequestLanes(slots, rivals, ownNames),
+    compileRivalRequestLane(rivals, slots?.ordinaryWordRivals ?? []),
   );
 }
 

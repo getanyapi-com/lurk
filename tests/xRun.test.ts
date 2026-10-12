@@ -794,16 +794,19 @@ describeDb("the X pipeline against a database", () => {
       .from(schema.xLanes)
       .where(orm.eq(schema.xLanes.projectId, project.id))
       .orderBy(schema.xLanes.rank);
-    expect(lanes.map((lane) => lane.family)).toEqual(["request", "rival", "diy", "stack"]);
+    expect(lanes.map((lane) => lane.family)).toEqual(["request", "request", "rival", "diy", "stack"]);
     // The request lane keeps replies: an ask is often a reply in someone else's thread.
     expect(lanes[0].body).toMatch(/^"booking page" \("looking for" OR .*\) lang:en -filter:retweets$/u);
-    expect(lanes[2].body.startsWith(`(${rival} OR "booking page") ("vibe coded" OR`)).toBe(true);
+    // The rival-request lane: the coined rival asked about, without "alternative".
+    expect(lanes[1].body).toMatch(new RegExp(`^${rival} \\("looking for" OR .*\\) lang:en -filter:retweets$`, "u"));
+    expect(lanes[1].body).not.toContain("alternative");
+    expect(lanes[3].body.startsWith(`(${rival} OR "booking page") ("vibe coded" OR`)).toBe(true);
     // A lone generic word is dropped; the workflow lane asks for top-level posts with reach.
-    expect(lanes[3].body).toMatch(new RegExp(`^\\("claude code" OR .*\\) ${topic} lang:en -filter:retweets -filter:replies min_faves:20$`, "u"));
-    // The request query is shared across projects and may already be cached
-    // by another test; the three unique rival/topic queries still reach X.
-    expect(search.mock.calls.length).toBeGreaterThanOrEqual(3);
-    expect(search.mock.calls.length).toBeLessThanOrEqual(4);
+    expect(lanes[4].body).toMatch(new RegExp(`^\\("claude code" OR .*\\) ${topic} lang:en -filter:retweets -filter:replies min_faves:20$`, "u"));
+    // The category request query is shared across projects and may already be
+    // cached by another test; the four unique rival/topic queries still reach X.
+    expect(search.mock.calls.length).toBeGreaterThanOrEqual(4);
+    expect(search.mock.calls.length).toBeLessThanOrEqual(5);
     const [state] = await db().select().from(schema.xProjects).where(orm.eq(schema.xProjects.projectId, project.id));
     expect((state.seeds as { slots: { topics: string[] } }).slots.topics).toEqual([topic, "app"]);
 
@@ -840,13 +843,16 @@ describeDb("the X pipeline against a database", () => {
       .where(orm.eq(schema.xLanes.projectId, project.id))
       .orderBy(schema.xLanes.rank);
     expect(lanes.map((lane) => [lane.family, lane.runs])).toEqual([
+      ["request", 2],
       ["rival", 2],
       ["diy", 2],
       ["stack", 2],
       ["rival", 2],
     ]);
-    expect(lanes[0].body.startsWith(`${rival} (alternative`)).toBe(true);
-    expect(lanes[3].body.startsWith('("alternative to loom"')).toBe(true);
+    // The rival-request lane names the coined rival only, never "loom".
+    expect(lanes[0].body.startsWith(`${rival} ("looking for"`)).toBe(true);
+    expect(lanes[1].body.startsWith(`${rival} (alternative`)).toBe(true);
+    expect(lanes[4].body.startsWith('("alternative to loom"')).toBe(true);
     expect(lanes.some((lane) => /\bthis\b/u.test(lane.body.split(" lang:")[0]))).toBe(false);
   });
 
@@ -1166,7 +1172,7 @@ describeDb("the X pipeline against a database", () => {
     await run.markLanesDue(project.id);
     await run.runXScan(project.id, null);
     expect(callsFor("rival")).toHaveLength(1);
-    const [lane] = await db().select().from(schema.xLanes).where(orm.eq(schema.xLanes.projectId, project.id)).orderBy(schema.xLanes.rank);
+    const lane = await laneOf(project.id, "rival");
     expect(lane.fullPages).toBe(1);
   });
 

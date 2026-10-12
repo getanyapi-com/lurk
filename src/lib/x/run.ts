@@ -1045,7 +1045,7 @@ export async function runXScan(projectId: string, jobId: string | null): Promise
       if (!sighting) {
         // A thread's walk may have written it first: the words this search matched still show on its card.
         if (screen.pass && matchedPhrase) await fillMatchedPhrase(projectId, post.id, matchedPhrase);
-        // A post a rival lane screened out that a venue lane keeps is the venue lane's to judge.
+        // A post a rival or request lane screened out that a venue lane keeps is the venue lane's to judge.
         if (venue && screen.pass && !processed.has(post.id)) {
           const claimed = await claimForVenue({ projectId, tweetId: post.id, laneId: lane.id, stage, matchedPhrase });
           if (claimed) track(claimed, post);
