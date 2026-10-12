@@ -1108,6 +1108,37 @@ Present accessible evidence cannot identify the invalid field or reconcile its
 bill. Future transport work needs new field-specific/correlation/billing
 evidence, not a renamed prompt retry. No app/ranking/production change follows.
 
+#### r82 — rejection diagnosed; grading moved to subscription models
+
+**Cause of the r79 400.** Reproduced with a 441-character dummy prompt and the
+same schema, so the lead content was not involved. Gemini rejects the schema
+when sixteen 21-character handle enums are combined with `minItems`/`maxItems`
+16; dropping the enum, dropping the count, or 9-character handles each passed
+(about $0.005 total). This is consistent with Gemini's structured-output
+complexity limit. Replaying the exact frozen request left the key's usage
+counter unchanged after 60 s, so rejected calls are not billed and the r79
+$0.720896 hold was in practice $0 (shared key, so strong evidence, not a receipt).
+
+**Grading no longer uses paid API models.** Experiments run on Opus 5.5, Fable
+5.1 and GPT-6 Astra as subagents, which are free on subscription and stronger.
+Each got the frozen r79 system and user messages verbatim (`brief.md`), blind to
+every other file. Total ordinal error over the 16 Tally sources (0–3 scale):
+
+| Grader | vs Astra r60 ref | vs Fable r60 ref | Strong / Plausible / Weak / Not |
+| --- | --- | --- | --- |
+| Opus 5.5 (independent of both refs) | 2 | 2 | 0 / 0 / 5 / 11 |
+| Astra | 2 (self) | 4 | 0 / 1 / 3 / 12 |
+| Fable 5.1 | 3 | 3 (self) | 0 / 1 / 4 / 11 |
+| Old Gemini compact A (r73) | 16 | 16 | 3 / 4 / 4 / 5 |
+| Old Gemini compact B (r73) | 11 | 11 | 1 / 4 / 5 / 6 |
+
+The two references disagree with each other by 2, so Opus is at the reference
+noise floor. The r78 "strength labels overclaim" finding was the Gemini grader
+calling weak leads Strong/Plausible; frontier graders do not. Scope: development
+evidence on one project's 16 archived sources, model-proxy references, not owner
+preference or conversion. Evidence: `subagent-grades-r82/` and `probe-r82/` in
+the ignored folder.
+
 #### Historical r43 checkpoint (superseded budget; retained for provenance)
 
 Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
