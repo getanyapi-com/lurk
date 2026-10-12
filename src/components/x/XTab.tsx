@@ -28,6 +28,7 @@ import {
   listXLanes,
   projectedWalletCostPerDay,
   xEvaluationEntry,
+  xEvaluationReplied,
   xLeadById,
   xThreadOf,
   xStatus,
@@ -223,12 +224,10 @@ export async function XTab({ userId, project, params }: { userId: string; projec
   const selectedCard = selection ? xOpportunityCard(selection) : null;
   const selectedId = selectedCard?.entryId ?? null;
   const selectedOpportunity = opportunities.items.find((item) => xOpportunityCard(item.entry).entryId === selectedId);
-  const thread = selectedCard ? await xThreadOf(selectedCard.tweetId, selectedCard.via?.tweetId ?? null) : null;
-  const faces = opportunities.items.map(({ entry, priority }) => {
-    const card = xOpportunityCard(entry);
-    return { id: card.entryId, at: card.postedAt, score: Math.round(100 * (priority ?? 0)), author: card.authorUsername,
-      avatarUrl: card.authorImage, subreddit: "", label: `@${card.authorUsername} on X`, plainAvatar: true };
-  });
+  const [thread, replied] = await Promise.all([
+    selectedCard ? xThreadOf(selectedCard.tweetId, selectedCard.via?.tweetId ?? null) : null,
+    selection && selection.kind !== "lead" ? xEvaluationReplied(project.id, selection.item.evaluationId) : false,
+  ]);
 
   return (
     // The Leads tab's frame: from lg up the page is the window under the
@@ -268,7 +267,7 @@ export async function XTab({ userId, project, params }: { userId: string; projec
 
         <PeopleStrip
           noun={filter.status === "new" ? "match" : "lead"}
-          faces={faces}
+          faces={opportunities.faces}
           days={filter.days}
           at={filter.at}
           params={params as FeedParams}
@@ -302,7 +301,7 @@ export async function XTab({ userId, project, params }: { userId: string; projec
                 <XSearches lanes={lanes} />
               </>
             }
-            pane={selection ? <XLeadDetail selection={selection} projectId={project.id} thread={thread} opportunity={filter.status === "new" ? selectedOpportunity : undefined} /> : null}
+            pane={selection ? <XLeadDetail selection={selection} projectId={project.id} thread={thread} replied={replied} opportunity={filter.status === "new" ? selectedOpportunity : undefined} /> : null}
           />
         </OpeningProvider>
       </div>

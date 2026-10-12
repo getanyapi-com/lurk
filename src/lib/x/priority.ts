@@ -3,7 +3,7 @@
  * These are explicit heuristics, not calibrated adoption/conversion probabilities.
  * Freeze a new version before any later unseen owner-feedback comparison.
  */
-export const X_PRIORITY_VERSION = "x-attention-2026-10-10.1";
+export const X_PRIORITY_VERSION = "x-attention-2026-10-12.1";
 export const X_PRIORITY_FLOOR = 0.4;
 
 function record(value: unknown): Record<string, unknown> {
@@ -61,8 +61,9 @@ export function xPriority(input: Pick<XPriorityInput, "signals" | "level" | "rep
   const checks: string[] = [];
   const notes: string[] = [];
   const own = noul(signals, "own_need");
-  const same = noul(signals, "same_kind");
-  const supported = noul(signals, "supported_job");
+  // Only answers xQuestions() asks (plus the pipeline's own reply check) are
+  // read (tests/xPriority.test.ts holds this): a signal no level produces is a term the app never fills.
+  const fit = noul(signals, "same_kind");
   const intent = expectedXIntent(signals.intent);
   const seller = noul(signals, "rival_vendor");
   const promoting = noul(signals, "promoting");
@@ -79,9 +80,7 @@ export function xPriority(input: Pick<XPriorityInput, "signals" | "level" | "rep
   const unmet = requirement.type === "choice" && requirement.choice === "unmet";
   if (unmet) checks.push("Requirement may not fit");
   if (failedReply) checks.push("Public reply not recommended");
-  // No commercial/personal/free-use penalty. A supported basic job can be a
-  // useful entry point even when the specialised product brief calls it a neighbour.
-  const fit = same === null && supported === null ? null : Math.max(same ?? 0, supported ?? 0);
+  // No commercial/personal/free-use penalty.
   let needPriority = own !== null && fit !== null && intent !== null && seller !== null && promoting !== null && resolved !== null
     ? own * fit * ((intent + 1) / 5) * (1 - seller) * (1 - promoting) * (1 - resolved)
     : null;

@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { handledThreads, xEvaluations, xLeads } from "@/db/schema";
+import { handledThreads, xEvaluations, xLeads, xPosts } from "@/db/schema";
 import { xAskScore, type ScoringSettings } from "@/lib/scoring/weights";
 import { X_SCORER_VERSION } from "./constants";
 import type { XAssessment } from "./judge";
@@ -303,6 +303,21 @@ export async function xLeadConversation(projectId: string, leadId: string): Prom
     .select({ conversationId: xLeads.conversationId, tweetId: xLeads.tweetId })
     .from(xLeads)
     .where(and(eq(xLeads.projectId, projectId), eq(xLeads.id, leadId)))
+    .limit(1);
+  return row ? (row.conversationId ?? row.tweetId) : null;
+}
+
+/**
+ * The conversation a post that is not a lead sits in (one New ranked from its
+ * stored evidence), so Replied can mark it as it marks a lead's. Null when the
+ * evaluation is not this project's.
+ */
+export async function xEvaluationConversation(projectId: string, evaluationId: string): Promise<string | null> {
+  const [row] = await db()
+    .select({ conversationId: xPosts.conversationId, tweetId: xPosts.id })
+    .from(xEvaluations)
+    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+    .where(and(eq(xEvaluations.projectId, projectId), eq(xEvaluations.id, evaluationId)))
     .limit(1);
   return row ? (row.conversationId ?? row.tweetId) : null;
 }

@@ -1,14 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { expectedXIntent, rankXOpportunities, xPriority } from "@/lib/x/priority";
+import { xQuestions } from "@/lib/x/questions";
 
 const noul = (noul: number) => ({ type: "noul", noul });
 const signals = (over: Record<string, unknown> = {}) => ({
-  own_need: noul(0.95), same_kind: noul(0.8), supported_job: noul(0.9),
+  own_need: noul(0.95), same_kind: noul(0.9),
   intent: { type: "score", score: 3.1 }, rival_vendor: noul(0.05), promoting: noul(0.05), resolved: noul(0.05),
   hard_requirement: { type: "choice", choice: "none_stated" }, ...over,
 });
 
 describe("cached X attention priority", () => {
+  it("reads only answers the X judge stores, at either level, plus the pipeline's reply check", () => {
+    const read = new Set<string>();
+    const spy = new Proxy(signals({ founder_would_reply: noul(0.9), reply: { worth_reply: true } }), {
+      get(target, key, receiver) {
+        if (typeof key === "string") read.add(key);
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    xPriority({ signals: spy, level: "complete", replyVerdictCode: "worth_reply" });
+    // reply is written by run.ts's reply check (signals.reply), not asked as a question.
+    read.delete("reply");
+    expect(read.size).toBeGreaterThan(0);
+    for (const complete of [false, true]) {
+      const asked = Object.keys(xQuestions(["s0"], { complete, brief: null }));
+      expect([...read].filter((key) => !asked.includes(key))).toEqual([]);
+    }
+  });
+
   it("uses graded intent when available and the raw score when the gateway omits distributions", () => {
     expect(expectedXIntent({ type: "score", score: 3, probabilities: { 2: 0.4, 3: 0.6 } })).toBeCloseTo(2.6);
     expect(expectedXIntent({ type: "score", score: 2.83 })).toBe(2.83);
@@ -23,8 +42,8 @@ describe("cached X attention priority", () => {
     }
   });
 
-  it("keeps supported basic jobs and unknown context without a commercial-use penalty", () => {
-    const basic = signals({ same_kind: noul(0.4), supported_job: noul(0.95) });
+  it("keeps unknown context without a commercial-use penalty", () => {
+    const basic = signals();
     const complete = xPriority({ signals: basic, level: "complete" });
     const unknown = xPriority({ signals: { ...basic, hard_requirement: { type: "choice", choice: "unknown" } }, level: "search" });
     expect(unknown.priority).toBe(complete.priority);
@@ -67,7 +86,7 @@ describe("cached X attention priority", () => {
     expect(xPriority({ ...verified, replyVerdictCode: undefined }).priority).toBeNull();
     expect(xPriority({ ...verified, signals: { ...raw, founder_would_reply: null } }).priority).toBeNull();
     expect(xPriority({ ...verified, signals: { ...raw, rival_vendor: null } }).priority).toBeNull();
-    expect(xPriority({ ...verified, signals: { ...raw, same_kind: null, supported_job: null } }).priority).toBeNull();
+    expect(xPriority({ ...verified, signals: { ...raw, same_kind: null } }).priority).toBeNull();
     expect(xPriority({ ...verified, signals: { ...raw, reply: { worth_reply: false } } }).priority).toBeNull();
     expect(xPriority({ ...verified, signals: { ...raw, reply: { worth_reply: true, code: "not_reply_worthy" } } }).priority).toBeNull();
     expect(xPriority({ ...verified, signals: { ...raw, reply: { worth_reply: true, code: "unexpected" } } }).priority).toBeNull();

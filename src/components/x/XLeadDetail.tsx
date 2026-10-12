@@ -1,5 +1,12 @@
 import { ExternalLink, Eye, Heart, MessageCircle, Search } from "lucide-react";
-import { hideXLeadAction, notFitXLeadAction, reopenXLeadAction, repliedXLeadAction } from "@/app/app/x/actions";
+import {
+  hideXLeadAction,
+  notFitXLeadAction,
+  reopenXEvaluationAction,
+  reopenXLeadAction,
+  repliedXEvaluationAction,
+  repliedXLeadAction,
+} from "@/app/app/x/actions";
 import { AuthorAvatar } from "@/components/AuthorAvatar";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { HighlightedBody } from "@/components/leads/HighlightedBody";
@@ -164,6 +171,7 @@ export function XLeadDetail({
   thread = null,
   now = new Date(),
   opportunity,
+  replied = false,
 }: {
   selection: XSelection;
   projectId: string;
@@ -171,6 +179,8 @@ export function XLeadDetail({
   thread?: XThreadData | null;
   now?: Date;
   opportunity?: Pick<XOpportunity, "priority" | "checks" | "notes">;
+  /** For a post that is not a lead: its conversation is already marked replied. */
+  replied?: boolean;
 }) {
   if (selection.kind !== "lead") {
     const item = selection.item;
@@ -213,7 +223,16 @@ export function XLeadDetail({
           </div>
           <XDetailRail card={item} engagement={item.engagement} unscored={filtered?.kind === "screened" && filtered.score === null} />
         </div>
-        <LeadActions openLabel="Open on X" url={item.url} actions={null} />
+        {/* Not a lead, so only Replied, which marks the conversation and needs no lead row. */}
+        <LeadActions
+          openLabel="Open on X"
+          url={item.url}
+          replied={replied}
+          actions={{
+            replied: repliedXEvaluationAction.bind(null, projectId, item.evaluationId),
+            reopen: reopenXEvaluationAction.bind(null, projectId, item.evaluationId),
+          }}
+        />
       </Pane>
     );
   }

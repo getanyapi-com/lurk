@@ -425,17 +425,33 @@ export type XEvaluationEntry =
   | { kind: "lead"; lead: XLeadCard };
 
 export type XOpportunity = { entry: XEvaluationEntry; priority: number | null; checks: string[]; notes?: string[] };
-export type XOpportunityFeed = { items: XOpportunity[]; total: number; posts: number };
+/**
+ * `items` is the top of the ranked stream; `faces` is every card of it, so the
+ * date strip counts and offers every day, not only the days the cap kept.
+ */
+export type XOpportunityFeed = { items: XOpportunity[]; total: number; posts: number; faces: LeadFace[] };
+
+/** The most cards New lists; the strip and the count still cover the whole ranked window. */
+const OPPORTUNITY_LIST_LIMIT = 200;
 
 export function xOpportunityCard(entry: XEvaluationEntry): XLeadCard | XHeldCard | XFilteredCard {
   return entry.kind === "lead" ? entry.lead : entry.item;
+}
+
+/** Stages a held card stands for: unsettled, or a judged post that lost its author's conversation to a sibling (write.ts writeLead). */
+const HELD_STAGES = ["review", "pending_context", "pending_reply", "merged"];
+
+function opportunityFace(id: string, at: Date, priority: number | null, author: string, avatarUrl: string | null): LeadFace {
+  return { id, at, score: Math.round(100 * (priority ?? 0)), author, avatarUrl, subreddit: "", label: `@${author} on X`, plainAvatar: true };
 }
 
 /**
  * A display-only stream of stored evidence, not the alert/qualification reader.
  * Rank the entire time window before deduplication and the display cap; applying
  * the old group caps first would still bury an older strong screened request.
- * No judge, lookup, stage write or change to the operational quiet rules here.
+ * Ranking reads only the columns it needs; the cards the cap keeps are then
+ * read whole. No judge, lookup, stage write or change to the operational quiet
+ * rules here.
  */
 export async function listXOpportunities(
   projectId: string,
@@ -446,42 +462,80 @@ export async function listXOpportunities(
   if (filter.status !== "new") {
     const leads = (await listXLeads(projectId, filter, now)).filter((lead) => includeReplies || lead.kind !== "reply");
     // History retains every marked post; author deduplication is for attention, not history.
-    return { items: leads.map((lead) => ({ entry: { kind: "lead", lead }, priority: null, checks: [] })), total: leads.length, posts: leads.length };
+    return {
+      items: leads.map((lead) => ({ entry: { kind: "lead", lead }, priority: null, checks: [] })),
+      total: leads.length,
+      posts: leads.length,
+      faces: leads.map((lead) => opportunityFace(lead.entryId, lead.postedAt, null, lead.authorUsername, lead.authorImage)),
+    };
   }
-  const rows = await db()
-    .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, lead: xLeads, closeCall: closeCallSql, worth: worthSql })
+  const pool = await db()
+    .select({
+      evaluationId: xEvaluations.id, stage: xEvaluations.stage, level: xEvaluations.level, signals: xEvaluations.signals,
+      reasonCode: xEvaluations.reasonCode, engagement: xEvaluations.engagement,
+      tweetId: xPosts.id, author: xPosts.authorUsername, authorImage: xPosts.authorImage, postedAt: xPosts.createdAt, leadId: xLeads.id,
+    })
     .from(xEvaluations)
     .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
     .innerJoin(projects, eq(projects.id, xEvaluations.projectId))
-    .leftJoin(xAuthors, authorJoin)
     .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
     .where(and(
       eq(xEvaluations.projectId, projectId), isNull(xPosts.unavailableAt), whenWhere(filter), xWordsWhere(),
       notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
       or(
         and(eq(xLeads.status, "new"), xShownWhere(), includeReplies ? undefined : eq(xLeads.kind, "ask")),
-        and(isNull(xLeads.id), or(
-          inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
-          unfinishedSql,
-          and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
-        )),
+        and(
+          isNull(xLeads.id),
+          or(
+            inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
+            unfinishedSql,
+            and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
+            // The legacy score picked which of an author's posts in a conversation
+            // became the lead; the loser's evidence still competes here.
+            and(eq(xEvaluations.stage, "merged"), includeReplies ? undefined : sql`${xEvaluations.reasonCode} is distinct from 'worth_reply'`),
+          ),
+          // The author's lead in this conversation was hidden, called a miss or
+          // answered: none of their other posts in it come back through evidence.
+          sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
+            and s.author_username = ${xPosts.authorUsername} and s.conversation_id = coalesce(${xPosts.conversationId}, ${xPosts.id})
+            and s.status <> 'new')`,
+        ),
       ),
       // Answered conversations must not reappear through unqualified sibling posts.
       sql`not exists (select 1 from ${handledThreads} h where h.project_id = ${xEvaluations.projectId}
         and h.platform = 'x' and (h.thread_id = ${xPosts.conversationId} or h.thread_id = ${xPosts.id}))`,
     ));
-  const candidates = rows.map((row) => {
+  const ranked = rankXOpportunities(pool.map((row) => ({
+    ...row, key: row.tweetId, entryId: row.leadId ? `lead-${row.leadId}` : `${HELD_STAGES.includes(row.stage) ? "held" : "filtered"}-${row.evaluationId}`,
+    replyVerdictCode: row.reasonCode,
+  })));
+  const top = ranked.slice(0, OPPORTUNITY_LIST_LIMIT);
+  const rows = top.length === 0 ? [] : await db()
+    .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, lead: xLeads, closeCall: closeCallSql, worth: worthSql })
+    .from(xEvaluations)
+    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+    .leftJoin(xAuthors, authorJoin)
+    .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
+    .where(and(eq(xEvaluations.projectId, projectId), inArray(xEvaluations.id, top.map((one) => one.evaluationId))));
+  const entries = new Map(rows.map((row): [string, XEvaluationEntry] => {
     const { evaluation, post, author, lead } = row;
-    const entry: XEvaluationEntry = lead
+    return [evaluation.id, lead
       ? { kind: "lead", lead: leadCard({ lead, post, author, context: evaluation.context, foundBy: evaluation.matchedPhrase }, now) }
-      : ["review", "pending_context", "pending_reply"].includes(evaluation.stage)
+      : HELD_STAGES.includes(evaluation.stage)
         ? { kind: "held", item: heldCard(row) }
-        : { kind: "filtered", item: filteredCard(row) };
-    return { entry, key: post.id, author: post.authorUsername, postedAt: post.createdAt, engagement: evaluation.engagement,
-      signals: evaluation.signals, level: evaluation.level, replyVerdictCode: evaluation.reasonCode };
+        : { kind: "filtered", item: filteredCard(row) }];
+  }));
+  // A row a scan changed between the two reads drops out rather than showing half-read.
+  const items = top.flatMap(({ evaluationId, priority, checks, notes }) => {
+    const entry = entries.get(evaluationId);
+    return entry ? [{ entry, priority, checks, notes }] : [];
   });
-  const ranked = rankXOpportunities(candidates);
-  return { items: ranked.slice(0, 200).map(({ entry, priority, checks, notes }) => ({ entry, priority, checks, notes })), total: ranked.length, posts: rows.length };
+  return {
+    items,
+    total: ranked.length,
+    posts: pool.length,
+    faces: ranked.map((one) => opportunityFace(one.entryId, one.postedAt, one.priority, one.author, one.authorImage)),
+  };
 }
 
 /**
@@ -498,7 +552,7 @@ export async function xEvaluationEntry(projectId: string, evaluationId: string, 
     return null;
   }
   const { stage } = row.evaluation;
-  if (stage === "review" || (["pending_context", "pending_reply"].includes(stage) && row.evaluation.signals !== null)) {
+  if (stage === "review" || stage === "merged" || (["pending_context", "pending_reply"].includes(stage) && row.evaluation.signals !== null)) {
     return { kind: "held", item: heldCard(row) };
   }
   if (stage === "rejected" || stage === "free_rejected" || (stage === "expired" && ["qualify", "review"].includes(row.evaluation.decision ?? ""))) {
@@ -508,6 +562,19 @@ export async function xEvaluationEntry(projectId: string, evaluationId: string, 
     .where(and(eq(xLeads.projectId, projectId), eq(xLeads.tweetId, row.evaluation.tweetId), isNull(xPosts.unavailableAt)))
     .limit(1);
   return lead ? { kind: "lead", lead: leadCard(lead, now) } : null;
+}
+
+/** Whether the conversation an evaluated post sits in is marked replied, for the pane's Replied button. */
+export async function xEvaluationReplied(projectId: string, evaluationId: string): Promise<boolean> {
+  const [row] = await db()
+    .select({ id: handledThreads.id })
+    .from(xEvaluations)
+    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+    .innerJoin(handledThreads, and(eq(handledThreads.projectId, xEvaluations.projectId), eq(handledThreads.platform, "x"),
+      eq(handledThreads.threadId, sql`coalesce(${xPosts.conversationId}, ${xPosts.id})`)))
+    .where(and(eq(xEvaluations.projectId, projectId), eq(xEvaluations.id, evaluationId)))
+    .limit(1);
+  return Boolean(row);
 }
 
 /** One post in a thread as X draws it: who, when, the words, and the counts under it. */
