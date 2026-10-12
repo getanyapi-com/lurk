@@ -469,73 +469,78 @@ export async function listXOpportunities(
       faces: leads.map((lead) => opportunityFace(lead.entryId, lead.postedAt, null, lead.authorUsername, lead.authorImage)),
     };
   }
-  const pool = await db()
-    .select({
-      evaluationId: xEvaluations.id, stage: xEvaluations.stage, level: xEvaluations.level, signals: xEvaluations.signals,
-      reasonCode: xEvaluations.reasonCode, engagement: xEvaluations.engagement,
-      tweetId: xPosts.id, author: xPosts.authorUsername, authorImage: xPosts.authorImage, postedAt: xPosts.createdAt, leadId: xLeads.id,
-    })
-    .from(xEvaluations)
-    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
-    .innerJoin(projects, eq(projects.id, xEvaluations.projectId))
-    .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
-    .where(and(
-      eq(xEvaluations.projectId, projectId), isNull(xPosts.unavailableAt), whenWhere(filter), xWordsWhere(),
-      notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
-      or(
-        and(eq(xLeads.status, "new"), xShownWhere(), includeReplies ? undefined : eq(xLeads.kind, "ask")),
-        and(
-          isNull(xLeads.id),
-          or(
-            inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
-            unfinishedSql,
-            and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
-            // The legacy score picked which of an author's posts in a conversation
-            // became the lead; the loser's evidence still competes here.
-            and(eq(xEvaluations.stage, "merged"), includeReplies ? undefined : sql`${xEvaluations.reasonCode} is distinct from 'worth_reply'`),
+  // One snapshot for both reads: a lead hidden or evidence rejudged between
+  // them would otherwise show a card that no longer qualifies, or new details
+  // under the old priority.
+  return db().transaction(async (tx) => {
+    const pool = await tx
+      .select({
+        evaluationId: xEvaluations.id, stage: xEvaluations.stage, level: xEvaluations.level, signals: xEvaluations.signals,
+        reasonCode: xEvaluations.reasonCode, engagement: xEvaluations.engagement,
+        tweetId: xPosts.id, author: xPosts.authorUsername, authorImage: xPosts.authorImage, postedAt: xPosts.createdAt, leadId: xLeads.id,
+      })
+      .from(xEvaluations)
+      .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+      .innerJoin(projects, eq(projects.id, xEvaluations.projectId))
+      .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
+      .where(and(
+        eq(xEvaluations.projectId, projectId), isNull(xPosts.unavailableAt), whenWhere(filter), xWordsWhere(),
+        notMuted(sql`${xEvaluations.projectId}`, sql`${xPosts.text}`, null),
+        or(
+          and(eq(xLeads.status, "new"), xShownWhere(), includeReplies ? undefined : eq(xLeads.kind, "ask")),
+          and(
+            isNull(xLeads.id),
+            or(
+              inArray(xEvaluations.stage, ["review", "rejected", "free_rejected"]),
+              unfinishedSql,
+              and(inArray(xEvaluations.stage, ["pending_context", "pending_reply"]), isNotNull(xEvaluations.signals)),
+              // The legacy score picked which of an author's posts in a conversation
+              // became the lead; the loser's evidence still competes here.
+              and(eq(xEvaluations.stage, "merged"), includeReplies ? undefined : sql`${xEvaluations.reasonCode} is distinct from 'worth_reply'`),
+            ),
+            // The author's lead in this conversation was hidden, called a miss or
+            // answered: none of their other posts in it come back through evidence.
+            sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
+              and lower(s.author_username) = lower(${xPosts.authorUsername}) and s.conversation_id = coalesce(${xPosts.conversationId}, ${xPosts.id})
+              and s.status <> 'new')`,
           ),
-          // The author's lead in this conversation was hidden, called a miss or
-          // answered: none of their other posts in it come back through evidence.
-          sql`not exists (select 1 from ${xLeads} s where s.project_id = ${xEvaluations.projectId}
-            and s.author_username = ${xPosts.authorUsername} and s.conversation_id = coalesce(${xPosts.conversationId}, ${xPosts.id})
-            and s.status <> 'new')`,
         ),
-      ),
-      // Answered conversations must not reappear through unqualified sibling posts.
-      sql`not exists (select 1 from ${handledThreads} h where h.project_id = ${xEvaluations.projectId}
-        and h.platform = 'x' and (h.thread_id = ${xPosts.conversationId} or h.thread_id = ${xPosts.id}))`,
-    ));
-  const ranked = rankXOpportunities(pool.map((row) => ({
-    ...row, key: row.tweetId, entryId: row.leadId ? `lead-${row.leadId}` : `${HELD_STAGES.includes(row.stage) ? "held" : "filtered"}-${row.evaluationId}`,
-    replyVerdictCode: row.reasonCode,
-  })));
-  const top = ranked.slice(0, OPPORTUNITY_LIST_LIMIT);
-  const rows = top.length === 0 ? [] : await db()
-    .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, lead: xLeads, closeCall: closeCallSql, worth: worthSql })
-    .from(xEvaluations)
-    .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
-    .leftJoin(xAuthors, authorJoin)
-    .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
-    .where(and(eq(xEvaluations.projectId, projectId), inArray(xEvaluations.id, top.map((one) => one.evaluationId))));
-  const entries = new Map(rows.map((row): [string, XEvaluationEntry] => {
-    const { evaluation, post, author, lead } = row;
-    return [evaluation.id, lead
-      ? { kind: "lead", lead: leadCard({ lead, post, author, context: evaluation.context, foundBy: evaluation.matchedPhrase }, now) }
-      : HELD_STAGES.includes(evaluation.stage)
-        ? { kind: "held", item: heldCard(row) }
-        : { kind: "filtered", item: filteredCard(row) }];
-  }));
-  // A row a scan changed between the two reads drops out rather than showing half-read.
-  const items = top.flatMap(({ evaluationId, priority, checks, notes }) => {
-    const entry = entries.get(evaluationId);
-    return entry ? [{ entry, priority, checks, notes }] : [];
-  });
-  return {
-    items,
-    total: ranked.length,
-    posts: pool.length,
-    faces: ranked.map((one) => opportunityFace(one.entryId, one.postedAt, one.priority, one.author, one.authorImage)),
-  };
+        // Answered conversations must not reappear through unqualified sibling posts.
+        sql`not exists (select 1 from ${handledThreads} h where h.project_id = ${xEvaluations.projectId}
+          and h.platform = 'x' and (h.thread_id = ${xPosts.conversationId} or h.thread_id = ${xPosts.id}))`,
+      ));
+    const ranked = rankXOpportunities(pool.map((row) => ({
+      ...row, key: row.tweetId, entryId: row.leadId ? `lead-${row.leadId}` : `${HELD_STAGES.includes(row.stage) ? "held" : "filtered"}-${row.evaluationId}`,
+      replyVerdictCode: row.reasonCode,
+    })));
+    const top = ranked.slice(0, OPPORTUNITY_LIST_LIMIT);
+    const rows = top.length === 0 ? [] : await tx
+      .select({ evaluation: xEvaluations, post: xPosts, author: xAuthors, lead: xLeads, closeCall: closeCallSql, worth: worthSql })
+      .from(xEvaluations)
+      .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
+      .leftJoin(xAuthors, authorJoin)
+      .leftJoin(xLeads, and(eq(xLeads.projectId, xEvaluations.projectId), eq(xLeads.tweetId, xEvaluations.tweetId)))
+      .where(and(eq(xEvaluations.projectId, projectId), inArray(xEvaluations.id, top.map((one) => one.evaluationId))));
+    const entries = new Map(rows.map((row): [string, XEvaluationEntry] => {
+      const { evaluation, post, author, lead } = row;
+      return [evaluation.id, lead
+        ? { kind: "lead", lead: leadCard({ lead, post, author, context: evaluation.context, foundBy: evaluation.matchedPhrase }, now) }
+        : HELD_STAGES.includes(evaluation.stage)
+          ? { kind: "held", item: heldCard(row) }
+          : { kind: "filtered", item: filteredCard(row) }];
+    }));
+    // Same snapshot, so every ranked row is here; the guard only keeps the types honest.
+    const items = top.flatMap(({ evaluationId, priority, checks, notes }) => {
+      const entry = entries.get(evaluationId);
+      return entry ? [{ entry, priority, checks, notes }] : [];
+    });
+    return {
+      items,
+      total: ranked.length,
+      posts: pool.length,
+      faces: ranked.map((one) => opportunityFace(one.entryId, one.postedAt, one.priority, one.author, one.authorImage)),
+    };
+  }, { isolationLevel: "repeatable read", accessMode: "read only" });
 }
 
 /**
@@ -564,14 +569,17 @@ export async function xEvaluationEntry(projectId: string, evaluationId: string, 
   return lead ? { kind: "lead", lead: leadCard(lead, now) } : null;
 }
 
-/** Whether the conversation an evaluated post sits in is marked replied, for the pane's Replied button. */
+/**
+ * Whether an evaluated post is marked replied, for the pane's Replied button:
+ * a mark on its conversation or on the post itself, the same two New hides it by.
+ */
 export async function xEvaluationReplied(projectId: string, evaluationId: string): Promise<boolean> {
   const [row] = await db()
     .select({ id: handledThreads.id })
     .from(xEvaluations)
     .innerJoin(xPosts, eq(xPosts.id, xEvaluations.tweetId))
     .innerJoin(handledThreads, and(eq(handledThreads.projectId, xEvaluations.projectId), eq(handledThreads.platform, "x"),
-      eq(handledThreads.threadId, sql`coalesce(${xPosts.conversationId}, ${xPosts.id})`)))
+      or(eq(handledThreads.threadId, xPosts.conversationId), eq(handledThreads.threadId, xPosts.id))))
     .where(and(eq(xEvaluations.projectId, projectId), eq(xEvaluations.id, evaluationId)))
     .limit(1);
   return Boolean(row);

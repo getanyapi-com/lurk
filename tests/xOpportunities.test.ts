@@ -2,9 +2,9 @@ import { expect, it } from "vitest";
 import { db } from "@/db";
 import { handledThreads, leadMutes, llmUsage, xEvaluations, xLeads, xPosts } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { markThreadReplied, reopenThread } from "@/lib/handled";
-import { listXOpportunities, xEvaluationEntry, xEvaluationReplied, xOpportunityCard } from "@/lib/x/read";
-import { xEvaluationConversation } from "@/lib/x/write";
+import postgres from "postgres";
+import { listXOpportunities, xEvaluationEntry, xEvaluationReplied, xOpportunityCard, type XOpportunityFeed } from "@/lib/x/read";
+import { markXEvaluationReplied } from "@/lib/x/write";
 import { describeDb, makeProject, makeUser, newId } from "./fixtures/db";
 
 const good = {
@@ -111,16 +111,64 @@ describeDb("the ranked X window", () => {
     const screened = await add(project.id, "screened", { conversationId: "c2" });
     const [evaluation] = await db().select().from(xEvaluations).where(and(eq(xEvaluations.projectId, project.id), eq(xEvaluations.tweetId, screened)));
     expect(await xEvaluationReplied(project.id, evaluation.id)).toBe(false);
-    const conversation = await xEvaluationConversation(project.id, evaluation.id);
-    expect(conversation).toBe("c2");
-    await markThreadReplied(project.id, "x", conversation!);
+    expect(await markXEvaluationReplied(project.id, evaluation.id, true)).toBe(true);
+    expect(await db().select({ thread: handledThreads.threadId }).from(handledThreads).where(eq(handledThreads.projectId, project.id))).toEqual([{ thread: "c2" }]);
     expect(await xEvaluationReplied(project.id, evaluation.id)).toBe(true);
     expect((await listXOpportunities(project.id, { days: 7, status: "new" })).items).toEqual([]);
     expect(await db().select().from(xLeads).where(eq(xLeads.projectId, project.id))).toHaveLength(0);
-    await reopenThread(project.id, "x", conversation!);
+    await markXEvaluationReplied(project.id, evaluation.id, false);
     expect((await listXOpportunities(project.id, { days: 7, status: "new" })).items).toHaveLength(1);
     const other = await fixture();
-    expect(await xEvaluationConversation(other.id, evaluation.id)).toBeNull();
+    expect(await markXEvaluationReplied(other.id, evaluation.id, true)).toBe(false);
+  });
+
+  it("agrees on Replied whether the mark sits under the conversation or the post, for hiding, showing and undoing", async () => {
+    const project = await fixture();
+    const loose = await add(project.id, "no conversation yet");
+    const [evaluation] = await db().select().from(xEvaluations).where(and(eq(xEvaluations.projectId, project.id), eq(xEvaluations.tweetId, loose)));
+    await markXEvaluationReplied(project.id, evaluation.id, true);
+    // A later fetch fills in the conversation; the mark stays under the post's own id.
+    await db().update(xPosts).set({ conversationId: "c5" }).where(eq(xPosts.id, loose));
+    expect((await listXOpportunities(project.id, { days: 7, status: "new" })).items).toEqual([]);
+    expect(await xEvaluationReplied(project.id, evaluation.id)).toBe(true);
+    await markXEvaluationReplied(project.id, evaluation.id, false);
+    expect(await xEvaluationReplied(project.id, evaluation.id)).toBe(false);
+    expect((await listXOpportunities(project.id, { days: 7, status: "new" })).items).toHaveLength(1);
+  });
+
+  it("keeps an author's posts out after their lead there was acted on, whatever case X gives the handle in", async () => {
+    const project = await fixture();
+    await add(project.id, "hidden lead", { stage: "lead", status: "hidden", author: "Alice", conversationId: "c4" });
+    await add(project.id, "held sibling", { stage: "review", level: "complete", author: "alice", conversationId: "c4" });
+    expect((await listXOpportunities(project.id, { days: 7, status: "new" })).items).toEqual([]);
+  });
+
+  it("ranks and lists from one snapshot, so a lead hidden between the two reads is not listed half-changed", async () => {
+    const project = await fixture();
+    const lead = await add(project.id, "lead", { stage: "lead", status: "new", level: "complete" });
+    const other = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+    try {
+      let listing: Promise<XOpportunityFeed> | undefined;
+      await other.begin(async (t) => {
+        // Only the read of the listed cards joins x_authors, so it waits here
+        // after the ranking read has run.
+        await t`lock table x_authors in access exclusive mode`;
+        listing = listXOpportunities(project.id, { days: 7, status: "new" });
+        for (let tries = 0; tries < 500; tries += 1) {
+          // The listing's own connection: it has read handled_threads in this transaction.
+          const [{ waiting }] = await t`select count(*)::int as waiting from pg_locks w where w.relation = 'x_authors'::regclass and not w.granted
+            and exists (select 1 from pg_locks h where h.pid = w.pid and h.granted and h.relation = 'handled_threads'::regclass)`;
+          if (waiting > 0) break;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        await t`update x_leads set status = 'hidden' where project_id = ${project.id} and tweet_id = ${lead}`;
+      });
+      const feed = await listing!;
+      expect(feed.items).toHaveLength(1);
+      expect(feed.items[0].entry).toMatchObject({ kind: "lead", lead: { tweetId: lead, status: "new" } });
+    } finally {
+      await other.end();
+    }
   });
 
   it("uses the persisted final reply verdict, not a raw positive, independently of buyer-only signals", async () => {
