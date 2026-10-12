@@ -1,0 +1,1267 @@
+# X opportunity ranking candidate
+
+Version: `x-attention-2026-10-10.1`. Draft PR #131; not merged/deployed and not independently validated.
+
+## What changed
+
+The X tab's New view reads one ranked stream from the existing evaluation window. Workflow state no longer determines priority. Screened, held, rejected and already-scored pending-context posts can be displayed without becoming a lead. The initial pane may open a strong uncertain opportunity. Below a visible priority floor, weaker/unscored cards remain in the same stream; if all are weak, the page says so and does not automatically front one as a good match.
+
+The computation uses cached Jev evidence only:
+
+```
+need priority = own_need × max(same_kind, supported_job)
+                × (expected_intent + 1)/5
+                × (1−rival_vendor) × (1−promoting) × (1−resolved)
+```
+
+PR #133 (`x-attention-2026-10-12.1`) drops `supported_job`: no `xQuestions()` level asks it, so production evidence never carries it, and fit is `same_kind` alone. The r83 snapshot did carry it (405 evaluations, from unmerged commit 2c121fd1); an offline r83 replay with and without it gave identical positive ranks (13/14 consensus positives in the top 10).
+
+Expected intent uses a valid stored 0–4 distribution, normalized for rounding, or the **unrounded raw score** when probabilities are absent/malformed. Missing inputs make the affected path unassessed, not an invented zero. Personal/free use has no automatic commercial penalty; a supported basic job can outrank a specialised-brief neighbour classification.
+
+A completed positive reply check preserves public conversation opportunities with a bounded term `0.5 × founder_would_reply × fit × (1−rival_vendor)`. This path is computed independently: absent adoption-only inputs do not erase an otherwise assessed conversation. It requires the pipeline's final `reasonCode=worth_reply`, raw `reply.worth_reply=true`, no reply failure/code, and valid founder, fit and rival signals. A raw positive alone is insufficient: the pipeline also checks shape/moment, required checks and a verbatim quote. Missing legacy provenance disables only the conversation path. Priority is the maximum of the available paths; neither available means null, while a valid zero stays zero. The marker is provenance, not permission to include merged rows excluded by the reader.
+
+Explicit unmet requirements multiply each available path by .2. A failed public-reply assessment disables conversation priority and adds “Public reply not recommended”; **it no longer multiplies independent adoption priority by .3**. Unknown/malformed requirements and context are annotations, not penalties. A `none_stated` assessment gets a neutral detail-only compatibility caveat, not a list-wide check: lack of an identified requirement does not verify fit. No requirement-confidence threshold or platform-specific extraction was added. New keeps one card per author, with date/engagement as tiebreaks. History keeps each marked post.
+
+These are heuristics, **not calibrated probabilities or expected financial value**. Priority stays internal to ordering; list and detail use descriptive pills instead of numeric scores. All above-divider opportunities say “Potential match,” irrespective of their old lead/held/filter state; requirement and context checks remain separate annotations. Legacy fit/intent verdicts do not determine New’s badges, since they do not determine its order. Unknown requirements still do not reduce priority; a higher position is not proof of verified product compatibility. Below the provisional .4 divider, rows say “Weaker match” (or “Unassessed”), with quieter headlines, backgrounds and avatars. Hover, keyboard focus and selection restore emphasis, and all posts remain reviewable. History retains the familiar badges without applying this divider. The divider is guidance, not deletion or an alert threshold. The reader ranks the entire bounded date window before author deduplication and its 200-row display cap. It respects project words, mutes, unavailable posts, lead statuses, existing ask-score filters and answered conversations.
+
+The pipeline previously changed failed reply checks to restore the ordinary buyer fold to the stored evaluation instead of leaving the old reply-route score on it. This iteration changes the display reader only; existing historical rows are not mutated. Internal replay diagnostics retain each path separately, never in the blind packet or user-facing numeric display.
+
+## What did NOT change
+
+- Retrieval queries, paid allowances and API/model calls.
+- Qualification, promotion, lead writes and alert eligibility.
+- Quiet/weekly scheduling or lane pausing. These remain operational policies, not controlled by the display floor.
+- Scoring-settings/alert scores. Their existing configuration continues to affect qualified ask eligibility; they are not reinterpreted as weights for this experimental attention score.
+- Production product briefs/configuration, outreach, merge or deployment.
+
+## Reproducible development check
+
+```
+npm run x:ranking-replay -- \
+  --snapshot .context/x-audit/prospects1009-5/snapshot.json \
+  --out .context/x-audit/ranking1010/another-new-directory \
+  --seed lurk-iteration-20261010-r1
+```
+
+Use a NEW output directory for each run; existing evidence is never overwritten. This CLI loads no environment or DB, imports no API client, and blocks `fetch`. It produces `replay.json` (hashes, rankings and blind attribution) and `review.html` (no score, stage, source method or model label). Owner choices can be downloaded locally; nothing is sent to X or another person. This is the same candidate retrieval arm, not a comparison of two search pools.
+
+The frozen Oct 2–9 development replay covers 415 candidate product/posts:
+
+| Check | Result |
+|---|---|
+| Clipy free recorder for a few videos | 11th in old groups → 3rd in new order |
+| Clipy already-recorded app-review story | 1st in flat old-score sort → 18th in Oct 9 ranker → 10th in Oct 10 ranker: known first-page regression |
+| Clipy first nine new cards | Two previously model-supported and seven model-conditional cases |
+| Grenseo screened complaint | 2nd in new order, still not verified exact technical fit |
+| Tally / Scarlett | No card clears the provisional .4 divider |
+
+These are unblinded sanity checks. Formula choice was informed by inspected examples; labels are model-generated; overlapping development data cannot demonstrate better user utility, recall, conversions or an unseen week. The cheap ranking fix does not establish that retrieval finds enough useful conversations.
+
+### Oct 10 review-driven semantic iteration
+
+Astra and Fable reviewed the route/evidence separation, with an implementation round after edits. They agree this corrects interpretation of cached inputs, not that it improves user usefulness. Astra's requirement-uncertainty critique was adopted: detail-only compatibility disclosure and conservative malformed-choice fallback. Fable's proposed `.7` requirement-mass cutoff was not adopted: it is another unvalidated threshold selected using inspected examples. Removing weaker-row muting was deferred because it conflicts with the explicitly requested visual distinction. The provisional .4 divider still collapses differing evidence levels; it is not a calibrated good/bad boundary.
+
+Before/after replay used identical saved posts and seed, in separate `before/` and `final/` output directories under `.context/x-audit/ranking1010/`; `after/` and `comparison.json` are preserved intermediate evidence, not final-source annotations. `final-comparison.json` references the final source hash; numerical order is unchanged from the intermediate run. There are 415 posts and 363 retained authors. Above-divider counts stay Cal.com 1, Tally 0, Clipy 3, Grenseo 1, Scarlett 0 (total **5**). Seventeen author priorities rise after removing the public-reply penalty. The ordered first ten change on four projects: unchanged above-divider counts do **not** establish unchanged first-page usefulness. Besides the already-solved Clipy story, Tally's promotional comparison rises 19th→8th and Cal.com's ambiguous Lemon post rises 22nd→10th. These regressions expose unreliable cached job/resolution/promotion signals; no weights were retuned to hide them.
+
+Independent conversation handling changes **zero cards in this archived corpus**: its missing-adoption-input behavior is covered by unit and reader/CLI integration fixtures, not evidence of newly recovered real prospects. The archived corpus also has no raw-positive-plus-failure-code example; that contradiction is fixture-tested only. The Mac request still stores `none_stated` despite explicitly asking for Mac: its detail caveat does not extract that constraint or verify Mac support, and the list still cannot distinguish it from a genuine no-specific-requirement request. Fixing that stored assessment remains deferred, as does the divider's compression of differing evidence strengths. No new retrieval, owner choices or conversions occurred. Unit coverage also checks failure override, absent marker/fit, malformed choices, valid zero and unmet scaling. Reader/CLI integration verifies the final marker reaches the ranker and route diagnostics do not enter the blind packet. Fresh full check: 970 tests across 106 files, including all four database-backed opportunity-reader cases (`check-final.log`); build passes. The actual archived preview displays the neutral caveat, with zero jobs, scans or usage rows afterwards. No real conversation-only example exists to render; that missing-adoption-input case remains fixture-only.
+
+## Prospective review protocol — previous freeze superseded
+
+### Oct 11 experimental task-reading contract (offline only)
+
+`src/lib/x/taskReading.ts` is a separate experimental contract, version
+`x-task-reading-2026-10-11.1`. **It is not called by judgeX or the display
+ranker.** No historical signals are rewritten. It asks for the particular
+product-linked task, author ownership/state, and author/fact citations, so a
+completed recording cannot be confused with an unresolved app-review problem.
+Personal, community and free use remain valid; missing product support stays
+unknown, not incompatible. Parents cannot supply an author's own need.
+
+Seven independent choice questions replace the existing requirement question
+and add six others. Source maps contain the actual normalized/truncated author
+sentences and exact supplied fact fields. A cited requirement verdict remains
+provisional: citation existence cannot prove the inference, and one fact cannot
+establish support for every restriction. Invalid requirement citations degrade
+to unknown without changing the raw answers.
+
+For a valid task-relation distribution, the experimental task factor is
+`P(own_open) + P(own_evaluating) + P(unknown) × legacyTaskFactor`, where the
+legacy factor is `own_need × (1−promoting) × (1−resolved)`. Missing/malformed
+distributions or invalid citation IDs retain the legacy factor. Uncited
+relation mass backs off to unknown; absent task linkage moves all own-task mass
+to unknown while retaining grounded non-adopter mass. The selected label alone
+cannot change the numerical result for the same distribution and citations.
+No one-hot probabilities are fabricated from reviewer choices.
+
+The source-blinded development probe freezes 100 archived posts (first 15
+retained-author cards plus five seeded remaining cards per project). Astra's
+independent reference is separate from the candidate extraction. Fable's
+extraction and implementation reviews failed at the provider; a fresh blinded
+Astra session continues extraction, explicitly a same-model-family surrogate,
+not a Fable result. Agreement is not owner utility or Jev accuracy. Without actual new Jev
+probabilities, the experimental numerical sort cannot be evaluated. The
+acceptance criterion remains fewer determinate evidence errors, no new
+determinate false closures, and no project losing useful first-ten cards; an
+inconclusive result or unchanged sort is **not a win**. Evidence and model
+disagreements are retained in `.context/x-audit/evidence1011/`.
+
+Reproduce a source-only export (no environment, DB or model-client imports):
+
+```
+npx tsx scripts/x-task-contract.ts SOURCE_PACKET NEW_OUTPUT.json
+```
+
+Existing output is refused. The measured complete-question block grows from
+20 to 26 questions, with a median 4,774 additional serialized question bytes
+(about 30%) and a median 1,144-byte extra fact map on this sample. These are
+local payload measurements, **not billed tokens, dollars, latency or real
+provider adherence**. Same call count does not imply unchanged cost.
+
+#### Development probe result and next hypothesis
+
+The 100-card categorical probe is **inconclusive, not an improvement**.
+The two blinded Astra passes agreed on 91 task classes, left five inconclusive,
+and disagreed on four potentially useful but ambiguous questions. Those four
+are not proven missed adopters. Requirement-label differences fell from 38 to
+nine, but different definitions of core job, hard restriction and optional
+interest prevent interpreting that as 29 corrected errors. No actual Jev
+probabilities were produced; no numerical ranking improvement was measured.
+One reference quote in a long Tally post was outside the scorer's bounded
+head/tail input; full-text reference is not automatically identical evidence.
+
+The separate reference pass over all 114 cached Tally posts found 112 Skips,
+one Investigate and one Insufficient. The investigation is an ambiguous
+complaint about CPA intake forms, not a clear open request to create a form.
+This is a weak cached retrieval pool, not evidence that Tally lacks demand.
+Free and personal use were not excluded. Ranking alone cannot create missing
+prospects; the saved earlier scout already tried some basic job/first-person
+queries, so those are not unexplored retrieval ideas.
+
+The next separately versioned hypothesis is `x-open-task-2026-10-11.2`:
+`xOpenTaskQuestions` adds a genuine joint NOUL for a still-open author adoption
+task, with source/fact diagnostics; `xOpenTaskFactor` uses it only with valid
+citations and a non-unknown relation. Missing or ambiguous evidence retains
+the old graded factor. It does not turn a chosen label into certainty. This
+hypothesis remains **offline and not enabled in production**. The pure
+OpenRouter wire serializer/parser is shared with the app in `jevWire.ts`;
+Gateway adherence is not established by an OpenRouter-route comparison.
+
+Forty paired requests are frozen (six nonoverlap and two declared diagnostics
+per project), with exact app `candidateOf`/state/question parity verified.
+The input correction strips a leading reply handle in one case; earlier
+artifacts remain preserved. A separate source-blinded Astra reference labels
+these 40 as two Reply, four Investigate, 30 Skip and four Insufficient. These
+are proxy judgments, not owner choices or unseen validation.
+
+The prepared comparison sorts a fixed 131-card context, overlaying the same
+40 fresh pairs in both arms while leaving 91 cached cards equal. Diagnostics
+also get an excluded sensitivity comparison. Incomplete pairs remain cached
+in both arms and an incomplete trial cannot establish a win. Raw answers and
+archived checked-reply provenance are preserved. Joint-factor coverage,
+unchanged-question drift, requirements, first-ten movements and actual billing
+must all be reported. The executor and evaluator check frozen hashes and
+request/journal provenance. Six isolated fake-fetch billing/error fixtures
+pass; these do not measure API behavior or actual cost.
+
+### Authorized paid scoring results, Oct 11
+
+Kevin authorized **$5 cumulative testing spend**, not $5 per run. This does
+not authorize fresh X scans or production changes. Historical audit costs are
+separate. Every new attempt is journalled; unresolved charges retain a full
+conservative reservation against the total.
+
+The 40 paired actual Jev comparison completed with 80 usable responses and
+$0.021785988 recorded cost. A dated model alias initially stopped execution;
+the first response was retained once after verifying the exact alias. The
+joint factor activated on only 2/40 cases. First-ten model-reference useful
+counts did not improve on any project. Astra and Fable's saved independent
+reviews found no accepted win; Fable's T3 task was subsequently cancelled by a
+server restart, so its surviving written review is not a terminal approval.
+The diagnostic-excluded sample was mostly below the head, limiting its ability
+to reveal first-page effects.
+
+A 30-response locator-option text diagnostic cost $0.009568272 and did not
+improve role citation/joint coverage. A separate 20-response role-instruction
+probe cost $0.006258: role citations rose 1/10 to 8/10 and joint activation
+1/10 to 6/10. This fixes a mechanical evidence-locator problem, not owner
+utility. It also exposes joint replacement raising some publishers.
+
+A predeclared 60-card cached-head comparison then used two identical baseline
+controls and the role-wording candidate, comparing both joint replacement and
+a conservative fold retaining existing promotion/resolution suppression.
+All 180 usable responses were obtained across 182 attempts. Two transport
+failures remain unknown-cost; their combined $0.145152 reservation is retained.
+Successful responses were reused unchanged through two separately journalled
+continuations, with request/hash provenance. The second continuation extended
+only the network timeout; prompts, labels, formulas and acceptance criteria
+were unchanged. This head test recorded $0.045114930.
+
+All four rankings retain the same model-reference useful first-ten counts:
+Cal.com 4, Tally 0, Clipy 9, Grenseo 2, Scarlett 1. Joint activation rose to
+42/60, but **neither candidate met the predeclared improvement criterion**.
+Valid citation IDs do not prove entailment. Content-scheduling/appointment
+scope confusion and crawler-access/causal-attribution support errors persist.
+The conservative fold reduces some publisher uplifts by construction, not as
+independent evidence of better understanding.
+
+The fixed **131-card replay context**, not the full 415-post corpus, contains
+known-reference useful totals of 4/1/11/2/1. Its known-label first-ten ceiling
+is 18 against the measured 16; four unresolved reference cases remain unknown.
+Three projects have no additional known-useful card to recover within this
+context. Tally's ambiguous intake complaint and two Clipy cases remain below
+the first ten. This is neither a global retrieval ceiling nor owner truth.
+
+At completion of the head test, cumulative known cost is **$0.082727190**,
+plus **$0.145152 reserved** for unknown charges. The authoritative continuing
+ledger is `.context/x-audit/evidence1011/testing-budget.json`; this paragraph
+is a dated checkpoint, not the remaining budget for later runs.
+
+Artifacts: `actual-comparison-r17.json`, `binding-results-r20.json`,
+`role-results-r22.json`, `head-results-r29.json`, all purchase journals and
+continuation amendments in the ignored evidence folder. Source-blinded model
+references remain development proxies, not human preferences, unseen
+validation, calibrated probabilities, conversions or measured global recall.
+The task contract remains offline; no revised factor is enabled in production.
+The previously recorded full source check passed 979 tests across 107 files;
+that historical software check is not new API or usefulness proof.
+
+### Standalone direct-attention experiment, Oct 11
+
+The next first-principles hypothesis judged worthwhile investigation directly,
+instead of replacing a marginal factor. Both independent preparation reviews
+found the same blocker: mixing a standalone scalar on grounded posts with a
+legacy product on ungrounded posts. This was corrected **before purchase**:
+every valid scalar, including zero with `none` citations, drives need attention;
+locators are diagnostics only. The unbought r30 is preserved and superseded by
+r32. A subsequent native amendment review was interrupted without a completed
+approval; none is inferred. Root verified the correction and frozen hashes;
+seven isolated fake-fetch fixtures passed, including zero with absent task
+linkage, with zero real API calls.
+
+All **131 cached replay-pool cards** received three fresh calls: identical
+baseline A/B and candidate containing the same 20 baseline questions plus one
+holistic NOUL and three primary-task/role/fact locators. Actual app input
+construction and body equivalence across the preparation amendment were
+verified. The candidate reads a supplied fact map; this is a bundle comparison,
+not an isolated causal estimate of a single question. No old intent/fit/
+promotion/resolution multipliers are applied to the holistic scalar. Existing
+checked-conversation provenance remains required. No display-floor,
+qualification, alerts or production integration changed.
+
+The 393 requests all returned usable responses, with **$0.097261374** recorded
+cost and no new unknown charges. Candidate reference-useful first-ten counts
+are **4/0/8/2/0 (14 total)**, versus **4/0/9/2/1 (16)** in both controls. Tally's
+first model-reference useful case moves 16th→21st; Scarlett's moves 3rd/4th→11th.
+The candidate loses one useful first-page case each on Clipy and Scarlett.
+It **fails** the frozen more-useful/fewer-Skip/no-project-loss criteria. The
+same conclusion holds with the predeclared bounded-source sensitivity treating
+one fuller-text Tally reference as Unknown. Unknown reference cards cannot
+establish a win by merely replacing Skips.
+
+Evidence: `HOLISTIC_PROTOCOL_R32.md`, `holistic-freeze-r32.json`,
+`purchases-holistic-r32.jsonl`, `holistic-results-r32.json` and the unchanged
+per-case raw answers in the ignored evidence directory. Fable's completed
+actual-result review independently verified all 12 hashes, 393 unique usable
+responses and the recorded receipts, and rejected the candidate. Its source
+audit identifies wrong-operation, helper and promotional uplifts; it also
+disputes several development reference actions. Neither those disputed actions
+nor cross-scale replicated score differences establish owner truth or statistical
+significance. Grenseo's reported AUC was tied, not worse. Astra's completed actual-result
+review also independently verifies the execution and rejects r32. It distinguishes
+source errors from debatable preferences and proposes a small sequential
+coherent-frame diagnostic with explicit source-entailment contrasts, not an
+accepted fix.
+A count regression against model references alone does not prove every disputed
+opportunity is worthless. The candidate is **not integrated**.
+
+Cumulative recorded scoring API charges after this test: **$0.179988564**,
+plus **$0.145152 reserved** for two earlier unknown charges. The same $5 overall
+cap leaves **$4.674859436 unencumbered** at this checkpoint. Model-review
+subscription usage is not represented as scoring API receipts. Cheap execution
+has been measured; useful lead recovery has not. No fresh X retrieval,
+production changes, owner review, unseen validation or conversions occurred.
+
+### Preference diagnostic and next mechanism preparation, Oct 11
+
+A zero-cost blinded preference packet is prepared, not completed. Its reproduced
+selection is the union of 19 model-reference-useful cards, 34 distinct first-ten
+boundary movers against either control (two useful overlaps), and four unknown
+references: **55 unique archived cards**, not the reviewer's approximate 42.
+The packet hides previous grades, positions, reference actions and model
+attribution. Exact bounded author words, supplied context, bios and product
+briefs remain available. Save / Investigate / Reply / Skip / Not sure and optional
+rationale export locally; missing and unsure choices remain unknown. Kevin's
+choices are proxy preferences unless the project-owner identity is established.
+They do not authorize outreach or measure conversion. Selection is conditioned
+on prior results, not unseen validation; because not every first-ten position is
+included, do not derive full precision@10 from this packet. Desktop/mobile
+render and isolated interaction/export checks passed with zero external calls.
+No choices have been collected or automatically transmitted.
+
+Artifacts: `OWNER_PROTOCOL_R35.md`, `owner-freeze-r35.json`,
+`owner-review-r35.html` and separate public/private packet JSON in the ignored
+evidence directory. The HTML contains no previous scores or private mappings.
+
+A separate **24-case coherent task-frame extraction probe** is concretely
+prepared for independent review, not bought: 16 named development failure/
+disagreement cases plus eight deterministically selected positive-retention
+controls. It asks a cheap structured-output model to describe actor, exact
+operation/object/output, concurrent tasks, task-local temporal state, adoption
+openness and explicit versus unknown requirements, with source quotations.
+There are no lead labels, scalar grades or fitted coefficients. Existing
+same-call independent locators did not test conditioning a second call on such
+a frame. Mechanical citations still do not establish entailment; every frame
+must pass an independent source audit before preparing a later paired scorer.
+No edited successful frames may be selectively passed onward. A successful
+extraction probe alone would not establish ranking usefulness or owner demand.
+
+`FRAME_PROTOCOL_R36.md` and r36/r38 plans are preserved as unbought preparations.
+Fable's completed r37 review supports a source-mechanism probe, with concrete
+pre-purchase gaps: fixed source expectations/threshold, output/reasoning bounds,
+a genuine Grenseo control, citable background and no example-answer leakage.
+The r40 preparation addresses those classes. Its eight controls include a real
+Grenseo tracker request; the system prompt uses generalized operation rules;
+all supplied brief fields and bio are citable. This uses Gemini rather than Jev,
+so even a pass would be a model/design-bundle result, not proof that sequential
+architecture alone helped.
+
+The review also exposed earlier reviewer overclaims. The Microsoft/SSO post
+actually discusses booking pages and Calendly; a completed switch is plausible,
+not uniquely established. Grenseo's supplied brief explicitly mentions citations
+driving AI answers; exact answer-specific attribution remains unknown rather
+than proved absent. One evaluator p0 can concatenate an author's self-thread:
+the saved recorder inquiry is separate from its earlier traffic invitation.
+The extractor still sees only the bounded combined input and must not invent
+chronology. Preserve these alternatives in the pre-purchase expectation sheet.
+
+`FRAME_PROTOCOL_R40.md`, `frame-plan-r40.json` and ignored `run-frame-r40.mjs`
+provide concrete serial mechanics, with no second-stage scorer prepared. Sixteen
+isolated fake-fetch fixtures pass (36 simulated POSTs, **zero real calls**),
+including durable pending reservations, reasoning/token cap failures, malformed
+JSON, exact quotations, shape bounds, tamper detection and near-cap rejection.
+The executor defaults to no-network dry run. Explicit reasoning off is enforced
+in the request and must be proved by actual usage before a response is usable;
+missing reasoning usage stops rather than becoming zero. Array limits are in the
+schema; executable validation additionally enforces bounded free strings.
+
+The 24-attempt local ceiling is **$0.50 within the same $5 cumulative cap**.
+The pending reserve is widened conservatively to the full published input AND
+provider output maximum, including reasoning: **$0.360448 per pending attempt**,
+not expected spend. Previous unknown charges remain reserved. Public catalog
+price/context/capabilities must match frozen metadata, requests have provider
+price/parameter guards, and any uncertain failure stops without automatic retry.
+Astra completed 24 pre-purchase expectation rows containing 122 source rules
+and 261 exact citations, all independently checked before a 12-artifact freeze.
+Fable's completed r41 mechanics review found no concrete budget/security defect;
+its earlier snapshot lacked the expectations/freeze that subsequently landed.
+That review is not approval of later changed hashes or evidence of utility.
+
+#### Actual frame smoke and stopped continuation
+
+The r40 first call returned billing and zero reported reasoning tokens, but a
+validator incorrectly classified signature-only Google metadata as thought
+content. It stopped after **one call, $0.0015295**. The raw response, source and
+frozen expectations remain unchanged. A narrow r42 representation amendment
+allows recognized signature-only metadata only when usage reports zero thinking;
+nonblank thought text remains rejected. Eighteen zero-call fixtures pass, including
+both metadata cases. It also requests explicit usage receipts, as Fable advised.
+
+The continuation reused that already-paid response with journal/request hashes
+and proof its charge was already in the cumulative ledger; it did **not** retry
+or charge it twice. Two fresh responses cost **$0.0024185**. The second stopped
+on two exact source quotations exceeding the frozen 160-code-point limit (the longest
+was 202 points). No source text or generated frame was shortened or patched.
+The stop is a mechanical length failure, not itself proof of bad understanding.
+A wider quotation limit has been inspected **offline only**, not promoted to
+primary acceptance or used to call a completed trial.
+
+Exactly **three actual unique frames**, not 24, were bought for **$0.003948**.
+Fable's completed independent r43 audit verifies receipts, reuse, all 16 r42
+freeze hashes and exact source quotations. It confirms a critical diagnostic
+source failure: advice that booking pages let someone replace Calendly became
+an unqualified completed personal migration, and current Google subscription
+became a mandatory integration allegedly supported by Cal.com without a fact
+citation. The source permits a qualified migration inference, not a definite
+completion claim. Both Clipy controls retain their actual requests; that does
+not excuse the diagnostic error or prove every frame bad.
+
+**Close r40/r42 as rejected under the frozen development criterion.** The
+remaining 21 calls are not bought: they cannot restore all 24 usable responses
+or remove the already-observed critical source error. No paid output,
+expectation or criterion is patched to salvage a pass. Astra's completed r43
+audit independently confirms both decisive errors and the exact three-call
+accounting. It also records the first Clipy frame's overstatement of no AI slop
+as a ban on AI features, without retrofitting a new rejection threshold on a
+retained control. This is neither an architecture verdict nor a ranking/owner-
+utility result; there is no second-stage scoring call or production integration.
+
+A zero-purchase r44 design proposal compares a quote-only variance rerun,
+source-only task extraction followed by separate product mapping, and a
+one-call typed-claim revision. The latter two would distinguish stated facts
+from inference per claim rather than hide uncertainty in a catch-all field.
+Source-only extraction would withhold product facts to test contamination;
+removing compatibility fields would leave that class **untested**, not passed.
+Fixed source-ID citations remove model-written quotation-length failures
+without purporting to fix entailment. Fable's completed r44 design review
+chooses source-only extraction and withdraws its earlier quote-only rerun
+recommendation. Per-claim uncertainty is needed because every earlier catch-all
+unresolved field was merely unknown; product removal alone cannot repair a
+person/state misreading. Its claim that a failure establishes brief/retrieval,
+not reader, as the cause is not accepted: that does not follow from this probe.
+
+A new **r45 source-only candidate is prepared, not purchased**: five tasks,
+typed stated/inferred/unknown basis on named actor/operation/state/condition
+claims, task-local requirements and fixed source-pointer enums. A direct author
+request needs no I/my; authoring advice is not personally executing its advice.
+These are source-entailment rules, not lexical pronoun gates. All 24 own/context/
+bio maps remain unchanged. The 122 original expectation items remain immutable;
+routing yields 53 source-only, 43 mixed and 26 product-only. Mixed source facets
+are reviewed and product support remains untested; fact-cited budget boilerplate
+still cannot license invented author conditions or commercial intent.
+
+Twenty-five isolated fake-fetch fixtures pass: **66 simulated POSTs, zero real
+calls**, exercising durable reservations, unknown billing, receipt/model/token/
+reasoning guards, source-only payloads, fixed pointers, all flags despite shape
+errors, catalog price drift, pre-existing lock/journal refusal and near-cap stop.
+The dry run verifies 15 frozen artifacts and performs zero network requests.
+This is executor preparation proof, not semantic or ranking evidence. Astra's
+completed independent r44 design review instead recommends the smaller complete
+one-call typed-claim test, retaining product support/relation challenges. Root
+selects that **joint C** test first. Fable's product-priming and reuse objections
+remain valid risks; no review is represented as unanimous. Both variants are
+prompt/schema bundles with stochastic variance, so neither pass would establish
+sequencing causality. The r45 source-only preparation is preserved unbought, and
+its exact-executor review r46 is cancelled as superseded, not failed or approved.
+
+The new **r47 joint candidate is prepared, not purchased**: same 24 full source
+maps and original expectations, per-claim basis/pointers, nested task-local
+condition/necessity/support and separately qualified operation relations. No
+catch-all unqualified summary/adoption slot; relation/support explanations are
+audited under their claim basis. Product facts remain available, while the same
+brief is not sent again in a redundant top-level product object. Twenty-six
+fake-fetch fixtures pass with **24 simulated POSTs, zero real calls**. Fifteen
+artifacts were frozen and zero-network dry run passed. Fable's r48 exact
+executor review found no blocking defect; Astra's independently completed review
+reproduced two receipt-validation blockers before any purchase. Falsey parsed
+JSON bypassed object validation, and nonstring reasoning could throw before
+response journaling. Both were fixed before execution: every parsed value is
+schema-checked, metadata types become ordinary rejection errors, and full known-
+charge receipt evidence is fsynced before interpretation with a narrow exception
+boundary. Thirty-four zero-call checks passed (32 fake POSTs); request/prompt/
+source/expectation bytes unchanged and affected freeze hashes renewed. Older
+readiness reviews are not represented as approval of changed executor hashes.
+
+Only **three initial regression calls** can execute under this prepared runner,
+then it pauses for independent actual-source audit before any of the remaining
+21. A clean cohort is not a full24 pass, source error rate, architecture proof
+or ranking result. A critical source failure ends the candidate. The first
+cohort order deliberately includes the two retained controls and known Cal
+failure; all are development regressions, not a fresh holdout.
+
+#### Actual joint attempt and provider-format diagnostics
+
+The r47 first physical POST returned **Google HTTP400 INVALID_ARGUMENT**, no
+model frame and no cost receipt. It stopped immediately; the other two planned
+cohort calls were not made. Its **$0.360448** worst-case charge remains reserved,
+not assumed paid or free. A separately declared one-call r50 wire diagnostic
+removed repeated pointer enums while retaining the executable whitelist. The
+same400 occurred, again no frame/receipt, another **$0.360448** reserved. Enum
+removal alone did not fix the rejection; the generic error does not identify
+which constraint caused it. Google's official structured-output documentation
+notes large/deep schemas may be rejected, but that is only a possible explanation.
+
+A separately frozen one-call r51 diagnostic used JSON-object mode with the same
+typed contract supplied in system text and strictly validated locally. It
+returned **one actual frame for $0.00148175**, complete stop and zero reported
+reasoning. It was **mechanically unusable**: bare s0/s1 and generic fact pointers
+failed the unchanged exact namespaced-source contract. No IDs were patched,
+frame accepted, or other case bought. The raw frame's interpretation of no AI
+slop and its different-operation verdict based on specialized positioning are
+independently audited by both Fable and Astra r52. Both reject the frame; Astra accepts its functional recording abstraction alongside request communication, unlike Fable. That source-reading disagreement is preserved, not made a mandatory verb gate. Fable confirms semantic failures beyond pointers: a which-tool request becomes a stated recording/video-output task, no AI slop loses its quality qualifier and becomes a stated required ban, face cam/editing are omitted, and positioning overrides supplied capabilities. The honest unknown AI support does not erase these failures. No output is rehabilitated.
+
+Thus **three new physical requests across three declared variants**, two without
+any frame/cost receipt and one known-cost unusable frame—not three completed
+regressions, zero accepted frames and no full24 or ranking comparison. Current
+candidate/provider-wire changes are stopped pending actual reviews. Neither
+receipt failure nor a citation-shape failure is proof that the architecture
+cannot work. The original r40/r42 paid failures and all unbought preparations
+remain preserved.
+
+Cumulative known receipts now **$0.185418314**, unknown reservations
+**$0.866048**, leaving **$3.948533686** under the same $5 cap. Incremental known
+cost is $0.00148175 and new uncertainty reserve $0.720896; the reserve is not
+reported spend. Ledger/run sums reconcile, no pending lock remains. Each format
+diagnostic had its own declared local exposure bound; the stopped tranche's
+unknown charge was never ignored or silently reused. No fresh X, DB/production/
+config/display, outreach or deploy occurred. Evidence: both r48 reviews,
+`JOINT_RECEIPT_AMENDMENT_R49.md`, r47/r50/r51 frozen plans, execution logs,
+purchase journals, wire protocols, `joint-partial-result-r52.json` and current
+budget. Both independent r52 actual-source reviews are completed and preserved. Astra prefers a zero-API owner comparison next; Fable proposes the controlled reader probe. Root selected the bounded mechanism question, not consensus on utility.
+
+
+#### Controlled reader comparison prepared; not purchased
+
+Fable identifies the mechanical representation defect: r50 removed the only
+literal namespaced-ID enum, and r51 showed nested namespace/key fields instead
+of the `own:s0` strings required locally. The new r53 model input uses a single
+flat `{id,text}` list with every literal pointer; all source text/maps, schema,
+semantic instructions and original expectations are unchanged. The pointer
+sentence changes to name the literal ID field. Both arms also newly disable
+provider fallback; this common routing safeguard is disclosed, not described as
+an unchanged wire bundle versus r51. Within pairs messages and parameters are
+byte-identical except model ID and necessary published provider price guards.
+
+Maximum **six serial fresh calls** on the same three inspected cases, counter-
+balanced L,S / S,L / L,S. L is Gemini3.1FlashLite; S is Gemini3FlashPreview, a
+higher-priced non-Lite candidate, not proved stronger on this task. Same JSON-
+object contract, temperature0, reasoning off, 3500 output cap; receipts must
+prove zero reasoning. L full published context/output reserve **$0.360448**,
+local hard exposure **$0.50**; S reserve **$0.720896**, explicitly raised local
+hard exposure **$1.00**. Overall $5 unchanged, all unknowns retained. Recorded
+spend stop $0.10 per arm is not a hard ten-cent limit. Global mechanical/receipt/
+budget stop, no retry/reuse/remaining21 purchase. Source audits after complete
+six receipts, never an automatic semantic pass. Thirty-six offline fixtures,
+46 simulated POSTs, zero paid calls passed; 13 artifact hashes and zero-network
+dry run verified. Both exact-executor r54 reviews completed: no current-catalog blocker reproduced, but the request-fee guard was omitted when rebuilding max_price. Root restored request:0 and added livecatalog rejection of nonzero/invalid request fees in a separately preserved r55 billing-only amendment.42offlinechecks52fakePOST0paidpassed; source/message/schema/criteria bytes unchanged,16artifactfreeze/dryrunverified. Old r54 reviews concern original r53 bytes, not automatic certification of amended hashes.
+
+Original critical failure criteria and immutable r40 expectations remain.
+Both control failures close this typed-joint tuning line on these cases, not
+all architectures. A passing S with failing L supports a candidate-reader
+bundle on three development cases, not a general causal bottleneck. A passing
+arm can justify a separately frozen remaining21 test, not immediate131 replay,
+owner usefulness or ranking improvement. No owner choices have been collected.
+No scoring purchase was made for the original r53 preparation; it remains unbought. The separately frozen r55 amendment was subsequently executed as recorded below.
+Evidence: `READER_PAIR_PROTOCOL_R53.md`, paired plan/executor/fixtures/freeze,
+public catalog snapshot and completed Fable r52 source report.
+
+#### Actual controlled reader execution; semantic reviews pending
+
+The amended r55 runner completed **six fresh serial physical POSTs**, three per
+arm, all mechanically usable with literal source IDs, complete stop and zero
+reported reasoning. No retry/reuse, new unknown charge or extra case purchase.
+The three price-guarded pairs used identical submitted sources/messages/schema
+and semantic parameters except model/necessary published price guard. Original
+r53 remains preserved and unbought. Exact amended plan hash:
+`912ab5398667d6e2e7db9838c735c82baa5787f2b219d542cb4fe60a2acbdee6`.
+
+Observed scoring cost **$0.01862475**: L **$0.00625525**, S **$0.01236950**.
+Cumulative known **$0.204043064**, unknown reserved **$0.866048**, remaining
+**$3.929908936** under the same $5 total. Six reservation/receipt/answer rows
+account for six purchases; raw receipts and answers are not counted twice.
+Ledger/run sums and all preparation hashes reconcile; no pending lock remains.
+Neither model price nor cost on three variable-length cases establishes a
+production budget guarantee.
+
+Mechanical completion is **not a semantic pass**. Initial root inspection finds
+L still broadens no AI slop and mistakes specialized positioning/tool-selection
+communication for a different operation; S retains more concrete capability
+support but appears to overstate author conditions/actions. These are preliminary
+source observations, not settled independent verdicts or a ranking result. All
+soft flags are preserved, including L Cal relation-linkage flags. No acceptable
+arm/full24 result is claimed, and the remaining21 are not bought.
+
+A new opaque-ID shuffled source-only review packet contains all six exact
+frames, sources and flags, hiding model/arm/cost/case identity for first-pass
+reading. The private map and unchanged raw journals are then used for accounting
+and model comparison. This is imperfect model-output blinding, not owner labels
+or unseen validation; review findings are recorded before unmapping. Independent
+Astra/Fable actual r56 reviews are active. Original expectation ambiguities and
+critical criteria stay immutable; no literal-select verb gate or post-output
+relaxation. Source-cleanliness, owner usefulness, ranking and retrieval remain
+separate questions. The owner packet still has zero choices.
+
+Evidence: both completed r54 readiness reports, `READER_PAIR_PROTOCOL_R55.md`,
+r55 plan/executor/fixtures/preparation freeze, execution result/raw purchase
+journal/current verified pricing, `reader-pair-actual-freeze-r56.json`, and
+public/private r56 source-review packets. No fresh X, production/config/display,
+outreach, merge or deployment. PR remains draft.
+
+#### Independent reader reviews and next owner comparison
+
+Both actual r56 reviews are complete and verify all six raw receipts/freeze
+hashes/accounting. Fable grades L1/3 and S3/3 with qualified Cal basis/condition
+and omitted-advice gaps; Astra grades L0/3 and S2/3, rejecting S Cal's stated
+actor/operation migration and required/stated affordability. Root keeps that
+Cal failure under the ORIGINAL per-claim rule: inferred completion in two fields
+does not qualify unsupported stated claims elsewhere. No forgiving the original
+criterion after seeing a better-looking model. L short-question operation
+exclusion remains disputed; functional recording abstraction is allowed without
+a new literal-select verb gate. Fable's changed no-AI-content paraphrase grading
+is not adopted; a bio mentioning AI is also not proof of acceptance of a specific
+target's AI use. Both independent reports remain intact.
+
+Root verdict: **S passes the controls but not all three**. Neither all3 unlock
+nor bothfailcontrol closure branch is met. No remaining21/42call buy or new typed-
+joint prompt revision now. This pauses this purchase line; it does not disprove
+joint architectures or establish a generally solved reader bottleneck. Observed
+higher-tier source improvements cannot repair rejected r32 ranking utility.
+
+Prepared **r57 zero-API owner attention comparison** on the already frozen131
+pool: ALL top-ten union from baseline_a/b/rejectedr32 candidate,68unique cards,
+plus exactly two seeded cards outside all three top tens per project,10more.
+Total78: Cal15/Tally16/Clipy13/Grenseo16/Scarlett18. Unlike original r35diagnostic55,
+this includes every common top-ten card and can support exact original first-ten
+owner counts if reviewed. Original r35 is preserved; neither packet has collected
+choices. No model-reference-label selection, scores, ranks, model labels or
+selection reasons appear publicly. Opaque seeded order, original bounded source/
+context/bio/product facts, per-project filter, local-only five-action choices and
+rationale/export. No automatic chat or production ingestion claimed.
+
+Save/Investigate/Reply/Skip/unresolved are reported separately. Auxiliary
+attention counts have known lower / known+unknown upper bounds. Candidate wins
+this bounded comparison only if aggregate lower exceeds BOTH baseline uppers
+AND each project's lower does not fall below baseline upper; unknown choices
+cannot be assigned conveniently. First known attention rank and only sampled
+attention outside first ten are separate, not global recall/conversion or
+calibrated probabilities. Do not retune frozen orders while choices arrive.
+
+Meaningful synthetic analyzer checks passed: missing/Not sure remain unknown,
+allSkip counts, ties not wins, partial asymmetric mapping, invalid versions/
+IDs/duplicates/project/actions rejected, complete unique union/no public grades.
+Desktop728/mobile360 HTML renders and temporary synthetic filter/navigation/
+action/note/export checks passed; zero real choices. Twelve artifact hashes
+freeze original ranks, sources, packet/analyzer/protocol and prior reports.
+Both independent r58 packet reviews completed: selection/blinding/analyzer checks pass. Astra caught an actual visible-brief omission; Fable did not identify it. Root fixed it before showing cards. Sources
+remain overlapping development archives; Kevin's proxy choices are not verified
+independent project-owner identities. No new API charge; budget remains known
+$0.204043064 + reserved $0.866048, unencumbered $3.929908936. Evidence:
+`reader-pair-root-decision-r57.json`, both r56 reports, ownercomparison r57
+protocol/public/private/html/analyzer/tests/freeze. PR remains draft.
+
+#### Corrected owner presentation r59 — ready for choices
+
+Original r57 embedded all supplied product fields but its visible brief omitted
+`does_not`. Astra caught missing Scarlett WhatsApp/GoogleCalendar requirements,
+MXN pricing/no-free-plan and Grenseo no-automatic-publishing/no-free-plan. Before
+any real choice/publication, root preserved r57 and made a presentation-only r59
+correction: every supplied product field is displayed, absent/empty fields only
+skipped. Original78cards, IDs, source/product objects, private selection/shuffle,
+all131orders and metric logic unchanged; packet/storage/export version changes.
+Both r58 reviews concern original bytes; focused root equality/synthetic tests
+and desktop/mobile/all-five-full-brief DOM checks verify amended presentation.
+No source/model/score retrieval or owner choice was generated. Zero choices;
+choices must come from Kevin, not a model pretending to know his preferences.
+
+Corrected artifact `owner-comparison-r59.html` with local choice export,
+`OWNER_DISPLAY_AMENDMENT_R59.md` and14artifact input freeze. Freeze SHA256:
+`0b9500c8018f7bdc2724414edb4df21b3aa3ce5ad91ba5d7d9aacd52fddebd19`. No additional API spend; budget unchanged. Current age/fit
+facts remain supplied archived information, not freshly verified product claims.
+Source/ranking/utility remain unvalidated at this historical checkpoint; PR draft.
+Owner choices are optional preference calibration, not a gate on further
+independent model-based evaluation (see r60 below).
+
+#### Independent graded model evaluation r60 — owner review is optional
+
+Kevin explicitly authorized continuing model-based evaluation instead of making
+him label the packet. Astra and Fable independently judge the same 78 archived
+cards without ranks, scores, earlier per-card labels or each other's judgments.
+The existing three-arm top-ten union (68 cards) plus ten seeded below-ten cards
+is unchanged; all supplied product facts and limitations remain available.
+The rubric is Strong / Plausible / Weak / Not opportunity / Insufficient,
+with separate proxy Save / Investigate / Reply / Skip / Not sure actions.
+Personal/community/free/basic use remains potentially useful, not an automatic
+negative. These are model judgments, never owner choices or conversion proof.
+
+The fixed protocol reports each original arm's graded/action top-ten and top-three
+composition per project, with disagreements visible. Auxiliary ordinal weights
+3/2/1/0 and unknown intervals are illustrative evaluation units, not calibrated
+value or public lead scores. Candidate wins require beating both baseline
+upper bounds without a project decline under both reviewers; no averaging away
+disagreements or post-output rule changes. Existing failed r32 and task-frame
+experiments remain rejected unless new evidence specifically supports otherwise.
+
+Initial packet/protocol/eight input hashes were frozen before labelling. The
+comparison implementation was authored before returned labels but its separate
+hash addendum was recorded after Astra completed, before root inspected label
+content or computed rank comparisons. Mechanical validation covers all 78 IDs,
+matching projects, bounds and exact supplied excerpts; this does not certify
+semantic entailment. Synthetic checks cover unknowns, ties, adverse reviewer
+judgments and achievable wins. Astra's 78-card output passes the mechanical
+check; Fable remains active. No comparative result is claimed yet. Root does not
+unblind ranks for analysis until both completed label sets are preserved.
+
+No fresh X scans, production/config/DB writes, outreach or scoring API purchases.
+Same budget: $0.204043064 known receipts plus $0.866048 reserved unknown charges,
+$3.929908936 unencumbered under the $5 cumulative scoring cap. T3 review-account
+costs are not invented or included as scoring API receipts. Artifacts:
+`MODEL_ATTENTION_PROTOCOL_R60.md`, public packet, both freeze files, analyzer,
+synthetic checks and separate model label/validation files in ignored evidence.
+
+#### Actual graded model comparison r60; root review r61
+
+Both independent 78-card outputs are now preserved at hashes Astra
+`1a29e0d8dbdfc2df53e2db7ff03515e7b94fc756aeb669b04e569bae7cbd73ed`
+and Fable `ad97f10b66594823edd3a8932da954635aea42e2438525b84ba3be7ffccb3503`.
+Coverage/project/enum/bound/exact-excerpt validation passes, then ranks unblinded.
+No label altered to settle a disagreement. Actual comparison tests pass;
+Astra independently recomputes the saved output exactly in completed r61 audit.
+
+| Reviewer | Baseline A Strong+Plausible / 50 | Baseline B | Rejected r32 revision |
+|---|---:|---:|---:|
+| Astra | 19 | 18 | 16 |
+| Fable | 13 | 13 | 12 |
+
+Strong counts unchanged (Astra7/Fable5); revision loses plausible cards. The
+frozen graded-win criterion fails under both reviewers; r32 remains rejected.
+Proxy attention counts are Astra35/35/30 and Fable19/19/16, but12 Weak/Weak
+cards have AstraSave/FableSkip: different attention policies, not calibrated
+value. Exact grade agreement56/78,19 adjacent differences,2 two-level differences,
+0 three-level,1 involving unknown; action agreement50/78. No averaging into
+fake certainty. This compares an experimental scorer with cached controls,
+not a production/UI functionality test or general live discovery performance.
+
+Root/source review qualifies frozen rationale errors: duplicate Scarlett
+Helpin wording does not prove coordination/payment/authenticity; the generic
+Cal “you can dump Calendly” does not establish the author's completed switch;
+Clipy competitor membership does not establish Mac support; Grenseo page-read
+tracking does not prove causal answer attribution. Fable's11 Tally non-opportunity
+labels are not11 form respondents (some are publishers/business discussion).
+Intake pain and basic recording remain valid conditional opportunities; no
+new procurement-only or human-review gate. Original labels stay intact.
+
+Astra proposes the next distinct hypothesis: direct-source listwise ordering
+of exactly these78 cards, two input permutations across allfiveprojects,
+no scores/ranks/labels/diagnosticframes supplied. Original restricted controls
+retain their full firsttens. This isolates a selected-pool representation probe,
+not full131/415 coverage or unseen validation. A new pre-output protocol can
+use paired difference intervals so a shared unknown cancels when selected
+identically; do not rewrite r60's conservative separate bounds or failed verdict.
+Both reviewers' paired aggregate lower must improve, no project decline, against
+both controls in both complete input-order runs. Input-order changes also include
+ordinary model variation, not isolated position-bias causality.
+
+Both actual-result r61 reviews are complete and reproduce the saved results.
+Root corrects review overclaims: Astra Grenseo+1 utility disproves a blanket
+“not better anywhere”; Fable Tally+1 versus baselineA, tie versusB; genericCal
+advice ISin top10 at10/10/5 despite Fable review saying absent. None changes
+the failed aggregate verdict. Fable favors full131+53extra labels; root selects
+Astra's bounded78probe first, avoiding missing-reference uncertainty.
+
+Concrete r62 protocol/tenrequest plan prepared with full productbrief, fresh
+opaque handles, unchanged bounded text/bio/context/date; explicit author/URL
+metadata withheld and masking disclosed. Paired unknown criterion specified
+before outputs. Whole-pool rank-stability thresholds remain a pre-output
+design question because weak/nonopportunity ties can reorder without changing
+usefulness. Astra implements the offline harness/meaningful zero-paid fixtures;
+Fable exact-design r63 review is active. No new scoring purchase. Candidate's conservative Lite reserve$0.360448
+cannot fit a ten-cent HARD exposure ceiling. Proposed$0.47 local exposure and
+$0.10 recorded-spend STOP are separate; a call could cross that stop threshold.
+Actual cost-effectiveness unmeasured. No freshX/production/config/DB/outreach/
+merge/deploy. Same cumulative$5 budget unchanged. Artifacts: both r60 model
+labels/reports/freezes, results, rootdecisionr61, Astra actualreviewr61 and
+interactive result HTML, LISTWISE_PROTOCOL_R62.md, prepare-listwise-r62.py,
+listwise-plan-r62.json and live catalog artifact in ignored evidence. Owner
+choices remain optional.
+
+#### Pre-purchase listwise amendment r64 — same bounded hypothesis
+
+Fable's completed r63 design audit verifies source/control/request hashes and
+flags output-cap risk: allowed rationales/quotes can exceed4000tokens. Root
+preserves original proposal/implementation/test bytes and raises cap8192 before
+any output. Exact ten-request diff verifies ONLYmax_tokens changes; messages,
+rubric, full productfacts, boundedsource andpriceguards identical. Published
+full-context/max-output conservative reserve remains$0.360448, localexposure
+$0.47, settledspendSTOP$0.10, same$5cumulative cap. No ten-centbillguarantee.
+
+Stability now concerns graded evidence rather than arbitrary weak-card order:
+at most1 known two-or-more-level grade flip/project and3overall acrossorders;
+positive-setJaccard>=.5 only when union>=3. Unknown transitions remain unknown;
+whole-pooltau/toptenoverlap diagnostic only. These are preregistered experimental
+consistency guards, not validated user-value thresholds. Identicaltext/bio/context
+Helpinpair's within-call grade/actionsplit prevents auditedsuccess;24minute
+snapshot timestamp difference is not a material coarse-gradefact. Different
+metadata duplicates are not automatically equaljudgment. Separate source audit
+still needed; exact quotes cannot establish semanticentailment.
+
+The selected-pool oracle ceiling is low, computed from frozen references before
+outputs, not new candidate results. Fable Clipy cannot improve known ordinal
+utility. Fable Cal's maximum known gain1 is smaller than the[-3,0] uncertainty
+penalty from excluding its unknown-destination card. Therefore a blockedhurdle
+can reflect missing knowledge, not proven worsejudgment. Predeclared descriptors:
+robust improvement only if bothseed/bothreviewer/bothbaseline pairedhurdlespass;
+complete known no-loss/tie is not a win or statisticalnoninferiority;
+unknown-straddling results uncertainty-limited; knownnegativebounds reference
+loss; budget-stopped incomplete is NOTcandidatefamilyfailure. No post-output
+retuning or unknownfill. These ceilings apply onlyselected78, notfull131/415.
+
+Astra's original r63 offline implementation passed34fake-fetch executor and
+16synthetic analyzer checks, zeroactualcalls. It now harmonizes the8192 and
+stability amendments with fresh meaningfulfixtures; oldhashes/reviews not
+certification of changedbytes. Final source/private/reference/protocol/plan/
+prompt/catalog/helper/executor/analyzer/test/fixturereport hashes andallten
+requesthashes must be verified beforepurchase; catalog rechecked beforePOST.
+At that pre-purchase checkpoint there were no outputs or charges. The actual
+result follows; no fresh X, production/config/DB/outreach/merge/deploy changes.
+Owner review remains optional.
+
+#### Actual listwise Lite probe r64/r65 — stopped after one invalid output
+
+Fresh offline verification passed 36 executor and 29 comparison checks before
+the final freeze. The first Grenseo request then cost **$0.00322875**, returned
+16 rows, and completed normally (`stop`, zero reported reasoning tokens).
+It was not truncated. Output validation failed: extra card field, missing
+required positive evidence, a mistyped foreign handle, and a non-exact quote.
+The executor settled the receipt before rejecting the response and stopped
+without retries; the other nine requests were not purchased. Zero usable
+rankings means the five-project comparison remains incomplete, not a ranking
+win or proof that listwise ranking cannot work.
+
+Astra's independent actual-source audit verifies both freezes, exact request,
+receipt and journal. Correction to root's initial review brief: the non-exact
+quote normalized a double newline to a space; it did **not** invent the hardware
+excerpt or factual content. The citation contract still fails. Separately,
+“explicitly solves” overstates crawler-read-to-answer attribution. An agency
+bio can evidence ongoing citation work, so promotion or lack of an explicit
+shopping request does not disprove a conditional opportunity; “prime target”
+certainty remains unsupported. Do not introduce a procurement-only gate.
+
+Current cumulative budget: **$0.207271814 known receipts + $0.866048 reserved
+unknown charges; $3.926680186 unencumbered** under the same $5 overall cap.
+The cheap failed call is not a successful-ranking cost estimate. Raw output,
+errors, actual diagnostic and hashes remain preserved in ignored evidence;
+no near-matching handles, quote repair or relabeling. Astra recommends one
+unchanged higher-tier diagnostic, not resuming the batch. Fable's completed independent actual review reproduces the contract and billing
+findings and also recommends exactly one same-input higher-tier diagnostic.
+One pass or repeated failure cannot causally isolate reader capacity versus
+format. Its hypothetical scoring of rejected output is not an accepted result,
+and handle enums alone would not enforce exactly-once coverage. A new one-call
+harness is being prepared offline;
+no further purchase has occurred at this checkpoint.
+
+#### Actual same-input higher-tier probe r66 — partial compliance, still rejected
+
+Both completed r65 reviews recommended one unchanged Grenseo A call on Gemini
+3 Flash Preview. The new harness passed 45 meaningful offline checks, freshly
+rerun by root; all 34 original provenance hashes and exact request equality
+were verified. Only model and price guard changed. The final pre-purchase
+freeze covers 45 artifacts, including the unchanged source-audit criteria.
+No failed output, examples, reference grades or review advice entered the input.
+
+The single actual call cost **$0.0092835**, with 4,377 input / 2,365 output tokens,
+zero reported reasoning tokens and normal `stop`. It returned all exact handles,
+required fields and positive evidence, but failed three citation checks: two
+quotes join separated excerpts with ellipses; a third uses an exact phrase from
+`product.what_it_does` while attributing it to `product.capabilities`. Correction
+to root's initial actual-review brief: that third error is wrong-field
+attribution, not invented punctuation or factual content. Billing was settled
+before rejection, no new unknown reserve arose, and the one-call runner ended
+without retries. Zero accepted rankings; no full batch or ranking-win claim.
+
+This narrower error set does not causally prove a generic model-capacity or
+format bottleneck. Separately, the rationale treating a founder's forking advice
+as an opportunity to pitch an imagined audience may transfer audience need to
+the author. Publisher statistics do not prove the publisher's own unmet need;
+the supplied business bio can nevertheless support a conditional ongoing job.
+Source selectors could eliminate free-form quote transcription without curing
+these judgment issues. Independent Astra/Fable actual-source reviews are active
+before choosing the next distinct experiment. No further wording retry or
+mechanics-only success is being promoted to lead utility.
+
+Cumulative known receipts **$0.216555314**, historical unknown reservations
+**$0.866048**, remaining **$3.917396686**, same $5 overall cap. The two measured
+listwise calls together cost $0.01251225 and produced zero accepted rankings;
+neither measures scaled successful-ranking economics. Both original receipts,
+rejected outputs, exact diagnostics and freezes remain unchanged in ignored
+evidence. No fresh X, production/config/DB writes, outreach, merge or deployment;
+model evaluation continues without mandatory owner labels.
+
+#### Completed r68 source reviews and compact-ordering proposal r69
+
+Both actual-source audits verify the S receipt/request/freezes and identify
+material positive-rationale defects beyond transcription: audience-to-author
+need transfer on fork advice, and a publisher's statistical argument described
+as its own clear unmet need. An adjacent vendor or publisher can still have a
+conditional ongoing use; bio/context may establish genuine work. Do not turn
+this into a universal competitor/publisher/bio-only rejection rule. Fable's
+illustrative scoring of the invalid order is not an accepted protocol result,
+and cross-format order correlation is not unchanged-configuration stability.
+
+Root chooses Astra's compact output proposal over Fable's source-span selectors:
+the product job is graded ordering, while original text is already held for
+rendering and audit. Pinpoint evidence generation is not currently required.
+The new request returns only ordered handle/grade/action. Exact same Grenseo A
+source, product facts, input order, S model and rubric prefix; only the final
+output paragraph and strict schema change. Failed prior contracts stay failed,
+not repaired or relabeled. Output explanations are not invented afterward.
+
+The new one-call harness passes **53 meaningful offline executor checks**;
+the project-local comparison has **17 synthetic checks**, freshly rerun by root.
+Strict enums do not replace exactly-once coverage checks. Valid new output only
+can receive paired unknown-preserving metrics under both frozen reviewers
+against both baselines. Advance requires strictly positive lower bounds in all
+four comparisons AND independent all16 source/grade audit with no serious
+unsupported positive assignment. Reasonable adjacent ambiguity remains allowed;
+reviewers cannot infer absent model reasoning. A schema pass or tie is not a
+win. If no useful local signal appears, stop further Grenseo format variants
+and retain baseline, not declare universal architecture failure. Full five-
+project/two-permutation criterion remains unchanged and untested.
+
+The S actual freeze's historical ledger bytes are preserved as an immutable
+post-S snapshot; live accounting is not incorrectly pinned to its old hash.
+All52 immutable provenance hashes match. Same full reserve$0.720896, local
+exposure$0.83, known-spend stop$0.10 and cumulative$5 cap; no guaranteed bill
+or projected useful-output cost. No compact scoring call yet. Fable r70
+independent design review is active before final freeze/purchase. Current
+known/unknown/remaining totals are unchanged. No fresh X, production/config/DB,
+outreach, merge or deployment; owner review remains optional.
+
+#### Actual compact test r71 — feasible and inexpensive once, no local improvement
+
+Fable's completed r70 design review found no concrete blocker and reproduced
+both offline suites and preparation. Root's final pre-purchase freeze covers
+70 artifacts, including comparison code/tests/fixture reports and both loaded
+helpers. Correction to review wording: a rejected request without a finite
+receipt does not prove zero charge; the full unknown reserve would be retained.
+The comparison CLI requires an actual one-attempt execution and verifies the
+freeze, while explicitly synthetic fixtures use the pure test function.
+
+One real compact request returned all16 exact handles, valid grades/actions,
+no extra fields, normal stop and zero reported reasoning tokens. Receipt:
+**4,789 input / 403 output tokens, $0.0036035**, settled before validation.
+No retry, repair or new unknown charge. This is the first mechanically accepted
+listwise order, not a useful-ranking verdict. The legitimate new-order paired
+analysis gives **[0,0] versus each baseline under each reviewer**: four ties.
+Top-ten Strong/Plausible remains Astra4 and Fable2, same as controls. Independent
+all16 source/grade audits are active; no absent model rationale is reconstructed.
+
+The predeclared positive-local-signal rule therefore fails. **Stop further
+Grenseo format variants and do not buy a broad compact batch just because JSON
+works.** Retain the baseline. This one inspected near-ceiling project does not
+establish behavior on other projects, reject every listwise architecture, or
+prove a causal compactness benefit. No full five-project/two-order comparison,
+unseen generalization, owner preference or conversion claim.
+
+Current cumulative receipts **$0.220158814 known**, **$0.866048 historical unknown
+reservations**, **$3.913793186 remaining**, same overall$5 cap. The three recent
+listwise probes cost $0.01611575 combined. One valid compact receipt is a measured
+price point, not a scaled useful-ranking cost guarantee. New actual evidence
+uses an immutable post-compact budget snapshot, not a pinned live ledger.
+
+A zero-network cached-source census finds all78 judged posts in the415 archived
+snapshot. Longer raw text exists for23 selected posts (Cal4, Tally8, Clipy5,
+Grenseo3, Scarlett3); length alone does not establish a source superset because
+some supplied inputs combine self-thread text. No missing selected bio is already
+available within the same project's profile cache. Only three selected cards
+have additional same-author posts in that project cache; one Scarlett reply
+lacks supplied context. These are availability counts, not proof enrichment
+improves ranking. The next distinct experiment awaits the actual-source reviews;
+no fresh X, production/config/DB write, outreach, merge or deployment.
+
+Astra's completed r71 audit independently recomputes all four ties, verifies
+70+7 hashes and audits every assigned grade without reconstructing reasons.
+No serious unsupported positive is established from grades alone; categorical
+dismissals of existing own citation workflows/happy setups remain substantive
+undergrading concerns. Compactness did not cure judgment. It recommends a
+different Tally source-completeness pilot: eight longer raw texts reduce to
+three substantive omitted middles, while five differences are mostly mentions/
+punctuation. One omission describes the client's poor CPA form and separate
+document, NOT control of the CPA's tool. Another restores application-process
+constraints and a no-feedback-request statement; another is general founder
+discussion. These motivate information fidelity, not desired positive grades.
+
+Only data/protocol preparation is underway while Fable's actual r71 review
+completes. Any pilot retains the supplied combined self-thread and appends exact
+mapped originals separately; fresh rank-blind full-evidence model references
+must be frozen before candidate outputs, preserving old references unchanged.
+No new paid call, relabeling of prior evidence or broader batch has occurred.
+
+#### Tally compact r73 — prepared protocol, followed by actual outcome below
+
+Fable's completed r71 audit independently reproduces the accepted compact
+receipt, 70+7 hashes, all four ties and grade assessments. Both reviewers
+support the Grenseo stop and flag existing-workflow false-negative concerns.
+Root selects Fable's unexpanded Tally A/B diagnostic before Astra's prepared
+source-completeness alternative; Astra agrees this preserves the simpler
+source/reference question. Tally has more measured reference headroom than
+Grenseo. Seven of baseline A's ten are Not opportunity under both references
+(with another Not opportunity under Fable); this is a selected-development
+opportunity to test ordering, not a general quality estimate.
+
+The source-completeness data/protocol package is exact-source verified and
+unbought/unlabelled. It is not an automatic next purchase. The new Tally
+compact plan preserves both original source strings/input orders, full facts,
+compact rubric, model and controls. No full-text append, score/label/example,
+desired-card hint or changed eligibility rule enters the scorer. Root verifies
+all78 immutable provenance hashes and both request identities. Pre-purchase
+offline checks passed: **63 executor + 22 comparison fixtures**, zero candidate
+calls at that checkpoint (two input-position diagnostic checks added before
+the final freeze).
+
+Only two sequential physical requests maximum under one journal/lock and
+phase-wide exposure cap; first unknown/invalid stops before B, accepted A is
+preserved if B fails. Same cumulative$5 approval, known floor$0.220158814,
+unknown floor$0.866048, full reserve$0.720896, local exposure$0.83 and recorded
+stop$0.10. No per-call renewal or guaranteed price. Independent Fable r74 design
+review completed without blockers before root's final freeze/purchase.
+
+Each complete permutation must have positive paired lower bounds versus both
+baselines under both frozen reviewers (eight comparisons). Grade stability:
+maximum1 known two-level change, known-positive Jaccard>=.5 only when union>=3;
+unknown transitions separate. Independent all16 source/grade audits in each
+order consider material positive AND negative mismatches without inventing
+reasons. No tax-preparer-specific promotion requirement, respondent quota or
+weak-card rank-overlap gate; those overfit inspected examples or harmless
+reshuffling. A complete non-pass stops this unexpanded Tally branch and retains
+baseline, not rejects all listwise approaches. Incomplete budget/billing stops
+are not hypothesis failure. A pass is one-project provisional evidence, not
+automatic full-batch spending, production integration or unseen/conversion proof.
+
+#### Actual Tally r73 / independent r78 audit — ordering gain, full failure
+
+Both physical calls completed for **$0.007913 total** ($0.0039565 each), with
+known receipts and no new unknown reservation. Both return all16 exact
+grade/action records; no quotes, repair, retry or fallback. All eight paired
+ordering comparisons pass: Astra +4 versus each baseline in each permutation;
+Fable +3 versus A and +2 versus B in each permutation. Grade stability also
+passes: no two-level flips and positive-set Jaccard5/7. These remain frozen
+model-proxy ordering gains on selected archived development posts.
+
+**Full source-audited success fails; retain baseline and stop this unexpanded
+Tally compact branch.** The first Astra audit and a fresh source-first Astra
+audit independently reject unsupported Strong assignments: another actor's
+workflow, category commentary and a completed replacement are not established
+strong author opportunities. The fresh reviewer also disputes several
+Plausible assignments; adjacent boundary disagreements are explicit, not
+forced into consensus. Both consider all32 assignments and establish no
+decisive material negative in these observed outputs. This is not a future
+license to suppress uncertainty or basic/community usefulness.
+
+There is only one Astra-reference Plausible and no Fable-reference
+Strong/Plausible in the candidate top10. The measured gain mainly substitutes
+Weak for Not opportunity; it is not a useful good-lead shortlist, improved
+retrieval, adoption or conversion proof. Original analysis/freezes stay intact;
+the separate root closure records full failure without rewriting their pending
+audit fields.
+
+Fable's design review is complete, **but no actual Tally Fable audit completed**:
+two configured Claude accounts ended in rate limits and the Cursor provider
+ended in “Provider turn failed.” All terminal results were read, with no pending
+child runs. Bounded retries stop; these errors contain no quality verdict and
+do not replace frozen Fable references. Current scoring budget is
+**$0.228071814 known + $0.866048 historical unknown reservations**, leaving
+**$3.905880186** under the cumulative$5 approval. Review-account costs are not
+represented as scoring receipts.
+
+Evidence in the ignored folder: `tally-compact-analysis-r73.json`, immutable
+actual diagnostic/freeze r75, original Astra actual r75, fresh independent
+`tally-source-independent-astra-r78.md`, and root closure r78.
+
+#### One independent ordinal-grade experiment r79 — protocol and incomplete attempt
+
+The fresh Astra review supports one bounded test of grade/action assessment
+without a comparative-order objective. Same16 unexpanded sources, complete
+product facts and verbatim grade/general-condition rubric; one deterministic
+shuffle and fresh opaque handles. No prior grades, ranks, reference labels,
+critiques, corrected examples or case-specific hints enter the grader. Earlier
+relative orders remain fixed privately; output must preserve supplied input
+order. No numeric public score or positive quota, and no first-person/purchasing
+gate. Same model/settings/provider-price controls, one POST maximum with full
+reserve, exclusive journal/global lock and no repair/retry/fallback.
+
+Require clean independent all16 source audit for material unsupported positives
+**and negatives**, plus four strict all16 ordinal-error improvements: each
+frozen reference versus each prior A/B grade vector. Positions3/2/1/0 are an
+evaluation convention, not measured cardinal utility. Unknowns use paired
+intervals with shared reference uncertainty; upper new-minus-old loss must be
+negative in every comparison. Action disagreement is diagnostic. All-Weak is
+not a count-based failure, but unsupported collapse still fails source audit.
+
+Offline **73 executor + 38 analyzer checks** pass, including all125 grade triples.
+Exact independent implementation/design review resolved a release-gate omission;
+the runner now requires fresh analyzer fixtures and the actual review/root
+decision. All120 pre-output hashes were bound and dry readiness passed before
+the single POST. Success could establish
+only a grade-layer improvement, not a new ranking win, repair of the failed
+experiment, unseen/owner/conversion proof or production rollout. Nonsignal,
+uncertainty or failure stops this one-shot branch without tuning until it passes.
+
+**Actual attempt: incomplete, no grade-quality verdict.** Google returned HTTP400
+`INVALID_ARGUMENT` through OpenRouter, without usage/cost or model grades. The
+executor correctly stopped after exactly one POST, retained the full
+**$0.720896 unknown-cost reservation**, and did not retry, repair or fall back.
+All four comparisons remain unset; no source audit can assess nonexistent
+output. This is not a semantic failure or evidence that independent grading
+does not work. The frozen request remains unmodified and the branch is stopped.
+
+An offline exact comparison finds unchanged model/settings/provider controls and
+schema structure; changed messages, schema name and opaque handle strings/order.
+The generic error does not identify a cause. Longer handle strings or schema
+complexity are hypotheses, not established causes. No fresh attempt follows
+merely because a shorter schema seems plausible.
+
+Current cumulative scoring ledger after this attempt: **$0.228071814 known +
+$1.586944 reserved unknown**, leaving **$3.184984186** under the same cumulative
+$5 cap. No bill is inferred as zero from an error or an absent receipt. Seven
+immutable actual-snapshot hashes preserve the request/error, journal, execution,
+analysis and post-attempt ledger snapshot. Root keeps live ledger outside all
+freezes. Evidence: `cardinal-grades-actual-diagnostic-r81.json`, actual freeze r81,
+and completed design review r80, actual Astra review r81 and root closure r81 in
+the ignored folder. The actual review verifies all120+7 hashes, independently
+recomputes incomplete comparison fields and identifies no causal request field.
+
+Root followed through on read-only transport diagnosis. Official generation
+metadata/content requires a generation ID that the retained error lacks;
+response headers were not saved, so no header-only correlation can be recovered
+from this attempt. Aggregate completed-day analytics is not per-attempt proof.
+The configured Aside preview is unavailable in T3 mode; a bounded native default
+profile check reached OpenRouter Sign In, not logs, and its new tab was closed.
+No install/login/account change, external message or new model POST was made.
+Present accessible evidence cannot identify the invalid field or reconcile its
+bill. Future transport work needs new field-specific/correlation/billing
+evidence, not a renamed prompt retry. No app/ranking/production change follows.
+
+#### r82 — rejection diagnosed; grading moved to subscription models
+
+**Cause of the r79 400.** Reproduced with a 441-character dummy prompt and the
+same schema, so the lead content was not involved. Gemini rejects the schema
+when sixteen 21-character handle enums are combined with `minItems`/`maxItems`
+16; dropping the enum, dropping the count, or 9-character handles each passed
+(about $0.005 total). This is consistent with Gemini's structured-output
+complexity limit. Replaying the exact frozen request left the key's usage
+counter unchanged after 60 s, so rejected calls are not billed and the r79
+$0.720896 hold was in practice $0 (shared key, so strong evidence, not a receipt).
+
+**Grading no longer uses paid API models.** Experiments run on Opus 5.5, Fable
+5.1 and GPT-6 Astra as subagents, which are free on subscription and stronger.
+Each got the frozen r79 system and user messages verbatim (`brief.md`), blind to
+every other file. Total ordinal error over the 16 Tally sources (0–3 scale):
+
+| Grader | vs Astra r60 ref | vs Fable r60 ref | Strong / Plausible / Weak / Not |
+| --- | --- | --- | --- |
+| Opus 5.5 (independent of both refs) | 2 | 2 | 0 / 0 / 5 / 11 |
+| Astra | 2 (self) | 4 | 0 / 1 / 3 / 12 |
+| Fable 5.1 | 3 | 3 (self) | 0 / 1 / 4 / 11 |
+| Old Gemini compact A (r73) | 16 | 16 | 3 / 4 / 4 / 5 |
+| Old Gemini compact B (r73) | 11 | 11 | 1 / 4 / 5 / 6 |
+
+The two references disagree with each other by 2, so Opus is at the reference
+noise floor. The r78 "strength labels overclaim" finding was the Gemini grader
+calling weak leads Strong/Plausible; frontier graders do not. Scope: development
+evidence on one project's 16 archived sources, model-proxy references, not owner
+preference or conversion. Evidence: `subagent-grades-r82/` and `probe-r82/` in
+the ignored folder.
+
+#### r83 — full-pool blind grading: the ranker helps; the pool is the bottleneck
+
+Opus 5.5 and GPT-6 Astra (subscription subagents, $0) each graded all 415 archived
+posts blind with the r79 rubric, in 28 shuffled single-project batches built with the
+app's own `candidateState`. They agreed exactly on 336/415; 6 disagreements exceed one
+level. Consensus positive (both Strong/Plausible): **14**; consensus Not: 286.
+
+| Project | Posts | Consensus positives | In top 10, #131 | In top 10, old order |
+| --- | --- | --- | --- | --- |
+| Cal.com | 103 | 2 | 2 | 1 (old list has 7 rows) |
+| Tally | 114 | 0 | 0 | 0 |
+| Clipy | 137 | 10 | 9 | 6 |
+| Grenseo | 31 | 2 | 2 | 1 (old list has 3 rows) |
+| Scarlett | 30 | 0 | 0 | 0 |
+| **Total** | 415 | 14 | **13** | **8** |
+
+- No project loses a first-page positive. Every project with positives has them at
+  ranks 1–2 (Clipy 1–9). Tally's and Scarlett's top posts are consensus Not, but all sit
+  below the .4 divider (max priority .10 and .36), so they show as "Weaker match".
+- The one buried positive (Clipy, rank 112) has no cached Jev evidence at all: a
+  missing-evaluation case, not a formula error.
+- Cached Jev fields separate cleanly: mean priority .359 for positives vs .010 for
+  consensus Not; own_need .75 vs .23; expected intent 2.83 vs 0.80.
+- The .4 divider is conservative: 6 consensus positives sit between .2 and .4. Not
+  retuned here (would be fitting to these five projects).
+- **Bottleneck is retrieval:** 14 of 415 posts (3%) are worth showing, and two of five
+  projects have none. Ordering cannot fix that.
+
+Evidence: `full-pool-r83/` (batches, key, orders, labels, `scores.json`) and
+`plan-r83/` (three model plans and the combined plan) in the ignored folder.
+
+#### r84 — retrieval pilot: asking-about-a-rival and buyer words widen the pool
+
+**Where r83's positives came from:** request lanes 12 of 14, rival lanes 2, and diy
+and stack 0. Request lanes exist only on #131. Projects run 4–7 lanes against a
+30-page allowance, so the lane count, not the budget, limits breadth. Draft PR #134
+moves the request lanes to main, ordered first.
+
+**Live pilot, same window for both arms:**
+- Window: 2026-10-05 to 2026-10-12, five projects, up to 5 pages per lane.
+- Arm A: #131's lanes.
+- Arm B: A's rival, diy and stack lanes, plus:
+  - up to 4 request lanes from a new buyer-words `asks` slot, filled by Opus 5.5
+    from product facts only;
+  - six more request words;
+  - a **rival-request** lane: coined rivals AND request words.
+- Spend: X data $0.082 (81 search pages and 150 parent lookups). Graded blind by
+  Opus 5.5 and GPT-6 Astra on the subscriptions: 310 screened posts, 215 graded
+  identically.
+
+| Project | A good | B good |
+|---|---:|---:|
+| Cal.com | 0 | 1 |
+| Tally | 1 | 3 |
+| Clipy | 5 | 6 |
+| Grenseo | 2 | 3 |
+| Scarlett | 0 | 1 |
+| **Total** | **8** | **14** |
+
+B also improves precision: 5.4% of screened posts are good vs 3.7%. Both arms
+together found 15.
+
+- **The rival-request lane is the find:** it produced a good lead in 4 of 5 projects
+  from 33 screened posts, e.g. "Best self hosted open source calendly, cal?" and
+  "Google forms just wasn't working… suggestions". It accounts for B's only Cal.com
+  and Scarlett hits, a third of B's Tally hits and one of Grenseo's. It is deterministic
+  and needs no new model call.
+- **Buyer words help Tally:** "google form" gave 2 good leads (12 posts where at
+  least one grader said good). "online form" stays dead (0/35 in each arm).
+- **Dead or empty:** the scheduling-*, whatsapp-*, "ai search tracking" and
+  "ai rank tracker" request lanes.
+- **Against the pre-set bar:** the bar was B ≥ 2× A. B reached 1.75×, gained in 5/5
+  projects and lost one A-only post (the "form builder" lane). So the result is
+  directional; counts are around 10, where one post moves any number.
+
+**Next:** add the rival-request lane to PR #134 (no model or cost change, under a
+cent a day). Treat the `asks` slot as a separate step: it changes the seeds prompt.
+Dropping diy and stack still waits for more evidence.
+
+Evidence: `search-r84/` (brief, three plans, combined plan, `asks/`, `lanes.json`,
+`raw/`, `results.json`, `purchases.jsonl`, batches, key, `raw-grades/`, `scores.json`).
+
+#### Historical r43 checkpoint (superseded budget; retained for provenance)
+
+Keep the conservative **$0.360448 pending reserve** inside a **$0.50 local hard
+exposure cap**. A separate **$0.10 recorded-spend stop** prevents another call
+once receipts reach it; this is not a guaranteed ten-cent total, because the last
+outstanding reserved response may cross that stop level. The same $5 cumulative
+cap and historical unknown reserves remain unchanged. No retry/reuse, stage-two
+purchase or production integration. After this first-stage formulation and at
+most one separately reviewed mapping formulation, recurring determinate errors
+end prompt tuning on these 24 inspected cases. No successful development pass
+would establish ranking value or owner preferences.
+
+At this checkpoint cumulative recorded scoring receipts are **$0.183936564**,
+plus unchanged **$0.145152 unknown-charge reservations**, leaving
+**$4.670911436 unencumbered** under the same $5 overall cap. No new uncertain
+charge occurred; no fresh X, DB/production/config, retrieval or display change.
+Evidence: `FRAME_AMENDMENT_R42.md`, both preserved purchase journals/freezes,
+`frame-execution-results-r40.json`, `frame-execution-results-r42.json`, and
+`frame-partial-analysis-r43.json`, `frame-closure-r43.json`, completed
+`fable-frame-smoke-r43.md` and proposal `FRAME_NEXT_DESIGN_R44.md` in the ignored
+folder, plus r45 source-only protocol/plan/routing/fixtures/freeze. Pending
+reviews are not represented as approvals.
+
+The previously proposed **2026-10-10 06:00 UTC–2026-10-17 06:00 UTC** freeze is invalidated by this version change after its start. Do not use that date with the new ranker to call an overlapping comparison frozen or unseen. All iteration replays remain development evidence. Before inspecting a subsequent corpus, freeze the final ranker hash, version, .4 floor, seed, and a new chronological window that starts after the freeze. No replacement window is scheduled or declared independently unseen here.
+
+1. Export the next same-format local audit snapshot on the five existing projects. No run is scheduled or new spending authorized by this document. If comparing scout retrieval too, keep its budget and pool provenance separate; $.153 was an observed past experiment, not a guaranteed future cost.
+2. Run the offline CLI with `--validation-after <new-frozen-window-start>`. It rejects earlier included posts. This date check **does not prove nobody has seen them**; record prior inspection and author/thread overlaps separately.
+3. The packet interleaves old group order and new ranked order with deterministic seeded starting sides, deduplicating posts/authors. Hide attribution until choices are collected. Review the first ten per project and then skim remaining posts for misses. Do not equate interleaving credit with a directly measured standalone precision@10; separately report each ranker's retained top-ten positions against the choices.
+4. Optional preference calibration: record actual project-owner preferences and Kevin's proxy choices separately. Mark Save / Investigate / Reply / Skip. Independent model judgments can evaluate provisional ranking usefulness without waiting for these choices, but do not stand in for anyone's personal preferences or measure conversion.
+5. Report useful choices in the displayed ten, first useful rank, useful cards below the floor/outside ten, duplicate reduction and review time. Count scout-only useful opportunities separately from ordering recovery. Missing/unreviewed choices are unknown, not skips.
+6. Decision rule: if independently found/missed useful opportunities exceed the ordering recovery, prioritize retrieval. If coverage misses are near zero and owner usefulness improves, keep the simple ranking and stop adding ranking machinery. Do not call an ambiguous/tied comparison a win. A single small week is directional, not statistical assurance.
+7. Track actual conversations and adoption later; they are different outcomes from willingness to investigate.
+
+The packet/protocol are prepared. **No unseen corpus has been collected or owner review completed yet.** Owner review is optional, not required for continued iteration. The PR stays draft; model-based provisional usefulness, unseen generalization and actual conversion remain distinct outcomes.
+
+## Inspecting the actual app locally
+
+Use an isolated local preview database populated from the frozen snapshot, not an empty real project. Start `next dev` with `LURK_X_PREVIEW_ONLY=true`, `X_LEADS=true` and `RUN_SCHEDULER=false`; leave retrieval/model/email keys blank. Do not change `.env` or point this preview at production.
+
+The development-only flag suppresses the X tab's start-on-open, rejects its Scan now action before queueing or charging an allowance, hides the scan button/status, and labels the page as archived data. It does not affect production. The regular project picker, date/status filters, ranked reader, styling and detail pane still work.
+
+The Oct 9 local preview uses a separate database with all 415 archived candidate evaluations across five copied projects; no original project or frozen audit row is replaced. Verify its jobs, X runs and usage tables remain empty after opening/selecting/refreshing. This is UI verification, not fresh lead-quality validation.

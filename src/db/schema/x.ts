@@ -143,7 +143,7 @@ export const xLanes = pgTable(
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    /** rival, diy (build-vs-buy) or stack (workflow); see src/lib/x/lanes.ts. */
+    /** rival, request, diy (build-vs-buy) or stack (workflow); see src/lib/x/lanes.ts. */
     family: text("family").notNull(),
     /** The rivals a lane covers; empty for a stack lane. */
     seeds: text("seeds").array().notNull(),

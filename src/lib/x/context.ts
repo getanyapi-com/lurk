@@ -82,7 +82,8 @@ async function walk(
     next = parent.inReplyToId;
   }
   return {
-    replyingTo: others.map((parent) => `@${parent.authorUsername}: ${ownWords(parent).slice(0, PARENT_CHARS)}`),
+    // A UTF-16 slice can split an astral character; PostgreSQL JSON rejects the lone surrogate.
+    replyingTo: others.map((parent) => `@${parent.authorUsername}: ${ownWords(parent).slice(0, PARENT_CHARS).replace(/[\uD800-\uDBFF]$/u, "")}`),
     parents: others,
     selfThread,
     chainIncomplete,

@@ -7,6 +7,7 @@ import { markThreadReplied, reopenThread } from "@/lib/handled";
 import { requireXProject } from "@/lib/owned";
 import { pressForJob } from "@/lib/throttle";
 import { openX } from "@/lib/x/open";
+import { xPreviewOnly } from "@/lib/x/preview";
 import { markLanesDue } from "@/lib/x/run";
 import { setXLeadStatus, xLeadConversation } from "@/lib/x/write";
 
@@ -16,6 +17,7 @@ import { setXLeadStatus, xLeadConversation } from "@/lib/x/write";
  * so a prefetched link buys nothing.
  */
 export async function openXAction(projectId: string) {
+  if (xPreviewOnly()) return;
   await requireXProject(projectId);
   if ((await openX(projectId)) !== "none") {
     kickScheduler();
@@ -28,6 +30,7 @@ export async function openXAction(projectId: string) {
  * budget. The press is taken first, so a refused press changes nothing.
  */
 export async function scanXNowAction(projectId: string) {
+  if (xPreviewOnly()) throw new Error("Scans are disabled in the saved-data preview.");
   const { user } = await requireXProject(projectId);
   await pressForJob(user.id, "x_scan_now", "x_scan", projectId);
   await markLanesDue(projectId);

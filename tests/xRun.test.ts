@@ -41,6 +41,20 @@ vi.mock("@/lib/anyapi", async (importOriginal) => ({
 
 const HOUR = 3_600_000;
 
+describe("audit backfill validation", () => {
+  it("rejects unbounded or malformed limits before starting a scan", async () => {
+    const { runXScan } = await import("@/lib/x/run");
+    for (const backfill of [
+      { windowHours: Infinity, pagesPerLane: 10 },
+      { windowHours: 0, pagesPerLane: 10 },
+      { windowHours: 168, pagesPerLane: Infinity },
+      { windowHours: 168, pagesPerLane: 0 },
+      { windowHours: 168, pagesPerLane: 1.5 },
+    ]) await expect(runXScan("no-project", null, backfill)).rejects.toThrow("audit backfill requires");
+    expect(search).not.toHaveBeenCalled();
+  });
+});
+
 /** A rival name no other test, or test file, searches for, so no paid page is shared between them. */
 function uniqueRival(): string {
   const letters = Array.from({ length: 8 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");
@@ -75,12 +89,13 @@ function page(items: Item[], nextCursor: string | null = null) {
 }
 
 type Page = ReturnType<typeof page>;
-type Family = "rival" | "diy" | "stack";
+type Family = "rival" | "request" | "diy" | "stack";
 
 /** Which family a query sent to X belongs to, from the words lanes.ts binds each to. */
 function familyOfQuery(query: string): Family {
   if (query.includes(" min_faves:")) return "stack";
   if (query.includes('"vibe coded"')) return "diy";
+  if (query.includes('"looking for"')) return "request";
   return "rival";
 }
 
@@ -278,6 +293,22 @@ describeDb("the X pipeline against a database", () => {
       .from(schema.jobs)
       .where(orm.and(orm.eq(schema.jobs.projectId, projectId), orm.eq(schema.jobs.kind, kind), orm.isNull(schema.jobs.startedAt)));
   }
+
+  it("stores truncated parent context without splitting an astral Unicode character", async () => {
+    const rival = uniqueRival();
+    const { project } = await fixture([rival]);
+    const parent = item("x".repeat(599) + "𝚗", { authorUsername: "otherperson" });
+    const reply = item(`Looking for an alternative to ${rival}`, { isReply: true, inReplyToId: parent.id });
+    serve("rival", page([reply]));
+    tweet.mockResolvedValue({ output: { found: true, data: { ...parent, authorHandle: "otherperson" } }, costUsd: 0.00022 });
+    await openX(project.id);
+    await run.runXScan(project.id, null);
+    const [evaluation] = await db().select().from(schema.xEvaluations)
+      .where(orm.and(orm.eq(schema.xEvaluations.projectId, project.id), orm.eq(schema.xEvaluations.tweetId, reply.id as string)));
+    expect(evaluation.context).toMatchObject({ replyingTo: ["@otherperson: " + "x".repeat(599)] });
+    const [scan] = await db().select().from(schema.xRuns).where(orm.eq(schema.xRuns.projectId, project.id));
+    expect(scan.partialReason).toBeNull();
+  });
 
   it("reads the last month on first open: screens, walks a reply's parent and judges it too, writes leads and books the next scan", async () => {
     const rival = uniqueRival();
@@ -793,11 +824,15 @@ describeDb("the X pipeline against a database", () => {
       .from(schema.xLanes)
       .where(orm.eq(schema.xLanes.projectId, project.id))
       .orderBy(schema.xLanes.rank);
-    expect(lanes.map((lane) => lane.family)).toEqual(["rival", "diy", "stack"]);
-    expect(lanes[1].body.startsWith(`(${rival} OR "booking page") ("vibe coded" OR`)).toBe(true);
+    expect(lanes.map((lane) => lane.family)).toEqual(["rival", "request", "diy", "stack"]);
+    expect(lanes[1].body.startsWith('"booking page" ("looking for" OR')).toBe(true);
+    expect(lanes[2].body.startsWith(`(${rival} OR "booking page") ("vibe coded" OR`)).toBe(true);
     // A lone generic word is dropped; the workflow lane asks for top-level posts with reach.
-    expect(lanes[2].body).toMatch(new RegExp(`^\\("claude code" OR .*\\) ${topic} lang:en -filter:retweets -filter:replies min_faves:20$`, "u"));
-    expect(search).toHaveBeenCalledTimes(3);
+    expect(lanes[3].body).toMatch(new RegExp(`^\\("claude code" OR .*\\) ${topic} lang:en -filter:retweets -filter:replies min_faves:20$`, "u"));
+    // The category query is shared across projects and may already be cached
+    // by another test; the three unique rival/topic queries still reach X.
+    expect(search.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(search.mock.calls.length).toBeLessThanOrEqual(4);
     const [state] = await db().select().from(schema.xProjects).where(orm.eq(schema.xProjects.projectId, project.id));
     expect((state.seeds as { slots: { topics: string[] } }).slots.topics).toEqual([topic, "app"]);
 
@@ -908,6 +943,29 @@ describeDb("the X pipeline against a database", () => {
     const [xRun] = await db().select().from(schema.xRuns).where(orm.eq(schema.xRuns.projectId, project.id));
     expect(xRun.replies).toBeGreaterThanOrEqual(1);
     expect(xRun.replyChecks).toBeGreaterThanOrEqual(2);
+  });
+
+  it("restores a held candidate's buyer score when its reply check fails", async () => {
+    process.env.OPENROUTER_API_KEY = "test";
+    const rival = uniqueRival();
+    const { project } = await fixture([rival], { brief: true });
+    const post = item(`reply-me: ${rival} could be cheaper, its pricing doubled again and I rebooked every client by hand today.`);
+    serve("rival", page([post]));
+    askJev.mockImplementation(async (call) => ({ ...answerAll(call),
+      same_kind: { type: "noul", noul: 0.8 }, intent: { type: "score", score: 1.45 },
+    }));
+    modelAnswers((call) => {
+      if (call.purpose !== "x_reply") throw new Error("no seed words here");
+      return worthy(false);
+    });
+    await openX(project.id);
+    await run.runXScan(project.id, null);
+    const held = (await evaluationsOf(project.id)).find((row) => row.tweetId === post.id);
+    expect(held).toMatchObject({ stage: "review", intent: 1, fit: 3 });
+    expect((held?.signals as { reply: { worth_reply: boolean } }).reply.worth_reply).toBe(false);
+    // Pre-check reply priority is 80+; a held buyer with intent 1 must not retain it.
+    expect(held?.score).toBeLessThan(70);
+    expect(await leadsOf(project.id)).toHaveLength(0);
   });
 
   it("checks at most the day's reply allowance, and nothing at all without a brief", async () => {
