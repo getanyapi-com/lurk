@@ -75,12 +75,13 @@ function page(items: Item[], nextCursor: string | null = null) {
 }
 
 type Page = ReturnType<typeof page>;
-type Family = "rival" | "diy" | "stack";
+type Family = "rival" | "request" | "diy" | "stack";
 
 /** Which family a query sent to X belongs to, from the words lanes.ts binds each to. */
 function familyOfQuery(query: string): Family {
   if (query.includes(" min_faves:")) return "stack";
   if (query.includes('"vibe coded"')) return "diy";
+  if (query.includes('"looking for"')) return "request";
   return "rival";
 }
 
@@ -793,11 +794,16 @@ describeDb("the X pipeline against a database", () => {
       .from(schema.xLanes)
       .where(orm.eq(schema.xLanes.projectId, project.id))
       .orderBy(schema.xLanes.rank);
-    expect(lanes.map((lane) => lane.family)).toEqual(["rival", "diy", "stack"]);
-    expect(lanes[1].body.startsWith(`(${rival} OR "booking page") ("vibe coded" OR`)).toBe(true);
+    expect(lanes.map((lane) => lane.family)).toEqual(["request", "rival", "diy", "stack"]);
+    // The request lane keeps replies: an ask is often a reply in someone else's thread.
+    expect(lanes[0].body).toMatch(/^"booking page" \("looking for" OR .*\) lang:en -filter:retweets$/u);
+    expect(lanes[2].body.startsWith(`(${rival} OR "booking page") ("vibe coded" OR`)).toBe(true);
     // A lone generic word is dropped; the workflow lane asks for top-level posts with reach.
-    expect(lanes[2].body).toMatch(new RegExp(`^\\("claude code" OR .*\\) ${topic} lang:en -filter:retweets -filter:replies min_faves:20$`, "u"));
-    expect(search).toHaveBeenCalledTimes(3);
+    expect(lanes[3].body).toMatch(new RegExp(`^\\("claude code" OR .*\\) ${topic} lang:en -filter:retweets -filter:replies min_faves:20$`, "u"));
+    // The request query is shared across projects and may already be cached
+    // by another test; the three unique rival/topic queries still reach X.
+    expect(search.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(search.mock.calls.length).toBeLessThanOrEqual(4);
     const [state] = await db().select().from(schema.xProjects).where(orm.eq(schema.xProjects.projectId, project.id));
     expect((state.seeds as { slots: { topics: string[] } }).slots.topics).toEqual([topic, "app"]);
 
